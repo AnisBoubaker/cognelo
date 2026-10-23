@@ -83,7 +83,7 @@ export function GradebookExportDialog({ target, onClose }: { target: GradebookEx
           </div>
           <p className="muted">{t("courseDetail.exportFinalGradesOnlyHelp")}</p>
           <div className="dialog-actions">
-            <button className="secondary" type="button" onClick={onClose}>{t("common.cancel")}</button>
+            <button className="secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.cancel")}</button>
             <button disabled={!fileName.trim()} type="submit">
               <AppIcon name="download" />
               {t("courseDetail.exportGrades")}

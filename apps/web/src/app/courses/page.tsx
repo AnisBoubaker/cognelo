@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { MarkdownRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -30,7 +32,7 @@ export default function CoursesPage() {
         {error ? <p className="error">{error}</p> : null}
         {canCreateCourses ? (
           <div className="section-actions">
-            <Link className="button" href="/courses/new">{t("courses.create")}</Link>
+            <Link className="button" href="/courses/new"><AppIcon name="add" /> {t("courses.create")}</Link>
           </div>
         ) : null}
         <section className="grid">

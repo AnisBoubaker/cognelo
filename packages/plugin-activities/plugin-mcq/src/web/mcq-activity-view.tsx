@@ -1,6 +1,6 @@
 "use client";
 
-import { isActivityContentClosedError } from "@cognelo/activity-ui";
+import { ActionIcon, isActivityContentClosedError } from "@cognelo/activity-ui";
 
 import { useApplicationTime } from "@cognelo/activity-ui";
 
@@ -762,6 +762,7 @@ export function McqActivityView({
               <p className="muted">{copy.generateHelp}</p>
               <div className="row">
                 <button type="button" disabled={generating || description.trim().length < 10} onClick={requestMcqGeneration}>
+                  <ActionIcon name="generate" />
                   {generating ? copy.generating : copy.generate}
                 </button>
               </div>
@@ -779,9 +780,11 @@ export function McqActivityView({
               </div>
               <div className="dialog-actions">
                 <button className="secondary" type="button" onClick={() => setShowReplaceGenerationDialog(false)}>
+                  <ActionIcon name="close" />
                   {copy.keepCurrentSource}
                 </button>
                 <button type="button" onClick={() => void generateMcqSource()}>
+                  <ActionIcon name="sync" />
                   {copy.replaceCurrentSource}
                 </button>
               </div>
@@ -1022,9 +1025,11 @@ export function McqActivityView({
             </div>
             <div className="dialog-actions">
               <button className="secondary" type="button" disabled={submitting} onClick={() => setShowSubmitConfirmDialog(false)}>
+                <ActionIcon name="edit" />
                 {copy.keepWorking}
               </button>
               <button type="button" disabled={submitting || submissionAvailability?.canStart === false} onClick={() => void submitMcqAnswers()}>
+                <ActionIcon name="submit" />
                 {submitting ? copy.saving : copy.confirmSubmit}
               </button>
             </div>
@@ -1152,9 +1157,11 @@ function McqStudentView({
       {parsedMcq.questions.length && !hideActions ? (
         <div className="row">
           <button type="button" disabled={disabled} onClick={onSubmit}>
+            <ActionIcon name="check" />
             {checkAnswersLabel}
           </button>
           <button className="secondary" type="button" disabled={resetDisabled} onClick={onReset}>
+            <ActionIcon name="refresh" />
             {resetLabel}
           </button>
         </div>

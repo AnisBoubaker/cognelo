@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { useServerNow, useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 
 
@@ -37,7 +39,7 @@ export function MyTeamsPanel({ courseId, groupId }: { courseId: string; groupId:
 
   return <section className="section stack my-teams-panel">
     <h2>{t("studentGroupings.myTeams")}</h2>
-    {error ? <div role="alert"><p className="error">{t("studentGroupings.myTeamsError")}</p><button type="button" className="secondary" onClick={() => void reload()}>{t("common.retry")}</button></div> : null}
+    {error ? <div role="alert"><p className="error">{t("studentGroupings.myTeamsError")}</p><button type="button" className="secondary" onClick={() => void reload()}><AppIcon name="refresh" /> {t("common.retry")}</button></div> : null}
     {loading ? <p>{t("common.loading")}</p> : groupings.length ? groupings.map((grouping) => <MyGrouping key={grouping.id} grouping={grouping} courseId={courseId} groupId={groupId} reload={reload} />) : <p className="muted">{t("studentGroupings.noMyTeams")}</p>}
   </section>;
 }
@@ -103,7 +105,7 @@ function MyGrouping({ grouping, courseId, groupId, reload }: { grouping: MyStude
       </section>;
     })}</div>
     {choiceEnabled ? <footer className="student-grouping-card-footer student-choice-footer">
-      {open ? <><p className="muted">{t(grouping.allowChoiceChanges ? "studentGroupings.changesAllowed" : "studentGroupings.choiceFinal")}</p><button type="button" disabled={!canConfirm || busy} onClick={() => void confirm()}>{t(busy ? "common.saving" : "studentGroupings.confirmChoice")}</button></> : null}
+      {open ? <><p className="muted">{t(grouping.allowChoiceChanges ? "studentGroupings.changesAllowed" : "studentGroupings.choiceFinal")}</p><button type="button" disabled={!canConfirm || busy} onClick={() => void confirm()}><AppIcon name="check" /> {t(busy ? "common.saving" : "studentGroupings.confirmChoice")}</button></> : null}
       {message ? <p role="status">{message}</p> : null}{error ? <p className="error" role="alert">{error}</p> : null}
     </footer> : null}
   </article>;

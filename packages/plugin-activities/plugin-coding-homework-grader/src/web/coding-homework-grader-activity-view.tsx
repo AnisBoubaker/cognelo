@@ -1,6 +1,6 @@
 "use client";
 
-import { isActivityContentClosedError } from "@cognelo/activity-ui";
+import { ActionIcon, isActivityContentClosedError } from "@cognelo/activity-ui";
 
 import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 
@@ -711,7 +711,7 @@ export function CodingHomeworkGraderActivityView({
           <h2>{activity.title}</h2>
           {loadingStudentAssignment ? <p>{copy.loading}</p> : <MarkdownRenderer markdown={studentAssignment?.assignment.promptMarkdown || activity.description} />}
           {studentAssignment?.assignment.promptPdf && activityFileUrl ? (
-            <p><a className="button secondary" href={activityFileUrl(studentAssignment.assignment.promptPdf.id)} target="_blank" rel="noreferrer">{copy.viewPdf}</a></p>
+            <p><a className="button secondary" href={activityFileUrl(studentAssignment.assignment.promptPdf.id)} target="_blank" rel="noreferrer"><ActionIcon name="open" /> {copy.viewPdf}</a></p>
           ) : null}
           {studentAssignment?.assignment.providedFiles.length && activityFileUrl ? (
             <div className="stack">
@@ -828,7 +828,7 @@ export function CodingHomeworkGraderActivityView({
               </label>
               <span className="muted">{assignmentPdf?.originalName ?? copy.noPdf}</span>
               {assignmentPdf && activityFileUrl ? (
-                <a className="button secondary" href={activityFileUrl(assignmentPdf.id)} target="_blank" rel="noreferrer">{copy.viewPdf}</a>
+                <a className="button secondary" href={activityFileUrl(assignmentPdf.id)} target="_blank" rel="noreferrer"><ActionIcon name="open" /> {copy.viewPdf}</a>
               ) : null}
             </div>
             {assignmentPdf && activityFileUrl ? (
@@ -854,6 +854,7 @@ export function CodingHomeworkGraderActivityView({
                   <div className="inline-actions" key={file.id}>
                     {activityFileUrl ? <a href={activityFileUrl(file.id)} target="_blank" rel="noreferrer">{file.originalName}</a> : <span>{file.originalName}</span>}
                     <button className="button secondary" disabled={deletingProvidedFileId === file.id} type="button" onClick={() => void deleteProvidedFile(file.id)}>
+                      <ActionIcon name="remove" />
                       {deletingProvidedFileId === file.id ? "..." : copy.removeProvidedFile}
                     </button>
                   </div>
@@ -998,6 +999,7 @@ export function CodingHomeworkGraderActivityView({
             </div>
             <div className="inline-actions">
               <button className="button secondary" disabled={loadingDocumentation} type="button" onClick={() => void loadDocumentationPreview({ notify: true })}>
+                <ActionIcon name="visible" />
                 {loadingDocumentation ? "..." : copy.preview}
               </button>
               <button
@@ -1006,6 +1008,7 @@ export function CodingHomeworkGraderActivityView({
                 type="button"
                 onClick={() => void createDocumentationSnapshot()}
               >
+                <ActionIcon name="snapshot" />
                 {creatingSnapshot ? "..." : copy.documentationSnapshot}
               </button>
               {authoringClient.extractDocumentation ? (
@@ -1015,6 +1018,7 @@ export function CodingHomeworkGraderActivityView({
                   type="button"
                   onClick={() => void extractDocumentationSources()}
                 >
+                  <ActionIcon name="extract" />
                   {extractingDocumentation ? "..." : copy.extractDocumentation}
                 </button>
               ) : null}
@@ -1324,9 +1328,11 @@ function ChallengeQuestionsPanel({
       {complete ? null : (
         <div className="inline-actions">
           <button className="button secondary" disabled={saving || submitting} type="button" onClick={onSave}>
+            <ActionIcon name="save" />
             {saving ? "..." : copy.saveDraft}
           </button>
           <button className="button primary" disabled={!allAnswered || saving || submitting} type="button" onClick={onSubmit}>
+            <ActionIcon name="submit" />
             {submitting ? "..." : copy.submitAnswers}
           </button>
         </div>

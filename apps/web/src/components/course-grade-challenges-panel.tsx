@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { useEffect, useState } from "react";
 import { ReviewAndGradeDialog } from "@/components/review-and-grade-dialog";
 import { api, type CourseGradebookRow, type GradeChallenge } from "@/lib/api";
@@ -119,6 +121,7 @@ export function CourseGradeChallengesPanel({ courseId }: { courseId: string }) {
                     type="button"
                     onClick={() => void openReviewAndGrade(challenge)}
                   >
+                    <AppIcon name="review" />
                     {reviewLoadingId === challenge.id ? t("common.loading") : t("courseDetail.reviewAndGrade")}
                   </button>
                 </div>
@@ -148,6 +151,7 @@ export function CourseGradeChallengesPanel({ courseId }: { courseId: string }) {
                         type="button"
                         onClick={() => void sendAnswer(challenge)}
                       >
+                        <AppIcon name="submit" />
                         {savingId === challenge.id ? t("common.saving") : t("courseDetail.sendChallengeAnswer")}
                       </button>
                     </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApplicationTimeProvider, useApplicationTime } from "@cognelo/activity-ui";
 import type { CourseTimeSettingsDto } from "@cognelo/contracts";
@@ -45,7 +47,7 @@ export function CourseTimeProvider({ courseId, children }: { courseId: string; c
   if (!user) return <AppShell>{null}</AppShell>;
   if (!settings || loadedIdentity !== identity) return <AppShell><main className="page stack">
     <p role={error !== null ? "alert" : undefined}>{error !== null ? error || t("timeSettings.loadError") : t("common.loading")}</p>
-    {error !== null ? <button onClick={() => { setError(null); setRetry((value) => value + 1); }}>{t("common.retry")}</button> : null}
+    {error !== null ? <button onClick={() => { setError(null); setRetry((value) => value + 1); }}><AppIcon name="refresh" /> {t("common.retry")}</button> : null}
   </main></AppShell>;
   return <CourseTimeContext.Provider value={courseValue}><ApplicationTimeProvider value={timeValue}>{children}</ApplicationTimeProvider></CourseTimeContext.Provider>;
 }

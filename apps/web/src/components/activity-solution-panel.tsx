@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { useState } from "react";
 import { CodeRenderer, MarkdownRenderer } from "@cognelo/activity-ui";
 import type { ActivitySolution } from "@cognelo/activity-sdk";
@@ -35,6 +37,7 @@ export function ActivitySolutionPanel({ courseId, groupId, activityId }: { cours
           <p className="muted">{t("activitySolution.tryFirstHelp")}</p>
           <div className="row">
             <button type="button" disabled={loading} onClick={() => void reveal()}>
+              <AppIcon name="visible" />
               {loading ? t("common.loading") : t("activitySolution.show")}
             </button>
           </div>

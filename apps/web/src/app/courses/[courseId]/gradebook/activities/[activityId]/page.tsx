@@ -943,16 +943,19 @@ export default function GradebookActivityResultsPage() {
             <div className="row wrap">
               {isSummativeActivity && activityActions.canRerunAutomaticGrading ? (
                 <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts || savingGradeKey === "__all:regrade"} type="button" onClick={() => void regradeAllRows()}>
+                  <AppIcon name="refresh" />
                   {savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll")}
                 </button>
               ) : null}
               {isSummativeActivity && activityActions.canAssessWithAi ? (
                 <button className="button secondary" disabled={savingGradeKey === "__all:ai-feedback"} type="button" onClick={() => void (activityActions.aiAssessmentChangesGrade ? openAiGradingBatchDialog() : generateAiFeedbackForAllRows())}>
+                  <AppIcon name="generate" />
                   {savingGradeKey === "__all:ai-feedback" ? t("common.saving") : t("courseDetail.generateAiFeedbackAll")}
                 </button>
               ) : null}
               {isSummativeActivity && activityActions.canReviewAndGrade && supportsAiFeedbackReview(activityTypeKey) ? (
                 <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts} type="button" onClick={() => void openFeedbackReview(groupedRows)}>
+                  <AppIcon name="review" />
                   {t("courseDetail.gradeAllManually")}
                 </button>
               ) : activityActions.canReviewAndGrade && hasRowsWithSubmittedAttempts ? (
@@ -960,10 +963,12 @@ export default function GradebookActivityResultsPage() {
                   className="button secondary"
                   href={manualGradingHref(courseId, activityId, groupId)}
                 >
+                  <AppIcon name="review" />
                   {t("courseDetail.gradeAllManually")}
                 </Link>
               ) : activityActions.canReviewAndGrade ? (
                 <button className="button secondary" disabled type="button">
+                  <AppIcon name="review" />
                   {t("courseDetail.gradeAllManually")}
                 </button>
               ) : null}
@@ -1052,6 +1057,7 @@ export default function GradebookActivityResultsPage() {
                   <p className="muted">{t("courseDetail.aiBatchImpact")}</p>
                 </div>
                 <button className="button secondary" disabled={aiGradingBatchDialog.submitting} type="button" onClick={() => setAiGradingBatchDialog(null)}>
+                  <AppIcon name="close" />
                   {t("common.close")}
                 </button>
               </div>
@@ -1113,9 +1119,11 @@ export default function GradebookActivityResultsPage() {
                   {aiGradingBatchDialog.error ? <p className="error-text" role="alert">{aiGradingBatchDialog.error}</p> : null}
                   <div className="dialog-actions">
                     <button className="button secondary" disabled={aiGradingBatchDialog.submitting} type="button" onClick={() => setAiGradingBatchDialog(null)}>
+                      <AppIcon name="close" />
                       {t("common.cancel")}
                     </button>
                     <button className="button primary" disabled={aiGradingBatchDialog.submitting} type="submit">
+                      <AppIcon name="generate" />
                       {aiGradingBatchDialog.submitting ? t("common.saving") : t("courseDetail.aiBatchStart")}
                     </button>
                   </div>
@@ -1237,14 +1245,16 @@ function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onGradeChange
             {row?.participantName} · {state.selectedIndex + 1} / {state.rows.length}
           </p>
         </div>
-        <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button>
+        <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button>
       </div>
       {state.rows.length > 1 ? (
         <div className="row wrap">
           <button className="button secondary" disabled={state.loading || state.selectedIndex === 0} type="button" onClick={() => onSelectIndex(state.selectedIndex - 1)}>
+            <AppIcon name="back" />
             {t("courseDetail.feedbackReviewPrevious")}
           </button>
           <button className="button secondary" disabled={state.loading || state.selectedIndex >= state.rows.length - 1} type="button" onClick={() => onSelectIndex(state.selectedIndex + 1)}>
+            <AppIcon name="next" />
             {t("courseDetail.feedbackReviewNext")}
           </button>
         </div>
@@ -1279,6 +1289,7 @@ function AiFeedbackReviewPanel({ state, onClose, onFeedbackChange, onGradeChange
           </div>
           <div className="row wrap dialog-actions">
             <button className="button primary" disabled={state.saving} type="button" onClick={() => void onSave()}>
+              <AppIcon name="save" />
               {state.saving ? t("common.saving") : t("courseDetail.saveReview")}
             </button>
           </div>

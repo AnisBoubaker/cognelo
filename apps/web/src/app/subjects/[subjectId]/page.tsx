@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -53,9 +55,11 @@ export default function SubjectDetailPage() {
                 {subject ? (
                   <div className="section-actions">
                     <Link className="button secondary" href="/subjects">
+                      <AppIcon name="back" />
                       {t("common.back")}
                     </Link>
                     <Link className="button" href={`/subjects/${subject.id}/edit`}>
+                      <AppIcon name="edit" />
                       {t("common.edit")}
                     </Link>
                   </div>

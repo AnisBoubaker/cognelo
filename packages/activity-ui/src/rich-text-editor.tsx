@@ -1,5 +1,7 @@
 "use client";
 
+import { ActionIcon } from "./action-icon";
+
 import DOMPurify from "dompurify";
 import {
   type ClipboardEvent,
@@ -915,7 +917,7 @@ export function RichTextEditor({
           type="button"
           onClick={() => setIsFullScreen((current) => !current)}
         >
-          <span aria-hidden="true">{isFullScreen ? "⤢" : "⛶"}</span>
+          <ActionIcon name={isFullScreen ? "collapse" : "expand"} />
           <span>{isFullScreen ? copy.exitFullScreen : copy.fullScreen}</span>
         </button>
       </div>
@@ -934,53 +936,53 @@ export function RichTextEditor({
               <option value="blockquote">{copy.blockquote}</option>
               <option value="pre">{copy.preformatted}</option>
             </select>
-            <button aria-label={copy.bold} title={copy.bold} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("bold")}>
-              <strong>B</strong>
-            </button>
-            <button aria-label={copy.italic} title={copy.italic} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("italic")}>
-              <em>I</em>
-            </button>
-            <button aria-label={copy.bulletList} title={copy.bulletList} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("insertUnorderedList")}>
-              • List
-            </button>
-            <button aria-label={copy.numberedList} title={copy.numberedList} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("insertOrderedList")}>
-              1. List
-            </button>
-            <button aria-label={copy.link} title={copy.link} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => void addLink()}>
-              🔗
-            </button>
+            <button aria-label={copy.bold} title={copy.bold} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("bold")}><ActionIcon name="bold" /></button>
+            <button aria-label={copy.italic} title={copy.italic} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("italic")}><ActionIcon name="italic" /></button>
+            <button aria-label={copy.bulletList} title={copy.bulletList} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("insertUnorderedList")}><ActionIcon name="bulletList" /></button>
+            <button aria-label={copy.numberedList} title={copy.numberedList} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("insertOrderedList")}><ActionIcon name="numberedList" /></button>
+            <button aria-label={copy.link} title={copy.link} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => void addLink()}><ActionIcon name="link" /></button>
             <button aria-label={copy.unlink} title={copy.unlink} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand("unlink")}>
+              <ActionIcon name="unlink" />
               {copy.unlink}
             </button>
             <button aria-label={copy.addEquation} title={copy.addEquation} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addEquation}>
-              <span aria-hidden="true">∑</span> {copy.equation}
+              <ActionIcon name="equation" />
+              {copy.equation}
             </button>
             <button aria-label={copy.addTable} title={copy.addTable} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addTable}>
-              <span aria-hidden="true">▦</span> {copy.table}
+              <ActionIcon name="table" />
+              {copy.table}
             </button>
             <button aria-label={copy.addImage} title={copy.addImage} type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addImage}>
-              <span aria-hidden="true">▧</span> {copy.image}
+              <ActionIcon name="image" />
+              {copy.image}
             </button>
           </div>
           {tableSelection ? (
             <div className="rich-text-editor-table-toolbar" role="toolbar" aria-label={copy.tableActions}>
               <button aria-label={copy.addRowBefore} title={copy.addRowBefore} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => addTableRow("before")}>
-                <span aria-hidden="true">＋↑</span> {copy.addRowBefore}
+                <ActionIcon name="rowBefore" />
+                {copy.addRowBefore}
               </button>
               <button aria-label={copy.addRowAfter} title={copy.addRowAfter} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => addTableRow("after")}>
-                <span aria-hidden="true">＋↓</span> {copy.addRowAfter}
+                <ActionIcon name="rowAfter" />
+                {copy.addRowAfter}
               </button>
               <button aria-label={copy.addColumnBefore} title={copy.addColumnBefore} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => addTableColumn("before")}>
-                <span aria-hidden="true">＋←</span> {copy.addColumnBefore}
+                <ActionIcon name="columnBefore" />
+                {copy.addColumnBefore}
               </button>
               <button aria-label={copy.addColumnAfter} title={copy.addColumnAfter} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => addTableColumn("after")}>
-                <span aria-hidden="true">＋→</span> {copy.addColumnAfter}
+                <ActionIcon name="columnAfter" />
+                {copy.addColumnAfter}
               </button>
               <button aria-label={copy.removeRow} title={copy.removeRow} type="button" onMouseDown={(event) => event.preventDefault()} onClick={removeTableRow}>
-                <span aria-hidden="true">−↕</span> {copy.removeRow}
+                <ActionIcon name="rowRemove" />
+                {copy.removeRow}
               </button>
               <button aria-label={copy.removeColumn} title={copy.removeColumn} type="button" onMouseDown={(event) => event.preventDefault()} onClick={removeTableColumn}>
-                <span aria-hidden="true">−↔</span> {copy.removeColumn}
+                <ActionIcon name="columnRemove" />
+                {copy.removeColumn}
               </button>
             </div>
           ) : null}

@@ -179,3 +179,7 @@ The optional [core content-closure policy](../../../../docs/ACTIVITY_CONTENT_ACC
 ## Editor history and draft restoration
 
 Use the shared [editor undo lifecycle](../../../../docs/EDITOR_UNDO.md). Draft loading gates editing and offers Retry on failure. Restored answers establish a baseline without firing an autosave; real typing, undo, and redo use the existing ordered answer persistence. The Test host retains separate per-question/file models in memory only and disposes them on session/view changes. Reopening or reloading uses the saved answer with empty undo history.
+
+## Shared action controls
+
+Teacher, learner, and settings actions follow the platform [button and icon contract](../../../../docs/ACTION_BUTTONS.md). Use explicit semantic `ActionIcon` names with localized labels; dimensions and interaction colors are shared CSS, while tabs, disclosure rows, and specialized editor controls retain their own layout.

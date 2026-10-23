@@ -382,14 +382,17 @@ export default function ManualActivityGradingPage() {
               <p>{t("courseDetail.manualGradingPagePosition", { current: pageIndex + 1, total: pageCount })}</p>
             </div>
             <div className="row wrap">
-              <Link className="button secondary" href={resultsHref}>{t("courseDetail.detailedResults")}</Link>
+              <Link className="button secondary" href={resultsHref}><AppIcon name="review" /> {t("courseDetail.detailedResults")}</Link>
               <button className="button secondary" disabled={saving || pageIndex === 0} type="button" onClick={() => void goToPage(pageIndex - 1)}>
+                <AppIcon name="back" />
                 {t("courseDetail.previousSubmission")}
               </button>
               <button className="button secondary" disabled={saving || pageIndex >= pageCount - 1} type="button" onClick={() => void goToPage(pageIndex + 1)}>
+                <AppIcon name="next" />
                 {t("courseDetail.nextSubmission")}
               </button>
               {pageHasGradeableAttempt ? <button disabled={saving} type="button" onClick={() => void saveCurrentPage()}>
+                                           <AppIcon name="save" />
                 {saving ? t("common.saving") : t("common.save")}
               </button> : null}
             </div>

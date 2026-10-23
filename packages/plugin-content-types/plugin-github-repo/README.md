@@ -30,3 +30,5 @@ When changing this plugin, update:
 
 - `packages/plugin-content-types/plugin-github-repo/README.md`
 - `packages/plugin-content-types/plugin-github-repo/PROJECT_MEMORY.md`
+
+Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.

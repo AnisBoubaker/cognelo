@@ -52,3 +52,5 @@ When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an inva
 Displayed submission and review timestamps use the shared [effective course timezone (application default unless overridden)](../../../docs/APPLICATION_TIME.md).
 
 The shared [activity content closure setting](../../../docs/ACTIVITY_CONTENT_ACCESS.md) can restrict student access after effective attempts or closing dates end. The host then shows only receipts and released grade totals; staff records remain available.
+
+Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.

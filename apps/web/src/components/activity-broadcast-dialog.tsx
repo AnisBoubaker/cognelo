@@ -107,7 +107,7 @@ export function ActivityBroadcastDialog({
           </div>
           {error ? <p className="error" role="alert">{error}</p> : null}
           <div className="dialog-actions">
-            <button className="secondary" disabled={sending} type="button" onClick={onClose}>{t("common.cancel")}</button>
+            <button className="secondary" disabled={sending} type="button" onClick={onClose}><AppIcon name="close" /> {t("common.cancel")}</button>
             <button disabled={sending || !body.trim() || !overview?.enabled || !overview.activeRecipientCount} type="submit">
               <AppIcon name="messages" />
               {sending ? t("activityMessenger.sending") : t("activityMessenger.sendBroadcast")}

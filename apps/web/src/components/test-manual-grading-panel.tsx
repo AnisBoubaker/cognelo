@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { useNotifications } from "@cognelo/activity-ui";
 import type { CourseGradebookRow, CourseTestAttemptReview } from "@/lib/api";
@@ -83,17 +85,19 @@ export function TestManualGradingPanel({
           <h2>{readOnly ? "Test results" : "Grade Test manually"}</h2>
           <p className="muted">{row.participantEmail}</p>
         </div>
-        <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button>
+        <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button>
       </div>
 
       {loading ? <p className="muted">{t("common.loading")}</p> : null}
       {!loading && attemptCount > 1 ? (
         <div className="row">
           <button className="button secondary" disabled={selectedIndex === 0} type="button" onClick={() => onSelectAttemptIndex(selectedIndex - 1)}>
+            <AppIcon name="back" />
             {t("courseDetail.previousSubmission")}
           </button>
           <span className="muted">{t("courseDetail.submissionPosition", { current: selectedIndex + 1, total: attemptCount })}</span>
           <button className="button secondary" disabled={selectedIndex >= attemptCount - 1} type="button" onClick={() => onSelectAttemptIndex(selectedIndex + 1)}>
+            <AppIcon name="next" />
             {t("courseDetail.nextSubmission")}
           </button>
         </div>
@@ -124,6 +128,7 @@ export function TestManualGradingPanel({
                   />
                   <span>/ {item.pointsPossible}</span>
                   <button className="button secondary" disabled={savingItemId !== null} type="button" onClick={() => void saveItem(item.testItemId, item.pointsPossible)}>
+                    <AppIcon name="save" />
                     {savingItemId === item.testItemId ? t("common.saving") : t("common.save")}
                   </button>
                 </div>
@@ -141,6 +146,7 @@ export function TestManualGradingPanel({
             <h3>{row.score === null ? "-" : `${row.score} / ${row.maxScore}`}</h3>
           </div>
           <button className="button secondary" disabled={isSavingRegrade} type="button" onClick={() => void onRegradeAttempt()}>
+            <AppIcon name="refresh" />
             {isSavingRegrade ? t("common.saving") : t("courseDetail.regrade")}
           </button>
         </div>
@@ -153,8 +159,8 @@ export function TestManualGradingPanel({
           <textarea id="test-manual-reason" value={reason} onChange={(event) => setReason(event.target.value)} />
         </div>
         <div className="dialog-actions">
-          <button className="button secondary" type="button" onClick={onClose}>{t("common.cancel")}</button>
-          <button disabled={isSavingOverride} type="submit">{isSavingOverride ? t("common.saving") : t("common.save")}</button>
+          <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.cancel")}</button>
+          <button disabled={isSavingOverride} type="submit"><AppIcon name="save" /> {isSavingOverride ? t("common.saving") : t("common.save")}</button>
         </div>
       </form> : null}
     </section>

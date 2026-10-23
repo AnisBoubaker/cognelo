@@ -453,6 +453,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                           groups: current.groups.map((group) => ({ ...group, assigned: true }))
                         } : current)}
                       >
+                        <AppIcon name="assign" />
                         {t("courseDetail.activitySettingsAssignAll")}
                       </button>
                     ) : null}
@@ -503,9 +504,11 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
 
           <div className="activity-settings-actions dialog-actions">
             <button className="secondary" disabled={saving} type="button" onClick={onClose}>
+              <AppIcon name="close" />
               {t("common.cancel")}
             </button>
             <button disabled={saving || loading || !draft} type="submit">
+              <AppIcon name="save" />
               {saving ? t("common.saving") : t("courseDetail.activitySettingsSave")}
             </button>
           </div>
@@ -564,13 +567,13 @@ function ExceptionsEditor({ group, general, summative, disabled, onChange }: {
               : group.students.filter((student) => !group.exceptions.some((exception) => exception.participantId === student.id)).map((student) => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} ({student.email})</option>)}
           </select>
         </div>
-        <button type="button" className="secondary" disabled={disabled || !(kind === "team" ? teamId : participantId)} onClick={() => add(kind)}>{t("activityExceptions.add")}</button>
+        <button type="button" className="secondary" disabled={disabled || !(kind === "team" ? teamId : participantId)} onClick={() => add(kind)}><AppIcon name="add" /> {t("activityExceptions.add")}</button>
       </div>
       {group.exceptions.filter((exception) => kind === "team" ? exception.teamId : exception.participantId).map((exception, index, entries) => <div className="activity-exception-row" key={exception.key}>
         <button type="button" className={`secondary activity-exception-select${selected?.key === exception.key ? " is-active" : ""}`} aria-pressed={selected?.key === exception.key} disabled={disabled} onClick={() => setSelectedKey(exception.key)}>{kind === "team" ? `${index + 1}. ` : ""}{label(exception)}</button>
         <div className="activity-exception-row-actions">
-          {kind === "team" ? <><button type="button" className="secondary" aria-label={t("activityExceptions.higherPriority", { name: label(exception) })} disabled={disabled || index === 0} onClick={() => move(exception, -1)}>↑</button><button type="button" className="secondary" aria-label={t("activityExceptions.lowerPriority", { name: label(exception) })} disabled={disabled || index === entries.length - 1} onClick={() => move(exception, 1)}>↓</button></> : null}
-          <button type="button" className="secondary" aria-label={t("activityExceptions.remove", { name: label(exception) })} disabled={disabled} onClick={() => onChange(group.exceptions.filter((item) => item.key !== exception.key))}>{t("common.remove")}</button>
+          {kind === "team" ? <><button type="button" className="secondary" aria-label={t("activityExceptions.higherPriority", { name: label(exception) })} disabled={disabled || index === 0} onClick={() => move(exception, -1)}><AppIcon name="up" /></button><button type="button" className="secondary" aria-label={t("activityExceptions.lowerPriority", { name: label(exception) })} disabled={disabled || index === entries.length - 1} onClick={() => move(exception, 1)}><AppIcon name="down" /></button></> : null}
+          <button type="button" className="secondary" aria-label={t("activityExceptions.remove", { name: label(exception) })} disabled={disabled} onClick={() => onChange(group.exceptions.filter((item) => item.key !== exception.key))}><AppIcon name="remove" /> {t("common.remove")}</button>
         </div>
       </div>)}
     </section>)}

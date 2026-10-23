@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -16,7 +18,7 @@ import {
   type BankTestItem
 } from "@/lib/api";
 import { activityCreationConfig } from "@/lib/activity-creation-defaults";
-import type { Locale } from "@/lib/i18n";
+import { type Locale, useI18n } from "@/lib/i18n";
 
 type Props = {
   activity: BankActivity;
@@ -28,6 +30,7 @@ type Props = {
 const excludedNestedTypes = new Set(["test"]);
 
 export function BankTestActivityView({ activity, bank, locale, onActivityUpdated }: Props) {
+  const { t } = useI18n();
   const router = useRouter();
   const notifications = useNotifications();
   const [test, setTest] = useState<BankTest | null>(null);
@@ -212,7 +215,7 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
                 setBusy(false);
                 setDuplicating(false);
               }
-            }}>Duplicate Test</button>
+            }}><AppIcon name="duplicate" /> Duplicate Test</button>
           )}
         />
       </section>
@@ -242,22 +245,22 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
               </div>
             </div>
             <div className="section-actions">
-              <Link className="button secondary" href={`/activity-banks/${bank.id}/activities/${item.bankActivityId}?testBankActivityId=${activity.id}`}>Edit</Link>
+              <Link className="button secondary" href={`/activity-banks/${bank.id}/activities/${item.bankActivityId}?testBankActivityId=${activity.id}`}><AppIcon name="edit" /> Edit</Link>
               <button className="button secondary" disabled={busy || hasUnsavedSettings || index === 0} type="button" onClick={() => perform(async () => {
                 const previous = test.items[index - 1];
                 await api.updateBankTestItem(bank.id, activity.id, item.id, { position: previous.position });
                 await api.updateBankTestItem(bank.id, activity.id, previous.id, { position: item.position });
-              })}>↑</button>
+              })} aria-label={t("courseDetail.moveUp")}><AppIcon name="up" /></button>
               <button className="button secondary" disabled={busy || hasUnsavedSettings || index === test.items.length - 1} type="button" onClick={() => perform(async () => {
                 const next = test.items[index + 1];
                 await api.updateBankTestItem(bank.id, activity.id, item.id, { position: next.position });
                 await api.updateBankTestItem(bank.id, activity.id, next.id, { position: item.position });
-              })}>↓</button>
-              <button className="button danger" disabled={busy || hasUnsavedSettings} type="button" onClick={() => setItemPendingRemoval(item)}>Remove</button>
+              })} aria-label={t("courseDetail.moveDown")}><AppIcon name="down" /></button>
+              <button className="button danger" disabled={busy || hasUnsavedSettings} type="button" onClick={() => setItemPendingRemoval(item)}><AppIcon name="remove" /> Remove</button>
             </div>
           </article>
         )) : <p className="muted">This reusable Test does not contain any activities yet.</p>}
-        <button className="button" disabled={busy || hasUnsavedSettings} type="button" onClick={() => setShowActivityPicker(true)}>Add activity</button>
+        <button className="button" disabled={busy || hasUnsavedSettings} type="button" onClick={() => setShowActivityPicker(true)}><AppIcon name="add" /> Add activity</button>
       </section>
 
       {showActivityPicker ? (

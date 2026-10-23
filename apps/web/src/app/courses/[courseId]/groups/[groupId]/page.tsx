@@ -1099,7 +1099,7 @@ export default function CourseGroupPage() {
               <div className="workspace-context">
                 <h1>{course.title}: {group.title}</h1>
                 <span className="muted">{group.status === "published" ? t("groupPage.statusPublished") : t("groupPage.statusDraft")}</span>
-                {canManageRoster ? <Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}/student-view`} rel="noopener" target="_blank">{t("courseDetail.studentView")}</Link> : null}
+                {canManageRoster ? <Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}/student-view`} rel="noopener" target="_blank"><AppIcon name="visible" /> {t("courseDetail.studentView")}</Link> : null}
                 {group.availableFrom || group.availableUntil ? <span className="muted"> · {formatAvailabilityWindow(group.availableFrom, group.availableUntil, t, timeZone)}</span> : null}
               </div>
             }
@@ -1349,9 +1349,11 @@ export default function CourseGroupPage() {
                           {assignmentError ? <p className="error">{assignmentError}</p> : null}
                           <div className="row">
                             <button type="submit" disabled={!assignActivityId || !assignableActivities.length || !canManage}>
+                              <AppIcon name="assign" />
                               {t("groupPage.assignActivity")}
                             </button>
                             <button className="secondary" type="button" onClick={() => setIsAssigningActivity(false)}>
+                              <AppIcon name="close" />
                               {t("common.close")}
                             </button>
                           </div>
@@ -1596,6 +1598,7 @@ export default function CourseGroupPage() {
                             status: gradebookStatus
                           })}
                         >
+                          <AppIcon name="download" />
                           {t("courseDetail.exportCsv")}
                         </a>
                       </div>
@@ -1683,6 +1686,7 @@ export default function CourseGroupPage() {
                                   type="button"
                                   onClick={() => setGradebookRelease(activity.gradebookItemId, !activity.gradesReleased, activity.activityTitle)}
                                 >
+                                                                                                 <AppIcon name={activity.gradesReleased ? "hidden" : "visible"} />
                                   {activity.gradesReleased ? t("courseDetail.hideGrades") : t("courseDetail.releaseGrades")}
                                 </button> : null}
                                 {activity.assessmentMode === "summative" && !activity.gradesReleased && activity.incompleteGradeCount > 0 ? (
@@ -1696,6 +1700,7 @@ export default function CourseGroupPage() {
                                   className="button secondary"
                                   href={`/courses/${courseId}/gradebook/activities/${activity.activityId}?groupId=${groupId}`}
                                 >
+                                  <AppIcon name="review" />
                                   {t("courseDetail.detailedResults")}
                                 </Link>
                               </div>
@@ -1726,6 +1731,7 @@ export default function CourseGroupPage() {
                         </div>
                         {canManageRoster ? (
                           <button className="secondary" type="button" onClick={() => setIsAddingParticipant((current) => !current)}>
+                            <AppIcon name={isAddingParticipant ? "close" : "add"} />
                             {isAddingParticipant ? t("common.cancel") : t("groupPage.addParticipant")}
                           </button>
                         ) : null}
@@ -1810,9 +1816,11 @@ export default function CourseGroupPage() {
                           {participantError ? <p className="error">{participantError}</p> : null}
                           <div className="row">
                             <button type="submit" disabled={savingParticipant}>
+                              <AppIcon name="add" />
                               {savingParticipant ? t("common.saving") : t("groupPage.addParticipant")}
                             </button>
                             <button className="secondary" type="button" onClick={closeParticipantForm}>
+                              <AppIcon name="close" />
                               {t("common.close")}
                             </button>
                           </div>
@@ -1923,6 +1931,7 @@ export default function CourseGroupPage() {
                       </div>
                       <div className="row">
                         <button type="submit" disabled={savingGroup}>
+                          <AppIcon name="save" />
                           {savingGroup ? t("common.saving") : t("groupPage.saveSettings")}
                         </button>
                       </div>

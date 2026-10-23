@@ -1,5 +1,7 @@
 "use client";
 
+import { ActionIcon, type ActionIconName } from "./action-icon";
+
 import { type ReactNode, useEffect, useId, useRef } from "react";
 
 export type ConfirmationDialogProps = {
@@ -10,6 +12,7 @@ export type ConfirmationDialogProps = {
   cancelLabel?: string;
   eyebrow?: string;
   confirmVariant?: "default" | "danger";
+  confirmIcon?: ActionIconName;
   confirmDisabled?: boolean;
   isConfirming?: boolean;
   onCancel: () => void;
@@ -24,6 +27,7 @@ export function ConfirmationDialog({
   cancelLabel,
   eyebrow,
   confirmVariant = "default",
+  confirmIcon,
   confirmDisabled = false,
   isConfirming = false,
   onCancel,
@@ -82,6 +86,7 @@ export function ConfirmationDialog({
         <div className="dialog-actions">
           {cancelLabel ? (
             <button className="secondary" disabled={isConfirming} type="button" onClick={onCancel}>
+              <ActionIcon name="close" />
               {cancelLabel}
             </button>
           ) : null}
@@ -92,6 +97,7 @@ export function ConfirmationDialog({
             type="button"
             onClick={() => void onConfirm()}
           >
+            <ActionIcon name={confirmIcon ?? (confirmVariant === "danger" ? "alert" : "check")} />
             {confirmLabel}
           </button>
         </div>

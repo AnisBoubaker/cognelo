@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 
 
@@ -179,6 +181,7 @@ export default function PluginSettingsPage() {
                     </label>
                     {!plugin.isEnabled ? (
                       <button className="secondary" disabled={isSaving(kind, plugin.key)} type="button" onClick={() => void deactivatePlugin(kind, plugin)}>
+                        <AppIcon name="deactivate" />
                         {t("settings.pluginDeactivate")}
                       </button>
                     ) : null}
@@ -202,6 +205,7 @@ export default function PluginSettingsPage() {
                       </label>
                     ) : null}
                     <button disabled={isSaving(kind, plugin.key)} type="button" onClick={() => void activatePlugin(kind, plugin)}>
+                      <AppIcon name="activate" />
                       {t("settings.pluginActivate")}
                     </button>
                   </div>

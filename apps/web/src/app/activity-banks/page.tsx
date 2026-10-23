@@ -106,7 +106,7 @@ export default function ActivityBanksPage() {
         {error ? <p className="error">{error}</p> : null}
 
         <section className="section stack">
-          <div className="section-heading"><div><p className="eyebrow">{t("activityBanks.listEyebrow")}</p><h1 className="content-title">{t("activityBanks.listTitle")}</h1></div><button type="button" onClick={openCreate}>{t("activityBanks.addTitle")}</button></div>
+          <div className="section-heading"><div><p className="eyebrow">{t("activityBanks.listEyebrow")}</p><h1 className="content-title">{t("activityBanks.listTitle")}</h1></div><button type="button" onClick={openCreate}><AppIcon name="add" /> {t("activityBanks.addTitle")}</button></div>
           {activityBanks.length ? (
             <div className="table-list activity-bank-list">
               {activityBanks.map((bank) => (
@@ -135,7 +135,7 @@ export default function ActivityBanksPage() {
               <div className={`field ${editorBank?.activities?.length ? "field-readonly" : ""}`}><label htmlFor="bank-subject">{t("activityBanks.subjectLabel")}</label><select id="bank-subject" value={draft.subjectId} disabled={Boolean(editorBank?.activities?.length)} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value })} required>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select>{editorBank?.activities?.length ? <p className="muted">{t("activityBanks.subjectLockedHelp")}</p> : null}</div>
               <div className="field"><label htmlFor="bank-title">{t("activityBanks.titleLabel")}</label><input id="bank-title" minLength={2} maxLength={160} required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div>
               <div className="field"><label htmlFor="bank-description">{t("activityBanks.descriptionLabel")}</label><textarea id="bank-description" maxLength={4000} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></div>
-              <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setEditorBank(undefined)}>{t("common.cancel")}</button><button disabled={saving || !draft.subjectId} type="submit">{saving ? t("common.saving") : t("common.save")}</button></div>
+              <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setEditorBank(undefined)}><AppIcon name="close" /> {t("common.cancel")}</button><button disabled={saving || !draft.subjectId} type="submit"><AppIcon name="save" /> {saving ? t("common.saving") : t("common.save")}</button></div>
             </form>
           </section></div>
         ) : null}
@@ -148,7 +148,7 @@ export default function ActivityBanksPage() {
               <label className="checkbox-row"><input type="radio" name="delete-mode" checked={deleteState.mode === "move"} onChange={() => setDeleteState({ ...deleteState, mode: "move" })} /><span>{t("activityBanks.moveActivities")}</span></label>
               {deleteState.mode === "move" ? <div className="field"><label htmlFor="destination-bank">{t("activityBanks.destinationLabel")}</label><select id="destination-bank" required value={deleteState.targetId} onChange={(event) => setDeleteState({ ...deleteState, targetId: event.target.value })}><option value="">{t("activityBanks.chooseDestination")}</option>{moveTargets.map((bank) => <option key={bank.id} value={bank.id}>{bank.title}</option>)}</select>{!moveTargets.length ? <p className="muted">{t("activityBanks.noMoveTargets")}</p> : null}</div> : null}
               <label className="checkbox-row"><input type="radio" name="delete-mode" checked={deleteState.mode === "delete"} onChange={() => setDeleteState({ ...deleteState, mode: "delete" })} /><span>{t("activityBanks.deleteAllActivities")}</span></label>
-              <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDeleteState(null)}>{t("common.cancel")}</button><button disabled={saving || (deleteState.mode === "move" && !deleteState.targetId)} className={deleteState.mode === "delete" ? "danger" : ""} type="submit">{saving ? t("common.saving") : t("activityBanks.continueLabel")}</button></div>
+              <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDeleteState(null)}><AppIcon name="close" /> {t("common.cancel")}</button><button disabled={saving || (deleteState.mode === "move" && !deleteState.targetId)} className={deleteState.mode === "delete" ? "danger" : ""} type="submit"><AppIcon name="next" /> {saving ? t("common.saving") : t("activityBanks.continueLabel")}</button></div>
             </form>
           </section></div>
         ) : null}

@@ -5,3 +5,5 @@
 The plugin stores Markdown and presentation preferences in generic resource metadata, declares its media-bearing fields, and provides embedding document/index/search handlers. Duplication retains the body and display settings but drops the derived search index.
 
 See [Text material reference](docs/REFERENCE.md) for routes, defaults, image lifecycle, and validation.
+
+Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.

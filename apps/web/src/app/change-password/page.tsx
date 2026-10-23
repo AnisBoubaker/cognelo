@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
@@ -62,7 +64,7 @@ export default function ForcedPasswordChangePage() {
       <section className="login-panel">
         <div className="stack">
           <div className="row">
-            <button className="secondary" type="button" onClick={async () => { await logout(); router.replace("/login"); }}>{t("common.logout")}</button>
+            <button className="secondary" type="button" onClick={async () => { await logout(); router.replace("/login"); }}><AppIcon name="logout" /> {t("common.logout")}</button>
             <div style={{ flex: 1 }} />
             <LocaleSwitcher />
           </div>
@@ -86,7 +88,7 @@ export default function ForcedPasswordChangePage() {
             </div>
             <p className="muted">{t("settings.passwordRequirements")}</p>
             {error ? <p className="error" role="alert">{error}</p> : null}
-            <button className="login-submit-button" disabled={saving} type="submit">{saving ? t("settings.changingPassword") : t("settings.changePassword")}</button>
+            <button className="login-submit-button" disabled={saving} type="submit"><AppIcon name="key" /> {saving ? t("settings.changingPassword") : t("settings.changePassword")}</button>
           </form>
         </div>
       </section>

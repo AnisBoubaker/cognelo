@@ -33,3 +33,7 @@ Duplication copies Markdown and display preferences, excluding `embeddingIndex`.
 - Core media tests cover reference ownership and section/resource visibility during image delivery.
 - `tests/e2e/text-content.spec.ts` covers dedicated editing, actual image uploads and retention, tables/formulas, inline/page/modal display, new-tab behavior, focus/scroll restoration, section visibility, student permissions, and duplicate image retention.
 - Existing content-resource E2E coverage also checks inherited folder visibility, duplication, file and GitHub materials, and saved ordering.
+
+## Shared action controls
+
+Teacher, learner, and settings actions follow the platform [button and icon contract](../../../../docs/ACTION_BUTTONS.md). Use explicit semantic `ActionIcon` names with localized labels; dimensions and interaction colors are shared CSS, while tabs, disclosure rows, and specialized editor controls retain their own layout.

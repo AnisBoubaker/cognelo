@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { useNotifications } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -194,6 +196,7 @@ export default function BankActivityAuthoringPage() {
               <Link className="button secondary" href={searchParams.get("testBankActivityId")
                 ? `/activity-banks/${activityBankId}/activities/${searchParams.get("testBankActivityId")}`
                 : `/activity-banks/${activityBankId}`}>
+                <AppIcon name="back" />
                 {t("bankActivityPage.backToBank")}
               </Link>
             </div>

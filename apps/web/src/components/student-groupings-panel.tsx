@@ -156,10 +156,10 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
   return <section className="stack student-groupings">
     <div className="section-heading student-groupings-heading">
       {sectionSelector}
-      {editing ? <button type="button" className="secondary" disabled={busy} onClick={() => void close()}>{t("common.close")}</button>
+      {editing ? <button type="button" className="secondary" disabled={busy} onClick={() => void close()}><AppIcon name="close" /> {t("common.close")}</button>
         : <button type="button" disabled={loading || busy} onClick={() => edit(null)}><AppIcon name="add" />{t("studentGroupings.create")}</button>}
     </div>
-    {error ? <div role="alert"><p className="error">{error}</p><button className="secondary" type="button" disabled={busy} onClick={() => void reload()}>{t("studentGroupings.reload")}</button></div> : null}
+    {error ? <div role="alert"><p className="error">{error}</p><button className="secondary" type="button" disabled={busy} onClick={() => void reload()}><AppIcon name="refresh" /> {t("studentGroupings.reload")}</button></div> : null}
     {loading ? <p>{t("common.loading")}</p> : editing ? <form id="student-grouping-form" className="form" aria-label={t(saved ? "studentGroupings.edit" : "studentGroupings.create")} onSubmit={(event) => { event.preventDefault(); void save().catch(() => {}); }}>
       <fieldset className="student-grouping-fields stack" disabled={busy}>
         <div className="field"><label htmlFor="student-grouping-title">{t("studentGroupings.name")}</label><input id="student-grouping-title" value={draft.title} maxLength={120} required onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div>
@@ -176,17 +176,17 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
             {choiceSummary(draft)}
             {!draft.studentChoiceEnabled ? <p className="muted">{t(draft.assignmentMethod === "random" ? "studentGroupings.randomMethodHelp" : "studentGroupings.manualMethodHelp")}</p> : null}
             <div className="student-grouping-setting-actions">
-              <button className="secondary" type="button" disabled={!draft.teams.length} onClick={() => setAssignmentDialogOpen(true)}>{t("studentGroupings.automaticAssign")}</button>
-              {draft.assignmentMethod !== "manual" ? <button className="secondary" type="button" onClick={() => setDraft({ ...draft, assignmentMethod: "manual", studentChoiceEnabled: false, choiceOpensAt: null, choiceClosesAt: null, allowChoiceChanges: false })}>{t("studentGroupings.useManual")}</button> : null}
+              <button className="secondary" type="button" disabled={!draft.teams.length} onClick={() => setAssignmentDialogOpen(true)}><AppIcon name="assign" /> {t("studentGroupings.automaticAssign")}</button>
+              {draft.assignmentMethod !== "manual" ? <button className="secondary" type="button" onClick={() => setDraft({ ...draft, assignmentMethod: "manual", studentChoiceEnabled: false, choiceOpensAt: null, choiceClosesAt: null, allowChoiceChanges: false })}><AppIcon name="edit" /> {t("studentGroupings.useManual")}</button> : null}
             </div>
           </section>
         </div>
-        <div className="section-heading"><h3>{t("studentGroupings.teams")}</h3><button className="secondary" type="button" disabled={draft.teams.length >= 500} onClick={() => setDraft((current) => ({ ...current, teams: [...current.teams, { key: crypto.randomUUID(), title: nextStudentTeamName(current.teams.map((team) => team.title), teachingLanguage), capacity: 4, participantIds: [] }] }))}>{t("studentGroupings.addTeam")}</button></div>
+        <div className="section-heading"><h3>{t("studentGroupings.teams")}</h3><button className="secondary" type="button" disabled={draft.teams.length >= 500} onClick={() => setDraft((current) => ({ ...current, teams: [...current.teams, { key: crypto.randomUUID(), title: nextStudentTeamName(current.teams.map((team) => team.title), teachingLanguage), capacity: 4, participantIds: [] }] }))}><AppIcon name="add" /> {t("studentGroupings.addTeam")}</button></div>
         {draft.teams.length ? draft.teams.map((team, index) => <div className="student-team-editor" key={team.key}>
           <div className="field"><input aria-label={t("studentGroupings.teamName", { number: index + 1 })} id={`team-${team.key}`} value={team.title} required maxLength={120} onChange={(event) => setDraft({ ...draft, teams: draft.teams.map((item) => item.key === team.key ? { ...item, title: event.target.value } : item) })} /></div>
           <div className="field student-team-capacity"><label htmlFor={`team-capacity-${team.key}`}>{t("studentGroupings.slotsPerTeam")}</label><input id={`team-capacity-${team.key}`} aria-label={t("studentGroupings.teamSlotLabel", { team: team.title })} type="number" min={team.participantIds.length} max={5000} required value={Number.isFinite(team.capacity) ? team.capacity : ""} onChange={(event) => setDraft({ ...draft, teams: draft.teams.map((item) => item.key === team.key ? { ...item, capacity: event.target.valueAsNumber } : item) })} /></div>
           <span className="muted">{t("studentGroupings.memberCount", { count: team.participantIds.length })}</span>
-          <button className="secondary" type="button" aria-label={t("studentGroupings.removeTeam", { number: index + 1 })} onClick={() => setDraft({ ...draft, teams: draft.teams.filter((item) => item.key !== team.key) })}>{t("common.remove")}</button>
+          <button className="secondary" type="button" aria-label={t("studentGroupings.removeTeam", { number: index + 1 })} onClick={() => setDraft({ ...draft, teams: draft.teams.filter((item) => item.key !== team.key) })}><AppIcon name="remove" /> {t("common.remove")}</button>
         </div>) : <p className="muted">{t("studentGroupings.noTeams")}</p>}
         <div className="section-heading">
           <h3>{t("studentGroupings.students")}</h3>

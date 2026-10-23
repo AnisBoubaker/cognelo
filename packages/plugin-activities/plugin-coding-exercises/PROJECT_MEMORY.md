@@ -46,3 +46,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Honor the host [activity content closure policy](../../../docs/ACTIVITY_CONTENT_ACCESS.md) for prompts, histories, solutions, and files. Final submission may return a host-handled closure signal instead of a review payload; preserve records and finalization cleanup.
 
 - [Undo and autosave](../../../docs/EDITOR_UNDO.md): wait for successful draft loading before mounting the editor. Restoration is a baseline, not an undoable edit or an answer write. Keep model history in its mounted attempt/question/file scope only; never persist history or let it cross attempts, users, files, or read-only submission views.
+
+- Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.

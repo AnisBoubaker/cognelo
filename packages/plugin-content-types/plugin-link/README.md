@@ -13,3 +13,5 @@ Apply `npm run db:migrate:all` when upgrading an existing installation; it now a
 Activate and enable **Link content** under Settings → Plugins → Content type plugins. Development seeding enables installed content plugins. Existing installations discover new plugins inactive and disabled until an administrator enables them.
 
 See [reference](docs/REFERENCE.md) for persistence, validation, and integration contracts, and [project memory](PROJECT_MEMORY.md) for durable constraints.
+
+Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.

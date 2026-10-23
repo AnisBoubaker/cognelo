@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { RichTextEditor } from "@cognelo/activity-ui";
@@ -70,6 +72,7 @@ export default function SubjectsPage() {
                 return !current;
               });
             }}>
+              <AppIcon name={showCreateForm ? "close" : "add"} />
               {showCreateForm ? t("common.cancel") : t("common.add")}
             </button>
           </div>
@@ -116,6 +119,7 @@ export default function SubjectsPage() {
               </div>
               <div className="row">
                 <button type="submit" disabled={saving}>
+                  <AppIcon name="add" />
                   {saving ? t("common.saving") : t("common.create")}
                 </button>
                 <button
@@ -129,6 +133,7 @@ export default function SubjectsPage() {
                     setProgrammingLanguage("");
                   }}
                 >
+                  <AppIcon name="close" />
                   {t("common.cancel")}
                 </button>
               </div>

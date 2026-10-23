@@ -1,7 +1,6 @@
 "use client";
 
-import { useApplicationTime } from "@cognelo/activity-ui";
-
+import { ActionIcon, useApplicationTime } from "@cognelo/activity-ui";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
@@ -797,6 +796,7 @@ export function ParsonsActivityView({
               <div className="stack" style={{ gap: 8 }}>
                 <KnowledgeGenerationModeField locale={locale} />
                 <button className="secondary" disabled={generating || description.trim().length < 10} type="button" onClick={requestParsonsGeneration}>
+                  <ActionIcon name="generate" />
                   {generating ? t("parsons.generating") : t("parsons.generate")}
                 </button>
                 <p className="muted">{t("parsons.generateHelp")}</p>
@@ -813,9 +813,11 @@ export function ParsonsActivityView({
                   </div>
                   <div className="dialog-actions">
                     <button className="secondary" type="button" onClick={() => setShowReplaceGenerationDialog(false)}>
+                      <ActionIcon name="close" />
                       {t("parsons.keepCurrentGenerated")}
                     </button>
                     <button type="button" onClick={() => void generateParsonsProblem()}>
+                      <ActionIcon name="sync" />
                       {t("parsons.replaceCurrentGenerated")}
                     </button>
                   </div>
@@ -853,9 +855,11 @@ export function ParsonsActivityView({
                 </div>
                 <div className="row wrap">
                   <button className="secondary" type="button" onClick={createGroupFromSelection}>
+                    <ActionIcon name="add" />
                     {t("parsons.createGroup")}
                   </button>
                   <button className="secondary" disabled={groups.length < 2} type="button" onClick={startPrecedenceRule}>
+                    <ActionIcon name="add" />
                     {t("parsons.addPrecedence")}
                   </button>
                 </div>
@@ -886,6 +890,7 @@ export function ParsonsActivityView({
                         </label>
                         <div className="row wrap">
                           <button className="secondary" type="button" onClick={() => deleteGroup(group.id)}>
+                            <ActionIcon name="remove" />
                             {t("parsons.deleteGroup")}
                           </button>
                         </div>
@@ -938,9 +943,11 @@ export function ParsonsActivityView({
                     </div>
                     <div className="row wrap">
                       <button type="button" onClick={savePrecedenceRule}>
+                        <ActionIcon name="save" />
                         {t("common.save")}
                       </button>
                       <button className="secondary" type="button" onClick={() => setPrecedenceDraft(null)}>
+                        <ActionIcon name="close" />
                         {t("common.cancel")}
                       </button>
                     </div>
@@ -959,9 +966,7 @@ export function ParsonsActivityView({
                             →
                           </span>
                           <span>{afterLabel}</span>
-                          <button className="secondary icon-button" title={t("parsons.deletePrecedence")} type="button" onClick={() => deletePrecedenceRule(rule.id)}>
-                            ×
-                          </button>
+                          <button className="secondary icon-button" title={t("parsons.deletePrecedence")} type="button" onClick={() => deletePrecedenceRule(rule.id)}><ActionIcon name="remove" /></button>
                         </div>
                       );
                     })}
@@ -1039,14 +1044,17 @@ export function ParsonsActivityView({
 
         <div className="parsons-toolbar row">
           <button className="secondary" type="button" onClick={resetWorkspace} disabled={isReadOnlyStudentAttempt}>
+            <ActionIcon name="refresh" />
             {t("parsons.reset")}
           </button>
           {isSummativeStudentSession && !deferSubmission ? (
             <button type="button" onClick={() => setShowSubmitConfirmDialog(true)} disabled={isReadOnlyStudentAttempt || submitting}>
+              <ActionIcon name="submit" />
               {t("parsons.submit")}
             </button>
           ) : !isSummativeStudentSession ? (
             <button type="button" onClick={checkSolution}>
+              <ActionIcon name="check" />
               {t("parsons.check")}
             </button>
           ) : null}
@@ -1163,9 +1171,11 @@ export function ParsonsActivityView({
             </div>
             <div className="dialog-actions">
               <button className="secondary" type="button" disabled={submitting} onClick={() => setShowSubmitConfirmDialog(false)}>
+                <ActionIcon name="edit" />
                 {t("parsons.keepWorking")}
               </button>
               <button type="button" disabled={submitting} onClick={() => void submitSolution()}>
+                <ActionIcon name="submit" />
                 {submitting ? t("parsons.submitting") : t("parsons.confirmSubmit")}
               </button>
             </div>
@@ -1184,18 +1194,7 @@ export function ParsonsActivityView({
 }
 
 function ParsonsControlIcon({ direction }: { direction: "up" | "down" | "left" | "right" }) {
-  const paths = {
-    up: "M12 16V8m0 0-4 4m4-4 4 4",
-    down: "M12 8v8m0 0-4-4m4 4 4-4",
-    left: "M16 12H8m0 0 4-4m-4 4 4 4",
-    right: "M8 12h8m0 0-4-4m4 4-4 4"
-  };
-
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
-      <path d={paths[direction]} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    </svg>
-  );
+  return <ActionIcon name={direction === "left" ? "back" : direction === "right" ? "next" : direction} />;
 }
 
 function parsonsSnapshotFromActivity(activity: ActivityLike) {

@@ -49,3 +49,5 @@ Expired compound Test responses can be [recovered from teacher results](../../..
 The shared [activity content closure setting](../../../docs/ACTIVITY_CONTENT_ACCESS.md) can restrict student access after effective attempts or closing dates end. The host then shows only receipts and released grade totals; staff records remain available.
 
 Saved code loads as a fresh [editor baseline](../../../docs/EDITOR_UNDO.md). Test question/file undo histories remain separate in memory while the Test is open; reload or reopening starts from the saved answer. Normal edits, undo, and redo continue to autosave.
+
+Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.

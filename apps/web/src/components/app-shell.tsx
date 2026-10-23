@@ -80,7 +80,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="page stack session-unavailable-page" role="alert">
         <h1>{t("common.connectionUnavailableTitle")}</h1>
         <p>{t("common.connectionUnavailableMessage")}</p>
-        <button type="button" onClick={() => void refresh()}>{t("common.retry")}</button>
+        <button type="button" onClick={() => void refresh()}><AppIcon name="refresh" /> {t("common.retry")}</button>
       </main>
     );
   }
@@ -164,6 +164,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     role="menuitem"
                     onClick={() => setIsAccountMenuOpen(false)}
                   >
+                    <AppIcon name="settings" />
                     {t("nav.settings")}
                   </Link>
                   <button
@@ -175,6 +176,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       router.replace("/login");
                     }}
                   >
+                    <AppIcon name="logout" />
                     {t("common.logout")}
                   </button>
                   <small className="account-version">{COGNELO_VERSION_LABEL}</small>
@@ -186,7 +188,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {sessionUnavailable ? (
         <div className="session-connection-warning" role="status">
           <span>{t("common.connectionRetrying")}</span>
-          <button className="secondary" type="button" onClick={() => void refresh()}>{t("common.retry")}</button>
+          <button className="secondary" type="button" onClick={() => void refresh()}><AppIcon name="refresh" /> {t("common.retry")}</button>
         </div>
       ) : null}
       <div className="activity-live-controls" id="activity-live-controls" />

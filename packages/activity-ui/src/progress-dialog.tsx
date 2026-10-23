@@ -1,4 +1,7 @@
 "use client";
+
+import { ActionIcon } from "./action-icon";
+
 import { useSharedDialogOpen } from "./dialog-provider";
 import { useBodyScrollLock } from "./body-scroll-lock";
 
@@ -121,6 +124,7 @@ export function ProgressDialog({
         {canClose ? (
           <div className="dialog-actions">
             <button ref={closeButtonRef} className="secondary" type="button" onClick={onClose}>
+              <ActionIcon name="close" />
               {closeLabel}
             </button>
           </div>

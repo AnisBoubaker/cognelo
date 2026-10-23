@@ -12,3 +12,5 @@ This file is for GitHub repo content plugin memory only.
 - The server plugin implements `indexEmbeddingDocuments` and `searchEmbeddingDocuments`. The current dev index is stored in resource metadata under `embeddingIndex`; future repository clone indexing and pgvector/plugin-owned table storage should stay behind those handlers.
 - No plugin-owned tables are needed for the first version. Future repository sync/indexing state can add plugin-owned persistence.
 - The server `duplicate` handler copies repository metadata but removes `embeddingIndex` so the new resource identity rebuilds derived search state independently.
+
+- Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.

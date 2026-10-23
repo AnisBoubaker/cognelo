@@ -1,3 +1,4 @@
+import { ActionIcon } from "@cognelo/activity-ui";
 import type { FormEvent } from "react";
 
 export type GithubRepoSettingsFormProps = {
@@ -29,7 +30,7 @@ export function GithubRepoSettingsForm({ title, url, error, onTitleChange, onUrl
       </div>
       {error ? <p className="error">{error}</p> : null}
       <div className="row">
-        <button type="submit">{t("courseDetail.saveMaterial")}</button>
+        <button type="submit"><ActionIcon name="save" /> {t("courseDetail.saveMaterial")}</button>
       </div>
     </form>
   );

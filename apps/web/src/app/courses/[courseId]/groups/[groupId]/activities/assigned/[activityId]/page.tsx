@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 
 
@@ -560,6 +562,7 @@ function GroupActivityContent() {
           </div>
           <div className="section-actions">
             <Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}`}>
+              <AppIcon name="back" />
               {t("groupPage.backToCourse")}
             </Link>
           </div>
@@ -588,6 +591,7 @@ function GroupActivityContent() {
               type="button"
               onClick={() => void startTimedAttempt()}
             >
+              <AppIcon name="run" />
               {startingTimedAttempt ? t("groupPage.timedActivityStarting") : t("groupPage.timedActivityStart")}
             </button>
             {!timedRuntime.availability.canStart ? <p className="muted">{timedRuntime.availability.reason}</p> : null}
@@ -684,16 +688,19 @@ function GroupActivityContent() {
                   rel="noreferrer"
                   target="_blank"
                 >
+                  <AppIcon name="download" />
                   {t("groupPage.safeExamBrowserDownloadApplication")}
                 </a>
                 {safeExamBrowserLaunch ? (
                   <a className="button secondary" href={safeExamBrowserLaunch.downloadUrl}>
+                    <AppIcon name="download" />
                     {t("groupPage.safeExamBrowserDownloadConfiguration")}
                   </a>
                 ) : null}
               </div>
               <div className="dialog-actions">
                 <button className="secondary" type="button" onClick={() => router.push(`/courses/${courseId}/groups/${groupId}`)}>
+                  <AppIcon name="close" />
                   {t("common.cancel")}
                 </button>
                 <button
@@ -701,6 +708,7 @@ function GroupActivityContent() {
                   type="button"
                   onClick={openActivityInSafeExamBrowser}
                 >
+                  <AppIcon name="open" />
                   {isPreparingSafeExamBrowser ? t("groupPage.safeExamBrowserOpening") : t("groupPage.safeExamBrowserOpen")}
                 </button>
               </div>
@@ -932,6 +940,7 @@ function GradeChallengePanel({
             onChange={(event) => onExplanationChange(event.target.value)}
           />
           <button disabled={isSubmitting || explanation.trim().length < 20} type="button" onClick={() => void onSubmit()}>
+            <AppIcon name="submit" />
             {isSubmitting ? t("common.saving") : t("groupPage.submitChallenge")}
           </button>
         </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { EditActionBar, ProgressDialog, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { ExecutionRunnerConfigurationInput, ExecutionRunnerType } from "@cognelo/contracts";
@@ -259,6 +261,7 @@ export default function RunnerSettingsPage() {
                           disabled={!configuration?.configured || runnerDirty || testing !== null}
                           onClick={() => void testRunner(runnerType)}
                         >
+                          <AppIcon name="run" />
                           {testing === runnerType ? t("settings.runnerTesting") : t("settings.runnerTest")}
                         </button>
                         {!configuration?.configured || runnerDirty ? <p className="muted">{t("settings.runnerSaveBeforeTest")}</p> : null}

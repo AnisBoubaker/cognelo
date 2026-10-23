@@ -1,5 +1,7 @@
 "use client";
 
+import { ActionIcon } from "./action-icon";
+
 import { useApplicationTime } from "./application-time";
 
 
@@ -344,9 +346,7 @@ export function NotificationProvider({ children, labels }: { children: ReactNode
                   {notification.title ? <p style={titleStyle}>{notification.title}</p> : null}
                   <p style={messageStyle}>{notification.message}</p>
                 </div>
-                <button aria-label={labels.dismiss} onClick={() => dismiss(notification.id)} style={closeButtonStyle} type="button">
-                  x
-                </button>
+                <button aria-label={labels.dismiss} onClick={() => dismiss(notification.id)} style={closeButtonStyle} type="button"><ActionIcon name="close" /></button>
               </div>
             </section>
           );
@@ -358,9 +358,7 @@ export function NotificationProvider({ children, labels }: { children: ReactNode
             <section aria-label={labels.historyTitle} style={historyPanelStyle}>
               <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between" }}>
                 <p style={titleStyle}>{labels.historyTitle}</p>
-                <button aria-label={labels.dismiss} onClick={() => setHistoryOpen(false)} style={closeButtonStyle} type="button">
-                  x
-                </button>
+                <button aria-label={labels.dismiss} onClick={() => setHistoryOpen(false)} style={closeButtonStyle} type="button"><ActionIcon name="close" /></button>
               </div>
               {history
                 .slice()
@@ -397,6 +395,7 @@ export function NotificationProvider({ children, labels }: { children: ReactNode
             style={historyButtonStyle}
             type="button"
           >
+            <ActionIcon name="history" />
             <span>{labels.history}</span>
             <span>{history.length}</span>
           </button>

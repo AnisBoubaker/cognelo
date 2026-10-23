@@ -162,6 +162,7 @@ export function DialogProvider({ children, labels }: { children: ReactNode; labe
         confirmLabel={active?.options.confirmLabel ?? labels.confirm}
         cancelLabel={active?.kind === "alert" ? undefined : active?.options.cancelLabel ?? labels.cancel}
         confirmVariant={active?.kind === "confirm" ? active.options.confirmVariant : "default"}
+        confirmIcon={active?.kind === "alert" ? "close" : undefined}
         confirmDisabled={promptInvalid}
         onCancel={() => finish(active ? cancelledValue(active) : null)}
         onConfirm={() => finish(active?.kind === "prompt" ? promptValue : true)}

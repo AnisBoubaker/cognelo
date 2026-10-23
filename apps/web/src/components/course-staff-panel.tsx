@@ -102,7 +102,7 @@ export function CourseStaffPanel({
           </div>
           <p className="muted">{t("courseDetail.courseStaffExistingAccountHelp")}</p>
           <div className="row">
-            <button disabled={saving} type="submit">{saving ? t("common.saving") : t("courseDetail.courseStaffAdd")}</button>
+            <button disabled={saving} type="submit"><AppIcon name="add" /> {saving ? t("common.saving") : t("courseDetail.courseStaffAdd")}</button>
           </div>
         </form>
       ) : null}

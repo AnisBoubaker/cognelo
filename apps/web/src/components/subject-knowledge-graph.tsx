@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import "@xyflow/react/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
 import {
@@ -716,7 +718,7 @@ export function SubjectKnowledgeGraph({
         {!readOnly ? <form className="knowledge-graph-add" onSubmit={addConcept}>
           <label className="sr-only" htmlFor="new-concept-title">{t("knowledgeGraph.conceptTitle")}</label>
           <input id="new-concept-title" value={newTitle} onChange={(event) => setNewTitle(event.target.value)} placeholder={t("knowledgeGraph.addPlaceholder")} />
-          <button className="button" disabled={!newTitle.trim()} type="submit">{t("knowledgeGraph.addConcept")}</button>
+          <button className="button" disabled={!newTitle.trim()} type="submit"><AppIcon name="add" /> {t("knowledgeGraph.addConcept")}</button>
         </form> : null}
       </div>
 
@@ -756,11 +758,13 @@ export function SubjectKnowledgeGraph({
             <p className="muted">{t("knowledgeGraph.aiHelp")}</p>
             <div className="row">
               <button type="button" disabled={generating || checkingGenerationImpact || subjectDescription.trim().length < 10} onClick={() => void requestGeneration()}>
+                <AppIcon name="generate" />
                 {generating || checkingGenerationImpact
                   ? t("knowledgeGraph.aiGenerating")
                   : t(generationMode === "iterate" ? "knowledgeGraph.aiIterate" : "knowledgeGraph.aiGenerate")}
               </button>
               <button className="secondary" type="button" disabled={generating} onClick={revertGraph}>
+                <AppIcon name="refresh" />
                 {t("knowledgeGraph.revert")}
               </button>
             </div>
@@ -785,6 +789,7 @@ export function SubjectKnowledgeGraph({
             </select>
           </div>
           <button className="secondary" type="button" disabled={!concepts.length || arranging} onClick={() => void arrangeGraph()}>
+            <AppIcon name="arrange" />
             {arranging ? t("knowledgeGraph.arranging") : t("knowledgeGraph.arrange")}
           </button>
         </div>
@@ -897,15 +902,15 @@ export function SubjectKnowledgeGraph({
               <div className="field">
                 <div className="knowledge-skill-heading">
                   <label>{t("knowledgeGraph.conceptSkills")}</label>
-                  <button className="knowledge-skill-add" type="button" aria-label={t("knowledgeGraph.addSkill")} title={t("knowledgeGraph.addSkill")} onClick={() => openSkillDialog("add")}>+</button>
+                  <button className="knowledge-skill-add" type="button" aria-label={t("knowledgeGraph.addSkill")} title={t("knowledgeGraph.addSkill")} onClick={() => openSkillDialog("add")}><AppIcon name="add" /></button>
                 </div>
                 <div className="knowledge-skill-list">
                   {selectedConcept.skillRecords.length ? selectedConcept.skillRecords.map((skill) => (
                     <div className="knowledge-skill-chip" key={skill.id}>
                       <span>{skill.title}</span>
                       <span className="knowledge-skill-actions">
-                        <button type="button" aria-label={t("knowledgeGraph.editSkill")} title={t("knowledgeGraph.editSkill")} onClick={() => openSkillDialog("edit", skill)}>✎</button>
-                        <button type="button" aria-label={t("knowledgeGraph.deleteSkill")} title={t("knowledgeGraph.deleteSkill")} onClick={() => void requestDeleteSkill(skill)}>⌫</button>
+                        <button type="button" aria-label={t("knowledgeGraph.editSkill")} title={t("knowledgeGraph.editSkill")} onClick={() => openSkillDialog("edit", skill)}><AppIcon name="edit" /></button>
+                        <button type="button" aria-label={t("knowledgeGraph.deleteSkill")} title={t("knowledgeGraph.deleteSkill")} onClick={() => void requestDeleteSkill(skill)}><AppIcon name="remove" /></button>
                       </span>
                     </div>
                   )) : <p className="muted">{t("knowledgeGraph.noSkills")}</p>}
@@ -915,23 +920,23 @@ export function SubjectKnowledgeGraph({
               <div className="field">
                 <div className="knowledge-skill-heading">
                   <label>{t("knowledgeGraph.conceptMisconceptions")}</label>
-                  <button className="knowledge-skill-add" type="button" aria-label={t("knowledgeGraph.addMisconception")} title={t("knowledgeGraph.addMisconception")} onClick={() => openMisconceptionDialog("add")}>+</button>
+                  <button className="knowledge-skill-add" type="button" aria-label={t("knowledgeGraph.addMisconception")} title={t("knowledgeGraph.addMisconception")} onClick={() => openMisconceptionDialog("add")}><AppIcon name="add" /></button>
                 </div>
                 <div className="knowledge-skill-list">
                   {selectedConcept.misconceptionRecords.length ? selectedConcept.misconceptionRecords.map((item) => (
                     <div className="knowledge-skill-chip" key={item.id}>
                       <span>{item.title}</span>
                       <span className="knowledge-skill-actions">
-                        <button type="button" aria-label={t("knowledgeGraph.editMisconception")} title={t("knowledgeGraph.editMisconception")} onClick={() => openMisconceptionDialog("edit", item)}>✎</button>
-                        <button type="button" aria-label={t("knowledgeGraph.deleteMisconception")} title={t("knowledgeGraph.deleteMisconception")} onClick={() => void requestDeleteMisconception(item)}>⌫</button>
+                        <button type="button" aria-label={t("knowledgeGraph.editMisconception")} title={t("knowledgeGraph.editMisconception")} onClick={() => openMisconceptionDialog("edit", item)}><AppIcon name="edit" /></button>
+                        <button type="button" aria-label={t("knowledgeGraph.deleteMisconception")} title={t("knowledgeGraph.deleteMisconception")} onClick={() => void requestDeleteMisconception(item)}><AppIcon name="remove" /></button>
                       </span>
                     </div>
                   )) : <p className="muted">{t("knowledgeGraph.noMisconceptions")}</p>}
                 </div>
                 <span className="muted">{t("knowledgeGraph.conceptMisconceptionsHelp")}</span>
               </div>
-              <button className="button" disabled={!editTitle.trim()} type="submit">{t("knowledgeGraph.applyConcept")}</button>
-              <button className="button danger" onClick={() => void requestDeleteConcept()} type="button">{t("knowledgeGraph.deleteConcept")}</button>
+              <button className="button" disabled={!editTitle.trim()} type="submit"><AppIcon name="check" /> {t("knowledgeGraph.applyConcept")}</button>
+              <button className="button danger" onClick={() => void requestDeleteConcept()} type="button"><AppIcon name="remove" /> {t("knowledgeGraph.deleteConcept")}</button>
             </form>
           ) : (
             <div className="knowledge-graph-empty stack">
@@ -954,9 +959,11 @@ export function SubjectKnowledgeGraph({
             </div>
             <div className="dialog-actions">
               <button className="secondary" type="button" onClick={() => setShowReplaceDialog(false)}>
+                <AppIcon name="close" />
                 {t("knowledgeGraph.aiKeepCurrent")}
               </button>
               <button type="button" onClick={() => void generateGraph()}>
+                <AppIcon name="sync" />
                 {t("knowledgeGraph.aiReplace")}
               </button>
             </div>
@@ -983,7 +990,7 @@ export function SubjectKnowledgeGraph({
               ? <p>{t("knowledgeGraph.aiNoStructuralChanges")}</p>
               : null}
             <div className="dialog-actions">
-              <button type="button" onClick={() => setGenerationSummary(null)}>{t("knowledgeGraph.aiChangesOk")}</button>
+              <button type="button" onClick={() => setGenerationSummary(null)}><AppIcon name="check" /> {t("knowledgeGraph.aiChangesOk")}</button>
             </div>
           </div>
         </div>

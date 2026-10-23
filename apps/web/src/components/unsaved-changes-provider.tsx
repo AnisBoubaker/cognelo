@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { UnsavedChangesContext, type UnsavedChangesGuard } from "@cognelo/activity-ui";
@@ -160,12 +162,15 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
               <p className="muted">{t("unsavedChanges.message")}</p>
               <div className="dialog-actions">
                 <button className="secondary" type="button" disabled={saving} onClick={() => setPendingHref(null)}>
+                  <AppIcon name="edit" />
                   {t("unsavedChanges.continueEditing")}
                 </button>
                 <button type="button" disabled={saving} onClick={saveAndLeave}>
+                  <AppIcon name="save" />
                   {saving ? t("common.saving") : t("unsavedChanges.saveAndLeave")}
                 </button>
                 <button className="secondary" type="button" disabled={saving} onClick={discardAndLeave}>
+                  <AppIcon name="remove" />
                   {t("unsavedChanges.discardAndLeave")}
                 </button>
               </div>

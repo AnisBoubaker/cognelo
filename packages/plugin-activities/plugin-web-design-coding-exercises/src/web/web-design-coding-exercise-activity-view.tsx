@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityExecutionStateHost, TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
-import { EditActionBar, MarkdownRenderer, MonacoCodeEditor, ProgressDialog, getEditActionBarCopy, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { ActionIcon, EditActionBar, MarkdownRenderer, MonacoCodeEditor, ProgressDialog, getEditActionBarCopy, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import {
   buildWebDesignPreviewDocument,
   defaultWebDesignExerciseConfig,
@@ -1167,7 +1167,7 @@ export function WebDesignCodingExerciseActivityView({
           deferSubmission={deferSubmission}
           readOnly={readOnly || !executionStateLoaded}
         />
-        {draftLoadFailed ? <button type="button" className="secondary" onClick={() => setDraftReload((value) => value + 1)}>{copy.retryLoadAnswer}</button> : null}
+        {draftLoadFailed ? <button type="button" className="secondary" onClick={() => setDraftReload((value) => value + 1)}><ActionIcon name="refresh" /> {copy.retryLoadAnswer}</button> : null}
       </section>
 
       {isFullScreen ? (
@@ -1249,6 +1249,7 @@ function AuthoringFileTabs({
         <h3 style={{ margin: 0 }}>{heading}</h3>
         {onAddFile ? (
           <button type="button" className="secondary" onClick={onAddFile}>
+            <ActionIcon name="add" />
             {copy.addFile}
           </button>
         ) : null}
@@ -1298,6 +1299,7 @@ function AuthoringFileTabs({
               </div>
               {onRemoveFile ? (
                 <button type="button" className="secondary" onClick={() => onRemoveFile(activeFile.path)} disabled={files.length <= 1}>
+                  <ActionIcon name="remove" />
                   {copy.remove}
                 </button>
               ) : null}
@@ -1438,15 +1440,18 @@ function StudentWorkspace({
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div className="row">
           <button type="button" className="secondary" onClick={onRunTests} disabled={readOnly || !testsAvailable || executingKind !== null}>
+            <ActionIcon name="run" />
             {executingKind === "run" ? copy.runningTests : copy.runTests}
           </button>
           {!deferSubmission ? (
             <button type="button" onClick={onSubmit} disabled={readOnly || !testsAvailable || executingKind !== null}>
+              <ActionIcon name="submit" />
               {executingKind === "submit" ? copy.submitting : copy.submit}
             </button>
           ) : null}
         </div>
         <button type="button" className="secondary" onClick={fullScreen ? onExitFullScreen : onEnterFullScreen}>
+          <ActionIcon name={fullScreen ? "collapse" : "expand"} />
           {fullScreen ? copy.exitFullScreen : copy.fullScreen}
         </button>
       </div>
@@ -1984,18 +1989,7 @@ function WebDesignActionIcon({ name }: { name: "add" | "reference" | "remove" | 
     );
   }
 
-  const paths = {
-    add: "M12 5v14M5 12h14",
-    reference: "M4 4h16v12H7l-3 3V4z",
-    remove: "M6 6l12 12M18 6L6 18",
-    save: "M5 5h14v14H5zM8 5v5h8M8 16h8"
-  } satisfies Record<Exclude<typeof name, "spinner">, string>;
-
-  return (
-    <svg aria-hidden="true" fill="none" height="18" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="18">
-      <path d={paths[name]} />
-    </svg>
-  );
+  return <ActionIcon name={name === "reference" ? "review" : name} />;
 }
 
 const webDesignCollapsibleHeaderStyle: CSSProperties = {
@@ -2087,6 +2081,7 @@ function PreviewPane({
           <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
             <h4 style={{ margin: 0 }}>{copy.console}</h4>
             <button type="button" className="secondary" onClick={() => setMessages([])}>
+              <ActionIcon name="clear" />
               {copy.clearConsole}
             </button>
           </div>

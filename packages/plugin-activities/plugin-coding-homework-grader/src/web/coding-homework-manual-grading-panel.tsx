@@ -1,7 +1,6 @@
 "use client";
 
-import { useApplicationTime } from "@cognelo/activity-ui";
-
+import { ActionIcon, useApplicationTime } from "@cognelo/activity-ui";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import type { CodingHomeworkGradebookAttemptRecord } from "./client";
@@ -98,6 +97,7 @@ export function CodingHomeworkManualGradingPanel({
           <p className="muted">{row.participantEmail}</p>
         </div>
         <button className="button secondary" type="button" onClick={onClose}>
+          <ActionIcon name="close" />
           {t("common.close")}
         </button>
       </div>
@@ -114,6 +114,7 @@ export function CodingHomeworkManualGradingPanel({
         <div className="stack">
           <div className="row">
             <button className="button secondary" disabled={selectedIndex === 0} type="button" onClick={() => onSelectAttemptIndex(selectedIndex - 1)}>
+              <ActionIcon name="back" />
               {t("courseDetail.previousSubmission")}
             </button>
             <span className="muted">{t("courseDetail.submissionPosition", { current: selectedIndex + 1, total: attemptCount })}</span>
@@ -123,6 +124,7 @@ export function CodingHomeworkManualGradingPanel({
               type="button"
               onClick={() => onSelectAttemptIndex(selectedIndex + 1)}
             >
+              <ActionIcon name="next" />
               {t("courseDetail.nextSubmission")}
             </button>
           </div>
@@ -185,9 +187,11 @@ export function CodingHomeworkManualGradingPanel({
             <h3>{formatGradebookScore(row.score, row.maxScore)}</h3>
           </div>
           <button className="button secondary" disabled type="button" onClick={() => void onRegradeAttempt()}>
+            <ActionIcon name="refresh" />
             {isSavingRegrade ? t("common.saving") : t("courseDetail.regrade")}
           </button>
           <button className="button secondary" disabled={isSavingDelete || !selectedAttempt} type="button" onClick={() => void onDeleteSubmission()}>
+            <ActionIcon name="remove" />
             {isSavingDelete ? t("common.saving") : t("courseDetail.deleteSubmission")}
           </button>
         </div>
@@ -211,9 +215,11 @@ export function CodingHomeworkManualGradingPanel({
         {formError ? <p className="error">{formError}</p> : null}
         <div className="dialog-actions">
           <button className="button secondary" type="button" onClick={onClose}>
+            <ActionIcon name="close" />
             {t("common.cancel")}
           </button>
           <button disabled={isSavingOverride} type="submit">
+            <ActionIcon name="save" />
             {isSavingOverride ? t("common.saving") : t("common.save")}
           </button>
         </div>

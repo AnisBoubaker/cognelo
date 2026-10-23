@@ -1,5 +1,7 @@
 "use client";
 
+import { ActionIcon } from "./action-icon";
+
 /* eslint-disable @next/next/no-img-element -- Preview sources are local object URLs or authenticated media routes that Next Image cannot optimize reliably. */
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
@@ -146,7 +148,7 @@ export function ImageEditorDialog({
             <h2 id="image-editor-title">{mode === "add" ? copy.addTitle : copy.editTitle}</h2>
             <p className="muted">{copy.help}</p>
           </div>
-          <button aria-label={copy.close} className="secondary icon-button" disabled={busy} type="button" onClick={onCancel}>×</button>
+          <button aria-label={copy.close} className="secondary icon-button" disabled={busy} type="button" onClick={onCancel}><ActionIcon name="close" /></button>
         </div>
 
         <div className="image-editor-layout">
@@ -227,10 +229,10 @@ export function ImageEditorDialog({
         {error ? <p className="form-error" role="alert">{error}</p> : null}
 
         <div className="dialog-actions image-editor-actions">
-          {onRemove ? <button className="danger-button" disabled={busy} type="button" onClick={onRemove}>{copy.remove}</button> : null}
+          {onRemove ? <button className="danger-button" disabled={busy} type="button" onClick={onRemove}><ActionIcon name="remove" /> {copy.remove}</button> : null}
           <span />
-          <button className="secondary" disabled={busy} type="button" onClick={onCancel}>{copy.cancel}</button>
-          <button disabled={busy} type="submit">{mode === "add" ? copy.insert : copy.update}</button>
+          <button className="secondary" disabled={busy} type="button" onClick={onCancel}><ActionIcon name="close" /> {copy.cancel}</button>
+          <button disabled={busy} type="submit"><ActionIcon name={mode === "add" ? "add" : "save"} /> {mode === "add" ? copy.insert : copy.update}</button>
         </div>
       </form>
     </div>,

@@ -4,6 +4,8 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- [Action buttons](ACTION_BUTTONS.md) use one compact outlined CSS recipe and the shared Tabler `ActionIcon` registry (`AppIcon` in web pages). Keep ordinary actions consistent across host and plugins, including save bars and dialogs. Choose icons explicitly by action, retain labels, and preserve danger, disabled, focus, navigation, and disclosure semantics.
+
 - [Editor undo](EDITOR_UNDO.md): restore saved code as a baseline, never as a full-document undoable edit. Keep undo/redo only in mounted-session memory, isolated by Test attempt/view, question, and file; dispose it on departure/account/attempt changes. Reload/reopen starts from the saved answer with empty history. Loading cannot autosave blank/starter text; normal edits and undo/redo must keep using ordered answer autosaves.
 
 - [Activity content access](ACTIVITY_CONTENT_ACCESS.md): optional General-only closure blocks student prompts, answers, histories, solutions, reports, and exam files once effective attempts/dates end. Keep valid started/reopened attempts usable, staff records intact, and only receipts/released totals visible after closure. Enforce through the shared assigned-route guard, grade projections, and media access; finalization may finish expired saved work but cannot return protected content.

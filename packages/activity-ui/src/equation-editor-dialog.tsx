@@ -1,5 +1,7 @@
 "use client";
 
+import { ActionIcon } from "./action-icon";
+
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MathfieldElement, VirtualKeyboardInterface } from "mathlive";
@@ -200,7 +202,7 @@ export function EquationEditorDialog({
             <h2 id="equation-editor-title">{mode === "edit" ? copy.editTitle : copy.addTitle}</h2>
             <p className="muted">{copy.help}</p>
           </div>
-          <button aria-label={copy.close} className="secondary icon-button" type="button" onClick={onCancel}>×</button>
+          <button aria-label={copy.close} className="secondary icon-button" type="button" onClick={onCancel}><ActionIcon name="close" /></button>
         </div>
 
         <div aria-label={copy.styleLabel} className="equation-editor-style" role="group">
@@ -246,10 +248,10 @@ export function EquationEditorDialog({
         {validationError ? <p className="error" role="alert">{validationError}</p> : null}
 
         <div className="dialog-actions equation-editor-actions">
-          {mode === "edit" && onRemove ? <button className="danger secondary" type="button" onClick={onRemove}>{copy.remove}</button> : null}
+          {mode === "edit" && onRemove ? <button className="danger secondary" type="button" onClick={onRemove}><ActionIcon name="remove" /> {copy.remove}</button> : null}
           <span className="equation-editor-action-spacer" />
-          <button className="secondary" type="button" onClick={onCancel}>{copy.cancel}</button>
-          <button disabled={loading || loadError} type="button" onClick={confirm}>{mode === "edit" ? copy.update : copy.insert}</button>
+          <button className="secondary" type="button" onClick={onCancel}><ActionIcon name="close" /> {copy.cancel}</button>
+          <button disabled={loading || loadError} type="button" onClick={confirm}><ActionIcon name={mode === "edit" ? "save" : "add"} /> {mode === "edit" ? copy.update : copy.insert}</button>
         </div>
       </section>
     </div>,

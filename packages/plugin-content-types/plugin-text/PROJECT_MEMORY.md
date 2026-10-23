@@ -7,3 +7,5 @@
 - Embedding extraction uses only the Markdown body. The deterministic development vector index remains `metadata.embeddingIndex`; duplication removes it for independent rebuilding.
 - Editor and reader navigation reuse the activity header action layout and shared “Back to course” translation; do not introduce local wording or alignment.
 - Keep host integration generic through renderer, editor, settings, and presentation registry keys. See [reference](docs/REFERENCE.md) and [media lifecycle](../../../docs/MEDIA_ASSETS.md).
+
+- Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.

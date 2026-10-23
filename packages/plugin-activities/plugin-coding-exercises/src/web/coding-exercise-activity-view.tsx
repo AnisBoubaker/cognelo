@@ -1,7 +1,6 @@
 "use client";
 
-import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
-
+import { ActionIcon, useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 
 import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -1406,6 +1405,7 @@ export function CodingExerciseActivityView({
               disabled={!config.language || generatingPrompt || description.trim().length < 10}
               onClick={requestPromptGeneration}
             >
+              <ActionIcon name="generate" />
               {generatingPrompt ? t("generatingPrompt") : t("generatePrompt")}
             </button>
             </div>
@@ -1433,6 +1433,7 @@ export function CodingExerciseActivityView({
               disabled={!config.language || generatingSolution || config.prompt.trim().length < 10}
               onClick={requestSolutionGeneration}
             >
+              <ActionIcon name="generate" />
               {generatingSolution ? t("generatingSolution") : t("generateSolution")}
             </button>
           ) : null}
@@ -1452,9 +1453,11 @@ export function CodingExerciseActivityView({
                 </div>
                 <div className="dialog-actions">
                   <button className="secondary" type="button" onClick={() => setReplacementDialog(null)}>
+                    <ActionIcon name="close" />
                     {getKeepReplacementLabel()}
                   </button>
                   <button type="button" onClick={confirmReplacementGeneration}>
+                    <ActionIcon name="sync" />
                     {getReplaceReplacementLabel()}
                   </button>
                 </div>
@@ -1526,6 +1529,7 @@ export function CodingExerciseActivityView({
                 ) : null}
                 <div className="dialog-actions">
                   <button className="secondary" type="button" onClick={() => setTestGenerationDialogOpen(false)}>
+                    <ActionIcon name="close" />
                     {t("cancelTestGeneration")}
                   </button>
                   <button
@@ -1537,6 +1541,7 @@ export function CodingExerciseActivityView({
                       hiddenTestCount: hiddenTestGenerationCount
                     })}
                   >
+                    <ActionIcon name="generate" />
                     {t("confirmTestGeneration")}
                   </button>
                 </div>
@@ -1741,6 +1746,7 @@ export function CodingExerciseActivityView({
                       type="button"
                       onClick={requestRubricGeneration}
                     >
+                      <ActionIcon name="generate" />
                       {generatingRubric ? t("generatingRubric") : t("generateRubric")}
                     </button>
                   ) : null}
@@ -1761,6 +1767,7 @@ export function CodingExerciseActivityView({
                       }
                     }))}
                   >
+                    <ActionIcon name="add" />
                     {t("addCriterion")}
                   </button>
                 </div>
@@ -1785,7 +1792,7 @@ export function CodingExerciseActivityView({
                               )
                             }
                           }))}
-                        >−</button>
+                        ><ActionIcon name="minus" /></button>
                       </div>
                       <input id={`coding-rubric-criterion-title-${index}`} maxLength={160} required value={criterion.title} onChange={(event) => setPrivateConfig((current) => ({
                         ...current,
@@ -1870,6 +1877,7 @@ export function CodingExerciseActivityView({
               disabled={!config.language || generatingTests || config.prompt.trim().length < 10 || !referenceSolution.trim()}
               onClick={requestTestsGeneration}
             >
+              <ActionIcon name="generate" />
               {generatingTests ? t("generatingTests") : t("generateTests")}
             </button>
           ) : null}
@@ -1883,6 +1891,7 @@ export function CodingExerciseActivityView({
                 disabled={!config.language || normalizeCodingExerciseSampleTests(config.sampleTests).length >= codingExerciseMaxGeneratedTestCount}
                 onClick={addSampleTest}
               >
+                <ActionIcon name="add" />
                 {t("addSampleTest")}
               </button>
             </div>
@@ -1905,6 +1914,7 @@ export function CodingExerciseActivityView({
                   <>
                     <div className="row" style={{ justifyContent: "flex-end" }}>
                       <button type="button" className="button secondary" onClick={() => removeSampleTest(index)}>
+                        <ActionIcon name="remove" />
                         {t("remove")}
                       </button>
                     </div>
@@ -1973,6 +1983,7 @@ export function CodingExerciseActivityView({
             <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
               <h3>{t("hiddenTests")}</h3>
               <button type="button" className="button secondary" disabled={!config.language} onClick={addHiddenTest}>
+                <ActionIcon name="add" />
                 {t("addHiddenTest")}
               </button>
             </div>
@@ -2000,6 +2011,7 @@ export function CodingExerciseActivityView({
                   <>
                     <div className="row" style={{ justifyContent: "flex-end" }}>
                       <button type="button" className="button secondary" onClick={() => removeHiddenTest(index)}>
+                        <ActionIcon name="remove" />
                         {t("remove")}
                       </button>
                     </div>
@@ -2163,6 +2175,7 @@ export function CodingExerciseActivityView({
                     type="button"
                     onClick={() => setIsWorkspaceFullScreen((current) => !current)}
                   >
+                    <ActionIcon name={isWorkspaceFullScreen ? "collapse" : "expand"} />
                     {isWorkspaceFullScreen ? t("exitFullScreen") : t("fullScreen")}
                   </button>
                 </div>
@@ -2192,12 +2205,13 @@ export function CodingExerciseActivityView({
                       readOnlyPrefix={templateProjection.readOnlyPrefix}
                       readOnlySuffix={templateProjection.readOnlySuffix}
                     />
-                    {draftLoadFailed ? <button type="button" className="secondary" onClick={() => setDraftReload((value) => value + 1)}>{t("retryLoadAnswer")}</button> : null}
+                    {draftLoadFailed ? <button type="button" className="secondary" onClick={() => setDraftReload((value) => value + 1)}><ActionIcon name="refresh" /> {t("retryLoadAnswer")}</button> : null}
                   </div>
 
                   {!deferSubmission ? (
                     <div className="row coding-exercise-editor-actions" style={{ alignItems: "center" }}>
                       <button type="button" onClick={submitCode} disabled={!config.language || readOnly || workingAction === "submit" || !editorCode.trim()}>
+                        <ActionIcon name="submit" />
                         {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
                       </button>
                       {submitExecution && submitExecution.status !== "pending" && canShowExecutionOutcome(submitExecution) ? (
@@ -2307,6 +2321,7 @@ export function CodingExerciseActivityView({
                   )}
 
                   <button type="button" onClick={runCode} disabled={!config.language || readOnly || workingAction === "run" || !editorCode.trim()}>
+                    <ActionIcon name="run" />
                     {workingAction === "run" ? t("running") : t("runTest")}
                   </button>
 
@@ -2396,6 +2411,7 @@ export function CodingExerciseActivityView({
                 </div>
                 <div className="dialog-actions">
                   <button type="button" onClick={acknowledgeSubmission}>
+                    <ActionIcon name="check" />
                     {t("confirmOk")}
                   </button>
                 </div>
@@ -2433,7 +2449,7 @@ function CodingRunHistory({ executions, locale }: { executions: CodingExecution[
         aria-expanded={expanded}
         aria-controls={historyId}
         onClick={() => setExpandedForRunId(expanded ? null : latest.id)}
-      >{formatCodingExercisesMessage(locale, expanded ? "hidePreviousRuns" : "showPreviousRuns", { count: previousRuns.length })}</button>
+      ><ActionIcon name={expanded ? "up" : "history"} /> {formatCodingExercisesMessage(locale, expanded ? "hidePreviousRuns" : "showPreviousRuns", { count: previousRuns.length })}</button>
       <div id={historyId} hidden={!expanded}>
         {expanded ? <div className="stack">
           {previousRuns.map((execution) => <ExecutionCard key={execution.id} execution={execution} title={formatZonedDateTime(new Date(execution.createdAt), timeZone, locale, { dateStyle: "medium", timeStyle: "medium" })} compact locale={locale} />)}

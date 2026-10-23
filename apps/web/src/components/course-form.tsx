@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { CourseInput, StudentContentLayout } from "@cognelo/contracts";
@@ -148,6 +150,7 @@ export function CourseForm({ initial, showStudentContentLayout = false, subjects
         />
       ) : (
         <button type="submit" disabled={saving || !subjectId}>
+          <AppIcon name="add" />
           {saving ? t("common.saving") : submitLabel}
         </button>
       )}

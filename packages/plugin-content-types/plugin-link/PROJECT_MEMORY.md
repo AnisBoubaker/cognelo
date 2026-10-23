@@ -12,3 +12,5 @@
 - Never weaken the public-address guard for tests. Mock the AI response for UI tests and test the HTTP gate, DNS pinning, redirects, and no-AI-on-failure behavior in server tests.
 - The private table has an idempotent content-plugin manifest migration. Existing activated installations must run the combined migration command; fresh activation is not an upgrade migration substitute.
 - Host pages dispatch through the presentation/settings registries. Do not introduce concrete link-type branches into course pages or core.
+
+- Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.

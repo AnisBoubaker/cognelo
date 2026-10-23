@@ -1,7 +1,6 @@
 "use client";
 
-import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
-
+import { ActionIcon, useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 
 import { CodingExerciseAiFeedbackReview } from "./coding-exercise-ai-feedback-review";
 
@@ -54,16 +53,18 @@ export function CodingExerciseManualGradingPanel({
           <h2>{t("courseDetail.inspectAttempts")}</h2>
           <p className="muted">{row.participantName} · {row.participantEmail}</p>
         </div>
-        <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button>
+        <button className="button secondary" type="button" onClick={onClose}><ActionIcon name="close" /> {t("common.close")}</button>
       </div>
 
       {attemptCount > 1 ? (
         <div className="row">
           <button className="button secondary" disabled={loading || selectedIndex === 0} type="button" onClick={() => onSelectAttemptIndex(selectedIndex - 1)}>
+            <ActionIcon name="back" />
             {t("courseDetail.previousSubmission")}
           </button>
           <span className="muted">{t("courseDetail.submissionPosition", { current: selectedIndex + 1, total: attemptCount })}</span>
           <button className="button secondary" disabled={loading || selectedIndex >= attemptCount - 1} type="button" onClick={() => onSelectAttemptIndex(selectedIndex + 1)}>
+            <ActionIcon name="next" />
             {t("courseDetail.nextSubmission")}
           </button>
         </div>

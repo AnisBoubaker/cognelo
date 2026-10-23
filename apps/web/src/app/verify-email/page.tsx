@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
@@ -91,6 +93,7 @@ export default function VerifyEmailPage() {
         <div className="stack">
           <div className="row">
             <button className="secondary" type="button" onClick={async () => { await logout(); router.replace("/login"); }}>
+              <AppIcon name="logout" />
               {t("common.logout")}
             </button>
             <div style={{ flex: 1 }} />
@@ -122,9 +125,11 @@ export default function VerifyEmailPage() {
             {status ? <p className="success-message" role="status">{status}</p> : null}
             {error ? <p className="error" role="alert">{error}</p> : null}
             <button className="login-submit-button" disabled={verifying || code.length !== 6} type="submit">
+              <AppIcon name="check" />
               {verifying ? t("emailVerification.verifying") : t("emailVerification.verify")}
             </button>
             <button className="secondary" disabled={sending || retryAfterSeconds > 0} type="button" onClick={() => void sendCode()}>
+              <AppIcon name="submit" />
               {sending
                 ? t("emailVerification.sending")
                 : retryAfterSeconds > 0

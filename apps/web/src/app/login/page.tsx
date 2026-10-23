@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
@@ -119,6 +121,7 @@ export default function LoginPage() {
             ) : null}
             {error ? <p className="error">{error}</p> : null}
             <button className="login-submit-button" type="submit" disabled={loading}>
+              <AppIcon name={mode === "login" ? "login" : "activate"} />
               {loading ? t("login.submitting") : mode === "login" ? t("login.submit") : t("login.activateSubmit")}
             </button>
           </form>

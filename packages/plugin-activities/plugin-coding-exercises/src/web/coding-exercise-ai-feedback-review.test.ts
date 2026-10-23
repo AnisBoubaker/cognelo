@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
 vi.mock("@cognelo/activity-ui", () => ({
+  ActionIcon: () => null,
   CodeRenderer: ({ code }: { code: string }) => React.createElement("pre", null, code),
   ConfirmationDialog: () => null
 }));

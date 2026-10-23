@@ -9,3 +9,5 @@
 - The server plugin implements `indexEmbeddingDocuments` and `searchEmbeddingDocuments`. The current dev index is stored in resource metadata under `embeddingIndex`; future pgvector/plugin-owned table storage should stay behind those handlers.
 - No plugin-owned table is used yet; future extraction/indexing state should add plugin-owned persistence.
 - The server `duplicate` handler copies safe metadata and shares the immutable `storedName` file reference, but removes `embeddingIndex`. A future mutable/object-storage backend must replace this with explicit reference counting or physical copy semantics.
+
+- Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.

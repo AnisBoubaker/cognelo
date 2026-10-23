@@ -650,6 +650,7 @@ export default function CourseDetailPage() {
             </div>
             <div className="section-actions">
               <Link className="button secondary" href="/courses">
+                <AppIcon name="back" />
                 {t("courseDetail.backToCourses")}
               </Link>
             </div>
@@ -1438,6 +1439,7 @@ export default function CourseDetailPage() {
                       rel="noopener"
                       target="_blank"
                     >
+                      <AppIcon name="visible" />
                       {t("courseDetail.studentView")}
                     </Link>
                   ) : null}
@@ -2085,7 +2087,7 @@ export default function CourseDetailPage() {
                   <form className="form" onSubmit={duplicateContentActivity}>
                     <div className="field"><label htmlFor="duplicate-course-activity-name">{t("courseDetail.duplicateContentTitleLabel")}</label><input id="duplicate-course-activity-name" autoFocus minLength={2} maxLength={180} required value={duplicateCourseActivityTitle} onChange={(event) => setDuplicateCourseActivityTitle(event.target.value)} /></div>
                     <p className="muted">{t("courseDetail.duplicateActivityLocationHelp")}</p>
-                    <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDuplicatingCourseActivity(null)}>{t("common.cancel")}</button><button disabled={isDuplicatingCourseActivity || duplicateCourseActivityTitle.trim().length < 2} type="submit">{isDuplicatingCourseActivity ? t("common.saving") : t("courseDetail.duplicateActivity")}</button></div>
+                    <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDuplicatingCourseActivity(null)}><AppIcon name="close" /> {t("common.cancel")}</button><button disabled={isDuplicatingCourseActivity || duplicateCourseActivityTitle.trim().length < 2} type="submit"><AppIcon name="duplicate" /> {isDuplicatingCourseActivity ? t("common.saving") : t("courseDetail.duplicateActivity")}</button></div>
                   </form>
                 </section>
               </div>
@@ -2103,10 +2105,10 @@ export default function CourseDetailPage() {
                     {!bankSyncDialog.sync.retrievalAllowed ? <p className="error">{t("courseDetail.bankSyncAttemptsLocked", { count: bankSyncDialog.sync.attemptCount })}</p> : null}
                     {bankSyncError ? <p className="error">{bankSyncError}</p> : null}
                     <div className="dialog-actions">
-                      <button className="secondary" disabled={bankSyncLoading} type="button" onClick={() => setBankSyncDialog(null)}>{t("common.cancel")}</button>
-                      {bankSyncDialog.sync.status === "course_ahead" ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.retrievalAllowed} type="button" onClick={() => setBankSyncConfirmation("retrieve_original")}>{t("courseDetail.bankSyncRestoreOriginal", { version: bankSyncDialog.sync.originalVersion.versionNumber })}</button> : null}
-                      {(bankSyncDialog.sync.status === "bank_ahead" || bankSyncDialog.sync.status === "diverged") ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.retrievalAllowed} type="button" onClick={() => setBankSyncConfirmation("retrieve_latest")}>{t("courseDetail.bankSyncRetrieveLatest", { version: bankSyncDialog.sync.latestVersion.versionNumber })}</button> : null}
-                      {(bankSyncDialog.sync.status === "course_ahead" || bankSyncDialog.sync.status === "diverged") && bankSyncDialog.sync.canWriteToBank ? <button disabled={bankSyncLoading} type="button" onClick={() => setBankSyncConfirmation("publish_to_bank")}>{t("courseDetail.bankSyncPublish")}</button> : null}
+                      <button className="secondary" disabled={bankSyncLoading} type="button" onClick={() => setBankSyncDialog(null)}><AppIcon name="close" /> {t("common.cancel")}</button>
+                      {bankSyncDialog.sync.status === "course_ahead" ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.retrievalAllowed} type="button" onClick={() => setBankSyncConfirmation("retrieve_original")}><AppIcon name="sync" /> {t("courseDetail.bankSyncRestoreOriginal", { version: bankSyncDialog.sync.originalVersion.versionNumber })}</button> : null}
+                      {(bankSyncDialog.sync.status === "bank_ahead" || bankSyncDialog.sync.status === "diverged") ? <button disabled={bankSyncLoading || !bankSyncDialog.sync.retrievalAllowed} type="button" onClick={() => setBankSyncConfirmation("retrieve_latest")}><AppIcon name="sync" /> {t("courseDetail.bankSyncRetrieveLatest", { version: bankSyncDialog.sync.latestVersion.versionNumber })}</button> : null}
+                      {(bankSyncDialog.sync.status === "course_ahead" || bankSyncDialog.sync.status === "diverged") && bankSyncDialog.sync.canWriteToBank ? <button disabled={bankSyncLoading} type="button" onClick={() => setBankSyncConfirmation("publish_to_bank")}><AppIcon name="publish" /> {t("courseDetail.bankSyncPublish")}</button> : null}
                     </div>
                   </div>
                 </section>
@@ -2128,8 +2130,8 @@ export default function CourseDetailPage() {
                     <p className="muted">{t("courseDetail.bankSyncConfirmPreserved")}</p>
                     {bankSyncError ? <p className="error">{bankSyncError}</p> : null}
                     <div className="dialog-actions">
-                      <button className="secondary" disabled={bankSyncLoading} type="button" onClick={() => setBankSyncConfirmation(null)}>{t("common.back")}</button>
-                      <button disabled={bankSyncLoading} type="button" onClick={() => void performBankSync(bankSyncConfirmation)}>{bankSyncLoading ? t("common.saving") : t("courseDetail.bankSyncConfirmAction")}</button>
+                      <button className="secondary" disabled={bankSyncLoading} type="button" onClick={() => setBankSyncConfirmation(null)}><AppIcon name="back" /> {t("common.back")}</button>
+                      <button disabled={bankSyncLoading} type="button" onClick={() => void performBankSync(bankSyncConfirmation)}><AppIcon name="sync" /> {bankSyncLoading ? t("common.saving") : t("courseDetail.bankSyncConfirmAction")}</button>
                     </div>
                   </div>
                 </section>

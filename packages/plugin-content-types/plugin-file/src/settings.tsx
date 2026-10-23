@@ -1,3 +1,4 @@
+import { ActionIcon } from "@cognelo/activity-ui";
 import type { ChangeEvent, FormEvent } from "react";
 
 export type FileContentSettingsFormProps = {
@@ -28,7 +29,7 @@ export function FileContentSettingsForm({ title, detail, error, onTitleChange, o
       </div>
       {error ? <p className="error">{error}</p> : null}
       <div className="row">
-        <button type="submit">{t("courseDetail.saveMaterial")}</button>
+        <button type="submit"><ActionIcon name="save" /> {t("courseDetail.saveMaterial")}</button>
       </div>
     </form>
   );

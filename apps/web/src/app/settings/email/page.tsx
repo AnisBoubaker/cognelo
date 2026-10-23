@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { EditActionBar, ProgressDialog, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { EmailDeliveryConfigurationInput } from "@cognelo/contracts";
@@ -283,6 +285,7 @@ export default function EmailSettingsPage() {
                   </div>
                   <div className="row">
                     <button disabled={testing || !configuration?.configured || isDirty} type="submit">
+                      <AppIcon name="submit" />
                       {testing ? t("settings.emailTesting") : t("settings.emailTestSend")}
                     </button>
                   </div>

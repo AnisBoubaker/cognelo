@@ -1,4 +1,7 @@
 "use client";
+
+import { AppIcon } from "@/components/app-icon";
+
 import { useApplicationTime, fromZonedDateTimeInput } from "@cognelo/activity-ui";
 
 import { useState } from "react";
@@ -65,7 +68,7 @@ export function StudentAssignmentDialog({ draft, studentIds, onApply, onClose }:
         <h3>{t("studentGroupings.teamSlots")}</h3>
         <div className="row">
           <div className="field"><label htmlFor="all-team-capacity">{t("studentGroupings.slotsPerTeam")}</label><input id="all-team-capacity" type="number" min={0} max={5000} value={Number.isFinite(bulkCapacity) ? bulkCapacity : ""} onChange={(event) => setBulkCapacity(event.target.valueAsNumber)} /></div>
-          <button className="secondary" type="button" disabled={!validCapacity(bulkCapacity)} onClick={() => setTeams((current) => current.map((team) => ({ ...team, capacity: bulkCapacity })))}>{t("studentGroupings.applySlotsToAll")}</button>
+          <button className="secondary" type="button" disabled={!validCapacity(bulkCapacity)} onClick={() => setTeams((current) => current.map((team) => ({ ...team, capacity: bulkCapacity })))}><AppIcon name="check" /> {t("studentGroupings.applySlotsToAll")}</button>
         </div>
         <div className="student-assignment-capacities">{teams.map((team) => <div className="field" key={team.key}>
           <label htmlFor={`assignment-capacity-${team.key}`}>{team.title}</label>

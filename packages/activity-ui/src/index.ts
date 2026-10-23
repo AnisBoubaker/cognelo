@@ -1,3 +1,4 @@
+export { ActionIcon, type ActionIconName } from "./action-icon";
 export * from "./code-editor";
 export { useBodyScrollLock } from "./body-scroll-lock";
 export * from "./activity-version-diff-view";

@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
@@ -192,6 +194,7 @@ export default function AiAgentSettingsPage() {
                 </div>
                 <div className="row">
                   <button disabled={saving} type="submit">
+                    <AppIcon name="save" />
                     {saving ? t("common.saving") : t("settings.saveAiAgentPreferences")}
                   </button>
                 </div>
@@ -227,6 +230,7 @@ export default function AiAgentSettingsPage() {
                 </div>
                 {form.id ? (
                   <button className="secondary" type="button" onClick={() => setForm(emptyForm)}>
+                    <AppIcon name="add" />
                     {t("settings.aiAgentNew")}
                   </button>
                 ) : null}
@@ -322,6 +326,7 @@ export default function AiAgentSettingsPage() {
 
                 <div className="row">
                   <button disabled={saving} type="submit">
+                    <AppIcon name="save" />
                     {saving ? t("common.saving") : t("settings.aiAgentSave")}
                   </button>
                 </div>
@@ -383,9 +388,11 @@ function AgentList({
               {canEdit ? (
                 <div className="table-actions">
                   <button className="secondary" type="button" onClick={() => onEdit(connection)}>
+                    <AppIcon name="edit" />
                     {t("common.edit")}
                   </button>
                   <button className="secondary" type="button" onClick={() => onDelete(connection)}>
+                    <AppIcon name="remove" />
                     {t("common.remove")}
                   </button>
                 </div>

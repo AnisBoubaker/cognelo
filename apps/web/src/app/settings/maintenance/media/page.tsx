@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { useCallback, useEffect, useState } from "react";
 import { ConfirmationDialog, ProgressDialog, useNotifications } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
@@ -75,6 +77,7 @@ export default function MediaMaintenancePage() {
               </div>
               {isAdmin ? (
                 <button className="secondary" disabled={loading || cleaning} type="button" onClick={() => void loadOverview()}>
+                  <AppIcon name="refresh" />
                   {loading ? t("common.loading") : t("settings.maintenanceRefresh")}
                 </button>
               ) : null}
@@ -108,6 +111,7 @@ export default function MediaMaintenancePage() {
                       type="button"
                       onClick={() => setConfirmingCleanup(true)}
                     >
+                      <AppIcon name="remove" />
                       {t("settings.maintenanceRunCleanup")}
                     </button>
                   </div>

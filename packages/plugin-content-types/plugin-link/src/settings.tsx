@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ProgressDialog } from "@cognelo/activity-ui";
+import { ActionIcon, ProgressDialog } from "@cognelo/activity-ui";
 import type { ContentPluginLocale } from "@cognelo/content-type-sdk";
 import { linkUrlSchema, MAX_SUMMARY_LINKED_PAGES, type LinkSummaryResult, type LinkSummarySources } from "./shared";
 
@@ -155,10 +155,10 @@ export function LinkContentSettingsForm({ resourceId, title, url, metadata, loca
       </div>
       <div className="row" style={{ alignItems: "end" }}>
         <div className="field" style={{ maxWidth: "12rem" }}><label htmlFor="settings-link-max-words">{labels.maxWords}</label><input id="settings-link-max-words" type="number" min={1} max={2000} required disabled={!loaded || generating} value={Number.isFinite(maxWords) ? maxWords : ""} onChange={(event) => onMetadataChange({ ...metadata, summaryMaxWords: event.target.valueAsNumber })} /></div>
-        <button className="secondary" type="button" disabled={!loaded || generating || !validMaxWords || !linkUrlSchema.safeParse(url).success} onClick={() => void generate()}>{labels.generate}</button>
+        <button className="secondary" type="button" disabled={!loaded || generating || !validMaxWords || !linkUrlSchema.safeParse(url).success} onClick={() => void generate()}><ActionIcon name="generate" /> {labels.generate}</button>
       </div>
       {!loaded ? <p className="muted">{loadFailed ? labels.loadError : labels.loading}</p> : null}
-      {loadFailed ? <button className="secondary" type="button" onClick={() => setRetry((current) => current + 1)}>{labels.retry}</button> : null}
+      {loadFailed ? <button className="secondary" type="button" onClick={() => setRetry((current) => current + 1)}><ActionIcon name="refresh" /> {labels.retry}</button> : null}
       {sources ? <p className="muted" role="status">{[
         labels.sourcesIncluded.replace("{count}", String(sources.includedPages)),
         sources.unavailablePages ? labels.sourcesUnavailable.replace("{count}", String(sources.unavailablePages)) : "",
@@ -167,7 +167,7 @@ export function LinkContentSettingsForm({ resourceId, title, url, metadata, loca
       ].filter(Boolean).join(" ")}</p> : null}
       {summaryError ? <p className="error" role="alert">{summaryError}</p> : null}
       {error ? <p className="error">{error}</p> : null}
-      <div className="row"><button type="submit" disabled={generating || !loaded}>{t("courseDetail.saveMaterial")}</button></div>
+      <div className="row"><button type="submit" disabled={generating || !loaded}><ActionIcon name="save" /> {t("courseDetail.saveMaterial")}</button></div>
     </form>
     <ProgressDialog open={generating} title={labels.generating} message={followSameDomainLinks ? labels.crawlProgress : labels.progress} progressLabel={labels.generating} />
   </>;

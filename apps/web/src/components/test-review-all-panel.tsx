@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import type { ReactNode } from "react";
 import {
   buildTestReportSummary,
@@ -42,7 +44,7 @@ export function TestReviewAllPanel({
           <h2>{t("courseDetail.reviewAll")}</h2>
           <p className="muted">{activityTitle} · {t("courseDetail.latestCompletedTestAttempts", { count: submissions.length })}</p>
         </div>
-        {!embedded && onClose ? <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button> : null}
+        {!embedded && onClose ? <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button> : null}
       </div>
 
       {loading ? <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p> : null}

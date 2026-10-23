@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { MarkdownRenderer } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -67,7 +69,7 @@ export default function StudentViewActivityPage() {
         <StudentPreviewBanner
           activityTitle={activity?.title}
           groupTitle={workspace ? `${workspace.course.title} · ${workspace.group.title}` : undefined}
-          actions={<Link className="button secondary" href={backHref}>{t("groupPage.backToCourse")}</Link>}
+          actions={<Link className="button secondary" href={backHref}><AppIcon name="back" /> {t("groupPage.backToCourse")}</Link>}
           onReset={resetPreview}
           t={t}
         />

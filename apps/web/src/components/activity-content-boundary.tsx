@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -60,7 +62,7 @@ export function ActivityContentBoundary({ children }: { children: ReactNode }) {
   const currentAccess = loadedScope === scope ? access : null;
   if (currentAccess && !currentAccess.locked) return children;
   return <AppShell><main className="page stack">
-    <div className="row" style={{ justifyContent: "flex-end" }}><Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}`}>{t("courseDetail.backToCourseContent")}</Link></div>
+    <div className="row" style={{ justifyContent: "flex-end" }}><Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}`}><AppIcon name="back" /> {t("courseDetail.backToCourseContent")}</Link></div>
     {currentAccess?.locked ? <section className="section stack">
       <h1 className="section-title">{currentAccess.title}</h1>
       <p role="status">{t("activityContentAccess.closed")}</p>
@@ -71,6 +73,6 @@ export function ActivityContentBoundary({ children }: { children: ReactNode }) {
       </li>)}</ul> : null}
       {currentAccess.grade ? <p>{t("groupPage.finalGradeLabel")}: {currentAccess.grade.score} / {currentAccess.grade.maxScore}</p> : null}
     </section> : <p>{t("common.loading")}</p>}
-    {error ? <div role="alert"><p>{error}</p><button onClick={() => setRetry((value) => value + 1)}>{t("common.retry")}</button></div> : null}
+    {error ? <div role="alert"><p>{error}</p><button onClick={() => setRetry((value) => value + 1)}><AppIcon name="refresh" /> {t("common.retry")}</button></div> : null}
   </main></AppShell>;
 }

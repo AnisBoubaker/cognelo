@@ -1,5 +1,7 @@
 "use client";
 
+import { ActionIcon } from "@cognelo/activity-ui";
+
 import { useId, type FormEvent } from "react";
 import type { ContentPluginLocale } from "@cognelo/content-type-sdk";
 import { readTextContent } from "./shared";
@@ -35,9 +37,9 @@ export type TextContentSettingsFormProps = TextDisplaySettingsProps & {
 export function TextContentSettingsForm({ error, editorHref, onSubmit, ...props }: TextContentSettingsFormProps) {
   const copy = textContentCopy(props.locale);
   return <form className="form" onSubmit={onSubmit}>
-    {editorHref ? <a className="button secondary" href={editorHref}>{copy.edit}</a> : null}
+    {editorHref ? <a className="button secondary" href={editorHref}><ActionIcon name="edit" /> {copy.edit}</a> : null}
     <TextDisplaySettings {...props} />
     {error ? <p className="error" role="alert">{error}</p> : null}
-    <button type="submit">{copy.save}</button>
+    <button type="submit"><ActionIcon name="save" /> {copy.save}</button>
   </form>;
 }

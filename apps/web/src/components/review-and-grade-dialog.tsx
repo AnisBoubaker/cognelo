@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ProgressDialog, useDialogs, useNotifications } from "@cognelo/activity-ui";
 import type { TestRegradeProgress } from "@cognelo/contracts";
@@ -485,7 +487,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
         <section className="dialog-panel answer-overlay stack" role="dialog" aria-modal="true">
           <div className="section-heading">
             <h2>{t("courseDetail.reviewAndGrade")}</h2>
-            <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button>
+            <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button>
           </div>
           <p className="error-text">{t("courseDetail.feedbackReviewUnavailable")}</p>
         </section>
@@ -502,7 +504,7 @@ function LoadingReviewDialog({ onClose, t }: {
     <section className="dialog-panel answer-overlay stack" role="dialog" aria-modal="true">
       <div className="section-heading">
         <h2>{t("courseDetail.reviewAndGrade")}</h2>
-        <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button>
+        <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button>
       </div>
       <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p>
     </section>
@@ -530,7 +532,7 @@ function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeC
           <h2>{t("courseDetail.reviewAndGrade")}</h2>
           <p className="muted">{row.participantName}</p>
         </div>
-        <button className="button secondary" type="button" onClick={onClose}>{t("common.close")}</button>
+        <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button>
       </div>
       {state.attemptReferences.length > 1 ? (
         <div className="row">
@@ -540,6 +542,7 @@ function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeC
             type="button"
             onClick={() => onSelectAttemptIndex(state.selectedAttemptIndex - 1)}
           >
+            <AppIcon name="back" />
             {t("courseDetail.previousSubmission")}
           </button>
           <span className="muted">{t("courseDetail.submissionPosition", {
@@ -552,6 +555,7 @@ function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeC
             type="button"
             onClick={() => onSelectAttemptIndex(state.selectedAttemptIndex + 1)}
           >
+            <AppIcon name="next" />
             {t("courseDetail.nextSubmission")}
           </button>
         </div>
@@ -586,6 +590,7 @@ function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeC
           </div>
           <div className="row wrap dialog-actions">
             <button className="button primary" disabled={state.saving} type="button" onClick={() => void onSave()}>
+              <AppIcon name="save" />
               {state.saving ? t("common.saving") : t("courseDetail.saveReview")}
             </button>
           </div>

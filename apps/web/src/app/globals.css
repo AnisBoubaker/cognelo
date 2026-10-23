@@ -21,6 +21,19 @@
   --shadow-card: 0 14px 30px rgba(13, 27, 71, 0.07);
   /* 75% of the original responsive section-heading scale. */
   --section-heading-size: clamp(1.0125rem, 1.5vw, 1.425rem);
+  /* One action-button recipe for core pages, shared dialogs, and plugins. */
+  --button-background: #fff;
+  --button-hover-background: #f2f7fd;
+  --button-active-background: #e8f1fc;
+  --button-border: color-mix(in srgb, var(--brand-blue), white 72%);
+  --button-hover-border: color-mix(in srgb, var(--brand-blue), white 42%);
+  --button-radius: 10px;
+  --button-font-size: 0.875rem;
+  --button-line-height: 1.4;
+  --button-height: 38px;
+  --button-padding: 8px 12px;
+  --button-icon-size: 18px;
+  --button-gap: 8px;
 }
 
 * {
@@ -81,47 +94,60 @@ button,
   appearance: none;
   -webkit-appearance: none;
   align-items: center;
-  background: linear-gradient(135deg, var(--brand-teal), var(--brand-blue));
-  border: 1px solid color-mix(in srgb, var(--brand-blue), white 18%);
-  box-shadow: 0 10px 22px rgba(46, 131, 216, 0.2);
-  border-radius: 8px;
-  color: #fff;
+  background: var(--button-background);
+  border: 1px solid var(--button-border);
+  box-shadow: none;
+  border-radius: var(--button-radius);
+  color: var(--ink);
   cursor: pointer;
   display: inline-flex;
+  font-size: var(--button-font-size);
   font-weight: 700;
+  gap: var(--button-gap);
   justify-content: center;
-  min-height: 42px;
-  padding: 0 16px;
+  line-height: var(--button-line-height);
+  min-height: var(--button-height);
+  padding: var(--button-padding);
   transition:
-    transform 140ms ease,
-    box-shadow 140ms ease,
     border-color 140ms ease,
-    background 140ms ease;
+    background-color 140ms ease,
+    color 140ms ease;
 }
 
-button:hover,
-.button:hover {
-  box-shadow: 0 14px 26px rgba(46, 131, 216, 0.24);
-  transform: translateY(-1px);
+:where(button, .button):where(:not(:disabled):not(.is-disabled):not([aria-disabled="true"])):hover {
+  background-color: var(--button-hover-background);
+  border-color: var(--button-hover-border);
 }
 
-button.secondary,
-.button.secondary {
-  background: rgba(255, 255, 255, 0.84);
-  color: var(--ink);
-  border-color: color-mix(in srgb, var(--brand-blue), white 72%);
-  box-shadow: none;
+:where(button, .button):where(:not(:disabled):not(.is-disabled):not([aria-disabled="true"])):active {
+  background-color: var(--button-active-background);
 }
 
-button.danger {
-  background: var(--danger);
-  border-color: var(--danger);
-  box-shadow: none;
+button.danger,
+.button.danger {
+  --button-border: color-mix(in srgb, var(--danger), white 60%);
+  --button-hover-border: var(--danger);
+  --button-hover-background: #fff1f0;
+  --button-active-background: #ffe2df;
+  color: var(--danger);
 }
 
-button:disabled {
+button:disabled,
+.button.is-disabled,
+.button[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+button > svg,
+.button > svg {
+  flex-shrink: 0;
+  height: var(--button-icon-size);
+  width: var(--button-icon-size);
+}
+
+@media (pointer: coarse) {
+  :root { --button-height: 44px; }
 }
 
 input,
@@ -236,11 +262,6 @@ select:focus {
   gap: 12px;
   justify-content: center;
   padding: 10px 24px;
-}
-
-.session-connection-warning button {
-  min-height: 34px;
-  padding-inline: 12px;
 }
 
 .session-unavailable-page {
@@ -586,22 +607,14 @@ select:focus {
 }
 
 .participant-group-menu-button {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-  color: var(--muted);
-  flex: 0 0 36px;
-  min-height: 36px;
+  flex: 0 0 var(--button-height);
+  min-height: var(--button-height);
   padding: 0;
 }
 
-.participant-group-menu-button:hover,
 .participant-group-menu-button[aria-expanded="true"] {
-  background: var(--surface-3);
-  border-color: var(--line);
-  box-shadow: none;
-  color: var(--ink);
-  transform: none;
+  background: var(--button-active-background);
+  border-color: var(--button-hover-border);
 }
 
 .participant-group-panel {
@@ -1761,18 +1774,6 @@ a.card:hover,
   gap: 8px;
 }
 
-.activity-report-actions .button {
-  font-size: 0.875rem;
-  min-height: 38px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  box-shadow: none;
-}
-
-.activity-report-actions .button svg {
-  flex-shrink: 0;
-}
-
 @media (max-width: 780px) {
   .activity-report-heading .workspace-context {
     flex: 0 1 auto;
@@ -1840,14 +1841,9 @@ a.card:hover,
 }
 
 .section-actions .section-action-icon-button {
-  height: 46px;
-  min-height: 46px;
-  width: 46px;
-}
-
-.section-actions .section-action-icon-button svg {
-  height: 22px;
-  width: 22px;
+  height: var(--button-height);
+  min-height: var(--button-height);
+  width: var(--button-height);
 }
 
 .content-header-menu {
@@ -3411,8 +3407,6 @@ button:hover > .disclosure-indicator {
 }
 
 .table-row-gradebook-detail .button {
-  padding-left: 10px;
-  padding-right: 10px;
   white-space: nowrap;
 }
 
@@ -4761,10 +4755,10 @@ button:hover > .disclosure-indicator {
 }
 
 .icon-button {
-  height: 36px;
-  min-height: 36px;
+  height: var(--button-height);
+  min-height: var(--button-height);
   padding: 0;
-  width: 36px;
+  width: var(--button-height);
 }
 
 .icon-button svg {
@@ -5827,10 +5821,7 @@ button:hover > .disclosure-indicator {
   gap: 4px;
 }
 
-.rich-text-editor-mode-tabs button,
-.rich-text-editor-fullscreen-toggle,
-.rich-text-editor-toolbar button,
-.rich-text-editor-table-toolbar button {
+.rich-text-editor-mode-tabs button {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -5839,10 +5830,7 @@ button:hover > .disclosure-indicator {
   padding: 6px 10px;
 }
 
-.rich-text-editor-mode-tabs button:hover,
-.rich-text-editor-fullscreen-toggle:hover,
-.rich-text-editor-toolbar button:hover,
-.rich-text-editor-table-toolbar button:hover {
+.rich-text-editor-mode-tabs button:hover {
   background: rgba(255, 255, 255, 0.8);
   border-color: rgba(46, 131, 216, 0.2);
 }
@@ -5883,12 +5871,6 @@ button:hover > .disclosure-indicator {
   flex-wrap: wrap;
   gap: 4px;
   padding: 7px 8px;
-}
-
-.rich-text-editor-table-toolbar button {
-  font-size: 0.86rem;
-  min-height: 34px;
-  padding: 5px 8px;
 }
 
 .rich-text-editor-table-toolbar button span {
@@ -6279,24 +6261,27 @@ button:hover > .disclosure-indicator {
 }
 
 .login-mode-toggle button.is-active {
-  background: linear-gradient(135deg, var(--brand-blue), var(--brand-violet));
-  color: #fff;
+  background: var(--button-background);
+  border: 1px solid var(--button-border);
+  color: var(--ink);
 }
 
 .login-panel .login-submit-button,
-.login-panel .login-submit-button:hover,
 .login-panel .login-submit-button:focus,
-.login-panel .login-submit-button:active {
-  background-color: var(--brand-blue);
-  background-image: linear-gradient(135deg, var(--brand-teal), var(--brand-blue));
-  color: #fff;
+.login-panel .login-submit-button:disabled {
+  /* Explicit paint also protects against Safari's native/autofill appearance. */
+  background-color: var(--button-background);
+  background-image: none;
+  color: var(--ink);
   width: 100%;
 }
 
-.login-panel .login-submit-button:disabled {
-  background-color: var(--brand-blue);
-  background-image: linear-gradient(135deg, var(--brand-teal), var(--brand-blue));
-  color: #fff;
+.login-panel .login-submit-button:not(:disabled):hover {
+  background-color: var(--button-hover-background);
+}
+
+.login-panel .login-submit-button:not(:disabled):active {
+  background-color: var(--button-active-background);
 }
 
 @media (max-width: 1200px) {
@@ -6312,11 +6297,6 @@ button:hover > .disclosure-indicator {
     grid-template-columns: repeat(3, minmax(140px, 1fr));
   }
 
-  .table-row-gradebook-detail .button {
-    font-size: 0.9rem;
-    padding-left: 8px;
-    padding-right: 8px;
-  }
 }
 
 @media (max-width: 780px) {
@@ -6511,8 +6491,6 @@ button:hover > .disclosure-indicator {
 .student-groupings-heading { align-items: flex-end; gap: 1rem; }
 .student-groupings-heading > button { flex: 0 0 auto; margin-inline-start: auto; }
 .student-grouping-details { border-block-start: 1px solid var(--line); }
-.student-groupings-heading > button,
-.student-grouping-card-actions > button { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; }
 .student-grouping-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .student-team-editor { display: flex; align-items: end; gap: 1rem; flex-wrap: wrap; }
 .student-team-editor .field { flex: 1 1 12rem; }
@@ -6526,9 +6504,6 @@ button:hover > .disclosure-indicator {
 .student-grouping-card-title h3 { margin: 0; font-size: 1.1rem; }
 .student-grouping-card-title p { margin: 0.35rem 0 0; font-size: 0.9rem; line-height: 1.5; }
 .student-grouping-card-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 0.5rem; }
-.student-grouping-card-actions button { min-height: 2.25rem; padding: 0.45rem 0.75rem; font-size: 0.85rem; box-shadow: none; }
-.student-grouping-card-actions .student-grouping-remove { width: 2.25rem; padding: 0.45rem; border-color: transparent; color: var(--muted); background: transparent; }
-.student-grouping-card-actions .student-grouping-remove:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 6%, white); }
 .student-team-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); align-items: start; gap: 1rem; padding: 1.25rem; background: var(--surface-2); }
 .student-team-cards:empty { display: none; }
 .student-team-card { --team-color: #2774b7; min-width: 0; border: 1px solid var(--line); border-block-start: 3px solid color-mix(in srgb, var(--team-color) 65%, white); border-radius: 10px; padding: 1rem; background: var(--surface); }
@@ -6589,7 +6564,6 @@ button:hover > .disclosure-indicator {
 .student-grouping-setting .checkbox-row input { flex: 0 0 auto; }
 .student-grouping-method { font-size: 1rem; }
 .student-grouping-setting-actions, .student-grouping-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.student-grouping-setting-actions button { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
 .student-grouping-policy { padding: 0.85rem 1.25rem; border-block-end: 1px solid var(--line); }
 .student-grouping-badge { display: inline-flex; padding: 0.25rem 0.65rem; background: var(--surface-3); color: var(--ink); border-radius: 6px; font-size: 0.8rem; line-height: 1.5; }
 .student-grouping-badge.is-hidden { background: #fff4df; color: #805719; }
@@ -6604,7 +6578,6 @@ button:hover > .disclosure-indicator {
 .activity-exception-select { text-align: start; overflow-wrap: anywhere; }
 .activity-exception-select.is-active { background: var(--surface-3); border-color: var(--accent); }
 .activity-exception-row-actions { display: flex; gap: 0.25rem; }
-.activity-exception-row-actions button { padding: 0.45rem 0.65rem; }
 @media (max-width: 600px) {
   .activity-exception-row { flex-wrap: wrap; align-items: start; }
   .activity-exception-select { flex-basis: 100%; }

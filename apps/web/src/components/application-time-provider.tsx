@@ -1,4 +1,7 @@
 "use client";
+
+import { AppIcon } from "@/components/app-icon";
+
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ApplicationTimeProvider } from "@cognelo/activity-ui";
 import { api } from "@/lib/api";
@@ -32,6 +35,6 @@ export function AppTimeProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
   const now = useCallback(() => anchor.current.server + performance.now() - anchor.current.monotonic, []);
   const value = useMemo(() => ({ timeZone: timeZone ?? "UTC", now, setTimeZone }), [timeZone, now]);
-  if (!timeZone) return <main className="page stack"><p role={failed ? "alert" : undefined}>{t(failed ? "timeSettings.loadError" : "common.loading")}</p>{failed ? <button onClick={() => void refresh()}>{t("common.retry")}</button> : null}</main>;
+  if (!timeZone) return <main className="page stack"><p role={failed ? "alert" : undefined}>{t(failed ? "timeSettings.loadError" : "common.loading")}</p>{failed ? <button onClick={() => void refresh()}><AppIcon name="refresh" /> {t("common.retry")}</button> : null}</main>;
   return <ApplicationTimeProvider value={value}>{children}</ApplicationTimeProvider>;
 }

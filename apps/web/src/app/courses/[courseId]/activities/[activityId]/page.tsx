@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import Link from "next/link";
 import type { ActivityKnowledgeConceptSelection } from "@cognelo/contracts";
 import { useParams, useSearchParams } from "next/navigation";
@@ -79,6 +81,7 @@ export default function ActivityPage() {
         <span className="muted">{course?.title} · {localizedActivityName()}</span>
       </div>
       <Link className="button secondary" href={testActivityId ? `/courses/${courseId}/activities/${testActivityId}` : `/courses/${courseId}`}>
+        <AppIcon name="back" />
         {testActivityId ? "Back to Test" : t("parsons.backToCourse")}
       </Link>
     </div>

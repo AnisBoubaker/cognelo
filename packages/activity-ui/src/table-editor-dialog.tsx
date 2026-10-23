@@ -1,5 +1,7 @@
 "use client";
 
+import { ActionIcon } from "./action-icon";
+
 import { type FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -66,7 +68,7 @@ export function TableEditorDialog({ copy, onCancel, onConfirm }: TableEditorDial
             <h2 id="table-editor-title">{copy.title}</h2>
             <p className="muted">{copy.help}</p>
           </div>
-          <button aria-label={copy.close} className="secondary icon-button" type="button" onClick={onCancel}>×</button>
+          <button aria-label={copy.close} className="secondary icon-button" type="button" onClick={onCancel}><ActionIcon name="close" /></button>
         </div>
 
         <div className="table-editor-size-fields">
@@ -96,8 +98,8 @@ export function TableEditorDialog({ copy, onCancel, onConfirm }: TableEditorDial
         </div>
 
         <div className="dialog-actions table-editor-actions">
-          <button className="secondary" type="button" onClick={onCancel}>{copy.cancel}</button>
-          <button type="submit">{copy.insert}</button>
+          <button className="secondary" type="button" onClick={onCancel}><ActionIcon name="close" /> {copy.cancel}</button>
+          <button type="submit"><ActionIcon name="add" /> {copy.insert}</button>
         </div>
       </form>
     </div>,

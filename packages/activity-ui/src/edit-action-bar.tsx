@@ -1,3 +1,4 @@
+import { ActionIcon } from "./action-icon";
 import React, { type ReactNode } from "react";
 
 type EditActionBarProps = {
@@ -45,9 +46,10 @@ export function EditActionBar({
   className = ""
 }: EditActionBarProps) {
   const cancelControl = cancelHref ? (
-    <a className="button secondary" href={cancelHref}>{cancelLabel}</a>
+    <a className="button secondary" href={cancelHref}><ActionIcon name="close" /> {cancelLabel}</a>
   ) : (
     <button className="button secondary" disabled={isSaving || !isDirty} type="button" onClick={onCancel}>
+      <ActionIcon name="close" />
       {cancelLabel}
     </button>
   );
@@ -66,6 +68,7 @@ export function EditActionBar({
           disabled={isSaving || !isDirty || saveDisabled}
           onClick={form ? undefined : onSave}
         >
+          <ActionIcon name="save" />
           {isSaving ? savingLabel : saveLabel}
         </button>
       </div>

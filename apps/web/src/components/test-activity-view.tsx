@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { isActivityContentClosedError } from "@cognelo/activity-ui";
 
 import Link from "next/link";
@@ -24,7 +26,7 @@ import {
   type SubjectProgrammingLanguage
 } from "@/lib/api";
 import { activityCreationConfig } from "@/lib/activity-creation-defaults";
-import type { Locale } from "@/lib/i18n";
+import { type Locale, useI18n } from "@/lib/i18n";
 import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
 import { formatRemainingTime, getTestCountdownTone, shouldAutoSubmitTestAttempt } from "@/lib/test-countdown";
 import { ActivityLiveControlPortal } from "@/components/activity-live-controls";
@@ -69,6 +71,7 @@ export function TestActivityView(props: Props) {
 }
 
 function TestAuthoringView({ activity, activityRouteCourseId, canManage, course, locale }: Props) {
+  const { t } = useI18n();
   const courseId = activityRouteCourseId ?? course?.id ?? "";
   const router = useRouter();
   const notifications = useNotifications();
@@ -303,6 +306,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
             secondaryActions={(
               <>
                 <button className="button secondary" disabled={busy || hasUnsavedSettings} type="button" onClick={duplicateCurrentTest}>
+                  <AppIcon name="duplicate" />
                   Duplicate Test
                 </button>
                 {!activity.bankActivityId ? (
@@ -310,6 +314,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
                     setPublishBankId(banks.find((bank) => bank.canManage)?.id ?? "");
                     setShowPublishToBank(true);
                   }}>
+                    <AppIcon name="add" />
                     Add to activity bank
                   </button>
                 ) : null}
@@ -345,18 +350,18 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
               </div>
             </div>
             {canManage ? <div className="section-actions">
-              <Link className="button secondary" href={`/courses/${courseId}/activities/${item.activityId}?testActivityId=${activity.id}`}>Edit</Link>
+              <Link className="button secondary" href={`/courses/${courseId}/activities/${item.activityId}?testActivityId=${activity.id}`}><AppIcon name="edit" /> Edit</Link>
               <button className="button secondary" disabled={busy || hasUnsavedSettings || index === 0} type="button" onClick={() => perform(async () => {
                 const previous = test.items[index - 1];
                 await api.updateTestItem(courseId, activity.id, item.id, { position: previous.position });
                 await api.updateTestItem(courseId, activity.id, previous.id, { position: item.position });
-              })}>↑</button>
+              })} aria-label={t("courseDetail.moveUp")}><AppIcon name="up" /></button>
               <button className="button secondary" disabled={busy || hasUnsavedSettings || index === test.items.length - 1} type="button" onClick={() => perform(async () => {
                 const next = test.items[index + 1];
                 await api.updateTestItem(courseId, activity.id, item.id, { position: next.position });
                 await api.updateTestItem(courseId, activity.id, next.id, { position: item.position });
-              })}>↓</button>
-              <button className="button danger" disabled={busy || hasUnsavedSettings} type="button" onClick={() => setItemPendingRemoval(item)}>Remove</button>
+              })} aria-label={t("courseDetail.moveDown")}><AppIcon name="down" /></button>
+              <button className="button danger" disabled={busy || hasUnsavedSettings} type="button" onClick={() => setItemPendingRemoval(item)}><AppIcon name="remove" /> Remove</button>
             </div> : null}
           </article>
         )) : <p className="muted">This Test does not contain any activities yet.</p>}
@@ -368,6 +373,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
             type="button"
             onClick={() => setShowActivityPicker(true)}
           >
+            <AppIcon name="add" />
             Add activity
           </button>
         ) : null}
@@ -422,8 +428,8 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
               </select>
             </div>
             <div className="dialog-actions">
-              <button className="secondary" disabled={busy} type="button" onClick={() => setShowPublishToBank(false)}>Cancel</button>
-              <button disabled={busy || !publishBankId} type="button" onClick={() => void publishCurrentTestToBank()}>{busy ? "Publishing…" : "Add and publish"}</button>
+              <button className="secondary" disabled={busy} type="button" onClick={() => setShowPublishToBank(false)}><AppIcon name="close" /> Cancel</button>
+              <button disabled={busy || !publishBankId} type="button" onClick={() => void publishCurrentTestToBank()}><AppIcon name="publish" /> {busy ? "Publishing…" : "Add and publish"}</button>
             </div>
           </section>
         </div>
@@ -792,6 +798,7 @@ function TestStudentRuntime({
           <span className="muted">{t(runtime.test.settings.navigationMode === "sequential" ? "courseDetail.testNavigationSequential" : "courseDetail.testNavigationFree")}</span>
         </div>
         <button className="button" disabled={busy || !runtime.availability.canStart} type="button" onClick={() => setShowStartConfirmation(true)}>
+          <AppIcon name="run" />
           {t("courseDetail.testStart")}
         </button>
         {!runtime.availability.canStart ? (
@@ -862,6 +869,7 @@ function TestStudentRuntime({
                 </span>
                 <button className="button secondary" disabled={busy} type="button" onClick={() => returnToActivity(index)}
                   aria-label={t("courseDetail.testReviewExercise", { title: item.activity.title })}>
+                  <AppIcon name="review" />
                   {t("courseDetail.testReviewAction")}
                 </button>
               </li>
@@ -869,9 +877,11 @@ function TestStudentRuntime({
           </ol>
           <div className="section-actions">
             <button className="button secondary" disabled={busy} type="button" onClick={() => returnToActivity(selectedIndex)}>
+              <AppIcon name="back" />
               {t("courseDetail.testBackToAnswers")}
             </button>
             <button className="button" disabled={busy || pendingSaveCount > 0} type="button" onClick={() => setShowSubmitConfirmation(true)}>
+              <AppIcon name="submit" />
               {t("courseDetail.testSubmitForGrading")}
             </button>
           </div>
@@ -931,6 +941,7 @@ function TestStudentRuntime({
 
           <section className="section section-actions">
             <button className="button secondary" disabled={selectedIndex === 0 || busy || pendingSaveCount > 0} type="button" onClick={() => setSelectedIndex((index) => Math.max(0, index - 1))}>
+              <AppIcon name="back" />
               {t("courseDetail.testPreviousActivity")}
             </button>
             {selectedIndex < runtime.test.items.length - 1 ? <button
@@ -943,10 +954,12 @@ function TestStudentRuntime({
                 setFurthestVisitedIndex((current) => Math.max(current, nextIndex));
               }}
             >
+                                                               <AppIcon name="next" />
               {t("courseDetail.testNextActivity")}
             </button> : null}
             {attemptStarted && selectedIndex === runtime.test.items.length - 1 ? (
               <button className="button" disabled={busy || pendingSaveCount > 0} type="button" onClick={() => void openSubmissionReview()}>
+                <AppIcon name="submit" />
                 {pendingSaveCount > 0 ? t("courseDetail.testSavingAnswers") : t("courseDetail.testSubmit")}
               </button>
             ) : null}

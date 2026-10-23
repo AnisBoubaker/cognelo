@@ -1,29 +1,12 @@
 import {
-  IconAlertCircle,
-  IconArrowDown,
-  IconArrowLeft,
-  IconArrowRight,
-  IconArrowUp,
-  IconArrowsExchange,
   IconBrandGithub,
   IconBrowser,
-  IconBook2,
-  IconCheck,
   IconChecklist,
   IconClipboardCheck,
-  IconChevronDown,
   IconCode,
-  IconCopy,
-  IconDots,
-  IconDownload,
-  IconEdit,
-  IconExternalLink,
-  IconEye,
-  IconEyeOff,
   IconFile,
   IconFileCheck,
   IconFileCode,
-  IconFilePlus,
   IconFileText,
   IconFileTypeDoc,
   IconFileTypePdf,
@@ -32,75 +15,22 @@ import {
   IconFileZip,
   IconFolder,
   IconFolderOpen,
-  IconFolderPlus,
-  IconGripVertical,
   IconLink,
   IconListCheck,
-  IconMail,
   IconMusic,
   IconPhoto,
-  IconPlus,
-  IconReplace,
   IconRoute,
   IconSquare,
-  IconSettings,
   IconTextSize,
   IconTornado,
-  IconTrash,
-  IconUpload,
-  IconUsersGroup,
   IconVideo,
-  IconX,
-  type IconProps
+  type IconProps,
 } from "@tabler/icons-react";
 import type { ActivityIconName } from "@cognelo/activity-sdk";
 import type { ContentTypeIconName } from "@cognelo/content-type-sdk";
 import React, { type ComponentType } from "react";
 
-export type AppIconName =
-  | "activityAdd" | "add" | "alert" | "assign" | "back" | "check" | "chevronDown" | "close"
-  | "compare" | "course" | "download" | "duplicate" | "down" | "drag" | "edit" | "folder"
-  | "folderAdd" | "folderOpen" | "hidden" | "messages" | "more" | "move" | "open" | "remove"
-  | "participants" | "save" | "settings" | "sync" | "up" | "upload" | "visible";
-
-const appIcons = {
-  activityAdd: IconFilePlus,
-  add: IconPlus,
-  alert: IconAlertCircle,
-  assign: IconListCheck,
-  back: IconArrowLeft,
-  check: IconCheck,
-  chevronDown: IconChevronDown,
-  close: IconX,
-  compare: IconArrowsExchange,
-  course: IconBook2,
-  download: IconDownload,
-  duplicate: IconCopy,
-  down: IconArrowDown,
-  drag: IconGripVertical,
-  edit: IconEdit,
-  folder: IconFolder,
-  folderAdd: IconFolderPlus,
-  folderOpen: IconFolderOpen,
-  hidden: IconEyeOff,
-  messages: IconMail,
-  more: IconDots,
-  move: IconArrowRight,
-  open: IconExternalLink,
-  participants: IconUsersGroup,
-  remove: IconTrash,
-  save: IconFileCheck,
-  settings: IconSettings,
-  sync: IconReplace,
-  up: IconArrowUp,
-  upload: IconUpload,
-  visible: IconEye
-} satisfies Record<AppIconName, ComponentType<IconProps>>;
-
-export function AppIcon({ name, size = 18, stroke = 2 }: { name: AppIconName; size?: number; stroke?: number }) {
-  const Icon = appIcons[name];
-  return <Icon aria-hidden="true" size={size} stroke={stroke} />;
-}
+export { ActionIcon as AppIcon, type ActionIconName as AppIconName } from "@cognelo/activity-ui";
 
 export function DisclosureIndicator({ expanded }: { expanded: boolean }) {
   return <span className="disclosure-indicator" aria-hidden="true">{expanded ? "▾" : "▸"}</span>;

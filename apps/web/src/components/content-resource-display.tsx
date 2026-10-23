@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@cognelo/activity-ui";
@@ -41,7 +43,7 @@ function ResourceModal({ title, onClose, ...props }: ResourceDisplayProps & { ti
     const rect = event.currentTarget.getBoundingClientRect();
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose();
   }}>
-    <div className="row content-resource-dialog-header"><h2 id={id}>{title}</h2><button type="button" className="secondary" onClick={onClose} autoFocus>{t("common.close")}</button></div>
+    <div className="row content-resource-dialog-header"><h2 id={id}>{title}</h2><button type="button" className="secondary" onClick={onClose} autoFocus><AppIcon name="close" /> {t("common.close")}</button></div>
     <ContentResourceBody {...props} />
   </dialog>, document.body);
 }

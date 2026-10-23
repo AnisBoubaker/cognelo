@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CodeRenderer, ConfirmationDialog } from "@cognelo/activity-ui";
+import { ActionIcon, CodeRenderer, ConfirmationDialog } from "@cognelo/activity-ui";
 
 export type CodingExerciseAiFeedbackReviewProps = {
   feedback: Record<string, unknown>;
@@ -82,6 +82,7 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
           type="button"
           onClick={() => setClearConfirmationOpen(true)}
         >
+          <ActionIcon name="clear" />
           {t("courseDetail.feedbackReviewClearContent")}
         </button>
       </div> : null}

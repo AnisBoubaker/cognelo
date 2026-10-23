@@ -1,5 +1,7 @@
 "use client";
 
+import { AppIcon } from "@/components/app-icon";
+
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -35,7 +37,7 @@ function ResourcePage({ editing }: { editing: boolean }) {
   const editor = resolveContentTypeEditor(data?.definition.editorRendererKey);
   return <AppShell><div className="stack">
     <div className="row activity-editor-context">
-      <Link className="button secondary" href={back}>{t("groupPage.backToCourse")}</Link>
+      <Link className="button secondary" href={back}><AppIcon name="back" /> {t("groupPage.backToCourse")}</Link>
     </div>
     {error ? <p className="error" role="alert">{error}</p> : !data ? <p>{t("common.loading")}</p> : <section className="card stack text-material-page">
       <h1 className="section-title">{data.resource.title}</h1>

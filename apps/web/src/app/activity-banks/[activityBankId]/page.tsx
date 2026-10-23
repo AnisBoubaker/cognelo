@@ -725,8 +725,9 @@ export default function ActivityBankDetailPage() {
               {bank?.description ? <p className="muted">{bank.description}</p> : null}
             </div>
             <div className="section-actions activity-bank-tree-actions">
-              <Link className="button secondary" href="/activity-banks">{t("activityBankDetail.backToBanks")}</Link>
+              <Link className="button secondary" href="/activity-banks"><AppIcon name="back" /> {t("activityBankDetail.backToBanks")}</Link>
               <button className="secondary" type="button" onClick={openConceptFilter}>
+                <AppIcon name="filter" />
                 {selectedConceptIds.size
                   ? t("activityBankDetail.filtersActive", { count: selectedConceptIds.size })
                   : t("activityBankDetail.filters")}
@@ -738,6 +739,7 @@ export default function ActivityBankDetailPage() {
                     {t("activityBankDetail.newFolder")}
                   </button>
                   <button type="button" onClick={() => openActivityPicker(null)}>
+                    <AppIcon name="add" />
                     {t("activityBankDetail.addActivityTitle")}
                   </button>
                 </>
@@ -971,9 +973,9 @@ export default function ActivityBankDetailPage() {
                 </div>
               ) : <p className="muted">{t("activityBankDetail.noSubjectConcepts")}</p>}
               <div className="dialog-actions">
-                <button className="secondary" type="button" onClick={() => setDraftConceptIds(new Set())}>{t("activityBankDetail.clearFilters")}</button>
-                <button className="secondary" type="button" onClick={() => setShowConceptFilter(false)}>{t("common.cancel")}</button>
-                <button type="button" onClick={applyConceptFilter}>{t("activityBankDetail.applyFilters")}</button>
+                <button className="secondary" type="button" onClick={() => setDraftConceptIds(new Set())}><AppIcon name="clearFilters" /> {t("activityBankDetail.clearFilters")}</button>
+                <button className="secondary" type="button" onClick={() => setShowConceptFilter(false)}><AppIcon name="close" /> {t("common.cancel")}</button>
+                <button type="button" onClick={applyConceptFilter}><AppIcon name="filter" /> {t("activityBankDetail.applyFilters")}</button>
               </div>
             </section>
           </div>
@@ -994,7 +996,7 @@ export default function ActivityBankDetailPage() {
               </div>
               <form className="form" onSubmit={duplicateActivity}>
                 <div className="field"><label htmlFor="duplicate-bank-activity-name">{t("activityBankDetail.duplicateActivityTitleLabel")}</label><input id="duplicate-bank-activity-name" minLength={2} maxLength={160} required autoFocus value={duplicateTitle} onChange={(event) => setDuplicateTitle(event.target.value)} /></div>
-                <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDuplicatingActivity(null)}>{t("common.cancel")}</button><button disabled={Boolean(duplicatingActivityId) || duplicateTitle.trim().length < 2} type="submit">{duplicatingActivityId ? t("common.saving") : t("activityBankDetail.duplicateActivity")}</button></div>
+                <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDuplicatingActivity(null)}><AppIcon name="close" /> {t("common.cancel")}</button><button disabled={Boolean(duplicatingActivityId) || duplicateTitle.trim().length < 2} type="submit"><AppIcon name="duplicate" /> {duplicatingActivityId ? t("common.saving") : t("activityBankDetail.duplicateActivity")}</button></div>
               </form>
             </section>
           </div>
@@ -1017,7 +1019,7 @@ export default function ActivityBankDetailPage() {
                   <textarea id="variation-ai-instructions" maxLength={4000} rows={6} autoFocus value={variationInstructions} onChange={(event) => setVariationInstructions(event.target.value)} placeholder={t("activityBankDetail.variationInstructionsPlaceholder")} />
                   <small>{t("activityBankDetail.variationInstructionsHelp")}</small>
                 </div>
-                <div className="dialog-actions"><button className="secondary" type="button" onClick={closeVariationDialog}>{t("common.cancel")}</button><button type="submit">{t("activityBankDetail.createVariation")}</button></div>
+                <div className="dialog-actions"><button className="secondary" type="button" onClick={closeVariationDialog}><AppIcon name="close" /> {t("common.cancel")}</button><button type="submit"><AppIcon name="generate" /> {t("activityBankDetail.createVariation")}</button></div>
               </form>
             </section>
           </div>
@@ -1088,7 +1090,7 @@ export default function ActivityBankDetailPage() {
                   </select>
                   {!activityBanks.some((candidate) => candidate.id !== bank.id && candidate.subjectId === bank.subjectId && candidate.canManage) ? <p className="muted">{t("activityBankDetail.noMoveDestinations")}</p> : null}
                 </div>
-                <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setMovingActivity(null)}>{t("common.cancel")}</button><button disabled={savingEdit || !moveTargetBankId} type="submit">{savingEdit ? t("common.saving") : t("activityBankDetail.moveActivity")}</button></div>
+                <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setMovingActivity(null)}><AppIcon name="close" /> {t("common.cancel")}</button><button disabled={savingEdit || !moveTargetBankId} type="submit"><AppIcon name="move" /> {savingEdit ? t("common.saving") : t("activityBankDetail.moveActivity")}</button></div>
               </form>
             </section>
           </div>
@@ -1110,7 +1112,7 @@ export default function ActivityBankDetailPage() {
                 </select></div>
               </div>
               {fromVersionId === toVersionId ? <p className="error">{t("bankActivityPage.versionDiffChooseDifferent")}</p> : null}
-              <div><button disabled={versionDiffLoading || !fromVersionId || !toVersionId || fromVersionId === toVersionId} type="button" onClick={() => void compareVersions()}>{versionDiffLoading ? t("common.loading") : t("bankActivityPage.compareVersions")}</button></div>
+              <div><button disabled={versionDiffLoading || !fromVersionId || !toVersionId || fromVersionId === toVersionId} type="button" onClick={() => void compareVersions()}><AppIcon name="compare" /> {versionDiffLoading ? t("common.loading") : t("bankActivityPage.compareVersions")}</button></div>
               {versionDiffError ? <p className="error">{versionDiffError}</p> : null}
               {versionDiff ? <ActivityVersionDiffView diff={versionDiff} labels={versionDiffLabels(t)} /> : null}
             </section>
@@ -1222,9 +1224,11 @@ export default function ActivityBankDetailPage() {
               </div>
               <div className="row">
                 <button type="submit" disabled={savingEdit}>
+                  <AppIcon name="save" />
                   {savingEdit ? t("common.saving") : t("common.save")}
                 </button>
                 <button className="secondary" type="button" onClick={() => setEditingActivity(null)}>
+                  <AppIcon name="close" />
                   {t("common.cancel")}
                 </button>
               </div>
