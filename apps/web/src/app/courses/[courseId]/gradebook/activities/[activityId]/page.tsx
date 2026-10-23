@@ -9,6 +9,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ContextMenu, ProgressDialog, useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { createMcqClient } from "@cognelo/plugin-mcq";
 import { createParsonsClient } from "@cognelo/plugin-parsons";
+import { useAuth } from "@/components/auth-provider";
+import { TeacherMessageAlertContext, useTeacherMessageAlerts } from "@/components/teacher-message-alerts";
 import { AppShell } from "@/components/app-shell";
 import { ActivityChatDialog } from "@/components/activity-chat";
 import { ActivityBroadcastDialog, StaffActivityChat } from "@/components/activity-broadcast-dialog";
@@ -30,7 +32,8 @@ import {
   CourseGradebookRow,
   GradebookMutationAttempt,
   GradebookMutationGrade,
-  TeacherAiFeedbackReview
+  TeacherAiFeedbackReview,
+  type ActivityMessagingStatus
 } from "@/lib/api";
 import {
   getAiFeedbackReviewCalculatedGradePercent,
@@ -53,6 +56,7 @@ export default function GradebookActivityResultsPage() {
   const origin = searchParams.get("origin") === "content" ? "content" : "gradebook";
   const requestedReportTab = searchParams.get("report") === "overview" ? "overview" : searchParams.get("report") === "students" ? "students" : null;
   const { locale, t } = useI18n();
+  const { user } = useAuth();
   const dialogs = useDialogs();
   const notifications = useNotifications();
   const mcqClient = useMemo(() => createMcqClient(apiRequest), []);
@@ -85,6 +89,8 @@ export default function GradebookActivityResultsPage() {
   const [showGradeExport, setShowGradeExport] = useState(false);
   const [showActivitySettings, setShowActivitySettings] = useState(false);
   const [showActivityMessenger, setShowActivityMessenger] = useState(false);
+  const [messagingStatus, setMessagingStatus] = useState<ActivityMessagingStatus | null>(null);
+  const [messagingParticipantId, setMessagingParticipantId] = useState<string | null>(null);
   const [messagingVersion, setMessagingVersion] = useState("");
   const [messagingEnabled, setMessagingEnabled] = useState(false);
   const [reportTab, setReportTab] = useState<"overview" | "students">(
@@ -185,22 +191,35 @@ export default function GradebookActivityResultsPage() {
     ))
   );
   const canMessageStudents = hasMessagingPermission && messagingEnabled;
+  const alerts = useTeacherMessageAlerts(user?.id, `${courseId}:${activityId}:${groupId ?? "all"}`, hasMessagingPermission);
+  const acceptMessagingStatus = alerts.acceptStatus;
+  const unreadMessageCount = canMessageStudents ? messagingStatus?.unreadCount ?? 0 : 0;
+  function openActivityMessenger() {
+    setMessagingParticipantId(messagingStatus?.unreadParticipantId ?? null);
+    setShowActivityMessenger(true);
+  }
+
   useEffect(() => {
     let cancelled = false;
     setMessagingEnabled(false);
+    setMessagingStatus(null);
     setShowActivityMessenger(false);
-    if (!hasMessagingPermission) return;
+    if (!hasMessagingPermission || !user?.id) return;
+    let pending = false;
     const refresh = async () => {
-      if (document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible" || pending) return;
+      pending = true;
       try {
         const { messaging } = await api.activityMessagingStatus(courseId, activityId, groupId);
         if (cancelled) return;
         setMessagingEnabled(messaging.enabled);
         setMessagingVersion(messaging.version);
+        setMessagingStatus(messaging);
+        acceptMessagingStatus(messaging);
         if (!messaging.enabled) setShowActivityMessenger(false);
       } catch {
         // Keep the last known setting during a temporary network failure.
-      }
+      } finally { pending = false; }
     };
     void refresh();
     const interval = window.setInterval(() => void refresh(), 10_000);
@@ -210,7 +229,7 @@ export default function GradebookActivityResultsPage() {
       window.clearInterval(interval);
       window.removeEventListener("focus", refresh);
     };
-  }, [activityId, courseId, groupId, hasMessagingPermission]);
+  }, [activityId, courseId, groupId, hasMessagingPermission, acceptMessagingStatus, user?.id]);
   const groupTitle = groupId ? gradebook?.items.find((item) => item.groupId === groupId)?.groupTitle
     ?? course?.groups?.find((group) => group.id === groupId)?.title : null;
   const backHref = origin === "content"
@@ -846,6 +865,7 @@ export default function GradebookActivityResultsPage() {
   }
 
   return (
+    <TeacherMessageAlertContext.Provider value={hasMessagingPermission ? { ...alerts.sound, unreadCount: unreadMessageCount } : null}>
     <AppShell>
       <main className="page stack">
         <section className="section stack">
@@ -859,9 +879,12 @@ export default function GradebookActivityResultsPage() {
             </div>
             <div className="section-actions activity-report-actions">
               {canMessageStudents ? (
-                <button className="button secondary" type="button" onClick={() => setShowActivityMessenger(true)}>
+                <button className={`button secondary activity-report-message-trigger${unreadMessageCount ? " has-unread" : ""}`} type="button"
+                  aria-label={t("activityMessenger.messageStudents")} aria-describedby={unreadMessageCount ? "activity-message-alert-summary" : undefined}
+                  onClick={openActivityMessenger}>
                   <AppIcon name="messages" />
                   {t("activityMessenger.messageStudents")}
+                  {unreadMessageCount ? <span className="activity-message-count" aria-hidden="true">{unreadMessageCount > 99 ? "99+" : unreadMessageCount}</span> : null}
                 </button>
               ) : null}
               {canManageCourse ? (
@@ -886,6 +909,13 @@ export default function GradebookActivityResultsPage() {
               </Link>
             </div>
           </div>
+          {unreadMessageCount > 0 ? <aside className="activity-message-alert" role="status" aria-live="polite">
+            <AppIcon name="messages" size={24} />
+            <div><strong id="activity-message-alert-summary">{t("activityMessenger.unreadStudentMessages", { count: unreadMessageCount })}</strong>
+              {alerts.needsInteraction ? <small>{t("activityMessenger.soundActivationHelp")}</small> : null}
+            </div>
+            <button className="secondary" type="button" onClick={openActivityMessenger}><AppIcon name="messages" />{t("activityMessenger.openUnreadMessages")}</button>
+          </aside> : null}
           <div className="tab-strip" role="tablist" aria-label={t("courseDetail.activityReportsTabsLabel")}>
             <button
               aria-selected={reportTab === "overview"}
@@ -1203,6 +1233,7 @@ export default function GradebookActivityResultsPage() {
         {showActivityMessenger ? (
           <ActivityBroadcastDialog
             updateKey={messagingVersion}
+            initialParticipantId={messagingParticipantId}
             activityId={activityId}
             courseId={courseId}
             groupId={groupId}
@@ -1211,6 +1242,7 @@ export default function GradebookActivityResultsPage() {
         ) : null}
       </main>
     </AppShell>
+    </TeacherMessageAlertContext.Provider>
   );
 }
 

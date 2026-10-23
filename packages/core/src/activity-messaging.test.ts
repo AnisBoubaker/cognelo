@@ -6,10 +6,11 @@ const db = vi.hoisted(() => ({
   activityAttempt: { findMany: vi.fn(), findFirst: vi.fn() },
   activityConversation: { findMany: vi.fn(), updateMany: vi.fn(), upsert: vi.fn(), findFirst: vi.fn() },
   activityConversationMessage: { findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn(), aggregate: vi.fn() },
-  activityConversationRead: { findUnique: vi.fn(), upsert: vi.fn() },
+  activityConversationRead: { findUnique: vi.fn(), upsert: vi.fn(), findFirst: vi.fn() },
   activityMessageBroadcast: { findMany: vi.fn() },
   courseGroupActivity: { findFirst: vi.fn() },
   courseGroupParticipant: { findFirst: vi.fn(), count: vi.fn() },
+  $queryRaw: vi.fn(),
   $transaction: vi.fn()
 }));
 const tx = vi.hoisted(() => ({
@@ -27,7 +28,7 @@ vi.mock("./activity-content-access", () => contentAccess);
 const gradebook = vi.hoisted(() => ({ getActivityAttemptAvailability: vi.fn() }));
 const groups = vi.hoisted(() => ({ getGroupAssignedActivity: vi.fn() }));
 
-vi.mock("@cognelo/db", () => ({ prisma: db, Prisma: {} }));
+vi.mock("@cognelo/db", async () => ({ prisma: db, Prisma: (await import("@prisma/client")).Prisma }));
 vi.mock("./authorization", () => authorization);
 vi.mock("./gradebook", () => gradebook);
 vi.mock("./groups", () => groups);
@@ -36,7 +37,7 @@ import {
   getLearnerActivityConversation,
   getStoredLearnerActivityConversation,
   markLearnerActivityConversationRead,
-  sendActivityBroadcast, sendLearnerActivityMessage, sendStaffActivityReply, getStaffActivityConversation, listActiveConversations, getLearnerActivityMessagingStatus, deleteActivityMessage
+  sendActivityBroadcast, sendLearnerActivityMessage, sendStaffActivityReply, getStaffActivityConversation, listActiveConversations, getLearnerActivityMessagingStatus, getActivityMessagingStatus, deleteActivityMessage
 } from "./activity-messaging";
 
 const student: CurrentUser = {
@@ -424,5 +425,42 @@ describe("student Test message context", () => {
     await sendLearnerActivityMessage(student, "course-1", "group-1", "activity-1", "General question");
     expect(tx.test.findFirst).not.toHaveBeenCalled();
     expect(tx.activityConversationMessage.create.mock.calls[0][0].data).not.toHaveProperty("testItemContext");
+  });
+});
+
+describe("teacher messaging notification status", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    db.activity.findFirst.mockResolvedValue({ id: "activity-1", metadata: enabledMetadata });
+    authorization.getActivityMessagingGroupScope.mockResolvedValue(["group-1"]);
+    db.activityConversationMessage.findFirst.mockResolvedValue({ id: "last-any-message" });
+    db.activityConversationRead.findFirst.mockResolvedValue(null);
+    db.activityConversationMessage.aggregate.mockResolvedValue({ _max: { deletedAt: null }, _count: { deletedAt: 0 } });
+    db.$queryRaw.mockResolvedValue([{
+      studentMessageCount: 4, unreadCount: 2, unreadParticipantId: "participant-1", latestId: "student-message-4",
+      latestSenderName: "Student One", latestParticipantId: "participant-1", latestCreatedAt: now
+    }]);
+  });
+  it("returns unread counts and newest student metadata without loading message bodies", async () => {
+    const status = await getActivityMessagingStatus(teacher, "course-1", "activity-1");
+    expect(status).toMatchObject({ unreadCount: 2, studentMessageCount: 4, unreadParticipantId: "participant-1", latestStudentMessage: {
+      id: "student-message-4", senderName: "Student One", participantId: "participant-1", createdAt: now.toISOString()
+    } });
+    expect(status).not.toHaveProperty("messages");
+    expect(db.activityConversationMessage.findMany).not.toHaveBeenCalled();
+    const query = db.$queryRaw.mock.calls[0][0];
+    expect(query.values).toContain(teacher.id);
+    expect(query.values).toContain("course-1");
+    expect(query.values).toContain("activity-1");
+    expect(query.values).toContain("group-1");
+  });
+  it("does not expose status to a user without messaging permission", async () => {
+    authorization.getActivityMessagingGroupScope.mockRejectedValue(new Error("forbidden"));
+    await expect(getActivityMessagingStatus(student, "course-1", "activity-1")).rejects.toThrow("forbidden");
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+  });
+  it("represents an activity with no incoming student messages", async () => {
+    db.$queryRaw.mockResolvedValue([{ studentMessageCount: 0, unreadCount: 0, unreadParticipantId: null, latestId: null, latestSenderName: null, latestParticipantId: null, latestCreatedAt: null }]);
+    expect(await getActivityMessagingStatus(teacher, "course-1", "activity-1")).toMatchObject({ unreadCount: 0, studentMessageCount: 0, latestStudentMessage: null });
   });
 });

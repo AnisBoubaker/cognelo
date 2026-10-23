@@ -194,6 +194,18 @@ export const enMessages = {
       time: "Time"
     },
     activityMessenger: {
+      soundNotifications: "Sound notifications",
+      muteSound: "Mute message sounds",
+      enableSound: "Enable message sounds",
+      soundUnavailable: "Sound is unavailable in this browser",
+      soundActivationHelp: "Click anywhere on this page to activate notification sounds.",
+      newBadge: "New",
+      unreadStudentMessages: "Unread student messages: {count}",
+      newMessageTitle: "New student message",
+      newMessageFrom: "{name} sent you a message.",
+      newMessages: "{count} new student messages arrived.",
+      openUnreadMessages: "Read messages",
+
       testExercise: "Exercise {number}: {title}",
       deleted: "Deleted",
       deleteMessage: "Delete message",

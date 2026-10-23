@@ -7,12 +7,12 @@ import { applyChatDeletion, mergeChatMessages } from "@/lib/activity-chat-histor
 import { api, type ActivityMessagingOverview, type StaffActivityConversation } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
-export function ActivityBroadcastDialog({ courseId, activityId, groupId, onClose, updateKey }: {
-  courseId: string; activityId: string; groupId?: string; onClose: () => void; updateKey: string;
+export function ActivityBroadcastDialog({ courseId, activityId, groupId, onClose, updateKey, initialParticipantId }: {
+  courseId: string; activityId: string; groupId?: string; onClose: () => void; updateKey: string; initialParticipantId?: string | null;
 }) {
   const { t } = useI18n();
   const [overview, setOverview] = useState<ActivityMessagingOverview | null>(null);
-  const [selected, setSelected] = useState("broadcast");
+  const [selected, setSelected] = useState(initialParticipantId ?? "broadcast");
   const [error, setError] = useState("");
   const refresh = useCallback(async () => {
     const result = await api.activityMessagingOverview(courseId, activityId, groupId);
@@ -46,10 +46,10 @@ export function ActivityBroadcastDialog({ courseId, activityId, groupId, onClose
           event.preventDefault(); tabs[next]?.focus(); tabs[next]?.click();
         }}>
         <button type="button" role="tab" id="chat-tab-broadcast" aria-controls="activity-chat-panel" aria-selected={selected === "broadcast"} tabIndex={selected === "broadcast" ? 0 : -1} onClick={() => setSelected("broadcast")}><AppIcon name="messages" />{t("activityMessenger.broadcastTab")}</button>
-        {overview?.conversations.map((conversation) => <button key={conversation.participantId} id={`chat-tab-${conversation.participantId}`} type="button" role="tab" aria-controls="activity-chat-panel" aria-selected={selected === conversation.participantId} tabIndex={selected === conversation.participantId ? 0 : -1} onClick={() => setSelected(conversation.participantId)}>
+        {overview?.conversations.map((conversation) => <button key={conversation.participantId} id={`chat-tab-${conversation.participantId}`} type="button" role="tab" data-unread={conversation.unread} aria-controls="activity-chat-panel" aria-selected={selected === conversation.participantId} tabIndex={selected === conversation.participantId ? 0 : -1} onClick={() => setSelected(conversation.participantId)}>
           <span className="activity-chat-avatar" aria-hidden="true">{conversation.studentName.slice(0, 1)}</span>
           <span><strong>{conversation.studentName}</strong><small>{conversation.groupTitle}</small></span>
-          {conversation.unread ? <span className="activity-chat-unread" aria-label={t("activityMessenger.unread")} /> : null}
+          {conversation.unread ? <span className="activity-chat-unread-badge" aria-label={t("activityMessenger.unread")}>{t("activityMessenger.newBadge")}</span> : null}
         </button>)}
         {overview && !overview.conversations.length ? <p className="muted activity-chat-sidebar-hint">{t("activityMessenger.noConversations")}</p> : null}
       </div>

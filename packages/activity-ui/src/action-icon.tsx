@@ -64,6 +64,8 @@ import {
   IconUnlink,
   IconUpload,
   IconUsersGroup,
+  IconVolume,
+  IconVolumeOff,
   IconX,
 } from "@tabler/icons-react";
 
@@ -88,6 +90,8 @@ const actionIcons = {
   folderOpen: IconFolderOpen,
   hidden: IconEyeOff,
   messages: IconMail,
+  soundOn: IconVolume,
+  soundOff: IconVolumeOff,
   more: IconDots,
   move: IconArrowRight,
   open: IconExternalLink,

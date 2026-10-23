@@ -194,6 +194,18 @@ export const frMessages = {
       time: "Heure"
     },
     activityMessenger: {
+      soundNotifications: "Notifications sonores",
+      muteSound: "Désactiver le son des messages",
+      enableSound: "Activer le son des messages",
+      soundUnavailable: "Le son n’est pas disponible dans ce navigateur",
+      soundActivationHelp: "Cliquez dans cette page pour activer les notifications sonores.",
+      newBadge: "Nouveau",
+      unreadStudentMessages: "Messages étudiants non lus : {count}",
+      newMessageTitle: "Nouveau message étudiant",
+      newMessageFrom: "{name} vous a envoyé un message.",
+      newMessages: "{count} nouveaux messages étudiants sont arrivés.",
+      openUnreadMessages: "Lire les messages",
+
       testExercise: "Exercice {number} : {title}",
       deleted: "Supprimé",
       deleteMessage: "Supprimer le message",

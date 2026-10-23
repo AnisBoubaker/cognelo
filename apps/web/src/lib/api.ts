@@ -890,7 +890,10 @@ export type ActivityConversationMessage = {
 };
 
 export type LearnerActivityMessagingStatus = { id: string; attemptNumber: number; canSend: boolean; unreadCount: number; version: string };
-export type ActivityMessagingStatus = { enabled: boolean; version: string };
+export type ActivityMessagingStatus = {
+  enabled: boolean; version: string; unreadCount: number; unreadParticipantId: string | null; studentMessageCount: number;
+  latestStudentMessage: { id: string; senderName: string; participantId: string; createdAt: string } | null;
+};
 export type ActivityMessageDeletionMarker = { id: string; deletedAt: string };
 export type ActivityMessageDeletion = { messageId: string | null; broadcastId: string | null; deletedAt: string };
 export type ActivityMessageHistory = { deletedMessages: ActivityMessageDeletionMarker[]; messages: ActivityConversationMessage[]; hasMore: boolean; unreadCount: number; canSend: boolean };

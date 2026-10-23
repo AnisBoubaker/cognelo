@@ -194,6 +194,18 @@ export const zhMessages = {
       time: "时间"
     },
     activityMessenger: {
+      soundNotifications: "声音通知",
+      muteSound: "关闭消息提示音",
+      enableSound: "开启消息提示音",
+      soundUnavailable: "此浏览器无法播放提示音",
+      soundActivationHelp: "点击此页面以启用消息提示音。",
+      newBadge: "新消息",
+      unreadStudentMessages: "未读学生消息：{count}",
+      newMessageTitle: "新学生消息",
+      newMessageFrom: "{name} 向您发送了一条消息。",
+      newMessages: "收到 {count} 条新学生消息。",
+      openUnreadMessages: "阅读消息",
+
       testExercise: "练习 {number}：{title}",
       deleted: "已删除",
       deleteMessage: "删除消息",

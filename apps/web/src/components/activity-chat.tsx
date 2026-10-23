@@ -3,6 +3,7 @@
 import { useApplicationTime, useBodyScrollLock } from "@cognelo/activity-ui";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { TeacherMessageSoundToggle, TeacherMessageUnreadBadge } from "@/components/teacher-message-alerts";
 import { AppIcon } from "@/components/app-icon";
 import type { ActivityConversationMessage } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -10,20 +11,25 @@ import { useI18n } from "@/lib/i18n";
 export function ActivityChatDialog({ children, onClose, wide = false }: { children: ReactNode; onClose: () => void; wide?: boolean }) {
   const { t } = useI18n();
   const dialog = useRef<HTMLDialogElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
   useBodyScrollLock(true);
   useEffect(() => {
     const element = dialog.current;
     const previousFocus = document.activeElement as HTMLElement | null;
     element?.showModal();
+    const composer = element?.querySelector<HTMLTextAreaElement>(".activity-chat-composer textarea:not(:disabled)");
+    (composer ?? heading.current)?.focus({ preventScroll: true });
     return () => { element?.close(); previousFocus?.focus(); };
   }, []);
   return createPortal(
     <dialog ref={dialog} aria-labelledby={titleId} className={`dialog-panel activity-chat-dialog${wide ? " activity-chat-dialog--wide" : ""}`}
       onCancel={(event) => { event.preventDefault(); onClose(); }}>
       <div className="activity-chat-heading">
-        <h2 id={titleId}><AppIcon name="messages" /> {t("activityMessenger.title")}</h2>
+        <h2 id={titleId} ref={heading} tabIndex={-1} data-chat-title><AppIcon name="messages" /> {t("activityMessenger.title")}</h2>
+        <div className="activity-chat-heading-actions"><TeacherMessageUnreadBadge /><TeacherMessageSoundToggle />
         <button className="secondary icon-button" type="button" aria-label={t("common.close")} onClick={onClose}><AppIcon name="close" /></button>
+        </div>
       </div>
       {children}
     </dialog>, document.body
@@ -93,6 +99,15 @@ export function ActivityChatComposer({ onSend, broadcast = false }: { onSend: (b
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const input = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const field = input.current;
+    const dialog = field?.closest("dialog");
+    // A lazy-loaded composer may replace the initial heading focus, but must not
+    // steal focus after the teacher has chosen another control or conversation.
+    if (dialog?.open && (document.activeElement === dialog || document.activeElement === dialog.querySelector("[data-chat-title]"))) {
+      field?.focus({ preventScroll: true });
+    }
+  }, []);
   async function send() {
     if (!body.trim() || sending) return;
     setSending(true); setError("");

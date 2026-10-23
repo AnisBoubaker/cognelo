@@ -19,7 +19,10 @@ export type ActivityConversationMessageView = {
   body: string; createdAt: string; broadcastId: string | null; attemptNumber: number; deletedAt: string | null; canDelete: boolean;
 };
 export type LearnerActivityMessagingStatus = { id: string; attemptNumber: number; canSend: boolean; unreadCount: number; version: string };
-export type ActivityMessagingStatus = { enabled: boolean; version: string };
+export type ActivityMessagingStatus = {
+  enabled: boolean; version: string; unreadCount: number; unreadParticipantId: string | null; studentMessageCount: number;
+  latestStudentMessage: { id: string; senderName: string; participantId: string; createdAt: string } | null;
+};
 export type ActivityMessageDeletionMarker = { id: string; deletedAt: string };
 export type ActivityMessageHistory = { deletedMessages: ActivityMessageDeletionMarker[]; messages: ActivityConversationMessageView[]; hasMore: boolean; unreadCount: number };
 export type LearnerActivityConversationView = ActivityMessageHistory & {
@@ -229,12 +232,46 @@ export async function getLearnerActivityMessagingStatus(user: CurrentUser, cours
 export async function getActivityMessagingStatus(user: CurrentUser, courseId: string, activityId: string, groupId?: string | null): Promise<ActivityMessagingStatus> {
   const { enabled, twoWayEnabled, groupScope } = await assertActivityMessagingAccess(user, courseId, activityId, groupId);
   const scope = { courseId, activityId, ...(groupScope ? { groupId: { in: groupScope } } : {}) };
-  const [last, read, deletion] = await Promise.all([
+  const [last, read, deletion, incoming] = await Promise.all([
     prisma.activityConversationMessage.findFirst({ where: { conversation: scope }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true } }),
     prisma.activityConversationRead.findFirst({ where: { conversation: scope }, orderBy: { updatedAt: "desc" }, select: { updatedAt: true } }),
-    prisma.activityConversationMessage.aggregate({ where: { conversation: scope }, _max: { deletedAt: true }, _count: { deletedAt: true } })
+    prisma.activityConversationMessage.aggregate({ where: { conversation: scope }, _max: { deletedAt: true }, _count: { deletedAt: true } }),
+    getIncomingStudentMessageStatus(user.id, courseId, activityId, groupScope)
   ]);
-  return { enabled, version: `${enabled}:${twoWayEnabled}:${last?.id ?? ""}:${read?.updatedAt.toISOString() ?? ""}:${deletion._max.deletedAt?.toISOString() ?? ""}:${deletion._count.deletedAt}` };
+  return { enabled, ...incoming, version: `${enabled}:${twoWayEnabled}:${last?.id ?? ""}:${read?.updatedAt.toISOString() ?? ""}:${deletion._max.deletedAt?.toISOString() ?? ""}:${deletion._count.deletedAt}` };
+}
+
+/** Counts and sender metadata only; the ordinary teacher poll never transfers message bodies. */
+async function getIncomingStudentMessageStatus(userId: string, courseId: string, activityId: string, groupScope: string[] | null) {
+  const groupFilter = groupScope === null ? Prisma.empty : groupScope.length
+    ? Prisma.sql`AND c."groupId" IN (${Prisma.join(groupScope)})` : Prisma.sql`AND FALSE`;
+  const [row] = await prisma.$queryRaw<Array<{
+    studentMessageCount: number; unreadCount: number; unreadParticipantId: string | null;
+    latestId: string | null; latestSenderName: string | null; latestParticipantId: string | null; latestCreatedAt: Date | null;
+  }>>(Prisma.sql`
+    WITH incoming AS (
+      SELECT m."id", m."createdAt", m."senderName", c."participantId",
+        (r."lastReadAt" IS NULL OR m."createdAt" > r."lastReadAt") AS unread
+      FROM "ActivityConversationMessage" m
+      JOIN "ActivityConversation" c ON c."id" = m."conversationId"
+      LEFT JOIN "ActivityConversationRead" r ON r."conversationId" = c."id" AND r."userId" = ${userId}
+      WHERE c."courseId" = ${courseId} AND c."activityId" = ${activityId} ${groupFilter}
+        AND m."senderKind" = 'student' AND m."deletedAt" IS NULL
+        AND (m."senderUserId" IS NULL OR m."senderUserId" <> ${userId})
+    )
+    SELECT stats.*, latest."id" AS "latestId", latest."senderName" AS "latestSenderName",
+      latest."participantId" AS "latestParticipantId", latest."createdAt" AS "latestCreatedAt",
+      unread."participantId" AS "unreadParticipantId"
+    FROM (SELECT COUNT(*)::integer AS "studentMessageCount", COUNT(*) FILTER (WHERE unread)::integer AS "unreadCount" FROM incoming) stats
+    LEFT JOIN LATERAL (SELECT * FROM incoming ORDER BY "createdAt" DESC, "id" DESC LIMIT 1) latest ON TRUE
+    LEFT JOIN LATERAL (SELECT "participantId" FROM incoming WHERE unread ORDER BY "createdAt" DESC, "id" DESC LIMIT 1) unread ON TRUE
+  `);
+  return {
+    unreadCount: row.unreadCount, studentMessageCount: row.studentMessageCount, unreadParticipantId: row.unreadParticipantId,
+    latestStudentMessage: row.latestId && row.latestCreatedAt ? {
+      id: row.latestId, senderName: row.latestSenderName!, participantId: row.latestParticipantId!, createdAt: row.latestCreatedAt.toISOString()
+    } : null
+  };
 }
 
 export async function getActivityMessagingOverview(user: CurrentUser, courseId: string, activityId: string, groupId?: string | null, now = new Date(), before?: string): Promise<ActivityMessagingOverview> {

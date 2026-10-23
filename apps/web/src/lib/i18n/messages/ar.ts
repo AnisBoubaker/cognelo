@@ -194,6 +194,18 @@ export const arMessages = {
       time: "الوقت"
     },
     activityMessenger: {
+      soundNotifications: "الإشعارات الصوتية",
+      muteSound: "كتم أصوات الرسائل",
+      enableSound: "تفعيل أصوات الرسائل",
+      soundUnavailable: "الصوت غير متاح في هذا المتصفح",
+      soundActivationHelp: "انقر في هذه الصفحة لتفعيل الإشعارات الصوتية.",
+      newBadge: "جديد",
+      unreadStudentMessages: "رسائل الطلاب غير المقروءة: {count}",
+      newMessageTitle: "رسالة جديدة من طالب",
+      newMessageFrom: "أرسل لك {name} رسالة.",
+      newMessages: "وصلت {count} رسائل جديدة من الطلاب.",
+      openUnreadMessages: "قراءة الرسائل",
+
       testExercise: "التمرين {number}: {title}",
       deleted: "محذوفة",
       deleteMessage: "حذف الرسالة",

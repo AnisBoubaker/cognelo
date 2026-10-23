@@ -45,6 +45,16 @@ The existing learner content-access poll runs every 20 seconds, including while 
 
 The open activity report polls a small messaging revision every ten seconds and on focus, using its existing cadence. Open dialogs fetch their contents only when that revision changes; they have no independent timer. Grading review loads its selected discussion on demand without polling. Hidden tabs skip periodic messaging checks, and unmounting the activity page cancels its timer. **Message students** requires messaging enabled and teacher messaging permission. Disabling messaging closes that dialog. Saved discussions remain accessible from **Review and grade → Activity messages** in individual and batch grading, even with messaging subsequently disabled. Review follows the selected submission when one is available; it does not allow replies, but authors can delete their own sent messages.
 
+### Teacher notifications and sound
+
+The same teacher summary includes the viewing teacher's unread student-message count, an unread participant to open, the student-message count, and the latest student's message ID, sender, participant, and timestamp. These fields use the authorized section scope and contain no message bodies. Read state is per teacher. No new polling interval or database migration is required.
+
+Unread messages highlight **Message students** with a count and show a persistent sticky banner. **Read messages** opens an unread student's conversation. Inside the dialog, the header count and highlighted **New** conversation badges keep unread messages visible. A newly observed student message also raises an app-wide notification and plays one short local two-tone chime per polling batch. Initial history, repeated polls, read receipts, teacher replies/broadcasts, and deletions stay silent. Leaving the activity page stops polling and disposes the audio context.
+
+The dialog's small speaker button controls sound; the preference persists per account in browser local storage and synchronizes across tabs. Muting stops current tones, and enabling sound does not replay messages received while muted. Browser [Web Audio activation rules](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Best_practices#autoplay_policy) still apply: a page interaction activates sound, and an unread banner explains when that interaction is needed. Visual notifications remain available without audio support or activation.
+
+Opening a chat focuses its message field when available, otherwise its non-action heading. When a composer finishes loading, it takes focus only if focus is still on that initial heading/dialog; it must not steal focus from another deliberately selected control. Read-only chats retain heading focus, and closing restores the prior focus. The speaker button remains keyboard-accessible but never receives automatic opening focus, so Space cannot accidentally mute sound.
+
 Presence remains independent of messaging. Recently present, unfinished attempts (45-second window) drive the **Students are answering** warning for live settings changes, even when messaging is off. Timed activities and Tests require a started attempt to renew presence; untimed activities use the next logical attempt. A broadcast created for an offline student uses a closed, inactive delivery record. Review/history requests do not renew presence.
 
 ## Authorization and retained access
@@ -55,6 +65,7 @@ Learners can retrieve and mark only their own enrolled history. Ordinary availab
 
 ## Verification
 
+- `tests/e2e/activity-message-alerts.spec.ts`: visible alerts, real Web Audio activation/chimes, quiet backlog and repeated polls, persistent mute, safe opening focus and Space during loading/typing, independent teacher read state, section scope, and no polling/audio after leaving the report. Unit tests cover alert deduplication and audio lifecycle/failure paths.
 - `tests/e2e/activity-message-test-context.spec.ts`: current exercise vs. last answer, randomized order, stable historical labels after edits/removal, rejected foreign context, and clearing context on review/standalone pages.
 - `tests/e2e/activity-message-deletion.spec.ts`: teacher/learner strikethrough, retained text, broadcast copies, author-only authorization, idempotency, old history pages, and heartbeat invalidation.
 - Core and route unit tests cover deletion ownership/scope, retained client history, switches, ownership, section scope, student-initiated replies, offline delivery, current-attempt presence, history cursors, and content closure.
