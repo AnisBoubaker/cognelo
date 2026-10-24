@@ -1,3 +1,4 @@
+import { exportCodingSubmission } from "./submission-export";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import {
   codingExerciseGeneratePromptRoute,
@@ -42,6 +43,7 @@ import { prisma } from "./db-client";
 export { listCodingExerciseProgrammingLanguages } from "./judge0";
 
 export const codingExercisesServerPlugin: ServerActivityPlugin = {
+  submissionExport: { activityTypeKeys: ["coding-exercise"], getContent: exportCodingSubmission },
   key: "coding-exercises",
   studentSolution: {
     activityTypeKeys: ["coding-exercise"],

@@ -1,3 +1,4 @@
+import { exportWebDesignSubmission } from "./submission-export";
 import { prisma } from "./db-client";
 import { parseWebDesignExerciseConfig } from "./web-design-coding-exercises";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
@@ -8,6 +9,7 @@ import { AppError } from "@cognelo/core";
 import { createWebDesignBankActivityVariation } from "./variation";
 
 export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
+  submissionExport: { activityTypeKeys: ["web-design-coding-exercise"], getContent: exportWebDesignSubmission },
   key: "web-design-coding-exercises",
   studentSolution: {
     activityTypeKeys: ["web-design-coding-exercise"],

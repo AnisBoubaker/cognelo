@@ -2,6 +2,30 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const frMessages = {
+  answerExport: {
+    "title": "Exporter les réponses des étudiants",
+    "single": "Exporter la réponse en PDF",
+    "download": "Exporter",
+    "submission": "Remise",
+    "attempt": "Tentative {number} - {date}",
+    "students": "Étudiants : {selected} sur {total} sélectionnés",
+    "selectAll": "Tout cocher",
+    "clearAll": "Tout décocher",
+    "attempts": "Tentatives à inclure",
+    "latest": "Dernière tentative remise",
+    "allAttempts": "Toutes les tentatives remises",
+    "format": "Format de téléchargement",
+    "onePdf": "Tous les étudiants dans un seul PDF",
+    "zip": "ZIP avec un PDF par étudiant",
+    "includePrompt": "Inclure l’énoncé avec chaque réponse",
+    "includeGrading": "Inclure les notes, la grille, les commentaires et les résultats des tests",
+    "submittedOnly": "Seules les tentatives remises sont incluses. Les tentatives en cours et supprimées sont exclues.",
+    "noSubmissions": "Aucune tentative remise n’est disponible pour l’exportation.",
+    "preparing": "Préparation de l’exportation",
+    "preparingHelp": "Création des PDF sélectionnés. Veuillez garder cette page ouverte.",
+    "ready": "L’exportation des réponses est prête.",
+    "failed": "Impossible d’exporter les réponses des étudiants."
+},
   activityContentAccess: {
     "setting": "Masquer le contenu lorsqu’aucune nouvelle tentative n’est autorisée",
     "settingHelp": "Après la dernière tentative ou la date de fermeture, masquer les questions, réponses, historiques, solutions et rapports détaillés. Les reçus de remise et les notes publiées restent accessibles. S’applique à toutes les sections et à tous les exercices d’un test.",

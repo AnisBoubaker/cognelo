@@ -281,6 +281,8 @@ The `deployments/` directories are filesystem deployment slots, not GitHub Relea
 
 Install dependencies, generate Prisma clients, verify, and build as the service account:
 
+Teacher answer PDF exports additionally need the API-side Chromium browser and multilingual fonts. Complete the [answer-export runtime setup](ANSWER_EXPORTS.md#runtime-installation) for the service account before enabling downloads; this is separate from the Web Design execution runner.
+
 ```bash
 sudo -u instance1 /bin/bash -c '
   set -euo pipefail

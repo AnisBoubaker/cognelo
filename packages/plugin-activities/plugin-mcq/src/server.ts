@@ -1,3 +1,4 @@
+import { exportMcqSubmission } from "./submission-export";
 import { AppError } from "@cognelo/core";
 import { prisma } from "@cognelo/db";
 import { prisma as mcqPrisma } from "./db-client";
@@ -10,6 +11,7 @@ import { createMcqBankActivityVariation } from "./variation";
 import { reconcileMcqResponseState } from "./mcq";
 
 export const mcqServerPlugin: ServerActivityPlugin = {
+  submissionExport: { activityTypeKeys: ["mcq"], getContent: exportMcqSubmission },
   key: "mcq",
   studentSolution: {
     activityTypeKeys: ["mcq"],

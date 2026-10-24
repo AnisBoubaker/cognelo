@@ -1,3 +1,5 @@
+import type { SubmissionExportHandler } from "./submission-export";
+export * from "./submission-export";
 import type { CurrentUser } from "@cognelo/contracts";
 import type { ActivityDefinition, ActivitySolutionContent } from "./index";
 
@@ -313,6 +315,8 @@ export type PluginHostCapabilityHandler<TResult = unknown> = () => Promise<TResu
 
 export type ServerActivityPlugin = {
   key: string;
+  /** Read-only projection of a host-authorized submitted attempt. */
+  submissionExport?: { activityTypeKeys: readonly string[]; getContent: SubmissionExportHandler };
   studentSolution?: {
     activityTypeKeys: readonly string[];
     /** Called only after the host authorizes solution release. Never return grading secrets. */
@@ -730,4 +734,8 @@ export async function runActivityAttemptDeletedHooksForPlugins(
 ) {
   const plugin = plugins.find((candidate) => candidate.key === input.pluginKey);
   await plugin?.hooks?.onActivityAttemptDeleted?.(input);
+}
+
+export function getSubmissionExportHandler(activityTypeKey: string): SubmissionExportHandler | null {
+  return currentServerPlugins().find((plugin) => plugin.submissionExport?.activityTypeKeys.includes(activityTypeKey))?.submissionExport?.getContent ?? null;
 }

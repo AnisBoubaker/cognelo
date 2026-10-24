@@ -38,3 +38,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Honor the host [activity content closure policy](../../../docs/ACTIVITY_CONTENT_ACCESS.md) for prompts, histories, solutions, and files. Final submission may return a host-handled closure signal instead of a review payload; preserve records and finalization cleanup.
 
 - Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.
+
+- [Answer exports](../../../docs/ANSWER_EXPORTS.md) are read-only plugin projections: Exports preserve selected choices. Prompt-off exports omit stems and unselected choices; grading-off exports omit answer keys and feedback. No checking or model call occurs.

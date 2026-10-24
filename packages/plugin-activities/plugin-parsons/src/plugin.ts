@@ -80,6 +80,7 @@ export const parsonsPlugin: ActivityPlugin = {
       },
       grading: {
         supportsAttempts: true,
+        supportsAnswerExport: true,
         supportsAutoGrading: true,
         supportsManualGrading: true,
         supportsRegrading: true,

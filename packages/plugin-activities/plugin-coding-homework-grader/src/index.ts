@@ -22,6 +22,7 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
       studentView: { mode: "read_only" },
       grading: {
         supportsAttempts: true,
+        supportsAnswerExport: true,
         supportsManualGrading: true,
         supportsFeedbackRenderer: true,
         supportsAnalyticsPayloads: true,

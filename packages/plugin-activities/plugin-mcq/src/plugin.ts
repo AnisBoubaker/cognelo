@@ -142,6 +142,7 @@ export const mcqPlugin: ActivityPlugin = {
       configSchema: mcqConfigSchema,
       grading: {
         supportsAttempts: true,
+        supportsAnswerExport: true,
         supportsAutoGrading: true,
         supportsManualGrading: true,
         supportsRegrading: true,

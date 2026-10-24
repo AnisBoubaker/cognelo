@@ -65,6 +65,8 @@ Some plugins need additional services:
 - Web Design Coding Exercises: run `npm run dev:runner`.
 - Coding Homework Grader challenge generation: configure a supported question-authoring model and run the API worker path documented by that plugin.
 
+Teacher answer PDF/ZIP exports use an API-side Chromium renderer. See [answer exports](docs/ANSWER_EXPORTS.md#runtime-installation) for browser and font setup.
+
 ## Verification
 
 ```bash

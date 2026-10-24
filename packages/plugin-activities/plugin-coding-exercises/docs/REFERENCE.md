@@ -307,3 +307,7 @@ Use the shared [editor undo lifecycle](../../../../docs/EDITOR_UNDO.md). Draft l
 ## Shared action controls
 
 Teacher, learner, and settings actions follow the platform [button and icon contract](../../../../docs/ACTION_BUTTONS.md). Use explicit semantic `ActionIcon` names with localized labels; dimensions and interaction colors are shared CSS, while tabs, disclosure rows, and specialized editor controls retain their own layout.
+
+## Answer exports
+
+The plugin implements `submissionExport.getContent` for the [shared PDF/ZIP export](../../../../docs/ANSWER_EXPORTS.md). Exports use the exact submitted source, latest stored test evaluation, and saved rubric/comments. Missing tests or ungraded work never block export. No Judge0 or model call occurs. The host enforces teacher/section scope, submission lifecycle, exact attempt selection, and prompt/grading switches. Private provider requests, credentials, and provenance are never exported.

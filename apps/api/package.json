@@ -19,14 +19,21 @@
     "@cognelo/db": "0.1.0",
     "@cognelo/plugin-registry": "0.1.0",
     "fflate": "^0.8.3",
+    "katex": "^0.16.45",
+    "marked": "^14.1.4",
     "next": "16.3.3",
+    "pdf-lib": "^1.17.1",
+    "playwright": "1.59.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "sanitize-html": "^2.18.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/katex": "^0.16.8",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/sanitize-html": "^2.16.2",
     "typescript": "^5.4.5"
   }
 }

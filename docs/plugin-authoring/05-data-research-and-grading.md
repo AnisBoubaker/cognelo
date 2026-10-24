@@ -180,3 +180,7 @@ You can always add richer persistence later, but cleaning up a messy data model 
 Previous: [Build Your First Plugin](05-build-your-first-plugin.md)
 
 Next: [Checklist And Reference](06-checklist-and-reference.md)
+
+## Submitted answer exports
+
+Declare `grading.supportsAnswerExport` and register the matching server `submissionExport.activityTypeKeys` / `getContent` handler to participate in [PDF/ZIP exports](../ANSWER_EXPORTS.md). The host supplies an authorized submitted attempt, its exact plugin reference or Test-child state, prompt/grading options, and localized document labels. Return typed Markdown/code/table blocks, and optional prompt-PDF bytes for activity-owned assignment documents. Read your own retained records; do not run graders, generate feedback, initialize state, or substitute a reference solution for missing work. Respect both switches, whitelist displayable feedback, and leave raw prompts/provider/provenance data private. The host handles selection, filenames, PDF rendering, optional ZIP packaging, and access control.

@@ -21,6 +21,7 @@ export const webDesignCodingExercisesPlugin: ActivityPlugin = {
       },
       grading: {
         supportsAttempts: true,
+        supportsAnswerExport: true,
         supportsAutoGrading: true,
         supportsManualGrading: true,
         supportsAnalyticsPayloads: true,

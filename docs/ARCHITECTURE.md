@@ -170,6 +170,8 @@ Activity messaging is core-owned and plugin-independent. Activity-wide, default-
 
 No course table rewrite is required.
 
+Teacher [answer exports](ANSWER_EXPORTS.md) use the capability-driven `submissionExport` server contract. Core authorizes and selects exact submitted attempts, plugins return their own safe document blocks, and the API prints escaped HTML with scripts/network disabled in a separate local Chromium context. PDF/ZIP generation is read-only and independent of the untrusted-code execution runners.
+
 ## Content Type Extensibility
 
 Content type plugins are the sibling system for non-activity course content. Their contracts/registry API live in `packages/content-type-sdk`, their installed composition lives in `packages/plugin-registry`, and implementations live under `packages/plugin-content-types/*`.

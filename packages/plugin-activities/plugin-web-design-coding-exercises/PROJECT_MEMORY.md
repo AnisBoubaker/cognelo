@@ -35,3 +35,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - [Undo and autosave](../../../docs/EDITOR_UNDO.md): wait for successful draft loading before mounting the editor. Restoration is a baseline, not an undoable edit or an answer write. Keep model history in its mounted attempt/question/file scope only; never persist history or let it cross attempts, users, files, or read-only submission views.
 
 - Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.
+
+- [Answer exports](../../../docs/ANSWER_EXPORTS.md) are read-only plugin projections: Exports display submitted HTML/CSS/JavaScript as escaped source and optionally include stored test results. They never execute student files or invoke the runner.

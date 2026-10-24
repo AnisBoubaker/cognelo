@@ -497,6 +497,8 @@ First plugin integration target:
 - Completed: add a shared per-activity export dialog to the content context menu, gradebook activity/group rows, and detailed-results page. The dedicated endpoint emits exactly email, first name, last name, and normalized final grade in CSV or XLSX; plugin-declared partial grades and ungraded/missing rows are excluded.
 - Completed: add attempt-scoped live activity broadcasts from the detailed report. The [activity-level messaging switch](ACTIVITY_MESSAGING.md) in General settings defaults off and updates learner/report controls live while preserving answering presence for settings warnings. The teacher dialog reports recently active recipients plus delivery/read counts; the learner receives a blinking unread envelope and chat-style history beside the timer. Timed activities and Tests bind the thread to their started core attempt, untimed activities use the next logical attempt without creating a core attempt on view, and a later attempt cannot receive earlier messages. Course-wide teachers/admins can broadcast to all assigned groups, section teachers remain section-scoped, and TAs are excluded. Sender/read persistence is bidirectional-ready even though this phase exposes only staff-to-learner writes.
 
+- Completed: [student answer exports](ANSWER_EXPORTS.md) from the activity report header and per-student menu, with exact single attempts, latest/all bulk attempts, prompt/grading switches, submitted-only selection, and combined PDF or one-per-student ZIP. Exporting never reruns grading or alters attempts.
+
 ### Phase 6A: Formative/Summative Assignment Mode - Completed
 
 - Completed: add General assignment-level `assessmentMode` metadata for direct group assignments and course activity settings.

@@ -2,6 +2,30 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const zhMessages = {
+  answerExport: {
+    "title": "导出学生答案",
+    "single": "将答案导出为 PDF",
+    "download": "导出",
+    "submission": "提交",
+    "attempt": "第 {number} 次作答 - {date}",
+    "students": "学生：已选择 {selected} 人，共 {total} 人",
+    "selectAll": "全选",
+    "clearAll": "取消全选",
+    "attempts": "包括的作答",
+    "latest": "最近一次已提交的作答",
+    "allAttempts": "所有已提交的作答",
+    "format": "下载格式",
+    "onePdf": "所有学生合并为一个 PDF",
+    "zip": "ZIP 文件，每位学生一个 PDF",
+    "includePrompt": "每个答案包含题目",
+    "includeGrading": "包含成绩、评分标准得分、评语和测试结果",
+    "submittedOnly": "仅包含已提交的作答，不包含未提交或已删除的作答。",
+    "noSubmissions": "没有可导出的已提交作答。",
+    "preparing": "正在准备答案导出",
+    "preparingHelp": "正在创建所选 PDF，请保持此页面打开。",
+    "ready": "答案导出已准备就绪。",
+    "failed": "无法导出学生答案。"
+},
   activityContentAccess: {
     "setting": "不再允许尝试时隐藏活动内容",
     "settingHelp": "最后一次尝试或截止时间之后，隐藏题目、答案、历史记录、参考答案和详细报告。学生仍可查看提交记录及已发布成绩。适用于所有班级和测验中的所有练习。",

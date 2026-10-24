@@ -21,6 +21,7 @@ import { TestReviewAllPanel } from "@/components/test-review-all-panel";
 import { ActivityReviewAllPanel, toActivityReviewResponse, type ActivityReviewResponse } from "@/components/activity-review-all-panel";
 import { codingRubricResultsFromFeedback, type CodingRubricCriterion } from "@/lib/activity-review-all";
 import { ReviewAndGradeDialog } from "@/components/review-and-grade-dialog";
+import { AnswerExportDialog } from "@/components/answer-export-dialog";
 import { GradebookExportDialog } from "@/components/gradebook-export-dialog";
 import { DeleteSubmissionDialog } from "@/components/delete-submission-dialog";
 import {
@@ -41,7 +42,7 @@ import {
   getManualGradingRenderer,
   renderTestReviewAllItem
 } from "@/lib/activity-renderers";
-import { getGradebookActivityActions } from "@/lib/gradebook-actions";
+import { canExportActivityAnswers, getGradebookActivityActions } from "@/lib/gradebook-actions";
 import { deletableSubmissions } from "@/lib/submission-deletion";
 import { excludeAiGradingTemplateTargets } from "@/lib/ai-grading-batch";
 import { type Locale, useI18n } from "@/lib/i18n";
@@ -86,6 +87,7 @@ export default function GradebookActivityResultsPage() {
   } | null>(null);
   const [reviewAndGradeRow, setReviewAndGradeRow] = useState<CourseGradebookRow | null>(null);
   const [submissionDeletionRow, setSubmissionDeletionRow] = useState<CourseGradebookRow | null>(null);
+  const [answerExportTarget, setAnswerExportTarget] = useState<{ participantId?: string } | null>(null);
   const [showGradeExport, setShowGradeExport] = useState(false);
   const [showActivitySettings, setShowActivitySettings] = useState(false);
   const [showActivityMessenger, setShowActivityMessenger] = useState(false);
@@ -903,6 +905,9 @@ export default function GradebookActivityResultsPage() {
                 <AppIcon name="download" />
                 {t("courseDetail.exportGrades")}
               </button>
+              {canExportActivityAnswers(activityTypeKey) ? <button className="button secondary" disabled={!rows.some((row) => row.attempts.some((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded"))} type="button" onClick={() => setAnswerExportTarget({})}>
+                <AppIcon name="download" />{t("answerExport.title")}
+              </button> : null}
               <Link className="button secondary activity-report-back" href={backHref}>
                 <AppIcon name="back" />
                 {backLabel}
@@ -1027,6 +1032,7 @@ export default function GradebookActivityResultsPage() {
                   savingGradeKey={savingGradeKey}
                   onReviewAndGrade={openReviewAndGrade}
                   onDeleteSubmission={setSubmissionDeletionRow}
+                  onExportAnswers={(row) => setAnswerExportTarget({ participantId: row.participantId })}
                   onReopenSubmission={reopenSubmission}
                   onRegrade={regradeRow}
                   onGenerateAiFeedback={generateAiFeedbackForRow}
@@ -1167,6 +1173,7 @@ export default function GradebookActivityResultsPage() {
           </div>
         ) : null}
 
+        {answerExportTarget ? <AnswerExportDialog courseId={courseId} activityId={activityId} activityTitle={activityTitle} groupId={groupId} participantId={answerExportTarget.participantId} onClose={() => setAnswerExportTarget(null)} /> : null}
         {submissionDeletionRow ? (
           <DeleteSubmissionDialog
             courseId={courseId}
@@ -1362,6 +1369,7 @@ function GradebookStudentRow({
   savingGradeKey,
   onReviewAndGrade,
   onDeleteSubmission,
+  onExportAnswers,
   onReopenSubmission,
   onRegrade,
   onGenerateAiFeedback,
@@ -1373,6 +1381,7 @@ function GradebookStudentRow({
   savingGradeKey: string | null;
   onReviewAndGrade: (row: CourseGradebookRow) => Promise<void>;
   onDeleteSubmission: (row: CourseGradebookRow) => void;
+  onExportAnswers: (row: CourseGradebookRow) => void;
   onReopenSubmission: (row: CourseGradebookRow) => Promise<void>;
   onRegrade: (row: CourseGradebookRow) => Promise<void>;
   onGenerateAiFeedback: (row: CourseGradebookRow) => Promise<void>;
@@ -1387,7 +1396,8 @@ function GradebookStudentRow({
   const canRerunAutomaticGrading = row.assessmentMode === "summative" && activityActions.canRerunAutomaticGrading;
   const canReopen = row.supportsSubmissionContinuation === true && Boolean(latestReopenableAttempt(row)) && !inProgressAttempt;
   const canDeleteSubmission = deletableSubmissions(row).length > 0;
-  const hasActions = canDeleteSubmission || canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
+  const canExport = canExportActivityAnswers(row.activityTypeKey) && row.attempts.some((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
+  const hasActions = canExport || canDeleteSubmission || canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
 
   function closeActionMenu() {
     setActionMenuAnchor(null);
@@ -1502,6 +1512,7 @@ function GradebookStudentRow({
                   <span>{t(row.assessmentMode === "formative" ? "courseDetail.inspectAttempts" : "courseDetail.reviewAndGrade")}</span>
                 </button>
               ) : null}
+              {canExport ? <button className="content-context-menu-item" role="menuitem" type="button" onClick={() => { closeActionMenu(); onExportAnswers(row); }}><AppIcon name="download" /><span>{t("answerExport.single")}</span></button> : null}
               {canDeleteSubmission ? (
                 <button className="content-context-menu-item is-danger" role="menuitem" type="button"
                   disabled={savingGradeKey !== null}

@@ -32,7 +32,8 @@
     "db:studio": "npm run db:studio --workspace @cognelo/db",
     "media:gc": "set -a && . ./.env && set +a && npx tsx scripts/media-gc.ts",
     "media:gc:delete": "set -a && . ./.env && set +a && npx tsx scripts/media-gc.ts --delete",
-    "production:bootstrap": "set -a && . ./.env && set +a && npx tsx scripts/bootstrap-production.ts"
+    "production:bootstrap": "set -a && . ./.env && set +a && npx tsx scripts/bootstrap-production.ts",
+    "pdf:install-browser": "playwright install chromium"
   },
   "dependencies": {
     "@cognelo/plugin-registry": "0.1.0",

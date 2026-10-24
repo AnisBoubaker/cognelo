@@ -1,5 +1,5 @@
 const nextConfig = {
-  serverExternalPackages: ["re2-wasm"],
+  serverExternalPackages: ["re2-wasm", "playwright", "playwright-core", "katex"],
   transpilePackages: [
     "@cognelo/config",
     "@cognelo/contracts",

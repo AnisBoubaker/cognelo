@@ -14,6 +14,7 @@ export type ActivityIconName = "browser-code" | "checklist" | "clipboard-check" 
 
 export type ActivityGradingCapability = {
   supportsAttempts?: boolean;
+  supportsAnswerExport?: boolean;
   supportsAutoGrading?: boolean;
   supportsManualGrading?: boolean;
   supportsRegrading?: boolean;
@@ -171,6 +172,7 @@ const coreDefinitions: ActivityDefinition[] = [
     studentView: { mode: "interactive", execution: "core" },
     grading: {
       supportsAttempts: true,
+      supportsAnswerExport: true,
       supportsAutoGrading: true,
       supportsManualGrading: true,
       supportsRegrading: true,

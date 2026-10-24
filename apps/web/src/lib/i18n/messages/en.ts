@@ -2,6 +2,30 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const enMessages = {
+  answerExport: {
+    "title": "Export student answers",
+    "single": "Export answer as PDF",
+    "download": "Export",
+    "submission": "Submission",
+    "attempt": "Attempt {number} - {date}",
+    "students": "Students: {selected} of {total} selected",
+    "selectAll": "Check all",
+    "clearAll": "Uncheck all",
+    "attempts": "Attempts to include",
+    "latest": "Latest submitted attempt",
+    "allAttempts": "All submitted attempts",
+    "format": "Download format",
+    "onePdf": "All students in one PDF",
+    "zip": "ZIP with one PDF per student",
+    "includePrompt": "Include the prompt with each answer",
+    "includeGrading": "Include grades, rubric scores, comments and test results",
+    "submittedOnly": "Only submitted attempts are included. Unsubmitted and deleted attempts are excluded.",
+    "noSubmissions": "No submitted attempts are available for export.",
+    "preparing": "Preparing answer export",
+    "preparingHelp": "Creating the selected PDFs. Please keep this page open.",
+    "ready": "The answer export is ready.",
+    "failed": "Unable to export student answers."
+},
   activityContentAccess: {
     "setting": "Hide activity content when no further attempts are allowed",
     "settingHelp": "After the final attempt or closing deadline, hide questions, answers, history, solutions, and detailed reports. Students retain submission receipts and released grades. Applies to every section and all exercises in a Test.",

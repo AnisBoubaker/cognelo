@@ -17,3 +17,7 @@ export function getGradebookActivityActions(activityTypeKey: string): GradebookA
     aiAssessmentChangesGrade: grading?.supportsAiFeedbackGrading === true
   };
 }
+
+export function canExportActivityAnswers(activityTypeKey: string) {
+  return getActivityDefinition(activityTypeKey)?.grading?.supportsAnswerExport === true;
+}

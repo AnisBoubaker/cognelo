@@ -1,3 +1,4 @@
+import { exportHomeworkSubmission } from "./submission-export";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { AppError } from "@cognelo/core";
 import { prisma } from "./db-client";
@@ -35,6 +36,7 @@ import { markCodingHomeworkSubmissionDeleted } from "./submission-deletion";
 registerCodingHomeworkBackgroundJobs();
 
 export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
+  submissionExport: { activityTypeKeys: ["coding-homework-grader"], getContent: exportHomeworkSubmission },
   key: "coding-homework-grader",
   attemptContinuation: {
     activityTypeKeys: ["coding-homework-grader"],

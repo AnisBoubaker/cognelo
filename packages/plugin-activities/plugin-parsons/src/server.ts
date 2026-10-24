@@ -1,3 +1,4 @@
+import { exportParsonsSubmission } from "./submission-export";
 export * from "./attempt-types";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { AppError } from "@cognelo/core";
@@ -11,6 +12,7 @@ import { evaluateParsonsAttemptStateForConfig } from "./attempts";
 import { createParsonsBankActivityVariation } from "./variation";
 
 export const parsonsServerPlugin: ServerActivityPlugin = {
+  submissionExport: { activityTypeKeys: ["parsons-problem"], getContent: exportParsonsSubmission },
   key: "parsons",
   studentSolution: {
     activityTypeKeys: ["parsons-problem"],

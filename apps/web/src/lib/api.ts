@@ -1,3 +1,4 @@
+import type { AnswerExportRequest, AnswerExportStudent } from "@cognelo/contracts";
 import type {
   ActivityMessageDeletionInput,
   ActivityMessageTestItemInput,
@@ -1902,6 +1903,18 @@ export const api = {
       params.set("groupId", groupId);
     }
     return request<{ attempts: CourseActivityInProgressAttempt[] }>(`/courses/${courseId}/gradebook?${params.toString()}`);
+  },
+  answerExportStudents: (courseId: string, activityId: string, groupId?: string) => request<{ students: AnswerExportStudent[] }>(`/courses/${courseId}/gradebook/activities/${activityId}/answers-export${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ""}`),
+  exportActivityAnswers: async (courseId: string, activityId: string, input: AnswerExportRequest) => {
+    const path = `/courses/${courseId}/gradebook/activities/${activityId}/answers-export`;
+    assertStudentViewRequestIsSafe(path, { method: "POST" });
+    const response = await fetch(`${API_URL}/api${path}`, { method: "POST", credentials: "include", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+    if (!response.ok) {
+      if (response.status === 401) notifyUnauthorized();
+      const body = await response.json().catch(() => ({}));
+      throw new ApiError(body.error?.message ?? "Export failed.", { ...body.error, status: response.status });
+    }
+    return { blob: await response.blob(), fileName: decodeURIComponent(/filename\*=UTF-8''([^;]+)/i.exec(response.headers.get("Content-Disposition") ?? "")?.[1] ?? `answers.${input.format}`) };
   },
   activityMessagingStatus: (courseId: string, activityId: string, groupId?: string) =>
     request<{ messaging: ActivityMessagingStatus }>(`/courses/${courseId}/gradebook/activities/${activityId}/messages?${new URLSearchParams({ summary: "1", ...(groupId ? { groupId } : {}) })}`),

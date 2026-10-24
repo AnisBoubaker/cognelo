@@ -51,3 +51,5 @@ The shared [activity content closure setting](../../../docs/ACTIVITY_CONTENT_ACC
 Saved code loads as a fresh [editor baseline](../../../docs/EDITOR_UNDO.md). Test question/file undo histories remain separate in memory while the Test is open; reload or reopening starts from the saved answer. Normal edits, undo, and redo continue to autosave.
 
 Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.
+
+Teachers can [export submitted answers as PDF or ZIP](../../../docs/ANSWER_EXPORTS.md), including selectable prompts and grading content. See [export details](docs/REFERENCE.md#answer-exports).

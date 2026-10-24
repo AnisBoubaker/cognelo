@@ -18,6 +18,7 @@ export const codingExercisesPlugin: ActivityPlugin = {
       studentView: { mode: "interactive", execution: "plugin" },
       grading: {
         supportsAttempts: true,
+        supportsAnswerExport: true,
         supportsAutoGrading: true,
         supportsManualGrading: true,
         supportsRegrading: true,

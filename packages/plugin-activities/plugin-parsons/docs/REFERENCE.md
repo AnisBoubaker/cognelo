@@ -174,3 +174,7 @@ The optional [core content-closure policy](../../../../docs/ACTIVITY_CONTENT_ACC
 ## Shared action controls
 
 Teacher, learner, and settings actions follow the platform [button and icon contract](../../../../docs/ACTION_BUTTONS.md). Use explicit semantic `ActionIcon` names with localized labels; dimensions and interaction colors are shared CSS, while tabs, disclosure rows, and specialized editor controls retain their own layout.
+
+## Answer exports
+
+The plugin implements `submissionExport.getContent` for the [shared PDF/ZIP export](../../../../docs/ANSWER_EXPORTS.md). Exports preserve submitted block order and indentation from the host snapshot or retained attempt. They never call the evaluator or substitute reference code. The host enforces teacher/section scope, submission lifecycle, exact attempt selection, and prompt/grading switches. Private provider requests, credentials, and provenance are never exported.
