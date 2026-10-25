@@ -150,11 +150,11 @@ function GroupActivityContent() {
     let cancelled = false;
     let refreshing = false;
     async function refreshPolicy() {
-      if (refreshing) return;
+      if (refreshing || safeExamBrowserLaunchDismissedRef.current) return;
       refreshing = true;
       try {
         const { access } = await api.groupActivitySafeExamBrowserAccess(courseId, groupId, activityId);
-        if (cancelled) return;
+        if (cancelled || safeExamBrowserLaunchDismissedRef.current) return;
         setSafeExamBrowserAccess(access);
         if (access.requiresSafeExamBrowser && !access.accessGranted) {
           setIsSafeExamBrowserGateOpen(true);
@@ -368,10 +368,11 @@ function GroupActivityContent() {
   }
 
   function openActivityInSafeExamBrowser() {
-    if (!safeExamBrowserLaunch) return;
+    if (!safeExamBrowserLaunch || safeExamBrowserLaunchDismissedRef.current) return;
     safeExamBrowserLaunchDismissedRef.current = true;
     flushSync(() => setIsSafeExamBrowserGateOpen(false));
     window.location.href = safeExamBrowserLaunch.launchUrl;
+    router.replace(`/courses/${courseId}/groups/${groupId}`);
   }
 
   useEffect(() => {
