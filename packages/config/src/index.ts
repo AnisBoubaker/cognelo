@@ -13,7 +13,7 @@ const EnvSchema = z.object({
 });
 
 export function getServerEnv() {
-  return EnvSchema.parse({
+  const parsed = EnvSchema.parse({
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_SECRET: process.env.JWT_SECRET,
     CORS_ORIGIN: process.env.CORS_ORIGIN ?? "http://localhost:3000",
@@ -21,4 +21,8 @@ export function getServerEnv() {
     MEDIA_STORAGE_ROOT: process.env.MEDIA_STORAGE_ROOT?.trim() || undefined,
     EMAIL_CREDENTIALS_ENCRYPTION_KEY: process.env.EMAIL_CREDENTIALS_ENCRYPTION_KEY || undefined
   });
+  if (process.env.NODE_ENV === "production" && (/replace|change.?me|dev.*secret/i.test(parsed.JWT_SECRET) || parsed.EMAIL_CREDENTIALS_ENCRYPTION_KEY === "0123456789abcdef".repeat(4))) {
+    throw new Error("Production requires unique generated application secrets.");
+  }
+  return parsed;
 }

@@ -1,3 +1,4 @@
+import { getActivityResponseDraft } from "@cognelo/core";
 import { canShowStudentActivityGrade } from "@cognelo/core";
 import { z } from "zod";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
@@ -30,11 +31,11 @@ const mcqGenerateInputSchema = z.object({
   instructions: z.string().max(4000).default(""),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
   questionCount: z.number().int().min(1).max(MCQ_AI_MAX_QUESTION_COUNT).default(5),
-  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
+  knowledge: activityGenerationKnowledgeSchema.prefault({ mode: "ignore" })
 });
 
 const mcqSubmissionInputSchema = z.object({
-  answers: z.record(z.array(z.string().min(1).max(120)).default([]))
+  answers: z.record(z.string(), z.array(z.string().min(1).max(120)).default([]))
 });
 
 type SubjectContext = {
@@ -78,6 +79,7 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
   path: "mcq/submission",
   activityTypeKeys: ["mcq"],
   allowExpiredTimedAttemptMethods: ["POST"],
+  expiredAttemptInput: async (context) => (await getActivityResponseDraft(context.user, context.courseId!, context.groupId!, context.activity.id))?.state ?? { answers: {} },
   methods: {
     GET: async ({ context }) => {
       if (!context.courseId || !context.groupId) {
@@ -188,6 +190,7 @@ export const mcqFormativeFeedbackRoute: PluginRouteDefinition = {
   path: "mcq/feedback",
   activityTypeKeys: ["mcq"],
   allowExpiredTimedAttemptMethods: ["POST"],
+  expiredAttemptInput: async (context) => (await getActivityResponseDraft(context.user, context.courseId!, context.groupId!, context.activity.id))?.state ?? { answers: {} },
   methods: {
     POST: async ({ context, readJson }) => {
       if (!context.courseId || !context.groupId) {

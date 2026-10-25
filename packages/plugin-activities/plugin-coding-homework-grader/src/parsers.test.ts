@@ -77,3 +77,14 @@ describe("coding homework C parser adapter", () => {
     });
   });
 });
+
+it("bounds malformed signatures, many functions, and oversized source analysis", async () => {
+  const started = performance.now();
+  const malformed = await parseCodingHomeworkSourceFiles([{ path: "malformed.c", languageKey: "c", content: "a".repeat(100_000) + "{}" }]);
+  expect(malformed.functions).toHaveLength(0);
+  const crowded = await parseCodingHomeworkSourceFiles([{ path: "crowded.c", languageKey: "c", content: "int f(void) { return 0; }\n".repeat(3000) }]);
+  expect(crowded.diagnostics.some((issue) => issue.code === "FUNCTION_ANALYSIS_LIMIT")).toBe(true);
+  const large = await parseCodingHomeworkSourceFiles([{ path: "large.c", languageKey: "c", content: " ".repeat(2_000_001) }]);
+  expect(large.diagnostics[0].code).toBe("SOURCE_ANALYSIS_LIMIT");
+  expect(performance.now() - started).toBeLessThan(1000);
+});

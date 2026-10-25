@@ -38,7 +38,7 @@ export const parsonsAttemptEventTypeSchema = z.enum(["move", "indent", "reset", 
 
 export const parsonsAttemptEventSchema = z.object({
   type: parsonsAttemptEventTypeSchema,
-  payload: z.record(z.unknown()).optional().default({})
+  payload: z.record(z.string(), z.unknown()).prefault({})
 });
 
 export const parsonsAttemptUpdateInputSchema = z.object({

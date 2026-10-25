@@ -12,7 +12,7 @@ export const parsonsGenerationInputSchema = z.object({
   description: z.string().min(10).max(4000),
   language: z.string().min(1).max(40),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
-  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
+  knowledge: activityGenerationKnowledgeSchema.prefault({ mode: "ignore" })
 });
 
 const generatedParsonsSchema = z

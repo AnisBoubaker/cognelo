@@ -123,6 +123,7 @@ export async function assertTimedActivityWriteAllowed(
   const context = await resolveTimedActivityContext(user, courseId, groupId, activityId);
   const activeAttempt = await findActiveAttempt(context.assignmentId, context.participantId);
   if (!activeAttempt) {
+    if (context.availableUntil && Date.now() >= context.availableUntil.getTime()) throw new AppError(409, "ATTEMPT_DUE_DATE_PASSED", "The activity deadline has passed.");
     if (assignmentTimeLimitMinutes(context.assignmentMetadata)) {
       throw new AppError(409, "TIMED_ACTIVITY_NOT_STARTED", "Start the timed attempt before changing or submitting a response.");
     }
@@ -130,12 +131,9 @@ export async function assertTimedActivityWriteAllowed(
   }
   const timeLimitMinutes = assignmentTimeLimitMinutes(context.assignmentMetadata);
   const expiresAt = assignmentAttemptExpiresAt(activeAttempt.startedAt, timeLimitMinutes, context.availableUntil);
-  if (
-    !options.allowExpiredAttempt &&
-    expiresAt &&
-    Date.now() >= expiresAt.getTime()
-  ) {
-    throw new AppError(409, "ACTIVITY_TIME_LIMIT_EXPIRED", "The activity time limit has expired. Submit the saved response to finish the attempt.");
+  if (expiresAt && Date.now() >= expiresAt.getTime()) {
+    if (!options.allowExpiredAttempt) throw new AppError(409, "ACTIVITY_TIME_LIMIT_EXPIRED", "The activity time limit has expired. Submit the saved response to finish the attempt.");
+    return { expiredAttemptId: activeAttempt.id };
   }
 }
 
@@ -172,7 +170,7 @@ async function findActiveAttempt(groupActivityId: string, participantId: string)
     where: { groupActivityId, participantId, lifecycle: "started" },
     orderBy: [{ attemptNumber: "desc" }]
   });
-  return attempts.find((attempt) => (activityAttemptTimeLimitMinutes(attempt.metadata) !== null || asRecord(attempt.metadata).continuation)) ?? null;
+  return attempts.find((attempt) => (activityAttemptTimeLimitMinutes(attempt.metadata) !== null || asRecord(attempt.metadata).continuation || asRecord(attempt.metadata).uploadReserved === true)) ?? null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

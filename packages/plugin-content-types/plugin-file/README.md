@@ -11,3 +11,5 @@ The file plugin owns file-specific extraction. It currently exposes source-like/
 Course content duplication copies the safe file metadata while sharing the immutable stored-file reference. The copied resource drops any derived embedding index so it can be rebuilt under the new resource identity.
 
 Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.
+
+Uploads use bounded multipart reads and remove staged files after persistence failures. Download and extraction share the server-owned storage containment check. Basic PDF extraction scans literal strings in linear time, including malformed files. See [security boundaries](../../../docs/SECURITY_BOUNDARIES.md).

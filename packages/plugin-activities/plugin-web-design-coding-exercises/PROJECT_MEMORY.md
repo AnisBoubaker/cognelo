@@ -38,3 +38,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.
 
 - [Answer exports](../../../docs/ANSWER_EXPORTS.md) are read-only plugin projections: Exports display submitted HTML/CSS/JavaScript as escaped source and optionally include stored test results. They never execute student files or invoke the runner.
+
+- `expiredAttemptInput` must reconstruct final input from saved server state. Never accept a fresh learner request body after expiry; the host checks again after body upload. See [deadline enforcement](docs/REFERENCE.md#deadline-finalization).

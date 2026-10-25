@@ -1,7 +1,8 @@
+import { prisma as corePrisma, type Prisma as CorePrisma } from "@cognelo/db";
 import { z } from "zod";
 import { AppError, startActivityAttempt, submitActivityAttempt } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
-import { Prisma, prisma } from "./db-client";
+import { Prisma } from "./db-client";
 import { toStudentChallengeQuestionRecord } from "./generation";
 
 type AnswerScope = {
@@ -75,11 +76,20 @@ export async function saveCodingHomeworkChallengeAnswers(
   }
 ) {
   const parsed = challengeAnswersInputSchema.parse(input ?? {});
-  const submission = await findStudentChallengeSubmission(scope, parsed.submissionId ?? null);
+  return corePrisma.$transaction(async (tx) => {
+  const candidates = await tx.$queryRaw<SubmissionRow[]>`SELECT * FROM "PluginCodingHomeworkSubmission"
+    WHERE "activityId" = ${scope.activityId} AND "groupId" = ${scope.groupId} AND "userId" = ${scope.user.id}
+      AND kind = 'final' AND (${parsed.submissionId ?? null}::text IS NULL OR id = ${parsed.submissionId ?? null})
+      AND NOT (metadata ? 'deletion') ORDER BY "createdAt" DESC LIMIT 1 FOR UPDATE`;
+  const row = candidates[0];
+  const submission: SubmissionWithQuestions | null = row ? { ...row, questions: await tx.$queryRaw<ChallengeQuestionRow[]>`SELECT * FROM "PluginCodingHomeworkChallengeQuestion" WHERE "submissionId" = ${row.id} ORDER BY "orderIndex"` } : null;
   if (!submission) {
     throw new AppError(404, "CODING_HOMEWORK_SUBMISSION_NOT_FOUND", "The requested submission was not found.");
   }
   if (submission.status === "ready_for_grading" || submission.status === "graded") {
+    if (options.finalize && parsed.answers.every((answer) => submission.questions.some((question) => question.id === answer.questionId && question.studentAnswer === answer.answer))) {
+      return { questions: submission.questions.map(toStudentChallengeQuestionRecord), submission: toSubmissionRecord(submission) };
+    }
     throw new AppError(409, "CODING_HOMEWORK_SUBMISSION_LOCKED", "This submission is complete and cannot be edited.");
   }
   if (submission.status !== "challenge_ready") {
@@ -89,6 +99,10 @@ export async function saveCodingHomeworkChallengeAnswers(
     throw new AppError(400, "CODING_HOMEWORK_CHALLENGES_NOT_READY", "Challenge questions are not ready for this submission.");
   }
 
+  if (submission.coreAttemptId) {
+    const [attempt] = await tx.$queryRaw<Array<{ lifecycle: string }>>`SELECT lifecycle FROM "ActivityAttempt" WHERE id = ${submission.coreAttemptId} FOR UPDATE`;
+    if (!attempt || attempt.lifecycle !== "started") throw new AppError(409, "CODING_HOMEWORK_SUBMISSION_LOCKED", "This attempt is complete and cannot be edited.");
+  }
   const questionsById = new Map(submission.questions.map((question) => [question.id, question]));
   const incomingAnswers = new Map<string, string>();
   for (const answer of parsed.answers) {
@@ -114,36 +128,20 @@ export async function saveCodingHomeworkChallengeAnswers(
   for (const question of submission.questions) {
     const nextAnswer = nextAnswers.get(question.id) ?? "";
     if (incomingAnswers.has(question.id) || options.finalize) {
-      await prisma.pluginCodingHomeworkChallengeQuestion.update({
-        where: { id: question.id },
-        data: {
-          answerSubmittedAt: submittedAt,
-          studentAnswer: nextAnswer
-        }
-      });
+      await tx.$executeRaw`UPDATE "PluginCodingHomeworkChallengeQuestion" SET "answerSubmittedAt" = ${submittedAt}, "studentAnswer" = ${nextAnswer}, "updatedAt" = NOW() WHERE id = ${question.id}`;
     }
   }
 
   const coreAttemptId =
     options.finalize && options.gradebook
-      ? await createSubmittedCoreAttempt(scope, submission, nextAnswers, submittedAt ?? new Date(), options.gradebook)
+      ? await createSubmittedCoreAttempt(scope, submission, nextAnswers, submittedAt ?? new Date(), options.gradebook, tx)
       : submission.coreAttemptId;
 
-  const updatedSubmission = await prisma.pluginCodingHomeworkSubmission.update({
-    where: { id: submission.id },
-    data: {
-      coreAttemptId,
-      metadata: {
-        ...normalizeObject(submission.metadata),
-        challengeAnswers: {
-          savedAt: new Date().toISOString(),
-          status: options.finalize ? "submitted" : "draft"
-        }
-      } as Prisma.InputJsonValue,
-      processingError: null,
-      status: options.finalize ? "ready_for_grading" : "challenge_ready"
-    }
-  });
+  const metadata = { ...normalizeObject(submission.metadata), challengeAnswers: { savedAt: new Date().toISOString(), status: options.finalize ? "submitted" : "draft" } };
+  const [updatedSubmission] = await tx.$queryRaw<SubmissionRow[]>`UPDATE "PluginCodingHomeworkSubmission"
+    SET "coreAttemptId" = ${coreAttemptId}, metadata = ${JSON.stringify(metadata)}::jsonb, "processingError" = NULL,
+    status = ${options.finalize ? "ready_for_grading" : "challenge_ready"}::"PluginCodingHomeworkSubmissionStatus", "updatedAt" = NOW()
+    WHERE id = ${submission.id} RETURNING *`;
 
   const refreshedQuestions = submission.questions.map((question) => ({
     ...question,
@@ -155,6 +153,7 @@ export async function saveCodingHomeworkChallengeAnswers(
     questions: refreshedQuestions.map(toStudentChallengeQuestionRecord),
     submission: toSubmissionRecord(updatedSubmission)
   };
+  });
 }
 
 async function createSubmittedCoreAttempt(
@@ -162,7 +161,8 @@ async function createSubmittedCoreAttempt(
   submission: SubmissionWithQuestions,
   answers: Map<string, string>,
   submittedAt: Date,
-  gradebook: ChallengeAnswerGradebookOptions
+  gradebook: ChallengeAnswerGradebookOptions,
+  tx: CorePrisma.TransactionClient
 ) {
   const assessmentMode = gradebook.assessmentMode === "summative" ? "summative" : "formative";
   const submittedAnswers = Object.fromEntries(submission.questions.map((question) => [question.id, answers.get(question.id) ?? ""]));
@@ -173,7 +173,7 @@ async function createSubmittedCoreAttempt(
     submittedAt: submittedAt.toISOString(),
     submissionId: submission.id
   } as Prisma.InputJsonValue;
-  const coreAttempt = await startActivityAttempt(scope.user, {
+  const coreAttempt = submission.coreAttemptId ? { id: submission.coreAttemptId } : await startActivityAttempt(scope.user, {
     courseId: scope.courseId,
     groupId: scope.groupId,
     activityId: scope.activityId,
@@ -183,31 +183,13 @@ async function createSubmittedCoreAttempt(
     assessmentMode,
     activityConfigFingerprint: gradebook.activityConfigFingerprint ?? null,
     metadata
-  });
+  }, tx);
   const submittedAttempt = await submitActivityAttempt(scope.user, {
     attemptId: coreAttempt.id,
     pluginAttemptRef: submission.id,
     metadata
-  });
+  }, tx);
   return submittedAttempt.id;
-}
-
-async function findStudentChallengeSubmission(scope: AnswerScope, submissionId: string | null): Promise<SubmissionWithQuestions | null> {
-  return prisma.pluginCodingHomeworkSubmission.findFirst({
-    where: {
-      ...(submissionId ? { id: submissionId } : {}),
-      activityId: scope.activityId,
-      groupId: scope.groupId,
-      kind: "final",
-      userId: scope.user.id
-    },
-    orderBy: { createdAt: "desc" },
-    include: {
-      questions: {
-        orderBy: { orderIndex: "asc" }
-      }
-    }
-  });
 }
 
 function toSubmissionRecord(row: SubmissionRow) {
@@ -216,11 +198,11 @@ function toSubmissionRecord(row: SubmissionRow) {
     activityId: row.activityId,
     coreAttemptId: row.coreAttemptId,
     createdAt: row.createdAt.toISOString(),
-    documentationSnapshotId: row.documentationSnapshotId,
+    documentationSnapshotId: null,
     groupId: row.groupId,
     kind: row.kind,
-    metadata: normalizeObject(row.metadata),
-    processingError: row.processingError,
+    metadata: {},
+    processingError: row.processingError ? "Processing could not be completed. Contact your course staff." : null,
     status: row.status,
     structureValidationSummary: normalizeObject(row.structureValidationSummary),
     updatedAt: row.updatedAt.toISOString(),

@@ -51,7 +51,7 @@
   ],
   "syscalls": [
     {
-      "comment": "Allow Chromium user namespaces and chroot inside its sandbox with all outer container capabilities dropped. Based on Playwright v1.59.1.",
+      "comment": "Allow Chromium user namespaces and chroot inside its sandbox with all outer container capabilities dropped. Based on Playwright v1.64.1.",
       "names": [
         "clone",
         "setns",

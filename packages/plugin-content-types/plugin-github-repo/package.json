@@ -11,7 +11,7 @@
   "dependencies": {
     "@cognelo/content-type-sdk": "0.1.0",
     "react": "^19.2.5",
-    "zod": "^3.23.8",
+    "zod": "^4.6.7",
     "@cognelo/activity-ui": "0.1.0"
   },
   "devDependencies": {

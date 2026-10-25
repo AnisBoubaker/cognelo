@@ -215,6 +215,8 @@ describe("group services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.activityAssignmentException.findMany.mockResolvedValue([]);
+    mockPrisma.courseGroupHiddenCourseMaterial.findMany.mockResolvedValue([]);
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1", status: "published", availableFrom: null, availableUntil: null });
     bcryptMocks.compare.mockResolvedValue(true);
     bcryptMocks.hash.mockResolvedValue("assigned-password-hash");
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
@@ -1326,7 +1328,7 @@ describe("group services", () => {
         participants: [{ id: "participant-1", userId: "student-1" }],
         hiddenCourseMaterials: []
       })
-      .mockResolvedValueOnce({ id: "group-1" });
+      .mockResolvedValueOnce({ id: "group-1", courseId: "course-1", status: "published", availableFrom: null, availableUntil: null });
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1", userId: "student-1" });
     mockPrisma.courseContentItem.findMany.mockResolvedValue([
       {
@@ -1364,7 +1366,7 @@ describe("group services", () => {
         availableFrom: null,
         availableUntil: null
       })
-      .mockResolvedValueOnce({ id: "group-1" });
+      .mockResolvedValueOnce({ id: "group-1", courseId: "course-1", status: "published", availableFrom: null, availableUntil: null });
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1", userId: "student-1" });
     mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
       id: "assignment-1",
@@ -1402,7 +1404,7 @@ describe("group services", () => {
         availableFrom: null,
         availableUntil: null
       })
-      .mockResolvedValueOnce({ id: "group-1" });
+      .mockResolvedValueOnce({ id: "group-1", courseId: "course-1", status: "published", availableFrom: null, availableUntil: null });
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1", userId: "student-1" });
     mockPrisma.courseGroupActivity.findFirst.mockResolvedValue({
       id: "assignment-1",
@@ -1910,8 +1912,8 @@ describe("group services", () => {
     ]);
 
     await expect(getCourseMaterialForGroupDownload(studentUser, "course-1", "group-1", "material-1")).rejects.toMatchObject({
-      status: 403,
-      code: "FORBIDDEN"
+      status: 404,
+      code: "NOT_FOUND"
     });
   });
 });

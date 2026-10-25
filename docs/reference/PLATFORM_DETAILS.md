@@ -430,10 +430,10 @@ The Coding Homework Grader seed fixture creates `Coding homework grader: INF-155
 
 ## Run Locally
 
-1. Copy environment values:
+1. Generate private local environment values and execution-service credentials:
 
 ```bash
-cp .env.example .env
+npm run local:configure
 ```
 
 2. Start PostgreSQL:
@@ -450,7 +450,7 @@ docker compose up -d judge0-db judge0-redis judge0-server judge0-worker
 
 Local Compose defaults to `ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2`, the Cognelo-tested Apple Silicon development image. Docker Desktop uses Judge0's per-process/thread limit fallback because it does not delegate a usable cgroup-v2 subtree; this is for trusted local development and is not equivalent to production cgroup isolation. The development worker pool is capped at two because Docker Desktop reports the host CPU count and a large automatically sized pool can collide over isolate boxes. Compose also mounts `infra/judge0/isolate.dev.conf` into both Judge0 containers so Isolate 2.x continues to accept Judge0's increasing submission IDs beyond its default 1,000-box range. Before workers accept jobs, an idempotent one-shot service configures every active C and C++ runtime with the common course-level system libraries for math, POSIX threads, dynamic loading, and POSIX realtime (`-pthread -lm -ldl -lrt`). Its C, C++, Go, Java, JavaScript, Python, Rust, and TypeScript runtimes have been validated with real compile/execute and stdin/stdout submissions. Set `JUDGE0_IMAGE` to override the image. The Ubuntu production runbook continues to use the official pinned Judge0 image on its supported Linux sandbox host. Cognelo treats every Judge0 internal error as a retryable service failure rather than a learner test result, and stops AI test correction immediately when every reference run fails at compilation or with a Judge0 internal error, because changing generated tests cannot repair the execution environment.
 
-If you are developing the web-design-coding-exercises plugin, generate a dedicated credential with `openssl rand -hex 32` and set `WEB_DESIGN_RUNNER_TOKEN` in `.env`, then start the Dockerized Playwright runner:
+If you are developing the web-design-coding-exercises plugin, the local configuration helper creates `WEB_DESIGN_RUNNER_TOKEN`; start the Dockerized Playwright runner:
 
 ```bash
 npm run dev:runner -- --build
@@ -481,7 +481,7 @@ After generating a Prisma client while development services are already running,
 npm run db:seed
 ```
 
-The development seed registers Judge0 at `http://localhost:2358` with the local Compose token and the Web Design runner at `http://localhost:3456`. New Web Design settings encrypt the configured `WEB_DESIGN_RUNNER_TOKEN` as a Bearer credential; without it the new row stays disabled. Existing settings are preserved. Existing installations must set `Authorization` / `Bearer <credential>` through **Settings → Runners** to match the runner environment. SageMath is shown under **Settings → Runners** but remains unconfigured until a compatible service is available. Administrators can replace or disable any endpoint there.
+The development seed registers Judge0 at `http://localhost:2358` with the generated `JUDGE0_AUTH_TOKEN` and the Web Design runner at `http://localhost:3456`. New Web Design settings encrypt the configured `WEB_DESIGN_RUNNER_TOKEN` as a Bearer credential; without it the new row stays disabled. Existing settings are preserved. Existing installations must set `Authorization` / `Bearer <credential>` through **Settings → Runners** to match the runner environment. SageMath is shown under **Settings → Runners** but remains unconfigured until a compatible service is available. Administrators can replace or disable any endpoint there.
 
 6. Run automated checks:
 

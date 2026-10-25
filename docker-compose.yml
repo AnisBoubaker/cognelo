@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: cognelo
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run local:configure first}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:

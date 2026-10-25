@@ -57,6 +57,7 @@ describe("db:migrate:all script helpers", () => {
     expect(calls).toEqual([
       { label: "apply core migrations" },
       { label: "Core Prisma generate", command: "npx", args: ["prisma", "generate", "--schema", "packages/db/prisma/schema.prisma"] },
+      { label: "Encrypt legacy model credentials", command: "npx", args: ["tsx", "scripts/encrypt-ai-credentials.ts"] },
       { label: "Plugin migrations", command: "npx", args: ["tsx", "scripts/apply-plugin-migrations.ts"] },
       {
         label: "Plugin Prisma generate: packages/plugin-activities/plugin-a/prisma/schema.prisma",

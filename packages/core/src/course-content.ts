@@ -103,6 +103,21 @@ type CourseContentDb = Pick<
   "activity" | "courseContentItem" | "courseContentResource" | "courseGroup" | "courseGroupActivity" | "courseGroupContentVisibilityOverride" | "courseMaterial"
 >;
 
+const contentFields = {
+  groupId: z.string().min(1).max(128).nullable().optional(),
+  parentId: z.string().min(1).max(128).nullable().optional(),
+  position: z.number().int().min(0).max(2_147_483_647).optional(),
+  isVisible: z.boolean().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  titleSnapshot: z.string().trim().min(1).max(180).nullable().optional()
+};
+const folderInputSchema = z.object({ ...contentFields, title: z.string().trim().min(1).max(180) });
+const materialItemInputSchema = z.object({ ...contentFields, materialId: z.string().min(1).max(128) });
+const activityItemInputSchema = z.object({ ...contentFields, activityId: z.string().min(1).max(128).nullable().optional(), courseGroupActivityId: z.string().min(1).max(128).nullable().optional() });
+const contentItemUpdateSchema = z.object(contentFields);
+const pluginResourceInputSchema = z.object({ ...contentFields, contentTypeKey: z.string().min(1).max(80), payload: z.unknown().optional(), itemMetadata: z.record(z.string(), z.unknown()).optional() });
+const pluginResourceUpdateSchema = z.object({ payload: z.unknown().optional(), isVisible: z.boolean().optional() });
+
 export type EffectiveContentVisibility = "visible" | "hidden" | "hidden_by_parent";
 
 export type ContentResourceVectorSearchMatch = ContentVectorSearchMatch & {
@@ -117,7 +132,8 @@ export type ContentResourceVectorSearchResult = {
   diagnostics: Array<ContentEmbeddingDiagnostic & { contentResourceId?: string; resourceTitle?: string }>;
 };
 
-export async function createContentFolder(user: CurrentUser, courseId: string, input: CreateFolderInput) {
+export async function createContentFolder(user: CurrentUser, courseId: string, rawInput: unknown) {
+  const input: CreateFolderInput = folderInputSchema.parse(rawInput);
   await assertCanManageCourse(user, courseId);
   if (input.groupId) {
     throw new AppError(400, "CONTENT_FOLDERS_ARE_COURSE_SCOPED", "Content folders belong to the course structure, not one group.");
@@ -138,7 +154,8 @@ export async function createContentFolder(user: CurrentUser, courseId: string, i
   });
 }
 
-export async function createMaterialContentItem(user: CurrentUser, courseId: string, input: CreateMaterialContentItemInput) {
+export async function createMaterialContentItem(user: CurrentUser, courseId: string, rawInput: unknown) {
+  const input: CreateMaterialContentItemInput = materialItemInputSchema.parse(rawInput);
   await assertCanManageCourse(user, courseId);
   const scope = normalizeScope(input);
   await assertValidScope(prisma, courseId, scope.groupId);
@@ -221,7 +238,7 @@ export async function listContentResources(user: CurrentUser, courseId: string, 
     return resources;
   }
 
-  const visibleResourceIds = await getVisibleContentResourceIds(courseId, scope.groupId);
+  const visibleResourceIds = new Set((await listContentItems(user, courseId, { groupId: scope.groupId, visibleOnly: true })).map((item) => item.contentResourceId));
   return resources.filter((resource) => visibleResourceIds.has(resource.id));
 }
 
@@ -330,7 +347,8 @@ export async function createContentResourceContentItem(user: CurrentUser, course
   });
 }
 
-export async function createPluginContentResource(user: CurrentUser, courseId: string, input: CreatePluginContentResourceInput) {
+export async function createPluginContentResource(user: CurrentUser, courseId: string, rawInput: unknown) {
+  const input: CreatePluginContentResourceInput = pluginResourceInputSchema.parse(rawInput);
   await assertCanManageCourse(user, courseId);
   const scope = normalizeScope(input);
   await assertValidScope(prisma, courseId, scope.groupId);
@@ -386,9 +404,10 @@ export async function updatePluginContentResource(
   user: CurrentUser,
   courseId: string,
   contentResourceId: string,
-  input: UpdatePluginContentResourceInput,
+  rawInput: unknown,
   scope: ContentScope = {}
 ) {
+  const input: UpdatePluginContentResourceInput = pluginResourceUpdateSchema.parse(rawInput);
   const resource = await getContentResourceForPluginRoute(user, courseId, contentResourceId, scope);
   await assertCanManageCourse(user, courseId);
   const serverPlugin = getServerContentTypePlugin(resource.pluginKey);
@@ -605,15 +624,17 @@ export async function getContentResourceForPluginRoute(
   }
   await assertContentResourcePluginActive(resource.pluginKey);
 
-  const mustEnforceVisibility = options.enforceVisibility ?? !(await canManageCourse(user, courseId));
+  const mustEnforceVisibility = options.enforceVisibility === true || !(await canManageCourse(user, courseId));
   if (mustEnforceVisibility) {
-    await assertContentResourceVisible(courseId, contentResourceId, scope.groupId);
+    const visible = await listContentItems(user, courseId, { groupId: scope.groupId, visibleOnly: true });
+    if (!visible.some((item) => item.contentResourceId === contentResourceId)) throw new AppError(404, "CONTENT_RESOURCE_NOT_AVAILABLE", "This content resource is not available.");
   }
 
   return resource;
 }
 
-export async function createActivityContentItem(user: CurrentUser, courseId: string, input: CreateActivityContentItemInput) {
+export async function createActivityContentItem(user: CurrentUser, courseId: string, rawInput: unknown) {
+  const input: CreateActivityContentItemInput = activityItemInputSchema.parse(rawInput);
   await assertCanManageCourse(user, courseId);
   if (!input.activityId && !input.courseGroupActivityId) {
     throw new AppError(400, "ACTIVITY_CONTENT_TARGET_REQUIRED", "Activity content must reference an activity or assigned group activity.");
@@ -649,9 +670,10 @@ export async function updateContentItem(
   user: CurrentUser,
   courseId: string,
   contentItemId: string,
-  input: UpdateContentItemInput,
+  rawInput: unknown,
   scope: ContentScope = {}
 ) {
+  const input: UpdateContentItemInput = contentItemUpdateSchema.parse(rawInput);
   await assertCanManageCourse(user, courseId);
   const item = await prisma.courseContentItem.findFirst({ where: { id: contentItemId, courseId, ...scopeWhere(scope) } });
   if (!item) {
@@ -679,8 +701,9 @@ export async function updateGroupContentItem(
   courseId: string,
   groupId: string,
   contentItemId: string,
-  input: UpdateContentItemInput
+  rawInput: unknown
 ) {
+  const input: UpdateContentItemInput = contentItemUpdateSchema.parse(rawInput);
   await assertCanManageCourse(user, courseId);
   await assertValidScope(prisma, courseId, groupId);
   const item = await prisma.courseContentItem.findFirst({
@@ -723,6 +746,24 @@ export async function updateGroupContentItem(
 export async function listContentItems(user: CurrentUser, courseId: string, options: ListContentOptions = {}) {
   await assertCanViewCourse(user, courseId);
   const scope = normalizeScope(options);
+  const manager = await canManageCourse(user, courseId);
+  if (!manager && !scope.groupId) {
+    const groups = await prisma.courseGroup.findMany({ where: { courseId, participants: { some: { userId: user.id } } }, select: { id: true } });
+    const visible = new Map<string, Awaited<ReturnType<typeof listScopedContentItems>>[number]>();
+    for (const group of groups) {
+      try {
+        for (const item of await listScopedContentItems(user, courseId, { groupId: group.id, visibleOnly: true })) visible.set(item.id, item);
+      } catch (error) { if (!(error instanceof AppError && error.status === 403)) throw error; }
+    }
+    return [...visible.values()];
+  }
+  return listScopedContentItems(user, courseId, options);
+}
+
+async function listScopedContentItems(user: CurrentUser, courseId: string, options: ListContentOptions) {
+  const scope = normalizeScope(options);
+  const manager = await canManageCourse(user, courseId);
+  if (scope.groupId && !manager) await assertCanViewGroup(user, courseId, scope.groupId);
   await assertValidScope(prisma, courseId, scope.groupId);
   const items = await prisma.courseContentItem.findMany({
     where: {
@@ -739,6 +780,21 @@ export async function listContentItems(user: CurrentUser, courseId: string, opti
     ? await prisma.courseGroupContentVisibilityOverride.findMany({ where: { groupId: scope.groupId } })
     : [];
   let effectiveItems = applyGroupVisibilityOverrides(items, overrides);
+  if (!manager && scope.groupId) {
+    const hidden = await prisma.courseGroupHiddenCourseMaterial.findMany({ where: { groupId: scope.groupId }, select: { courseMaterialId: true } });
+    if (hidden.length) {
+      const hiddenIds = new Set(hidden.map((entry) => entry.courseMaterialId));
+      const materials = await prisma.courseMaterial.findMany({ where: { courseId }, select: { id: true, parentId: true } });
+      const parents = new Map(materials.map((item) => [item.id, item.parentId]));
+      const hiddenMaterial = (id: string) => {
+        const seen = new Set<string>();
+        let current: string | null = id;
+        while (current) { if (hiddenIds.has(current) || seen.has(current)) return true; seen.add(current); current = parents.get(current) ?? null; }
+        return false;
+      };
+      effectiveItems = effectiveItems.map((item) => item.materialId && hiddenMaterial(item.materialId) ? { ...item, isVisible: false } : item);
+    }
+  }
   if (scope.groupId && !await canManageCourse(user, courseId)) {
     const assignmentByActivity = new Map(items.filter((item) => item.groupId === scope.groupId && item.courseGroupActivityId).map((item) => [item.activityId, item.courseGroupActivityId!]));
     const exceptions = await assignmentExceptionsForUser([...assignmentByActivity.values()], user.id);
@@ -750,7 +806,8 @@ export async function listContentItems(user: CurrentUser, courseId: string, opti
   }
   const withVisibility = addEffectiveVisibility(effectiveItems);
   const scopedItems = mergeGroupAssignmentsIntoSharedActivityPlacements(withVisibility, scope.groupId);
-  return options.visibleOnly ? scopedItems.filter((item) => item.effectiveVisibility === "visible") : scopedItems;
+  return manager && !options.visibleOnly ? scopedItems : scopedItems.filter((item) =>
+    item.effectiveVisibility === "visible" && (manager || item.kind !== "activity" || Boolean(item.courseGroupActivityId)));
 }
 
 function applyGroupVisibilityOverrides<T extends { id: string; isVisible: boolean }>(
@@ -1160,32 +1217,6 @@ function addEffectiveVisibility<T extends { id: string; parentId: string | null;
     ...item,
     effectiveVisibility: resolve(item)
   }));
-}
-
-async function assertContentResourceVisible(courseId: string, contentResourceId: string, groupId: string | null) {
-  const visibleResourceIds = await getVisibleContentResourceIds(courseId, groupId);
-  if (!visibleResourceIds.has(contentResourceId)) {
-    throw new AppError(404, "CONTENT_RESOURCE_NOT_AVAILABLE", "This content resource is not available.");
-  }
-}
-
-async function getVisibleContentResourceIds(courseId: string, groupId: string | null) {
-  const items = await prisma.courseContentItem.findMany({
-    where: {
-      courseId,
-      ...(groupId ? { OR: [{ groupId: null }, { groupId }] } : { groupId: null })
-    },
-    orderBy: [{ parentId: "asc" }, { position: "asc" }, { createdAt: "asc" }]
-  });
-  const overrides = groupId
-    ? await prisma.courseGroupContentVisibilityOverride.findMany({ where: { groupId } })
-    : [];
-  const visibleItems = addEffectiveVisibility(applyGroupVisibilityOverrides(items, overrides));
-  return new Set(
-    visibleItems
-      .filter((item) => item.contentResourceId && item.effectiveVisibility === "visible")
-      .map((item) => item.contentResourceId as string)
-  );
 }
 
 function contentResourceMarkdownFields(contentTypeKey: string) {

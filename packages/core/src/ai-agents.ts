@@ -1,3 +1,5 @@
+import { encryptCredential, decryptCredential } from "./credentials";
+import { fetchAiResponse } from "./ai-http";
 import {
   AiAgentConnectionInputSchema,
   AiAgentConnectionUpdateSchema,
@@ -36,7 +38,7 @@ export async function createAiAgentConnection(user: CurrentUser, input: unknown)
       displayName: data.displayName,
       model: data.model,
       baseUrl: normalizeNullable(data.baseUrl),
-      apiKey: normalizeNullable(data.apiKey),
+      apiKey: encryptCredential(normalizeNullable(data.apiKey)),
       isEnabled: data.isEnabled
     }
   });
@@ -55,7 +57,7 @@ export async function updateAiAgentConnection(user: CurrentUser, connectionId: s
     ...(data.displayName !== undefined ? { displayName: data.displayName } : {}),
     ...(data.model !== undefined ? { model: data.model } : {}),
     ...(data.baseUrl !== undefined ? { baseUrl: normalizeNullable(data.baseUrl) } : {}),
-    ...(data.apiKey !== undefined ? { apiKey: normalizeNullable(data.apiKey) } : {}),
+    ...(data.apiKey !== undefined ? { apiKey: encryptCredential(normalizeNullable(data.apiKey)) } : {}),
     ...(data.scope !== undefined ? { ownerId: data.scope === "global" ? null : user.id } : {}),
     ...(data.isEnabled !== undefined ? { isEnabled: data.isEnabled } : {})
   };
@@ -247,6 +249,7 @@ export async function generateQuestionAuthoringText(
 
 export async function generateAiAgentText(
   connection: {
+    ownerId?: string | null;
     provider: "ollama" | "openai" | "codex" | "claude";
     model: string;
     baseUrl: string | null;
@@ -367,6 +370,7 @@ function toPublicAiAgentConnection(connection: {
 
 async function callAiAgent(
   connection: {
+    ownerId?: string | null;
     provider: "ollama" | "openai" | "codex" | "claude";
     model: string;
     baseUrl: string | null;
@@ -378,22 +382,24 @@ async function callAiAgent(
     maxOutputTokens?: number;
   }
 ) {
+  const owner = connection.ownerId ? await prisma.user.findUnique({ where: { id: connection.ownerId }, select: { isActive: true, roles: { include: { role: true } } } }) : null;
+  const administratorOwned = owner?.isActive === true && owner.roles.some((entry) => entry.role.key === "admin");
+  const resolved = { ...connection, apiKey: decryptCredential(connection.apiKey), allowPrivate: connection.ownerId === null || administratorOwned };
   if (connection.provider === "ollama") {
-    return callOllama(connection, input);
+    return callOllama(resolved, input);
   }
   if (connection.provider === "claude") {
-    return callClaude(connection, input);
+    return callClaude(resolved, input);
   }
-  return callOpenAiCompatible(connection, input);
+  return callOpenAiCompatible(resolved, input);
 }
 
 async function callOpenAiCompatible(
-  connection: { model: string; baseUrl: string | null; apiKey: string | null },
+  connection: { model: string; baseUrl: string | null; apiKey: string | null; allowPrivate?: boolean },
   input: { systemPrompt: string; userPrompt: string; maxOutputTokens?: number }
 ) {
   const baseUrl = normalizeBaseUrl(connection.baseUrl ?? "https://api.openai.com/v1");
-  const response = await fetch(`${baseUrl}/responses`, {
-    method: "POST",
+  const response = await fetchAiResponse(`${baseUrl}/responses`, {
     headers: {
       "Authorization": `Bearer ${connection.apiKey}`,
       "Content-Type": "application/json"
@@ -404,18 +410,17 @@ async function callOpenAiCompatible(
       input: input.userPrompt,
       max_output_tokens: input.maxOutputTokens ?? 4000
     })
-  });
+  }, connection.allowPrivate);
   const payload = await readAiResponse(response);
   return extractOpenAiText(payload);
 }
 
 async function callClaude(
-  connection: { model: string; baseUrl: string | null; apiKey: string | null },
+  connection: { model: string; baseUrl: string | null; apiKey: string | null; allowPrivate?: boolean },
   input: { systemPrompt: string; userPrompt: string; maxOutputTokens?: number }
 ) {
   const baseUrl = normalizeBaseUrl(connection.baseUrl ?? "https://api.anthropic.com/v1");
-  const response = await fetch(`${baseUrl}/messages`, {
-    method: "POST",
+  const response = await fetchAiResponse(`${baseUrl}/messages`, {
     headers: {
       "x-api-key": connection.apiKey ?? "",
       "anthropic-version": "2023-06-01",
@@ -427,18 +432,17 @@ async function callClaude(
       messages: [{ role: "user", content: input.userPrompt }],
       max_tokens: input.maxOutputTokens ?? 4000
     })
-  });
+  }, connection.allowPrivate);
   const payload = await readAiResponse(response);
   return extractClaudeText(payload);
 }
 
 async function callOllama(
-  connection: { model: string; baseUrl: string | null },
+  connection: { model: string; baseUrl: string | null; allowPrivate?: boolean },
   input: { systemPrompt: string; userPrompt: string }
 ) {
   const baseUrl = normalizeBaseUrl(connection.baseUrl ?? "http://localhost:11434");
-  const response = await fetch(`${baseUrl}/api/chat`, {
-    method: "POST",
+  const response = await fetchAiResponse(`${baseUrl}/api/chat`, {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: connection.model,
@@ -448,7 +452,7 @@ async function callOllama(
         { role: "user", content: input.userPrompt }
       ]
     })
-  });
+  }, connection.allowPrivate);
   const payload = await readAiResponse(response);
   return extractOllamaText(payload);
 }
@@ -456,8 +460,7 @@ async function callOllama(
 async function readAiResponse(response: Response) {
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = payload && typeof payload === "object" && "error" in payload ? JSON.stringify(payload.error) : response.statusText;
-    throw new AppError(response.status, "AI_AGENT_REQUEST_FAILED", `The AI agent request failed: ${message}`);
+    throw new AppError(502, "AI_AGENT_REQUEST_FAILED", `The model provider returned HTTP ${response.status}.`, { providerStatus: response.status });
   }
   return payload;
 }

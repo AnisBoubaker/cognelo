@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@cognelo/core", () => ({
+  isTeacher: () => true, isCourseManager: () => false,
+  readBoundedFormData: (request: Request) => request.formData(),
   AppError: class AppError extends Error {
     constructor(public status: number, public code: string, message: string) {
       super(message);

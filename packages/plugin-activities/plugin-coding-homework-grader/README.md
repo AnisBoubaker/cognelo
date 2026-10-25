@@ -11,15 +11,17 @@ Programming Homework does not advertise the [student solution capability](../../
 ## Workflow
 
 ```text
-author assignment -> snapshot prior content -> validate ZIP -> analyze functions
+author assignment -> snapshot prior content -> validate ZIP -> reserve core attempt -> analyze functions
 -> generate challenge questions -> collect answers -> submit core attempt -> review grade
 ```
+
+Uploads and finalization enforce [transactional limits and archive safety](docs/REFERENCE.md#upload-and-finalization-boundaries).
 
 Long-running analysis and question generation use the shared background-job service. Final submission requests are idempotent and teachers can reprocess unfinished or failed work. Student submission/preflight and visible background processing, plus teacher uploads, extraction, snapshots, preflight, and saves, use the platform shared blocking progress dialog.
 
 When the effective summative assignment setting enables challenges, teacher-entered released grades and feedback are challengeable through the core course workflow, which reuses the plugin's existing **Review and grade** panel.
 
-Finalized challenge answers create a core attempt tagged with the assignment mode. Formative attempts remain available to the teacher's read-only inspector; only summative attempts may receive a grade.
+A valid final ZIP reserves a core attempt tagged with the assignment mode; finalized challenge answers submit that same attempt. Formative attempts remain available to the teacher's read-only inspector; only summative attempts may receive a grade.
 
 Course assignment settings may time this workflow. Core owns the explicit start and live deadline until submission. At zero the renderer finalizes complete challenge answers through the ordinary route; if the upload/analysis/questions are not ready or answers remain incomplete, core closes the timed attempt ungraded instead of fabricating plugin results.
 

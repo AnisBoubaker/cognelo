@@ -62,7 +62,8 @@ export const codingHomeworkCParserAdapter: CodingHomeworkParserAdapter = {
       }
 
       const result = parseCFile(file);
-      diagnostics.push(...result.diagnostics);
+      diagnostics.push(...result.diagnostics.slice(0, Math.max(0, 100 - diagnostics.length)));
+      if (functions.length + result.functions.length > 2000) return { functions: [], diagnostics: [{ code: "FUNCTION_ANALYSIS_LIMIT", message: "The source contains too many functions.", severity: "error", path: file.path }] };
       functions.push(...result.functions);
     }
 
@@ -87,6 +88,9 @@ export function createCodingHomeworkParserRegistry(adapters: readonly CodingHome
       return [...byLanguage.values()];
     },
     async parse(files: CodingHomeworkSourceFile[]): Promise<CodingHomeworkParseResult> {
+      if (files.length > 1000 || files.reduce((sum, file) => sum + file.content.length, 0) > 2_000_000) {
+        return { functions: [], diagnostics: [{ code: "SOURCE_ANALYSIS_LIMIT", message: "Source input exceeds the analysis limit.", severity: "error", path: files[0]?.path ?? "archive" }] };
+      }
       const groups = new Map<CodingHomeworkLanguageKey, CodingHomeworkSourceFile[]>();
       for (const file of files) {
         groups.set(file.languageKey, [...(groups.get(file.languageKey) ?? []), file]);
@@ -128,13 +132,21 @@ export async function parseCodingHomeworkSourceFiles(files: CodingHomeworkSource
 }
 
 function parseCFile(file: CodingHomeworkSourceFile): CodingHomeworkParseResult {
+  if (file.content.length > 2_000_000) return { functions: [], diagnostics: [{ code: "SOURCE_ANALYSIS_LIMIT", message: "Source input exceeds the analysis limit.", severity: "error", path: file.path }] };
+  const lineStarts = [0];
+  for (let offset = 0; offset < file.content.length; offset++) if (file.content[offset] === "\n") lineStarts.push(offset + 1);
+  const sourceLine = (offset: number) => {
+    let left = 0, right = lineStarts.length;
+    while (left < right) { const middle = (left + right) >>> 1; if (lineStarts[middle] <= offset) left = middle + 1; else right = middle; }
+    return left;
+  };
   const masked = maskCNonCode(file.content);
   const diagnostics: CodingHomeworkParserDiagnostic[] = [];
   const functions: CodingHomeworkParsedFunction[] = [];
   let index = 0;
   let topLevelBoundary = 0;
 
-  while (index < masked.length) {
+  while (index < masked.length && diagnostics.length < 100) {
     const char = masked[index];
     if (char === ";") {
       topLevelBoundary = index + 1;
@@ -144,7 +156,7 @@ function parseCFile(file: CodingHomeworkSourceFile): CodingHomeworkParseResult {
     if (char === "}") {
       diagnostics.push({
         code: "C_UNMATCHED_CLOSING_BRACE",
-        line: lineAt(file.content, index),
+        line: sourceLine(index),
         message: "Found a closing brace without a matching opening brace.",
         path: file.path,
         severity: "error"
@@ -164,7 +176,7 @@ function parseCFile(file: CodingHomeworkSourceFile): CodingHomeworkParseResult {
     if (closeIndex < 0) {
       diagnostics.push({
         code: signature ? "C_UNMATCHED_FUNCTION_BRACE" : "C_UNMATCHED_BRACE",
-        line: lineAt(file.content, index),
+        line: sourceLine(index),
         message: signature
           ? `Function ${signature.functionName} has an opening brace without a matching closing brace.`
           : "Found an opening brace without a matching closing brace.",
@@ -175,17 +187,18 @@ function parseCFile(file: CodingHomeworkSourceFile): CodingHomeworkParseResult {
     }
 
     if (signature) {
+      if (functions.length >= 2000) { diagnostics.push({ code: "FUNCTION_ANALYSIS_LIMIT", message: "The source contains too many functions.", severity: "error", path: file.path }); break; }
       const sourceStart = firstNonWhitespaceIndex(file.content, signatureRange.startIndex, index);
       const sourceEnd = closeIndex + 1;
       const functionCode = file.content.slice(sourceStart, sourceEnd).trim();
       functions.push({
         astText: serializeCFunctionAst(signature, file.content.slice(index + 1, closeIndex)),
-        endLine: lineAt(file.content, closeIndex),
+        endLine: sourceLine(closeIndex),
         functionCode,
         functionName: signature.functionName,
         languageKey: "c",
         sourcePath: file.path,
-        startLine: lineAt(file.content, sourceStart)
+        startLine: sourceLine(sourceStart)
       });
     }
 
@@ -211,24 +224,30 @@ function parseCSignature(signature: string): ParsedCSignature | null {
     return null;
   }
 
-  const match = normalized.match(/([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*$/);
-  if (!match?.index) {
-    return null;
+  if (!normalized.endsWith(")")) return null;
+  let depth = 0, open = -1;
+  for (let cursor = normalized.length - 1; cursor >= 0; cursor--) {
+    if (normalized[cursor] === ")") depth++;
+    else if (normalized[cursor] === "(" && --depth === 0) { open = cursor; break; }
   }
-
-  const functionName = match[1] as string;
+  if (open < 0) return null;
+  const prefix = normalized.slice(0, open).trimEnd();
+  let nameStart = prefix.length;
+  while (nameStart > 0 && /[A-Za-z0-9_]/.test(prefix[nameStart - 1])) nameStart--;
+  const functionName = prefix.slice(nameStart);
+  if (!nameStart || functionName.length > 160 || !/^[A-Za-z_]/.test(functionName)) return null;
   if (C_KEYWORDS.has(functionName)) {
     return null;
   }
 
-  const returnType = normalizeCType(normalized.slice(0, match.index));
+  const returnType = normalizeCType(prefix.slice(0, nameStart));
   if (!returnType || C_KEYWORDS.has(returnType)) {
     return null;
   }
 
   return {
     functionName,
-    parameters: parseCParameters(match[2] ?? ""),
+    parameters: parseCParameters(normalized.slice(open + 1, -1)),
     returnType
   };
 }
@@ -424,14 +443,4 @@ function firstNonWhitespaceIndex(source: string, startIndex: number, endIndex: n
     }
   }
   return startIndex;
-}
-
-function lineAt(source: string, index: number) {
-  let line = 1;
-  for (let cursor = 0; cursor < index; cursor += 1) {
-    if (source[cursor] === "\n") {
-      line += 1;
-    }
-  }
-  return line;
 }

@@ -26,8 +26,8 @@ export const codingHomeworkSubmissionRequirementsSchema = z.object({
   allowedExtensions: z.array(z.string().trim().min(1).max(24)).default([".c", ".h"]),
   ignoredPaths: z.array(z.string().trim().min(1).max(500)).default([]),
   languageKey: z.string().trim().min(1).max(40).default("c"),
-  maxArchiveBytes: z.number().int().min(1).max(250 * 1024 * 1024).default(25 * 1024 * 1024),
-  maxFileCount: z.number().int().min(1).max(10000).default(200),
+  maxArchiveBytes: z.number().int().min(1).max(25 * 1024 * 1024).default(25 * 1024 * 1024),
+  maxFileCount: z.number().int().min(1).max(1000).default(200),
   requiredFiles: z.array(pathRequirementSchema).default([]),
   requiredFolders: z.array(pathRequirementSchema).default([]),
   requiredFunctions: z.array(functionRequirementSchema).default([])
@@ -41,7 +41,7 @@ const assignmentInputSchema = z.object({
   promptPdfAttachmentId: z.string().nullable().optional(),
   questionCount: z.number().int().min(1).max(20).default(3),
   retrievedExampleCount: z.number().int().min(1).max(20).default(3),
-  settings: z.record(z.unknown()).default({})
+  settings: z.record(z.string(), z.unknown()).prefault({})
 });
 
 export const codingHomeworkAuthoringInputSchema = z.object({

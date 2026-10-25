@@ -125,7 +125,7 @@ export const codingExercisePrivateConfigSchema = z.object({
   templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),
   templatePrefix: z.string().max(60000).default(""),
   templateSuffix: z.string().max(60000).default(""),
-  aiFeedback: codingExerciseAiFeedbackConfigSchema.default({})
+  aiFeedback: codingExerciseAiFeedbackConfigSchema.prefault({})
 });
 
 export type CodingExercisePrivateConfig = z.infer<typeof codingExercisePrivateConfigSchema>;
@@ -134,11 +134,11 @@ export const codingExerciseHiddenTestsInputSchema = z.object({
   tests: z.array(codingExerciseHiddenTestSchema).max(codingExerciseMaxHiddenTestCount),
   sampleTests: z.array(sampleTestSchema).max(codingExerciseMaxGeneratedTestCount).default([]),
   referenceSolution: z.string().max(60000).default(""),
-  privateConfig: codingExercisePrivateConfigSchema.default({}),
+  privateConfig: codingExercisePrivateConfigSchema.prefault({}),
   activityConfig: codingExerciseConfigSchema.optional(),
   validateOnly: z.boolean().default(false),
   validationReceipt: z.object({
-    validationSummary: z.record(z.unknown()),
+    validationSummary: z.record(z.string(), z.unknown()),
     expiresAt: z.string().datetime(),
     signature: z.string().regex(/^[a-f0-9]{64}$/)
   }).strict().optional()

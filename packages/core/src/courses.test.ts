@@ -1,3 +1,4 @@
+vi.mock("./course-content", () => ({ listContentItems: vi.fn().mockResolvedValue([]) }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const tx = vi.hoisted(() => ({

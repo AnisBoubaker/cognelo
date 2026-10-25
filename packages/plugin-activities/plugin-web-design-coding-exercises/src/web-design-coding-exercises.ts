@@ -48,7 +48,7 @@ export const webDesignExerciseTestInputSchema = z.object({
   testCode: z.string().min(1).max(80000),
   isEnabled: z.boolean().default(true),
   weight: z.number().int().min(0).max(1000).default(1),
-  metadata: z.record(z.unknown()).default({})
+  metadata: z.record(z.string(), z.unknown()).prefault({})
 });
 
 export const webDesignExerciseTestsInputSchema = z.object({

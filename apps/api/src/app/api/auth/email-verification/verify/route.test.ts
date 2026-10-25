@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@cognelo/config", () => ({ getServerEnv: mocks.getServerEnv }));
-vi.mock("@cognelo/core", () => ({ verifyEmailAddress: mocks.verifyEmailAddress }));
+vi.mock("@cognelo/core", () => ({
+  consumeRateLimits: vi.fn(), verifyEmailAddress: mocks.verifyEmailAddress }));
 vi.mock("@/lib/http", () => ({
   handleRoute: async (handler: () => Promise<Response>) => handler(),
   json: (data: unknown, init?: ResponseInit) => Response.json(data, init),

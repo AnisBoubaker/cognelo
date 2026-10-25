@@ -342,6 +342,8 @@ export const arMessages = {
       submit: "تسجيل الدخول",
       submitting: "جار تسجيل الدخول...",
       error: "فشل تسجيل الدخول.",
+      rateLimited: "محاولات كثيرة جدًا. انتظر قليلًا ثم حاول مرة أخرى.",
+      passwordTooLong: "اختر كلمة مرور أقصر.",
       activationError: "تعذر تفعيل الحساب."
     },
     emailVerification: {

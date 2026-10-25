@@ -103,7 +103,7 @@ describe("user services", () => {
     expect(bcryptMocks.hash).toHaveBeenCalledWith("NewPassword456!", 12);
     expect(mockPrisma.user.update).toHaveBeenCalledWith({
       where: { id: "user-1" },
-      data: { passwordHash: "new-hash", mustChangePassword: false }
+      data: { passwordHash: "new-hash", mustChangePassword: false, authVersion: { increment: 1 } }
     });
   });
 

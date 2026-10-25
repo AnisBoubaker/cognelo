@@ -1,11 +1,13 @@
+vi.mock("./upload-budget", () => ({ acquireHomeworkUploadSlot: () => () => undefined, limitHomeworkUploads: vi.fn(), lockHomeworkUploadBudget: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const fsMocks = vi.hoisted(() => ({
   mkdir: vi.fn(),
-  writeFile: vi.fn()
+  writeFile: vi.fn(), rm: vi.fn()
 }));
 
 const dbMocks = vi.hoisted(() => ({
+  $transaction: vi.fn(), $queryRaw: vi.fn(), $executeRaw: vi.fn(),
   pluginCodingHomeworkAssignment: {
     findUnique: vi.fn()
   },
@@ -31,6 +33,8 @@ const dbMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("node:fs/promises", () => fsMocks);
+vi.mock("@cognelo/db", () => ({ prisma: dbMocks }));
+vi.mock("@cognelo/core", async (original) => ({ ...await original<typeof import("@cognelo/core")>(), startActivityAttempt: vi.fn().mockResolvedValue({ id: "reserved-attempt" }) }));
 vi.mock("./db-client", () => ({
   Prisma: {},
   prisma: dbMocks
@@ -43,6 +47,14 @@ describe("coding homework final submissions", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    dbMocks.$transaction.mockImplementation((handler) => handler(dbMocks));
+    dbMocks.$executeRaw.mockResolvedValue(1);
+    dbMocks.$queryRaw.mockImplementation(async (query, ...values) => {
+      const sql = query.join("?");
+      if (sql.includes('SELECT id FROM "PluginCodingHomeworkSubmission"')) return [];
+      if (sql.includes('INSERT INTO "PluginCodingHomeworkSubmissionFile"')) return [await dbMocks.pluginCodingHomeworkSubmissionFile.create({ data: { id: values[0], submissionId: values[1], path: values[2], languageKey: values[3], sizeBytes: values[4], sha256: values[5], storedName: values[6], metadata: JSON.parse(values[7]) } })];
+      return [await dbMocks.pluginCodingHomeworkSubmission.update({ where: { id: values[2] }, data: { zipAttachmentId: values[0], metadata: JSON.parse(values[1]), status: "structure_valid", coreAttemptId: "reserved-attempt" } })];
+    });
     fsMocks.mkdir.mockResolvedValue(undefined);
     fsMocks.writeFile.mockResolvedValue(undefined);
     dbMocks.pluginCodingHomeworkSubmissionRequirementSet.findUnique.mockResolvedValue({
@@ -110,30 +122,24 @@ describe("coding homework final submissions", () => {
 
     expect(result.summary.isValid).toBe(true);
     expect(result.submission).toMatchObject({
-      id: "submission-1",
+      id: expect.any(String),
       kind: "final",
       status: "structure_valid",
-      zipAttachmentId: "zip-attachment-1"
+      coreAttemptId: "reserved-attempt",
+      zipAttachmentId: expect.any(String)
     });
     expect(result.files).toHaveLength(1);
     expect(result.files[0]).toMatchObject({
       languageKey: "c",
       path: "main.c",
-      submissionId: "submission-1"
+      submissionId: result.submission.id
     });
-    expect(dbMocks.pluginCodingHomeworkAttachment.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        kind: "submission_zip",
-        ownerId: "submission-1",
-        ownerKind: "submission",
-        originalName: "submission.zip"
-      })
-    });
+    expect(dbMocks.$transaction).toHaveBeenCalledTimes(1);
     expect(dbMocks.pluginCodingHomeworkSubmissionFile.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         path: "main.c",
         languageKey: "c",
-        submissionId: "submission-1"
+        submissionId: result.submission.id
       })
     });
     expect(fsMocks.writeFile).toHaveBeenCalledTimes(2);

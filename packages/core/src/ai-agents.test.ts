@@ -1,3 +1,4 @@
+vi.mock("./ai-http", () => ({ fetchAiResponse: (url: string, init: RequestInit) => fetch(url, { ...init, method: "POST" }) }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPrisma = vi.hoisted(() => ({
@@ -341,7 +342,7 @@ describe("AI agent services", () => {
 
     fetchMock.mockResolvedValueOnce(Response.json({ error: { message: "bad" } }, { status: 500 }));
     await expect(generateQuestionAuthoringText(teacherUser, { systemPrompt: "sys", userPrompt: "user" })).rejects.toMatchObject({
-      status: 500,
+      status: 502,
       code: "AI_AGENT_REQUEST_FAILED"
     });
 

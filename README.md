@@ -45,7 +45,7 @@ scripts/db-seed.ts       Development/demo seed composition
 Requirements are Node.js, npm, Docker, and Docker Compose.
 
 ```bash
-cp .env.example .env
+npm run local:configure
 docker compose up -d db
 npm install
 npm run db:migrate:all
@@ -83,6 +83,7 @@ See [Browser user flows](tests/e2e/README.md) for service prerequisites and envi
 
 - [Install on Ubuntu with Apache](docs/DEPLOYMENT_UBUNTU_APACHE.md)
 - [Upgrade and rollback](docs/DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md)
+- [Security boundaries and upgrades](docs/SECURITY_BOUNDARIES.md)
 - [Release notes template](docs/RELEASE_NOTES_TEMPLATE.md)
 
 Public deployment guides use reserved example domains and generic instance identifiers. Keep the real infrastructure inventory in private operator notes outside Git.

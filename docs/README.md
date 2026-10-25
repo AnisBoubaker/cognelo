@@ -60,7 +60,8 @@ Open these only when changing or reviewing the named area:
 - [Student view](STUDENT_VIEW_IMPLEMENTATION_PLAN.md)
 - [Compound Test activity](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md)
 - [Edit action bar rollout inventory](EDIT_ACTION_BAR_ROLLOUT_INVENTORY.md)
-- [Security remediation tracker](SECURITY_REMEDIATION_TRACKER.md)
+- [Security boundaries](SECURITY_BOUNDARIES.md): access, request/upload limits, authentication, credentials, and upgrade requirements.
+- [Security remediation tracker](SECURITY_REMEDIATION_TRACKER.md) (local, ignored): defensive review status; private evidence remains outside the repository.
 
 Implementation plans contain design rationale and delivery state. They are not required reading for unrelated work.
 

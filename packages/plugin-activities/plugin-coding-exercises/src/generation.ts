@@ -33,7 +33,7 @@ export const codingExercisePromptGenerationInputSchema = z.object({
   description: z.string().min(10).max(4000),
   language: z.string().min(1).max(80),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
-  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
+  knowledge: activityGenerationKnowledgeSchema.prefault({ mode: "ignore" })
 });
 
 export const codingExerciseSolutionGenerationInputSchema = z.object({
@@ -41,7 +41,7 @@ export const codingExerciseSolutionGenerationInputSchema = z.object({
   prompt: z.string().min(10).max(12000),
   language: z.string().min(1).max(80),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
-  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
+  knowledge: activityGenerationKnowledgeSchema.prefault({ mode: "ignore" })
 });
 
 export const codingExerciseTestsGenerationInputSchema = z.object({
@@ -52,10 +52,10 @@ export const codingExerciseTestsGenerationInputSchema = z.object({
   referenceSolution: z.string().min(1).max(60000),
   templateSource: z.string().min(1).max(120000),
   templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),
-  visibleTestCount: z.number().int().min(0).max(codingExerciseMaxGeneratedTestCount).default(codingExerciseDefaultVisibleTestCount),
-  hiddenTestCount: z.number().int().min(0).max(codingExerciseMaxGeneratedTestCount).default(codingExerciseDefaultHiddenTestCount),
+  visibleTestCount: z.number().int().min(0).max(codingExerciseMaxGeneratedTestCount).prefault(codingExerciseDefaultVisibleTestCount),
+  hiddenTestCount: z.number().int().min(0).max(codingExerciseMaxGeneratedTestCount).prefault(codingExerciseDefaultHiddenTestCount),
   existingTests: existingTestsSchema.optional(),
-  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
+  knowledge: activityGenerationKnowledgeSchema.prefault({ mode: "ignore" })
 }).refine((input) => input.visibleTestCount + input.hiddenTestCount > 0, {
   message: "Request at least one visible or hidden test.",
   path: ["visibleTestCount"]
@@ -69,7 +69,7 @@ export const codingExerciseRubricGenerationInputSchema = z.object({
   referenceSolution: z.string().trim().min(1).max(60000),
   language: z.string().min(1).max(80),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
-  knowledge: activityGenerationKnowledgeSchema.default({ mode: "ignore" })
+  knowledge: activityGenerationKnowledgeSchema.prefault({ mode: "ignore" })
 });
 
 const generatedImpossibleSchema = z.object({
@@ -120,7 +120,8 @@ const generatedTestsSchema = z
     }
   });
 
-const generatedTestsEnvelopeSchema = generatedTestsSchema.innerType().extend({
+const generatedTestsEnvelopeSchema = z.object({
+  ...generatedTestsSchema.shape,
   sampleTests: z.array(z.unknown()).max(codingExerciseMaxGeneratedTestCount),
   hiddenTests: z.array(z.unknown()).max(codingExerciseMaxGeneratedTestCount)
 });
@@ -867,7 +868,7 @@ async function validateGeneratedTests(input: {
   if (parsed.data.hiddenTests.length !== input.hiddenTestCount) {
     issues.push(`Generate exactly ${input.hiddenTestCount} hidden tests; received ${parsed.data.hiddenTests.length}.`);
   }
-  const parseTests = <T extends { id: string; testCode: string }>(values: unknown[], schema: z.ZodType<T, z.ZodTypeDef, unknown>, kind: string, expectedOutput: (test: T) => string) =>
+  const parseTests = <T extends { id: string; testCode: string }>(values: unknown[], schema: z.ZodType<T>, kind: string, expectedOutput: (test: T) => string) =>
     values.flatMap((value, index) => {
       const result = schema.safeParse(value);
       if (!result.success) {

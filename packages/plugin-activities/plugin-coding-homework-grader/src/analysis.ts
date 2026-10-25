@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { buildContentVectorIndex, createDeterministicContentEmbeddingProvider, searchContentVectorIndex } from "@cognelo/content-type-sdk/vector";
@@ -95,6 +96,7 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
   if (!submission) {
     throw new AppError(404, "CODING_HOMEWORK_SUBMISSION_NOT_FOUND", "The requested submission was not found.");
   }
+  if (["ready_for_grading", "graded"].includes(submission.status)) throw new AppError(409, "CODING_HOMEWORK_SUBMISSION_LOCKED", "Completed submissions cannot be reprocessed.");
   if (submission.kind !== "final") {
     throw new AppError(400, "CODING_HOMEWORK_FINAL_SUBMISSION_REQUIRED", "Only final submissions can be analyzed.");
   }
@@ -189,7 +191,12 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
         }))
       ]
         .sort((left, right) => right.score - left.score || left.documentId.localeCompare(right.documentId))
-        .slice(0, nearestExampleCount);
+        .slice(0, nearestExampleCount)
+        .map((example) => ({ ...example,
+          functionCode: Buffer.from(example.functionCode, "utf8").subarray(0, 4000).toString("utf8").replace(/\uFFFD$/, ""),
+          isExcerpt: Buffer.byteLength(example.functionCode, "utf8") > 4000,
+          sourceHash: createHash("sha256").update(example.functionCode).digest("hex")
+        }));
       prepared.push({
         astText: parsedFunction.astText,
         divergenceScore: nearestExamples[0]?.distance ?? 1,

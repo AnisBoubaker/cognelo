@@ -1,3 +1,4 @@
+vi.mock("@/lib/auth-rate-limit", () => ({ limitAuthentication: vi.fn(), authenticationSucceeded: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -37,7 +38,7 @@ describe("account activation route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getServerEnv.mockReturnValue({ JWT_SECRET: "secret" });
-    mocks.readJson.mockResolvedValue({ token: "activation-token", password: "Password123!", confirmPassword: "Password123!" });
+    mocks.readJson.mockResolvedValue({ email: "student@example.test", password: "Password123!", confirmPassword: "Password123!" });
     mocks.activatePendingAccount.mockResolvedValue({ user: { id: "user-1" }, token: "signed-token" });
   });
 
@@ -47,7 +48,7 @@ describe("account activation route", () => {
     await expect(response.json()).resolves.toEqual({ user: { id: "user-1" } });
     expect(response.headers.get("set-cookie")).toContain("cognelo_session=signed-token");
     expect(mocks.activatePendingAccount).toHaveBeenCalledWith(
-      { token: "activation-token", password: "Password123!", confirmPassword: "Password123!" },
+      { email: "student@example.test", password: "Password123!", confirmPassword: "Password123!" },
       "secret"
     );
   });

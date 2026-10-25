@@ -1,3 +1,4 @@
+vi.mock("@/lib/auth-rate-limit", () => ({ limitAuthentication: vi.fn(), authenticationSucceeded: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({

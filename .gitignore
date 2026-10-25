@@ -21,3 +21,10 @@ storage
 # Local operator-only notes must never be published.
 /private-operations/
 /.private/
+
+# Generated local execution credentials.
+/infra/judge0/judge0.conf
+
+# Private staged environment replacements used during local credential rotation.
+/.env.*
+!/.env.example

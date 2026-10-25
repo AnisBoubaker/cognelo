@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import {
   clearActivityResponseDraft,
+  assertTimedActivityWriteAllowed,
   getActivityResponseDraft,
   saveActivityResponseDraft
 } from "@cognelo/core";
@@ -11,7 +12,7 @@ import { requireSafeExamBrowserAccess } from "@/lib/safe-exam-browser";
 type Params = { params: Promise<{ courseId: string; groupId: string; activityId: string }> };
 
 const draftInputSchema = z.object({
-  state: z.record(z.unknown())
+  state: z.record(z.string(), z.unknown())
 });
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { courseId, groupId, activityId } = await params;
     await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
+    await assertTimedActivityWriteAllowed(user, courseId, groupId, activityId);
     return json(await clearActivityResponseDraft(user, courseId, groupId, activityId));
   });
 }

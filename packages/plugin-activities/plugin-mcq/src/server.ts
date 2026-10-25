@@ -85,7 +85,7 @@ export const mcqServerPlugin: ServerActivityPlugin = {
     },
     submit: async ({ activity, payload }) => {
       const input = z.object({
-        answers: z.record(z.array(z.string().min(1).max(120)).default([])).default({})
+        answers: z.record(z.string(), z.array(z.string().min(1).max(120)).default([])).prefault({})
       }).parse(payload);
       return {
         state: { answers: input.answers },
@@ -97,7 +97,7 @@ export const mcqServerPlugin: ServerActivityPlugin = {
     activityTypeKeys: ["mcq"],
     actions: {
       submit: async ({ activity, payload }) => {
-        const input = z.object({ answers: z.record(z.array(z.string().min(1).max(120)).default([])).default({}) }).parse(payload);
+        const input = z.object({ answers: z.record(z.string(), z.array(z.string().min(1).max(120)).default([])).prefault({}) }).parse(payload);
         return {
           submission: {
             id: `student-preview-${crypto.randomUUID()}`,
@@ -111,7 +111,7 @@ export const mcqServerPlugin: ServerActivityPlugin = {
         };
       },
       feedback: async ({ activity, payload }) => {
-        const input = z.object({ answers: z.record(z.array(z.string().min(1).max(120)).default([])).default({}) }).parse(payload);
+        const input = z.object({ answers: z.record(z.string(), z.array(z.string().min(1).max(120)).default([])).prefault({}) }).parse(payload);
         return { feedback: buildMcqGradingResultFromConfig(activity.config, input.answers).feedback ?? {} };
       }
     }

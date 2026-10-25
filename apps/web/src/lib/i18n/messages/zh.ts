@@ -360,6 +360,8 @@ export const zhMessages = {
       submit: "登录",
       submitting: "登录中...",
       error: "登录失败。",
+      rateLimited: "尝试次数过多。请稍候再试。",
+      passwordTooLong: "请选择较短的密码。",
       activationError: "无法激活账户。"
     },
     emailVerification: {

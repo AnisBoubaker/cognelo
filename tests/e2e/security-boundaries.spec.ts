@@ -1,3 +1,4 @@
+import { createSafeExamBrowserLaunchToken, createSafeExamBrowserAccessToken } from "../../packages/core/src/safe-exam-browser";
 import { prisma } from "@cognelo/db";
 import { test, expect, ORIGINAL_SOURCE } from "./fixtures/bank-course";
 import { createAuthenticatedApi } from "./fixtures/auth";
@@ -59,7 +60,6 @@ test("future Test authoring is denied and runtime children use safe projections"
 });
 
 test("SEB launch and access credentials cannot authenticate or renew a session", async ({ bankCourse: data }) => {
-  const { createSafeExamBrowserLaunchToken, createSafeExamBrowserAccessToken } = await import("../../packages/core/src/safe-exam-browser");
   const student = await createAuthenticatedApi("student");
   try {
     const { user } = await responseJson<{ user: { id: string } }>(await student.get("/api/users/me"));

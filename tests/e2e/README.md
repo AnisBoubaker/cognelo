@@ -87,7 +87,7 @@ Outbox assertions require local access to the API’s storage. Use synthetic dom
 
 `workspace-layout.spec.ts` checks desktop/mobile page identity, navigation and action retention, and horizontal containment across list/detail pages, course and bank authoring, learner/preview workspaces, results/manual grading, and all account-setting sections after hero removal. Teacher course workspaces show one thin “Subject title - Course title” header above all tabs, with no repeated course identity in the content panels or tab toolbar. The Course/Group perspective controls appear only on Content, including after switching away from a selected group perspective and returning. Learner section headings and Student view previews show the subject title followed by the course/section titles, without section availability dates, including across the learner workspace tabs.
 
-`monaco-workers.spec.ts` exercises the actual HTML/CSS formatting workers and JavaScript diagnostics, including teacher inspection of an expired Web Design assignment. It requires no grading runner; editor rendering by itself does not prove worker initialization succeeded.
+`monaco-workers.spec.ts` verifies the loaded maintained sanitizer and exercises the actual HTML/CSS formatting workers and JavaScript diagnostics, including teacher inspection of an expired Web Design assignment. It requires no grading runner; editor rendering by itself does not prove worker initialization succeeded.
 
 `submission-deletion.spec.ts` covers the shared teacher action for MCQ, coding, Web Design, and compound Tests, mandatory reasons/cancellation, preserved records and student history, older/formative submissions, and permission/state rejection. Its Web Design scenario requires the local runner to create a real submission.
 
@@ -155,3 +155,5 @@ Link-summary coverage also checks the default-off same-domain checkbox, its gene
 `text-content.spec.ts` also verifies that display settings for long imported notes send only presentation fields and preserve both the full body and concurrent content edits.
 
 `security-boundaries.spec.ts` uses disposable fixtures to verify public activity projections, teacher-only Test authoring, future-Test denial, and concurrent one-attempt enforcement. Runner credential, command isolation, browser network, and cropped screenshot checks live in `packages/web-design-runner/src/security.test.ts`.
+
+`security-hardening.spec.ts` checks hidden lists/downloads and section isolation, bounded authentication, concurrent email-code guesses, password-session invalidation, purpose-bound model-key encryption/private-endpoint denial, atomic homework reservation/finalization, and a submission body crossing its deadline. Run it against a disposable local server with `COGNELO_BACKGROUND_JOBS_DISABLED=true`; the homework case supplies its own questions and removes its exact queued job, avoiding external model calls.

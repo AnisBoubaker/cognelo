@@ -1,3 +1,4 @@
+import { readBoundedJson, MAX_UPLOAD_JSON_BYTES } from "@cognelo/core";
 import { NextRequest } from "next/server";
 import { resolveContentTypePluginRoute } from "@cognelo/content-type-sdk/server";
 import { AppError, assertCanManageCourse, getContentResourceForPluginRoute } from "@cognelo/core";
@@ -49,11 +50,7 @@ export async function dispatchContentTypePluginRoute(request: NextRequest, param
       }
     },
     readJson: async () => {
-      try {
-        return await request.json();
-      } catch {
-        return {};
-      }
+      return readBoundedJson(request, MAX_UPLOAD_JSON_BYTES);
     }
   });
 

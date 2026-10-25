@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { expect, test } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
 import { defaultWebDesignExerciseConfig } from "../../packages/plugin-activities/plugin-web-design-coding-exercises/src/web-design-coding-exercises";
@@ -26,6 +27,13 @@ for (const expired of [false, true]) {
       await page.getByRole("tab", { name: "Student starting files", exact: true }).click();
     }
     await expect(page.locator(".monaco-editor").first()).toBeVisible();
+
+    const sanitizer = await page.evaluate(() => new Promise<{ version: string; clean: string }>((resolve, reject) => {
+      const require = (window as typeof window & { require: (modules: string[], ready: (purify: { version: string; sanitize: (text: string) => string }) => void, failed: (error: unknown) => void) => void }).require;
+      require(["vs/base/browser/dompurify/dompurify"], (purify) => resolve({ version: purify.version, clean: purify.sanitize('<img src="x" onerror="1"><svg onload="1"></svg>') }), reject);
+    }));
+    expect(sanitizer.version).toBe(DOMPurify.version);
+    expect(sanitizer.clean).not.toMatch(/onerror|onload/);
 
     // A painted editor alone does not prove that its background language services work.
     const results = await page.evaluate(async () => {

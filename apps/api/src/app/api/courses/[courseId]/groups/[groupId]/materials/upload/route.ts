@@ -1,8 +1,9 @@
+import { readBoundedFormData } from "@cognelo/core";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest } from "next/server";
-import { createGroupMaterial, assertCanManageCourse } from "@cognelo/core";
+import { createGroupMaterial, assertMaterialUploadTarget } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; groupId: string }> };
@@ -18,8 +19,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId } = await params;
-    await assertCanManageCourse(user, courseId);
-    const formData = await request.formData();
+    await assertMaterialUploadTarget(user, courseId, { groupId });
+    const formData = await readBoundedFormData(request);
     const file = formData.get("file");
     const titleValue = formData.get("title");
     const parentIdValue = formData.get("parentId");
@@ -32,9 +33,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       return json({ error: { code: "UPLOAD_TOO_LARGE", message: "Files must be 25 MB or smaller." } }, { status: 413 });
     }
 
+    await assertMaterialUploadTarget(user, courseId, { groupId, parentId: typeof parentIdValue === "string" && parentIdValue ? parentIdValue : null });
     const title = typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : file.name;
     const originalName = file.name || "group-material";
-    const storedName = `${randomUUID()}-${originalName.replace(SAFE_NAME_PATTERN, "_")}`;
+    const storedName = `${randomUUID()}-${originalName.replace(SAFE_NAME_PATTERN, "_").slice(0, 180)}`;
     const storageDir = path.join(process.cwd(), "../../storage/group-materials", courseId, groupId);
     await mkdir(storageDir, { recursive: true });
 

@@ -80,13 +80,13 @@ describe("auth services", () => {
     });
   });
 
-  it("returns the pending setup error for emails already added to groups", async () => {
+  it("does not distinguish pending invitations from invalid credentials", async () => {
     mockPrisma.user.findUnique.mockResolvedValue(null);
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue({ id: "participant-1" });
 
     await expect(loginWithPassword("student@example.test", "password", secret)).rejects.toMatchObject({
-      status: 403,
-      code: "PENDING_ACCOUNT_SETUP"
+      status: 401,
+      code: "UNAUTHORIZED"
     });
   });
 
@@ -167,6 +167,7 @@ describe("auth services", () => {
 
     const result = await loginWithPassword("teacher@example.test", "Password123!", secret);
     expect(result.user.emailVerified).toBe(false);
+    expect(result.user).toMatchObject({ name: null, firstName: null, lastName: null, roles: [] });
   });
 
   it("returns the forced-change state and rejects tokens issued before an administrator reset", async () => {
@@ -222,7 +223,7 @@ describe("auth services", () => {
         },
         secret
       )
-    ).rejects.toMatchObject({ status: 409, code: "ACCOUNT_ALREADY_EXISTS" });
+    ).rejects.toMatchObject({ status: 400, code: "ACCOUNT_ACTIVATION_UNAVAILABLE" });
 
     mockPrisma.user.findUnique.mockResolvedValueOnce(null);
     mockPrisma.courseGroupParticipant.findMany.mockResolvedValueOnce([]);
@@ -235,7 +236,7 @@ describe("auth services", () => {
         },
         secret
       )
-    ).rejects.toMatchObject({ status: 403, code: "ACCOUNT_ACTIVATION_NOT_ALLOWED" });
+    ).rejects.toMatchObject({ status: 400, code: "ACCOUNT_ACTIVATION_UNAVAILABLE" });
   });
 
   it("activates pending participants and creates the highest course memberships", async () => {

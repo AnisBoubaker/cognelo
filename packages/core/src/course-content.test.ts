@@ -1,7 +1,9 @@
+vi.mock("./groups", () => ({ assertCanViewGroup: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const mockPrisma = vi.hoisted(() => ({
+  courseGroupHiddenCourseMaterial: { findMany: vi.fn().mockResolvedValue([]) },
   activityAssignmentException: { findMany: vi.fn() },
   $transaction: vi.fn(),
   $executeRaw: vi.fn(),
@@ -27,6 +29,7 @@ const mockPrisma = vi.hoisted(() => ({
     update: vi.fn()
   },
   courseGroup: {
+    findMany: vi.fn().mockResolvedValue([{ id: "group-1" }]),
     findFirst: vi.fn()
   },
   courseGroupActivity: {
@@ -115,6 +118,7 @@ const teacherUser: CurrentUser = {
 describe("course content services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1" });
     mockPrisma.activityAssignmentException.findMany.mockResolvedValue([]);
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof mockPrisma) => unknown) => handler(mockPrisma));
     mockPrisma.courseContentItem.count.mockResolvedValue(0);

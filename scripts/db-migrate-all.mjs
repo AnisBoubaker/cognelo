@@ -172,6 +172,7 @@ export function runAll(options = {}) {
 
   applyCoreMigrationsFn();
   runCommand("Core Prisma generate", "npx", ["prisma", "generate", "--schema", coreSchema]);
+  runCommand("Encrypt legacy model credentials", "npx", ["tsx", "scripts/encrypt-ai-credentials.ts"]);
   runCommand("Plugin migrations", "npx", ["tsx", "scripts/apply-plugin-migrations.ts"]);
 
   for (const schema of schemas) {

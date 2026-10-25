@@ -15,6 +15,7 @@ const coreMocks = vi.hoisted(() => ({
 }));
 
 const dbMocks = vi.hoisted(() => ({
+  $transaction: vi.fn(), $queryRaw: vi.fn(), $executeRaw: vi.fn(),
   pluginCodingHomeworkChallengeQuestion: {
     update: vi.fn()
   },
@@ -25,6 +26,7 @@ const dbMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@cognelo/core", () => coreMocks);
+vi.mock("@cognelo/db", () => ({ prisma: dbMocks }));
 vi.mock("./db-client", () => ({
   Prisma: {},
   prisma: dbMocks
@@ -37,6 +39,15 @@ describe("coding homework challenge answers", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    dbMocks.$transaction.mockImplementation((handler) => handler(dbMocks));
+    dbMocks.$queryRaw.mockImplementation(async (query, ...values) => {
+      const sql = query.join("?");
+      if (sql.startsWith('SELECT * FROM "PluginCodingHomeworkSubmission"')) return [await dbMocks.pluginCodingHomeworkSubmission.findFirst()];
+      if (sql.startsWith('SELECT * FROM "PluginCodingHomeworkChallengeQuestion"')) return (await dbMocks.pluginCodingHomeworkSubmission.findFirst()).questions;
+      if (sql.includes('SELECT lifecycle FROM "ActivityAttempt"')) return [{ lifecycle: "started" }];
+      return [await dbMocks.pluginCodingHomeworkSubmission.update({ where: { id: values[3] }, data: { coreAttemptId: values[0], metadata: JSON.parse(values[1]), processingError: null, status: values[2] } })];
+    });
+    dbMocks.$executeRaw.mockImplementation(async (_query, ...values) => dbMocks.pluginCodingHomeworkChallengeQuestion.update({ where: { id: values[2] }, data: { answerSubmittedAt: values[0], studentAnswer: values[1] } }));
     dbMocks.pluginCodingHomeworkSubmission.findFirst.mockResolvedValue(testSubmission({ status: "challenge_ready" }));
     dbMocks.pluginCodingHomeworkChallengeQuestion.update.mockImplementation(async ({ data, where }) => ({
       ...testQuestion(where.id, where.id === "question-1" ? 0 : 1),
@@ -147,9 +158,9 @@ describe("coding homework challenge answers", () => {
         groupId: "group-1",
         pluginAttemptRef: "submission-1",
         pluginKey: "coding-homework-grader"
-      })
+      }), dbMocks
     );
-    expect(coreMocks.submitActivityAttempt).toHaveBeenCalledWith(testUser(), expect.objectContaining({ attemptId: "core-attempt-1" }));
+    expect(coreMocks.submitActivityAttempt).toHaveBeenCalledWith(testUser(), expect.objectContaining({ attemptId: "core-attempt-1" }), dbMocks);
     expect(result.submission.coreAttemptId).toBe("core-attempt-1");
   });
 
@@ -169,8 +180,8 @@ describe("coding homework challenge answers", () => {
     expect(coreMocks.startActivityAttempt).toHaveBeenCalledWith(testUser(), expect.objectContaining({
       assessmentMode: "formative",
       pluginAttemptRef: "submission-1"
-    }));
-    expect(coreMocks.submitActivityAttempt).toHaveBeenCalledWith(testUser(), expect.objectContaining({ attemptId: "core-attempt-1" }));
+    }), dbMocks);
+    expect(coreMocks.submitActivityAttempt).toHaveBeenCalledWith(testUser(), expect.objectContaining({ attemptId: "core-attempt-1" }), dbMocks);
   });
 
   it("locks completed submissions", async () => {

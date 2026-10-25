@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPrisma = vi.hoisted(() => ({
-  $transaction: vi.fn(async (operations: Promise<unknown>[]) => Promise.all(operations)),
+  $transaction: vi.fn(),
+  $queryRaw: vi.fn(),
   emailVerificationChallenge: {
     delete: vi.fn(),
     deleteMany: vi.fn(),
@@ -34,6 +35,7 @@ const user = {
 describe("email verification", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation(async (handler) => handler(mockPrisma));
     mockPrisma.user.findUnique.mockResolvedValue({
       email: user.email,
       emailVerifiedAt: null,

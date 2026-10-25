@@ -1,8 +1,9 @@
+import { readBoundedFormData } from "@cognelo/core";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest } from "next/server";
-import { updateMaterial, assertCanManageCourse } from "@cognelo/core";
+import { updateMaterial, assertMaterialUploadTarget } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; materialId: string }> };
@@ -18,8 +19,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, materialId } = await params;
-    await assertCanManageCourse(user, courseId);
-    const formData = await request.formData();
+    await assertMaterialUploadTarget(user, courseId, { materialId });
+    const formData = await readBoundedFormData(request);
     const file = formData.get("file");
     const titleValue = formData.get("title");
 
@@ -32,7 +33,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     const title = typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : file.name;
     const originalName = file.name || "course-material";
-    const storedName = `${randomUUID()}-${originalName.replace(SAFE_NAME_PATTERN, "_")}`;
+    const storedName = `${randomUUID()}-${originalName.replace(SAFE_NAME_PATTERN, "_").slice(0, 180)}`;
     const storageDir = path.join(process.cwd(), "../../storage/course-materials", courseId);
     await mkdir(storageDir, { recursive: true });
 

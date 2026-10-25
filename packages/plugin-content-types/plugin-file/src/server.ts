@@ -1,6 +1,6 @@
+import { readBoundedFormData, openStoredMaterial } from "@cognelo/core";
 import { randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { z } from "zod";
@@ -33,9 +33,6 @@ function readMetadata(metadata: Record<string, unknown> | undefined): FileMetada
   return (metadata ?? {}) as FileMetadata;
 }
 
-function storedFilePath(courseId: string, storedName: string) {
-  return path.join(fileStorageDir(courseId), storedName);
-}
 
 export const fileContentServerPlugin: ServerContentTypePlugin = {
   key: "file-content",
@@ -45,7 +42,7 @@ export const fileContentServerPlugin: ServerContentTypePlugin = {
       contentTypeKeys: ["file"],
       methods: {
         async PUT({ request, context }) {
-          const formData = await request.formData();
+          const formData = await readBoundedFormData(request);
           const file = formData.get("file");
           const titleValue = formData.get("title");
           if (!(file instanceof File)) {
@@ -56,7 +53,7 @@ export const fileContentServerPlugin: ServerContentTypePlugin = {
           }
           const title = typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : file.name || context.resource?.title || "File";
           const originalName = file.name || "course-file";
-          const storedName = `${randomUUID()}-${originalName.replace(SAFE_NAME_PATTERN, "_")}`;
+          const storedName = `${randomUUID()}-${originalName.replace(SAFE_NAME_PATTERN, "_").slice(0, 180)}`;
           const storageDir = fileStorageDir(context.courseId);
           await mkdir(storageDir, { recursive: true });
           await writeFile(path.join(storageDir, storedName), Buffer.from(await file.arrayBuffer()));
@@ -73,7 +70,7 @@ export const fileContentServerPlugin: ServerContentTypePlugin = {
                 setupStatus: "uploaded"
               }
             }
-          });
+          }).catch(async (error) => { await unlink(path.join(storageDir, storedName)).catch(() => undefined); throw error; });
           return { resource };
         }
       }
@@ -87,9 +84,9 @@ export const fileContentServerPlugin: ServerContentTypePlugin = {
           if (!metadata.storedName) {
             return Response.json({ error: { code: "NOT_DOWNLOADABLE", message: "This file has not been uploaded yet." } }, { status: 400 });
           }
-          const filePath = storedFilePath(context.courseId, metadata.storedName);
-          const fileStat = await stat(filePath);
-          const stream = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
+          const file = await openStoredMaterial(path.resolve(process.cwd(), "../../storage/course-content-files"), [context.courseId], metadata.storedName);
+          const fileStat = await file.stat();
+          const stream = Readable.toWeb(file.createReadStream()) as ReadableStream;
           return new Response(stream, {
             headers: {
               "Cache-Control": "no-store, max-age=0",
@@ -177,9 +174,10 @@ async function getFileEmbeddingDocuments(resource: ServerContentResourceRecord):
     };
   }
 
-  const filePath = storedFilePath(resource.courseId, metadata.storedName);
-  const fileStat = await stat(filePath);
+  const file = await openStoredMaterial(path.resolve(process.cwd(), "../../storage/course-content-files"), [resource.courseId], metadata.storedName);
+  const fileStat = await file.stat();
   if (fileStat.size > MAX_EMBEDDING_TEXT_BYTES) {
+    await file.close();
     return {
       sourceId: resource.id,
       documents: [],
@@ -194,7 +192,7 @@ async function getFileEmbeddingDocuments(resource: ServerContentResourceRecord):
     };
   }
 
-  const bytes = await readFile(filePath);
+  const bytes = await file.readFile().finally(() => file.close());
   const mimeType = metadata.mimeType ?? "application/octet-stream";
   const extracted = extractFileText(bytes, mimeType, metadata.originalName ?? resource.title);
   return {
@@ -333,26 +331,27 @@ function languageKeyForFile(fileName: string) {
   return null;
 }
 
-function extractSimplePdfText(bytes: Buffer) {
-  const raw = bytes.toString("latin1");
-  const matches = raw.match(/\((?:\\.|[^\\)])*\)/g) ?? [];
-  return matches
-    .map((match) => match.slice(1, -1).replace(/\\([nrtbf()\\])/g, (_, escaped: string) => {
-      switch (escaped) {
-        case "n":
-          return "\n";
-        case "r":
-          return "\r";
-        case "t":
-          return "\t";
-        case "b":
-        case "f":
-          return " ";
-        default:
-          return escaped;
-      }
-    }))
-    .join("\n")
-    .replace(/\s+\n/g, "\n")
-    .trim();
+/** Linear literal-string scan; malformed nesting must not trigger regex backtracking. */
+export function extractSimplePdfText(bytes: Buffer) {
+  const raw = bytes.toString("latin1"), values: string[] = [];
+  let depth = 0, current: string[] = [];
+  for (let index = 0; index < raw.length; index++) {
+    const character = raw[index];
+    if (!depth) {
+      if (character === "(") { depth = 1; current = []; }
+      continue;
+    }
+    if (character === "\\" && index + 1 < raw.length) {
+      const escaped = raw[++index];
+      if (escaped === "\r" || escaped === "\n") { if (escaped === "\r" && raw[index + 1] === "\n") index++; continue; }
+      if (/[0-7]/.test(escaped)) {
+        let octal = escaped;
+        while (octal.length < 3 && index + 1 < raw.length && /[0-7]/.test(raw[index + 1])) octal += raw[++index];
+        current.push(String.fromCharCode(parseInt(octal, 8)));
+      } else current.push(({ n: "\n", r: "\r", t: "\t", b: " ", f: " " } as Record<string, string>)[escaped] ?? escaped);
+    } else if (character === "(") { depth++; current.push(character); }
+    else if (character === ")") { if (--depth === 0) values.push(current.join("")); else current.push(character); }
+    else current.push(character);
+  }
+  return values.join("\n").split("\n").map((line) => line.trimEnd()).join("\n").trim();
 }

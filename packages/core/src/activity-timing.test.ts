@@ -138,7 +138,7 @@ describe("generic timed activity runtime", () => {
       timing: { expiresAt: "2026-10-11T14:10:00.000Z", remainingSeconds: 0, isExpired: true }
     });
     await expect(assertTimedActivityWriteAllowed(student, "course-1", "group-1", "activity-1")).rejects.toMatchObject({ code: "ACTIVITY_TIME_LIMIT_EXPIRED" });
-    await expect(assertTimedActivityWriteAllowed(student, "course-1", "group-1", "activity-1", { allowExpiredAttempt: true })).resolves.toBeUndefined();
+    await expect(assertTimedActivityWriteAllowed(student, "course-1", "group-1", "activity-1", { allowExpiredAttempt: true })).resolves.toMatchObject({ expiredAttemptId: "attempt-1" });
     await finalizeExpiredTimedActivityAttempt(student, "course-1", "group-1", "activity-1");
     expect(gradebook.submitActivityAttempt).toHaveBeenCalledWith(student, expect.objectContaining({
       attemptId: activeAttempt.id, metadata: expect.objectContaining({ timedOut: true, savedResponse: { answers: { q1: ["a"] } } })

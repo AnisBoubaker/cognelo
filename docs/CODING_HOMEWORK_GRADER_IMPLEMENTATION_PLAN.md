@@ -50,7 +50,7 @@ As of August 6, 2026:
 - Phase 10 is complete: valid final submissions can be analyzed into parsed submitted functions, deterministic dev embeddings, nearest reference examples from the shared content vector dispatcher, divergence scores, and selected candidate rows.
 - Phase 11 is complete: teachers can trigger or retry server-side challenge question generation for analyzed submissions. Generated questions are stored with prompt version, model, selected function provenance, nearest-example audit metadata, and submission status moves to `challenge_ready`.
 - Phase 12 is complete: valid student ZIP submissions now run analysis and challenge generation immediately, return student-safe challenge questions, collect draft/final answers, and mark the plugin submission `ready_for_grading` once every question is answered.
-- Phase 13 is complete: final answer submission creates/submits a core gradebook attempt for summative assignments, and teachers can review coding homework submissions from the gradebook manual grading surfaces.
+- Phase 13 is complete: valid ZIP upload reserves a core attempt and final answers atomically submit it. Teachers review submissions through the gradebook manual grading surfaces.
 - Activity-owned assignment resources are implemented: teachers can view the assignment PDF inline, manage files provided with the assignment, and those resources are extracted and searched alongside prior course material for challenge generation without creating separate course content resources.
 
 ## Product Boundaries
@@ -533,7 +533,7 @@ Declare grading capability:
 
 Submission flow:
 
-- Create a mode-tagged core attempt when the challenge-answer set is finalized. Summative attempts can be graded; formative attempts remain available for read-only teacher inspection.
+- Reserve a mode-tagged core attempt at valid final ZIP acceptance; submit it when the challenge-answer set is finalized. Summative attempts can be graded; formative attempts remain available for read-only teacher inspection.
 - Prefer final answer submission as the core submission point so incomplete challenge flows do not count as submitted work.
 - Store plugin submission ID as `pluginAttemptRef`.
 - Mark the core attempt submitted only when challenge answers are final.
@@ -770,7 +770,7 @@ Acceptance:
 Progress:
 
 - Added `src/submission.ts` with final ZIP submission handling. It reuses the existing ZIP reader and structure validation service, enforces ZIP MIME/name and teacher requirement limits, and resolves the latest ready documentation snapshot for provenance when one exists.
-- Added `coding-homework-grader/assignment` and `coding-homework-grader/submission` plugin routes for assigned group activity contexts. Final submissions require a group context; they do not create core attempts, grades, or challenge questions yet.
+- Added `coding-homework-grader/assignment` and `coding-homework-grader/submission` plugin routes for assigned group activity contexts. Final submissions require a group context and reserve their core attempt atomically with private artifacts before background processing.
 - Valid final submissions create `PluginCodingHomeworkSubmission` rows with `kind = final`, durable `submission_zip` attachment metadata, local files under `storage/coding-homework-grader/submissions`, and `PluginCodingHomeworkSubmissionFile` rows for extracted valid files.
 - Invalid structure submissions create an `invalid_structure` final submission record with the validation summary but do not write the uploaded ZIP or extract files.
 - Added student UI wiring to load the assignment prompt, show latest submission status, run the existing preflight check, and submit a final ZIP.
@@ -834,7 +834,7 @@ Acceptance:
 
 - Students cannot finalize until required questions are answered.
 - Once finalized, ZIP and answers are read-only for that attempt.
-- Finalization marks the plugin submission ready for grading and creates/submits a core attempt tagged with the assignment's current assessment mode.
+- Finalization marks the plugin submission ready for grading and submits the reserved core attempt tagged with the assignment's assessment mode.
 
 Progress:
 
@@ -842,7 +842,7 @@ Progress:
 - Automatic student-path generation uses a course teacher/owner's configured non-local question-authoring AI connection through a core helper, so students do not need personal AI preferences and provider keys stay server-side.
 - Added `coding-homework-grader/challenge-answers` with `PUT` for draft answer saves and `POST` for final answer submission. Finalization requires every generated question to have a non-empty answer.
 - The student UI now shows generated challenge questions immediately after a valid ZIP submission, locks the ZIP upload once questions are ready, allows draft saves, and marks the submission complete when final answers are submitted.
-- Final answer submission updates the plugin submission status to `ready_for_grading` and records a mode-tagged core attempt/submission for formative and summative assigned activities; only summative attempts enter grading.
+- Final answer submission updates the plugin submission status to `ready_for_grading` and submits the reserved mode-tagged core attempt for formative and summative assigned activities; only summative attempts enter grading.
 
 ### Phase 13: Teacher Manual Grading And Gradebook Integration
 
@@ -851,7 +851,7 @@ Deliverables:
 - Manual grading renderer. Complete: `coding-homework-grader-manual-grading`.
 - Gradebook attempts route. Complete: `coding-homework-grader/gradebook-attempts`.
 - Teacher review UI with code/question/answer/source context. Complete in the detailed gradebook overlay and basic bulk manual grading page.
-- Core grade recording. Complete through final-answer mode-tagged core attempts plus existing summative gradebook override saves.
+- Core grade recording. Complete through upload-reserved, final-answer-submitted core attempts plus existing summative gradebook override saves.
 - Released grade visibility through existing gradebook. Complete through normal gradebook release behavior.
 
 Acceptance:
@@ -862,13 +862,15 @@ Acceptance:
 
 ### Phase 14: Operational Hardening
 
+Security follow-up is complete: upload reservation and finalization are transactional, internal analysis is staff-only, learner errors/artifacts are projected, and expired finalization reads saved answers only. See the [owning reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md#upload-and-finalization-boundaries).
+
 Deliverables:
 
 - Shared core background job model/resumable processing service for long extraction/embedding/generation tasks. Complete: core owns the durable `BackgroundJob` table/service, the API starts the default in-process worker, and the grader registers a plugin handler for submission analysis/question generation.
 - Idempotency keys for retries. Complete for student final ZIP submissions.
 - Processing status timeline. Complete for upload/extraction, analysis, and challenge generation metadata.
 - Logging and error categorization. Complete in submission metadata through categorized retryable/non-retryable processing errors.
-- Rate limiting and file size limits. File size limits already enforced by teacher requirements; centralized rate limiting remains a separate platform policy item.
+- Rate limiting and file size limits. Complete: bounded streaming input, central-directory and expanded-size limits, persistent upload rates, a serialized storage quota/free-space check, and process concurrency caps.
 
 Acceptance:
 
@@ -982,7 +984,7 @@ Integration tests:
 
 - activate/deactivate plugin-owned tables
 - create bank activity, assign to course, verify independent course-owned plugin data
-- summative student submission creates a core attempt only after final answers
+- valid final upload reserves one core attempt; concurrent uploads and finalization cannot create duplicates
 - manual grade records normalized grade
 - webserver-filesystem artifacts remain downloadable through authorized plugin routes
 - shared-index retrieval respects content visibility and assignment cutoff rules
@@ -1007,8 +1009,8 @@ Frontend checks:
 
 ## Open Decisions
 
-- Whether final submission should occur at ZIP upload or after challenge answers. Recommended: after challenge answers.
-- Whether a student may create a new attempt after seeing challenge questions. Recommended: yes only if the assignment attempt policy allows another attempt, and the next attempt gets a newly generated challenge set.
+- Resolved: reserve the attempt at valid ZIP upload and mark it submitted only after final answers.
+- Resolved: finish the existing workflow before another upload; then the ordinary attempt policy controls a new workflow and question set.
 - Whether group-specific content before the assignment should be included in the documentation snapshot. Recommended: defer to a later phase.
 - Whether PDF assignment statements should also be indexed as documentation. Recommended: no; the assignment statement describes the task, while prior content resources define the taught material.
 - Whether a future deployment needs an external storage backend. Current decision: use hardened webserver-local storage in production and preserve the adapter boundary so this can change later without rewriting plugin workflows.

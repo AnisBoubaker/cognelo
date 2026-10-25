@@ -1,3 +1,4 @@
+import { getActivityResponseDraft } from "@cognelo/core";
 import { canShowStudentActivityGrade } from "@cognelo/core";
 import { randomUUID } from "node:crypto";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
@@ -235,6 +236,7 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
   path: "coding-exercises/submit",
   activityTypeKeys: ["coding-exercise"],
   allowExpiredTimedAttemptMethods: ["POST"],
+  expiredAttemptInput: async (context) => (await getActivityResponseDraft(context.user, context.courseId!, context.groupId!, context.activity.id))?.state ?? { sourceCode: "" },
   methods: {
     GET: async ({ context }) => {
       const executions = await listRecentCodingExerciseExecutions({

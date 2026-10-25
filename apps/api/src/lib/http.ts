@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getServerEnv } from "@cognelo/config";
-import { AppError, refreshAuthSession, verifyAuthToken } from "@cognelo/core";
+import { AppError, readBoundedJson, refreshAuthSession, verifyAuthToken } from "@cognelo/core";
 import "@cognelo/plugin-registry/server";
 export { AUTH_COOKIE, validateCsrfOrigin } from "./csrf";
 import { AUTH_COOKIE } from "./csrf";
@@ -94,12 +94,8 @@ export function progressJson<TProgress>(run: (report: (progress: TProgress) => v
   } }) });
 }
 
-export async function readJson(request: NextRequest) {
-  try {
-    return await request.json();
-  } catch {
-    return {};
-  }
+export async function readJson(request: NextRequest, maximum?: number) {
+  return readBoundedJson(request, maximum);
 }
 
 export async function handleRoute(handler: () => Promise<Response>) {
@@ -113,7 +109,7 @@ export async function handleRoute(handler: () => Promise<Response>) {
       );
     }
     if (error instanceof AppError) {
-      return json({ error: { code: error.code, message: error.message, details: error.details } }, { status: error.status });
+      return json({ error: { code: error.code, message: error.message, details: error.details } }, { status: error.status, ...(error.status === 429 ? { headers: { "Retry-After": String((error.details as { retryAfterSeconds?: number })?.retryAfterSeconds ?? 60) } } : {}) });
     }
     console.error(error);
     return json({ error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred." } }, { status: 500 });

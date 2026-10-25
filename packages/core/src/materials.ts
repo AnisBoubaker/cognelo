@@ -1,16 +1,20 @@
+import { listContentItems } from "./course-content";
 import { assertMaterialStorageUnchanged } from "./material-storage";
 import { CourseMaterialInputSchema, CourseMaterialUpdateSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
-import { assertCanManageCourse, assertCanViewCourse } from "./authorization";
+import { assertCanManageCourse, assertCanViewCourse, canManageCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
 
 export async function listMaterials(user: CurrentUser, courseId: string) {
   await assertCanViewCourse(user, courseId);
-  return prisma.courseMaterial.findMany({
+  const materials = await prisma.courseMaterial.findMany({
     where: { courseId },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }]
   });
+  if (await canManageCourse(user, courseId)) return materials;
+  const visible = new Set((await listContentItems(user, courseId, { visibleOnly: true })).map((item) => item.materialId));
+  return materials.filter((material) => visible.has(material.id));
 }
 
 export async function createMaterial(user: CurrentUser, courseId: string, input: unknown, serverUpload = false) {
@@ -25,6 +29,7 @@ export async function createMaterial(user: CurrentUser, courseId: string, input:
 
 export async function getMaterialForDownload(user: CurrentUser, courseId: string, materialId: string) {
   await assertCanViewCourse(user, courseId);
+  if (!(await canManageCourse(user, courseId)) && !(await listContentItems(user, courseId, { visibleOnly: true })).some((item) => item.materialId === materialId)) throw notFound("Course material");
   const material = await prisma.courseMaterial.findFirst({ where: { id: materialId, courseId, kind: "file" } });
   if (!material) {
     throw notFound("Course material");
@@ -68,5 +73,18 @@ async function assertValidParent(courseId: string, parentId: string | null | und
   const parent = await prisma.courseMaterial.findFirst({ where: { id: parentId, courseId, kind: "folder" } });
   if (!parent) {
     throw notFound("Parent folder");
+  }
+}
+
+/** Authorize URL targets before reading multipart bytes; validate parents before staging. */
+export async function assertMaterialUploadTarget(user: CurrentUser, courseId: string, scope: { groupId?: string; materialId?: string; parentId?: string | null } = {}) {
+  await assertCanManageCourse(user, courseId);
+  if (scope.groupId && !await prisma.courseGroup.findFirst({ where: { id: scope.groupId, courseId }, select: { id: true } })) throw notFound("Course group");
+  if (scope.materialId && !await prisma.courseMaterial.findFirst({ where: { id: scope.materialId, courseId }, select: { id: true } })) throw notFound("Course material");
+  if (scope.parentId) {
+    const parent = scope.groupId
+      ? await prisma.courseGroupMaterial.findFirst({ where: { id: scope.parentId, groupId: scope.groupId, kind: "folder" }, select: { id: true } })
+      : await prisma.courseMaterial.findFirst({ where: { id: scope.parentId, courseId, kind: "folder" }, select: { id: true } });
+    if (!parent) throw notFound("Parent folder");
   }
 }

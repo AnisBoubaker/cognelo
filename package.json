@@ -33,7 +33,8 @@
     "media:gc": "set -a && . ./.env && set +a && npx tsx scripts/media-gc.ts",
     "media:gc:delete": "set -a && . ./.env && set +a && npx tsx scripts/media-gc.ts --delete",
     "production:bootstrap": "set -a && . ./.env && set +a && npx tsx scripts/bootstrap-production.ts",
-    "pdf:install-browser": "playwright install chromium"
+    "pdf:install-browser": "playwright install chromium",
+    "local:configure": "node scripts/configure-local-security.mjs"
   },
   "dependencies": {
     "@cognelo/plugin-registry": "0.1.0",
@@ -41,24 +42,29 @@
   },
   "devDependencies": {
     "@eslint/compat": "2.1.1",
-    "@playwright/test": "1.59.1",
+    "@playwright/test": "1.64.1",
     "@types/node": "^20.12.12",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "eslint": "10.10.0",
-    "eslint-config-next": "16.3.3",
+    "eslint-config-next": "16.4.3",
     "typescript": "^5.4.5",
-    "vite": "7.3.6",
-    "vitest": "4.1.11"
+    "vite": "7.3.7",
+    "vitest": "4.1.12",
+    "esbuild": "0.28.2"
   },
   "optionalDependencies": {
-    "@next/swc-darwin-arm64": "16.3.3",
-    "@next/swc-darwin-x64": "16.3.3",
-    "@next/swc-linux-arm64-gnu": "16.3.3",
-    "@next/swc-linux-arm64-musl": "16.3.3",
-    "@next/swc-linux-x64-gnu": "16.3.3",
-    "@next/swc-linux-x64-musl": "16.3.3",
-    "@next/swc-win32-arm64-msvc": "16.3.3",
-    "@next/swc-win32-x64-msvc": "16.3.3"
+    "@next/swc-darwin-arm64": "16.4.3",
+    "@next/swc-darwin-x64": "16.4.3",
+    "@next/swc-linux-arm64-gnu": "16.4.3",
+    "@next/swc-linux-arm64-musl": "16.4.3",
+    "@next/swc-linux-x64-gnu": "16.4.3",
+    "@next/swc-linux-x64-musl": "16.4.3",
+    "@next/swc-win32-arm64-msvc": "16.4.3",
+    "@next/swc-win32-x64-msvc": "16.4.3"
+  },
+  "overrides": {
+    "katex": "^0.18.2",
+    "zod": "^4.6.7"
   }
 }

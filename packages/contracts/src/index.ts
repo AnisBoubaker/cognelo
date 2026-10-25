@@ -1,4 +1,17 @@
 import { z } from "zod";
+
+// Zod 4 applies inner defaults through optional properties. Patch schemas must
+// preserve omitted fields instead of resetting them to creation defaults.
+function partialWithoutDefaults<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
+  const strip = (field: z.ZodType): z.ZodType => {
+    if (field instanceof z.ZodDefault || field instanceof z.ZodPrefault) return strip(field.unwrap() as z.ZodType);
+    if (field instanceof z.ZodOptional) return strip(field.unwrap() as z.ZodType).optional();
+    if (field instanceof z.ZodNullable) return strip(field.unwrap() as z.ZodType).nullable();
+    return field;
+  };
+  return z.object(Object.fromEntries(Object.entries(schema.shape).map(([key, field]) => [key, strip(field as z.ZodType).optional()]))) as unknown as z.ZodObject<{ [K in keyof T]: z.ZodOptional<T[K]> }>;
+}
+
 export type { TestRegradeProgress, TestRegradeItemResult } from "./test-regrading";
 
 export const RoleKeySchema = z.enum(["admin", "course_manager", "teacher", "student"]);
@@ -86,16 +99,18 @@ export const ActivityMessageDeletionInputSchema = z.union([
 export type ActivityMessageDeletionInput = z.infer<typeof ActivityMessageDeletionInputSchema>;
 
 
+export const NewPasswordSchema = z.string().min(8).max(72).refine((value) => new TextEncoder().encode(value).byteLength <= 72, "Passwords must contain at most 72 UTF-8 bytes.");
+
 export const LoginInputSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8)
+  password: z.string().min(8).max(200)
 });
 export type LoginInput = z.infer<typeof LoginInputSchema>;
 
 export const ActivateAccountInputSchema = z
   .object({
     email: z.string().email(),
-    password: z.string().min(8),
+    password: NewPasswordSchema,
     confirmPassword: z.string().min(8)
   })
   .superRefine((value, context) => {
@@ -119,7 +134,7 @@ export const AdminUserCreateSchema = z.object({
   email: z.string().trim().email().max(320),
   firstName: z.string().trim().min(1).max(120),
   lastName: z.string().trim().min(1).max(120),
-  password: z.string().min(8).max(200),
+  password: NewPasswordSchema,
   roles: z.array(RoleKeySchema).min(1).max(RoleKeySchema.options.length)
 });
 export type AdminUserCreate = z.infer<typeof AdminUserCreateSchema>;
@@ -129,7 +144,7 @@ export type AdminUserUpdate = z.infer<typeof AdminUserUpdateSchema>;
 
 export const AdminUserPasswordResetSchema = z
   .object({
-    password: z.string().min(8).max(200),
+    password: NewPasswordSchema,
     confirmPassword: z.string().min(8).max(200)
   })
   .superRefine((value, context) => {
@@ -156,7 +171,7 @@ export type AdminUserFilters = z.infer<typeof AdminUserFiltersSchema>;
 export const UserPasswordChangeSchema = z
   .object({
     currentPassword: z.string().min(8).max(200),
-    newPassword: z.string().min(8).max(200),
+    newPassword: NewPasswordSchema,
     confirmNewPassword: z.string().min(8).max(200)
   })
   .superRefine((value, context) => {
@@ -181,14 +196,14 @@ export const AiAgentConnectionInputSchema = z.object({
   displayName: z.string().trim().min(2).max(160),
   provider: AiAgentProviderSchema,
   model: z.string().trim().min(1).max(160),
-  baseUrl: z.string().trim().url().max(500).optional().nullable(),
+  baseUrl: z.string().trim().url().max(500).refine((value) => { const url = new URL(value); return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash; }, "Use an HTTP(S) base URL without credentials, query parameters, or fragments.").optional().nullable(),
   apiKey: z.string().trim().max(2000).optional().nullable(),
   scope: AiAgentScopeSchema.optional().default("personal"),
   isEnabled: z.boolean().optional().default(true)
 });
 export type AiAgentConnectionInput = z.infer<typeof AiAgentConnectionInputSchema>;
 
-export const AiAgentConnectionUpdateSchema = AiAgentConnectionInputSchema.partial();
+export const AiAgentConnectionUpdateSchema = partialWithoutDefaults(AiAgentConnectionInputSchema);
 export type AiAgentConnectionUpdate = z.infer<typeof AiAgentConnectionUpdateSchema>;
 
 export const AiAgentPreferencesInputSchema = z.object({
@@ -244,7 +259,7 @@ export const ExecutionRunnerConfigurationInputSchema = z.object({
   isEnabled: z.boolean().optional().default(true),
   settings: z.object({
     enablePerProcessAndThreadLimits: z.boolean().optional().default(true)
-  }).optional().default({ enablePerProcessAndThreadLimits: true })
+  }).prefault({ enablePerProcessAndThreadLimits: true })
 }).superRefine((value, context) => {
   if (value.authToken && !value.authHeader) {
     context.addIssue({
@@ -291,7 +306,7 @@ export type CourseInput = z.infer<typeof CourseInputSchema>;
 export const StudentContentLayoutSchema = z.enum(["accordion", "folder_tabs"]);
 export type StudentContentLayout = z.infer<typeof StudentContentLayoutSchema>;
 
-export const CourseUpdateSchema = CourseInputSchema.partial().extend({
+export const CourseUpdateSchema = partialWithoutDefaults(CourseInputSchema).extend({
   studentContentLayout: StudentContentLayoutSchema.optional()
 });
 export type CourseUpdate = z.infer<typeof CourseUpdateSchema>;
@@ -323,7 +338,7 @@ export const SubjectInputSchema = z.object({
   description: z.string().max(4000).optional().default(""),
   teachingLanguage: SubjectTeachingLanguageSchema.default("en"),
   programmingLanguage: SubjectProgrammingLanguageSchema.nullable().optional().default(null),
-  metadata: z.record(z.unknown()).optional().default({})
+  metadata: z.record(z.string(), z.unknown()).prefault({})
 });
 export type SubjectInput = z.infer<typeof SubjectInputSchema>;
 
@@ -356,7 +371,7 @@ export const SubjectKnowledgeConceptInputSchema = z.object({
 });
 export type SubjectKnowledgeConceptInput = z.infer<typeof SubjectKnowledgeConceptInputSchema>;
 
-export const SubjectKnowledgeConceptUpdateSchema = SubjectKnowledgeConceptInputSchema.partial();
+export const SubjectKnowledgeConceptUpdateSchema = partialWithoutDefaults(SubjectKnowledgeConceptInputSchema);
 export type SubjectKnowledgeConceptUpdate = z.infer<typeof SubjectKnowledgeConceptUpdateSchema>;
 
 export const SubjectKnowledgeSkillDeletionSchema = z.discriminatedUnion("mode", [
@@ -402,7 +417,7 @@ export const SubjectKnowledgeGraphDeletionsSchema = z.object({
 });
 export type SubjectKnowledgeGraphDeletions = z.infer<typeof SubjectKnowledgeGraphDeletionsSchema>;
 
-export const SubjectUpdateSchema = SubjectInputSchema.partial().extend({
+export const SubjectUpdateSchema = partialWithoutDefaults(SubjectInputSchema).extend({
   knowledgeGraph: SubjectKnowledgeGraphDraftSchema.optional(),
   knowledgeGraphDeletions: SubjectKnowledgeGraphDeletionsSchema.optional()
 }).superRefine((value, context) => {
@@ -431,11 +446,11 @@ export const ActivityBankInputSchema = z.object({
   title: z.string().min(2).max(160),
   description: z.string().max(4000).optional().default(""),
   ownerId: RecordIdSchema.optional(),
-  metadata: z.record(z.unknown()).optional().default({})
+  metadata: z.record(z.string(), z.unknown()).prefault({})
 });
 export type ActivityBankInput = z.infer<typeof ActivityBankInputSchema>;
 
-export const ActivityBankUpdateSchema = ActivityBankInputSchema.partial();
+export const ActivityBankUpdateSchema = partialWithoutDefaults(ActivityBankInputSchema);
 export type ActivityBankUpdate = z.infer<typeof ActivityBankUpdateSchema>;
 
 export const ActivityBankFolderInputSchema = z.object({
@@ -445,7 +460,7 @@ export const ActivityBankFolderInputSchema = z.object({
 });
 export type ActivityBankFolderInput = z.infer<typeof ActivityBankFolderInputSchema>;
 
-export const ActivityBankFolderUpdateSchema = ActivityBankFolderInputSchema.partial().refine(
+export const ActivityBankFolderUpdateSchema = partialWithoutDefaults(ActivityBankFolderInputSchema).refine(
   (value) => Object.values(value).some((field) => field !== undefined),
   { message: "At least one folder field is required." }
 );
@@ -493,8 +508,8 @@ export const BankActivityInputSchema = z.object({
   title: z.string().min(2).max(180),
   description: ActivityDescriptionSchema.optional().default(""),
   lifecycle: ActivityLifecycleSchema.optional().default("draft"),
-  config: z.record(z.unknown()).optional().default({}),
-  metadata: z.record(z.unknown()).optional().default({}),
+  config: z.record(z.string(), z.unknown()).prefault({}),
+  metadata: z.record(z.string(), z.unknown()).prefault({}),
   knowledgeConceptIds: z.array(RecordIdSchema).max(200).refine((ids) => new Set(ids).size === ids.length, {
     message: "Knowledge concept identifiers must be unique."
   }).optional(),
@@ -507,7 +522,7 @@ export const BankActivityInputSchema = z.object({
 });
 export type BankActivityInput = z.infer<typeof BankActivityInputSchema>;
 
-export const BankActivityUpdateSchema = BankActivityInputSchema.partial();
+export const BankActivityUpdateSchema = partialWithoutDefaults(BankActivityInputSchema);
 export type BankActivityUpdate = z.infer<typeof BankActivityUpdateSchema>;
 
 export const BankActivityPlacementUpdateSchema = z.object({
@@ -627,7 +642,7 @@ const CourseMaterialBaseSchema = z.object({
   parentId: RecordIdSchema.nullable().optional(),
   body: z.string().max(20000).optional(),
   url: z.string().url().optional(),
-  metadata: z.record(z.unknown()).optional().default({}),
+  metadata: z.record(z.string(), z.unknown()).prefault({}),
   position: z.number().int().min(0).optional().default(0)
 });
 
@@ -651,13 +666,13 @@ function validateCourseMaterialCreate(value: { kind?: MaterialKind; url?: string
 export const CourseMaterialInputSchema = CourseMaterialBaseSchema.superRefine(validateCourseMaterialCreate);
 export type CourseMaterialInput = z.infer<typeof CourseMaterialInputSchema>;
 
-export const CourseMaterialUpdateSchema = CourseMaterialBaseSchema.partial().superRefine(validateCourseMaterialUrl);
+export const CourseMaterialUpdateSchema = partialWithoutDefaults(CourseMaterialBaseSchema).superRefine(validateCourseMaterialUrl);
 export type CourseMaterialUpdate = z.infer<typeof CourseMaterialUpdateSchema>;
 
 export const CourseGroupMaterialInputSchema = CourseMaterialBaseSchema.superRefine(validateCourseMaterialCreate);
 export type CourseGroupMaterialInput = z.infer<typeof CourseGroupMaterialInputSchema>;
 
-export const CourseGroupMaterialUpdateSchema = CourseMaterialBaseSchema.partial().superRefine(validateCourseMaterialUrl);
+export const CourseGroupMaterialUpdateSchema = partialWithoutDefaults(CourseMaterialBaseSchema).superRefine(validateCourseMaterialUrl);
 export type CourseGroupMaterialUpdate = z.infer<typeof CourseGroupMaterialUpdateSchema>;
 
 export const CourseContentPlacementInputSchema = z.object({
@@ -665,7 +680,7 @@ export const CourseContentPlacementInputSchema = z.object({
   titleSnapshot: z.string().trim().min(1).max(180).nullable().optional(),
   isVisible: z.boolean().optional().default(true),
   position: z.number().int().min(0).optional(),
-  metadata: z.record(z.unknown()).optional().default({})
+  metadata: z.record(z.string(), z.unknown()).prefault({})
 });
 export type CourseContentPlacementInput = z.infer<typeof CourseContentPlacementInputSchema>;
 
@@ -676,8 +691,8 @@ export const ActivityInputSchema = z.object({
   title: z.string().min(2).max(180),
   description: ActivityDescriptionSchema.optional().default(""),
   lifecycle: ActivityLifecycleSchema.optional().default("draft"),
-  config: z.record(z.unknown()).optional().default({}),
-  metadata: z.record(z.unknown()).optional().default({}),
+  config: z.record(z.string(), z.unknown()).prefault({}),
+  metadata: z.record(z.string(), z.unknown()).prefault({}),
   knowledgeConceptIds: z.array(RecordIdSchema).max(200).refine((ids) => new Set(ids).size === ids.length, {
     message: "Knowledge concept identifiers must be unique."
   }).optional(),
@@ -735,7 +750,7 @@ export const LiveActivityChangeSchema = z.object({
   confirmActiveStudents: z.boolean().optional(),
   studentMessage: z.string().trim().max(4000).optional()
 });
-export const ActivityUpdateSchema = ActivityInputSchema.partial().extend(LiveActivityChangeSchema.shape);
+export const ActivityUpdateSchema = partialWithoutDefaults(ActivityInputSchema).extend(LiveActivityChangeSchema.shape);
 export type ActivityUpdate = z.infer<typeof ActivityUpdateSchema>;
 
 export const TestSettingsSchema = z.object({
@@ -751,7 +766,7 @@ export const TestCreateSchema = z.object({
   description: z.string().max(4000).optional().default(""),
   lifecycle: ActivityLifecycleSchema.optional().default("draft"),
   position: z.number().int().min(0).optional().default(0),
-  settings: TestSettingsSchema.optional().default({}),
+  settings: TestSettingsSchema.prefault({}),
   contentPlacement: CourseContentPlacementInputSchema.optional()
 });
 export type TestCreate = z.infer<typeof TestCreateSchema>;
@@ -761,7 +776,7 @@ export const TestUpdateSchema = z.object({
   title: z.string().trim().min(2).max(180).optional(),
   description: z.string().max(4000).optional(),
   lifecycle: ActivityLifecycleSchema.optional(),
-  settings: TestSettingsSchema.partial().optional()
+  settings: partialWithoutDefaults(TestSettingsSchema).optional()
 });
 export type TestUpdate = z.infer<typeof TestUpdateSchema>;
 
@@ -771,7 +786,7 @@ export const BankTestCreateSchema = z.object({
   lifecycle: ActivityLifecycleSchema.optional().default("draft"),
   position: z.number().int().min(0).optional().default(0),
   folderId: RecordIdSchema.nullable().optional(),
-  settings: TestSettingsSchema.optional().default({})
+  settings: TestSettingsSchema.prefault({})
 });
 export type BankTestCreate = z.infer<typeof BankTestCreateSchema>;
 
@@ -779,7 +794,7 @@ export const BankTestUpdateSchema = z.object({
   title: z.string().trim().min(2).max(180).optional(),
   description: z.string().max(4000).optional(),
   lifecycle: ActivityLifecycleSchema.optional(),
-  settings: TestSettingsSchema.partial().optional()
+  settings: partialWithoutDefaults(TestSettingsSchema).optional()
 });
 export type BankTestUpdate = z.infer<typeof BankTestUpdateSchema>;
 
@@ -809,7 +824,7 @@ const TestItemSettingsSchema = z.object({
   pointsPossible: z.number().positive().max(100000).optional().default(1),
   isRequired: z.boolean().optional().default(true),
   position: z.number().int().min(0).optional(),
-  metadata: z.record(z.unknown()).optional().default({})
+  metadata: z.record(z.string(), z.unknown()).prefault({})
 });
 
 export const TestItemCreateSchema = z.discriminatedUnion("source", [
@@ -824,8 +839,8 @@ export const TestItemCreateSchema = z.discriminatedUnion("source", [
     title: z.string().trim().min(2).max(180),
     description: z.string().max(4000).optional().default(""),
     lifecycle: ActivityLifecycleSchema.optional().default("draft"),
-    config: z.record(z.unknown()).optional().default({}),
-    activityMetadata: z.record(z.unknown()).optional().default({})
+    config: z.record(z.string(), z.unknown()).prefault({}),
+    activityMetadata: z.record(z.string(), z.unknown()).prefault({})
   })
 ]);
 export type TestItemCreate = z.infer<typeof TestItemCreateSchema>;
@@ -835,7 +850,7 @@ export const TestItemUpdateSchema = z.object({
   pointsPossible: z.number().positive().max(100000).optional(),
   isRequired: z.boolean().optional(),
   position: z.number().int().min(0).optional(),
-  metadata: z.record(z.unknown()).optional()
+  metadata: z.record(z.string(), z.unknown()).optional()
 });
 export type TestItemUpdate = z.infer<typeof TestItemUpdateSchema>;
 
@@ -855,8 +870,8 @@ export const CourseGroupActivityInputSchema = z.object({
   activityId: RecordIdSchema,
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),
-  config: z.record(z.unknown()).optional().default({}),
-  metadata: z.record(z.unknown()).optional().default({}),
+  config: z.record(z.string(), z.unknown()).prefault({}),
+  metadata: z.record(z.string(), z.unknown()).prefault({}),
   gradebookSettings: GradebookItemSettingsInputSchema.optional(),
   position: z.number().int().min(0).optional().default(0),
   contentPlacement: CourseContentPlacementInputSchema.optional()
@@ -939,8 +954,8 @@ export type CourseAllGroupsActivityAssignmentInput = z.infer<typeof CourseAllGro
 export const CourseGroupActivityUpdateSchema = z.object({
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),
-  config: z.record(z.unknown()).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   confirmSummativeToFormative: z.boolean().optional(),
   confirmActiveStudents: z.boolean().optional(),
   studentMessage: z.string().trim().max(4000).optional(),
@@ -954,7 +969,7 @@ export const CourseGroupParticipantInputSchema = z
     firstName: z.string().trim().min(1).max(120).optional(),
     lastName: z.string().trim().min(1).max(120).optional(),
     email: z.string().email(),
-    assignedPassword: z.string().min(8).max(200).optional(),
+    assignedPassword: NewPasswordSchema.optional(),
     externalId: z.string().trim().max(120).optional().nullable()
   })
   .superRefine((value, context) => {

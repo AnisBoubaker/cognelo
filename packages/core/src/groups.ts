@@ -171,7 +171,7 @@ export async function getCourseGroup(user: CurrentUser, courseId: string, groupI
           }
         : { ...assignment, config: {}, activity: projectStudentActivity(assignment.activity, false) }),
     participants: isManager || canTeach ? group.participants : group.participants.filter((participant) => participant.userId === user.id),
-    hiddenCourseMaterialIds: group.hiddenCourseMaterials.map((entry) => entry.courseMaterialId)
+    hiddenCourseMaterialIds: isManager || canTeach ? group.hiddenCourseMaterials.map((entry) => entry.courseMaterialId) : []
   };
 }
 
@@ -743,6 +743,7 @@ export async function getGroupMaterialForDownload(user: CurrentUser, courseId: s
 export async function getCourseMaterialForGroupDownload(user: CurrentUser, courseId: string, groupId: string, materialId: string) {
   await assertCanViewGroup(user, courseId, groupId);
   await assertCourseMaterialBelongsToCourse(courseId, materialId);
+  if (!(await canManageCourse(user, courseId)) && !(await listContentItems(user, courseId, { groupId, visibleOnly: true })).some((item) => item.materialId === materialId)) throw notFound("Course material");
 
   const hiddenEntries = await prisma.courseGroupHiddenCourseMaterial.findMany({
     where: { groupId },
@@ -768,7 +769,10 @@ export async function getCourseMaterialForGroupDownload(user: CurrentUser, cours
     });
     const parentById = new Map<string, string | null>(courseMaterials.map((entry) => [entry.id, entry.parentId]));
     let parentId: string | null = material.parentId;
+    const seen = new Set<string>();
     while (parentId) {
+      if (seen.has(parentId)) throw new AppError(403, "FORBIDDEN", "This material is unavailable.");
+      seen.add(parentId);
       if (hiddenCourseMaterialIds.has(parentId)) {
         throw new AppError(403, "FORBIDDEN", "You do not have access to this course material in the group workspace.");
       }

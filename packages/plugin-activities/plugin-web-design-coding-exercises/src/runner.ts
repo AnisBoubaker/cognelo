@@ -11,7 +11,7 @@ const runnerTestResultSchema = z.object({
   score: z.number(),
   durationMs: z.number().int().nullable().optional(),
   message: z.string().nullable().optional(),
-  details: z.record(z.unknown()).default({})
+  details: z.record(z.string(), z.unknown()).prefault({})
 });
 
 const runnerResultSchema = z.object({

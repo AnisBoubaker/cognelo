@@ -14,8 +14,8 @@ type Params = { params: Promise<{ courseId: string; groupId: string; activityId:
 const stateInputSchema = z.object({
   parentAttemptId: z.string().min(1),
   sessionId: z.string().min(1).max(200),
-  state: z.record(z.unknown()),
-  configSnapshot: z.record(z.unknown()).optional()
+  state: z.record(z.string(), z.unknown()),
+  configSnapshot: z.record(z.string(), z.unknown()).optional()
 });
 
 export function OPTIONS() {

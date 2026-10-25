@@ -16,8 +16,8 @@ async function main() {
   const lastName = requiredEnvironmentValue("COGNELO_ADMIN_LAST_NAME");
   const password = requiredEnvironmentValue("COGNELO_ADMIN_PASSWORD");
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("COGNELO_ADMIN_EMAIL must be a valid email address.");
-  if (password.length < 12 || password.length > 200) {
-    throw new Error("COGNELO_ADMIN_PASSWORD must contain between 12 and 200 characters.");
+  if (password.length < 12 || Buffer.byteLength(password, "utf8") > 72 || password === "Password123!") {
+    throw new Error("COGNELO_ADMIN_PASSWORD must be a unique password with at least 12 characters and at most 72 UTF-8 bytes.");
   }
 
   for (const [key, name, description] of roleDefinitions) {

@@ -1645,3 +1645,12 @@ model ApplicationSettings {
   updatedById         String?
   updatedBy           User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 }
+
+// Shared, expiring abuse limits; keys are HMACs, never raw account/IP identifiers.
+model RateLimitBucket {
+  key       String   @id
+  count     Int
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

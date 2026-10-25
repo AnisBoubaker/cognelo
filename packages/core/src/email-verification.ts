@@ -77,7 +77,18 @@ export async function requestEmailVerification(
     return { required: false as const, sent: false as const, retryAfterSeconds: 0, expiresInSeconds: 0 };
   }
 
-  const existing = await prisma.emailVerificationChallenge.findUnique({ where: { userId: user.id } });
+  const key = verificationKey(encryptionKey);
+  const code = (dependencies.generateCode ?? generateVerificationCode)();
+  if (!/^\d{6}$/.test(code)) {
+    throw new AppError(500, "EMAIL_VERIFICATION_CODE_INVALID", "The verification code generator returned an invalid code.");
+  }
+  const expiresAt = new Date(now.getTime() + CODE_TTL_MS);
+  const deliver = dependencies.deliver ?? sendSystemEmailToEligibleRecipient;
+  const message = verificationMessages[locale];
+  const direction = locale === "ar" ? "rtl" : "ltr";
+  const cooldown = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id} FOR UPDATE`;
+  const existing = await tx.emailVerificationChallenge.findUnique({ where: { userId: user.id } });
   const retryAfterMs = existing ? existing.sentAt.getTime() + RESEND_COOLDOWN_MS - now.getTime() : 0;
   if (retryAfterMs > 0) {
     return {
@@ -88,15 +99,25 @@ export async function requestEmailVerification(
     };
   }
 
-  const key = verificationKey(encryptionKey);
-  const code = (dependencies.generateCode ?? generateVerificationCode)();
-  if (!/^\d{6}$/.test(code)) {
-    throw new AppError(500, "EMAIL_VERIFICATION_CODE_INVALID", "The verification code generator returned an invalid code.");
-  }
-  const expiresAt = new Date(now.getTime() + CODE_TTL_MS);
-  const deliver = dependencies.deliver ?? sendSystemEmailToEligibleRecipient;
-  const message = verificationMessages[locale];
-  const direction = locale === "ar" ? "rtl" : "ltr";
+  await tx.emailVerificationChallenge.upsert({
+    where: { userId: user.id },
+    create: {
+      userId: user.id,
+      codeHash: hashCode(user.id, account.email, code, key),
+      expiresAt,
+      sentAt: now,
+      failedAttempts: 0
+    },
+    update: {
+      codeHash: hashCode(user.id, account.email, code, key),
+      expiresAt,
+      sentAt: now,
+      failedAttempts: 0
+    }
+  });
+    return null;
+  });
+  if (cooldown) return cooldown;
   await deliver(
     {
       recipientEmail: account.email,
@@ -107,22 +128,7 @@ export async function requestEmailVerification(
     encryptionKey
   );
 
-  await prisma.emailVerificationChallenge.upsert({
-    where: { userId: user.id },
-    create: {
-      userId: user.id,
-      codeHash: hashCode(user.id, code, key),
-      expiresAt,
-      sentAt: now,
-      failedAttempts: 0
-    },
-    update: {
-      codeHash: hashCode(user.id, code, key),
-      expiresAt,
-      sentAt: now,
-      failedAttempts: 0
-    }
-  });
+
 
   return {
     required: true as const,
@@ -140,9 +146,11 @@ export async function verifyEmailAddress(
 ) {
   const { code } = EmailVerificationCodeInputSchema.parse(input);
   const now = (dependencies.now ?? (() => new Date()))();
-  const account = await prisma.user.findUnique({
+  const result = await prisma.$transaction(async (tx) => {
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id} FOR UPDATE`;
+  const account = await tx.user.findUnique({
     where: { id: user.id },
-    select: { emailVerifiedAt: true, isActive: true }
+    select: { email: true, emailVerifiedAt: true, isActive: true }
   });
   if (!account?.isActive) {
     throw unauthorized();
@@ -151,44 +159,46 @@ export async function verifyEmailAddress(
     return { verified: true as const };
   }
 
-  const challenge = await prisma.emailVerificationChallenge.findUnique({ where: { userId: user.id } });
+  const challenge = await tx.emailVerificationChallenge.findUnique({ where: { userId: user.id } });
   if (!challenge) {
     throw new AppError(400, "EMAIL_VERIFICATION_CODE_MISSING", "Request a verification code before continuing.");
   }
   if (challenge.expiresAt.getTime() <= now.getTime()) {
-    await prisma.emailVerificationChallenge.deleteMany({ where: { userId: user.id } });
-    throw new AppError(400, "EMAIL_VERIFICATION_CODE_EXPIRED", "The verification code has expired. Request a new code.");
+    await tx.emailVerificationChallenge.deleteMany({ where: { userId: user.id } });
+    return { error: new AppError(400, "EMAIL_VERIFICATION_CODE_EXPIRED", "The verification code has expired. Request a new code.") };
   }
   if (challenge.failedAttempts >= MAX_FAILED_ATTEMPTS) {
     throw new AppError(429, "EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED", "Too many incorrect attempts. Request a new code.");
   }
 
-  const expectedHash = hashCode(user.id, code, verificationKey(encryptionKey));
+  const expectedHash = hashCode(user.id, account.email, code, verificationKey(encryptionKey));
   if (!safeHashEquals(challenge.codeHash, expectedHash)) {
-    const updatedChallenge = await prisma.emailVerificationChallenge.update({
+    const updatedChallenge = await tx.emailVerificationChallenge.update({
       where: { userId: user.id },
       data: { failedAttempts: { increment: 1 } },
       select: { failedAttempts: true }
     });
     const failedAttempts = updatedChallenge.failedAttempts;
     if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
-      throw new AppError(429, "EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED", "Too many incorrect attempts. Request a new code.");
+      return { error: new AppError(429, "EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED", "Too many incorrect attempts. Request a new code.") };
     }
-    throw new AppError(400, "EMAIL_VERIFICATION_CODE_INCORRECT", "The verification code is incorrect.", {
+    return { error: new AppError(400, "EMAIL_VERIFICATION_CODE_INCORRECT", "The verification code is incorrect.", {
       remainingAttempts: MAX_FAILED_ATTEMPTS - failedAttempts
-    });
+    }) };
   }
 
-  await prisma.$transaction([
-    prisma.user.update({
+  await Promise.all([
+    tx.user.update({
       where: { id: user.id },
       data: { emailVerifiedAt: now }
     }),
-    prisma.emailVerificationChallenge.delete({ where: { userId: user.id } })
+    tx.emailVerificationChallenge.delete({ where: { userId: user.id } })
   ]);
   return { verified: true as const };
+  });
+  if ("error" in result) throw result.error;
+  return result;
 }
-
 function generateVerificationCode() {
   return randomInt(0, 1_000_000).toString().padStart(6, "0");
 }
@@ -204,8 +214,8 @@ function verificationKey(encryptionKey: string | undefined) {
   return Buffer.from(encryptionKey, "hex");
 }
 
-function hashCode(userId: string, code: string, key: Buffer) {
-  return createHmac("sha256", key).update(`${userId}:${code}`).digest("hex");
+function hashCode(userId: string, email: string, code: string, key: Buffer) {
+  return createHmac("sha256", key).update(`${userId}:${email.toLowerCase()}:${code}`).digest("hex");
 }
 
 function safeHashEquals(actual: string, expected: string) {

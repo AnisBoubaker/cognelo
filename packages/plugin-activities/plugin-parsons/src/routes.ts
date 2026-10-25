@@ -78,6 +78,11 @@ export const parsonsAttemptRoute: PluginRouteDefinition = {
   path: "parsons/attempt",
   activityTypeKeys: ["parsons-problem"],
   allowExpiredTimedAttemptMethods: ["PATCH"],
+  expiredAttemptInput: async (context) => {
+    const attempt = await findLatestParsonsAttempt({ activityId: context.activity.id, userId: context.user.id, config: parseParsonsConfig(context.activity.config), status: "in_progress" });
+    if (!attempt) throw new AppError(409, "SAVED_RESPONSE_MISSING", "No saved response is available to finalize.");
+    return { attemptId: attempt.id, submit: true, complete: true };
+  },
   methods: {
     POST: async ({ context, readJson }) => {
       const input = parsonsAttemptEnsureInputSchema.parse(await readJson());

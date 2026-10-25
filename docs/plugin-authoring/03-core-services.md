@@ -284,3 +284,7 @@ Use the shared platform first. Only add plugin-specific code where the shared pl
 Previous: [Bootstrap A Plugin](02-bootstrap.md)
 
 Next: [Build A Real Plugin](04-building-a-plugin.md)
+
+## Security-sensitive request boundaries
+
+Use the host-provided bounded `readJson`, and `readBoundedFormData` for multipart uploads. Do not parse an unbounded request stream inside a plugin. Declaring an expired final-submission method also requires `expiredAttemptInput`: it must reconstruct the final input from saved server data, never the incoming late body. The host rechecks time after reading the body and fails closed when the callback is absent. See [Security boundaries](../SECURITY_BOUNDARIES.md).

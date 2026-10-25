@@ -1,11 +1,13 @@
+vi.mock("./upload-budget", () => ({ acquireHomeworkUploadSlot: () => () => undefined, limitHomeworkUploads: vi.fn(), lockHomeworkUploadBudget: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const fsMocks = vi.hoisted(() => ({
   mkdir: vi.fn(),
-  writeFile: vi.fn()
+  writeFile: vi.fn(), unlink: vi.fn()
 }));
 
 const dbMocks = vi.hoisted(() => ({
+  $transaction: vi.fn(),
   pluginCodingHomeworkAttachment: {
     create: vi.fn()
   },
@@ -29,6 +31,7 @@ const { runCodingHomeworkPreflight } = await import("./preflight");
 describe("coding homework preflight uploads", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dbMocks.$transaction.mockImplementation((handler) => handler(dbMocks));
     fsMocks.mkdir.mockResolvedValue(undefined);
     fsMocks.writeFile.mockResolvedValue(undefined);
     dbMocks.pluginCodingHomeworkSubmissionRequirementSet.findUnique.mockResolvedValue({

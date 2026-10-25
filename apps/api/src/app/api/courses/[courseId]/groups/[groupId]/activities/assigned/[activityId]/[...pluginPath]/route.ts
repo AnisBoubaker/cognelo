@@ -1,3 +1,4 @@
+import { readBoundedJson, MAX_UPLOAD_JSON_BYTES } from "@cognelo/core";
 import { NextRequest } from "next/server";
 import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
 import { AppError, assertActivityTypePluginEnabled, assertTimedActivityWriteAllowed, getGroupAssignedActivity, assertActivityContentAccess } from "@cognelo/core";
@@ -42,9 +43,8 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
     });
   }
 
-  const payload = await handler({
-    request,
-    context: {
+  const context = {
+      expiredTimedAttemptId: undefined as string | undefined,
       user,
       courseId,
       groupId,
@@ -76,13 +76,22 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
           description: activity.activityType.description
         }
       }
-    },
+  };
+  const payload = await handler({
+    request, context,
     readJson: async () => {
-      try {
-        return await request.json();
-      } catch {
-        return {};
+      const body = await readBoundedJson(request, MAX_UPLOAD_JSON_BYTES);
+      // A request can straddle the deadline while uploading. Recheck after the
+      // body is read and replace late input, rather than trusting arrival time.
+      const timing = await assertTimedActivityWriteAllowed(user, courseId, groupId, activityId, {
+        allowExpiredAttempt: route.allowExpiredTimedAttemptMethods?.includes(unsafeMethod) === true
+      });
+      if (timing?.expiredAttemptId) {
+        if (!route.expiredAttemptInput) throw new AppError(409, "ACTIVITY_TIME_LIMIT_EXPIRED", "Only saved work can be finalized after expiry.");
+        context.expiredTimedAttemptId = timing.expiredAttemptId;
+        return route.expiredAttemptInput(context);
       }
+      return body;
     }
   });
 

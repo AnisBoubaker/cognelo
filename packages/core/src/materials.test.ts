@@ -17,7 +17,8 @@ vi.mock("@cognelo/db", () => ({
 
 vi.mock("./authorization", () => ({
   assertCanManageCourse: vi.fn(),
-  assertCanViewCourse: vi.fn()
+  assertCanViewCourse: vi.fn(),
+  canManageCourse: vi.fn().mockResolvedValue(true)
 }));
 
 const { createMaterial, deleteMaterial, getMaterialForDownload, listMaterials, updateMaterial } = await import("./materials");

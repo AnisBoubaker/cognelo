@@ -1,3 +1,4 @@
+import { getActivityResponseDraft } from "@cognelo/core";
 import { canShowStudentActivityGrade } from "@cognelo/core";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
@@ -118,6 +119,7 @@ export const webDesignExerciseSubmitRoute: PluginRouteDefinition = {
   path: "web-design-coding-exercises/submit",
   activityTypeKeys: ["web-design-coding-exercise"],
   allowExpiredTimedAttemptMethods: ["POST"],
+  expiredAttemptInput: async (context) => (await getActivityResponseDraft(context.user, context.courseId!, context.groupId!, context.activity.id))?.state ?? { files: [] },
   methods: {
     GET: async ({ context }) => {
       const submissions = await listRecentWebDesignExerciseSubmissions({

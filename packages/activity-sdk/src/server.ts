@@ -28,6 +28,8 @@ export type ServerActivityRecord = {
 };
 
 export type PluginRouteContext = {
+  /** Host-selected expired attempt; never a client request field. */
+  expiredTimedAttemptId?: string;
   user: CurrentUser;
   courseId?: string;
   groupId?: string;
@@ -51,6 +53,8 @@ export type PluginRouteDefinition = {
   activityTypeKeys?: readonly string[];
   courseAuthorization?: Partial<Record<PluginRouteMethod, CoursePluginRouteAuthorization>>;
   allowExpiredTimedAttemptMethods?: readonly Exclude<PluginRouteMethod, "GET">[];
+  /** Reconstruct final input from server-saved work only. Required at expiry. */
+  expiredAttemptInput?: (context: PluginRouteContext) => Promise<unknown>;
   methods: Partial<Record<PluginRouteMethod, PluginRouteHandler>>;
 };
 

@@ -22,24 +22,10 @@ export async function loginWithPassword(email: string, password: string, secret:
     include: { roles: { include: { role: true } } }
   });
 
-  if (!user || !user.isActive) {
-    const pendingParticipant = await prisma.courseGroupParticipant.findFirst({
-      where: { email: normalizedEmail, userId: null }
-    });
-    if (pendingParticipant) {
-      throw new AppError(
-        403,
-        "PENDING_ACCOUNT_SETUP",
-        "This email has been added to a group. Choose a password to activate the account."
-      );
-    }
-    throw unauthorized();
-  }
-
-  const isValid = await bcrypt.compare(password, user.passwordHash);
-  if (!isValid) {
-    throw unauthorized();
-  }
+  // The fallback hash equalizes password work for unknown accounts; never
+  // disclose invitation/account status from a failed login.
+  const valid = await bcrypt.compare(password, user?.passwordHash ?? "$2b$12$NBuVzxI8nr6slS.NNXvXW.JDKoSvpq50dZ/.5z/S7OWDKupqLdlD2");
+  if (!user?.isActive || !valid) throw unauthorized();
 
   return signInUser(user, secret);
 }
@@ -122,10 +108,10 @@ function toCurrentUser(user: {
   return {
     id: user.id,
     email: user.email,
-    name: user.name,
-    firstName: user.firstName ?? firstNameFromName(user.name),
-    lastName: user.lastName ?? lastNameFromName(user.name),
-    roles: user.roles.map((userRole) => userRole.role.key as CurrentUser["roles"][number]),
+    name: user.emailVerifiedAt ? user.name : null,
+    firstName: user.emailVerifiedAt ? user.firstName ?? firstNameFromName(user.name) : null,
+    lastName: user.emailVerifiedAt ? user.lastName ?? lastNameFromName(user.name) : null,
+    roles: user.emailVerifiedAt ? user.roles.map((userRole) => userRole.role.key as CurrentUser["roles"][number]) : [],
     mustChangePassword: Boolean(user.mustChangePassword),
     emailVerified: Boolean(user.emailVerifiedAt)
   };
@@ -136,7 +122,7 @@ export async function activatePendingAccount(input: unknown, secret: string) {
   const normalizedEmail = data.email.toLowerCase();
   const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existingUser) {
-    throw new AppError(409, "ACCOUNT_ALREADY_EXISTS", "An account already exists for this email. Sign in with your password instead.");
+    throw new AppError(400, "ACCOUNT_ACTIVATION_UNAVAILABLE", "Account activation is unavailable. Sign in or contact your course staff.");
   }
 
   const pendingParticipants = await prisma.courseGroupParticipant.findMany({
@@ -145,7 +131,7 @@ export async function activatePendingAccount(input: unknown, secret: string) {
   });
 
   if (!pendingParticipants.length) {
-    throw new AppError(403, "ACCOUNT_ACTIVATION_NOT_ALLOWED", "This email is not eligible for first-time account activation.");
+    throw new AppError(400, "ACCOUNT_ACTIVATION_UNAVAILABLE", "Account activation is unavailable. Sign in or contact your course staff.");
   }
 
   const firstParticipant = pendingParticipants[0];

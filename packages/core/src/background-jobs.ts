@@ -43,8 +43,8 @@ const enqueueSchema = z.object({
   id: z.string().trim().min(8).max(160).optional(),
   idempotencyKey: z.string().trim().min(4).max(240).optional(),
   maxAttempts: z.number().int().min(1).max(25).optional(),
-  metadata: z.record(z.unknown()).optional(),
-  payload: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
   priority: z.number().int().min(-1000).max(1000).optional(),
   queue: z.string().trim().min(1).max(120).optional(),
   runAfter: z.date().optional()

@@ -33,7 +33,7 @@ const screenshotInputSchema = z.object({
       width: z.number().int().min(320).max(1920).default(1024),
       height: z.number().int().min(240).max(2000).default(768)
     })
-    .default({ width: 1024, height: 768 })
+    .prefault({ width: 1024, height: 768 })
 });
 
 type RunInput = z.infer<typeof runInputSchema>;

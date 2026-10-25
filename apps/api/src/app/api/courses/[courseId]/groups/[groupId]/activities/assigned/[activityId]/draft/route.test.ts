@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@cognelo/core", () => ({
+  assertTimedActivityWriteAllowed: vi.fn(),
   clearActivityResponseDraft: mocks.clearActivityResponseDraft,
   getActivityResponseDraft: mocks.getActivityResponseDraft,
   saveActivityResponseDraft: mocks.saveActivityResponseDraft

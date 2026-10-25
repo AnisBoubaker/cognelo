@@ -1,3 +1,4 @@
+import { readBoundedJson, MAX_UPLOAD_JSON_BYTES } from "@cognelo/core";
 import { NextRequest } from "next/server";
 import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
 import { AppError, assertActivityTypePluginEnabled, assertCanManageActivityBank, getBankActivity } from "@cognelo/core";
@@ -50,11 +51,7 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
       }
     },
     readJson: async () => {
-      try {
-        return await request.json();
-      } catch {
-        return {};
-      }
+      return readBoundedJson(request, MAX_UPLOAD_JSON_BYTES);
     }
   });
 

@@ -672,6 +672,9 @@ async function upsertSeedAiConnection() {
 }
 
 async function main() {
+  if (process.env.NODE_ENV === "production" || process.env.COGNELO_ALLOW_DEMO_SEED !== "true") {
+    throw new Error("Demo seeding is disabled. Use local:configure for a development stack or production:bootstrap for production.");
+  }
   await ensurePluginLocalTables();
 
   await upsertRole("admin", "Admin", "Full platform administration access.");
@@ -3015,8 +3018,9 @@ async function seedExecutionRunners(updatedById: string) {
       runnerType: "judge0",
       displayName: "Judge0",
       baseUrl: "http://localhost:2358",
-      authHeader: "X-Auth-Token",
-      authTokenEncrypted: encryptSeedCredential("dev-local-token"),
+      authHeader: process.env.JUDGE0_AUTH_TOKEN ? "X-Auth-Token" : null,
+      authTokenEncrypted: process.env.JUDGE0_AUTH_TOKEN ? encryptSeedCredential(process.env.JUDGE0_AUTH_TOKEN) : null,
+      isEnabled: Boolean(process.env.JUDGE0_AUTH_TOKEN),
       settings: { enablePerProcessAndThreadLimits: true },
       updatedById
     }

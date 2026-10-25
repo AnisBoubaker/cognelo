@@ -182,3 +182,7 @@ The plugin implements `submissionExport.getContent` for the [shared PDF/ZIP expo
 ## Learner data boundaries
 
 Learner config and state contain displayed blocks and learner indentation only. Reference solution, source positions, expected indentation, groups/rules, and private fingerprints remain server-side. Public block identifiers derive only from displayed text; grading resolves the complete line multiset against server config and ignores client correctness fields. Checks use server feedback. Live edits retain matching displayed lines and append new lines.
+
+## Deadline finalization
+
+The shared assigned dispatcher checks the effective deadline after the request body arrives. At expiry, this plugin’s `expiredAttemptInput` supplies only its saved server response; incoming answer/code/file changes are ignored. Missing saved work follows the ordinary ungraded timeout fallback. This also applies to a request opened before the deadline whose body finishes later. See [security boundaries](../../../../docs/SECURITY_BOUNDARIES.md).

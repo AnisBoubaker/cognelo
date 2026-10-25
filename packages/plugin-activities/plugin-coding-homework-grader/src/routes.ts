@@ -265,7 +265,6 @@ export const codingHomeworkStudentAssignmentRoute: PluginRouteDefinition = {
 export const codingHomeworkSubmissionRoute: PluginRouteDefinition = {
   path: "coding-homework-grader/submission",
   activityTypeKeys: ["coding-homework-grader"],
-  allowExpiredTimedAttemptMethods: ["POST"],
   methods: {
     GET: async ({ context }) => {
       return getLatestCodingHomeworkSubmission(resolveStudentSubmissionScope(context));
@@ -365,7 +364,7 @@ export const codingHomeworkSubmissionAnalysisRoute: PluginRouteDefinition = {
   activityTypeKeys: ["coding-homework-grader"],
   methods: {
     POST: async ({ context, readJson }) => {
-      return analyzeCodingHomeworkSubmission(resolveStudentSubmissionScope(context), await readJson());
+      return analyzeCodingHomeworkSubmission(await resolveTeacherSubmissionScope(context), await readJson());
     }
   }
 };
@@ -382,7 +381,7 @@ function toProcessingJobRecord(job: Awaited<ReturnType<typeof getBackgroundJob>>
     attempts: job.attempts,
     completedAt: job.completedAt?.toISOString() ?? null,
     createdAt: job.createdAt.toISOString(),
-    error: job.error,
+    error: job.error ? { message: "Processing could not be completed. Contact your course staff." } : null,
     failedAt: job.failedAt?.toISOString() ?? null,
     handlerKey: job.handlerKey,
     id: job.id,
@@ -407,6 +406,14 @@ export const codingHomeworkChallengeAnswersRoute: PluginRouteDefinition = {
   path: "coding-homework-grader/challenge-answers",
   activityTypeKeys: ["coding-homework-grader"],
   allowExpiredTimedAttemptMethods: ["POST"],
+  expiredAttemptInput: async (context) => {
+    const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({ where: {
+      activityId: context.activity.id, groupId: context.groupId!, userId: context.user.id, kind: "final", status: "challenge_ready",
+      OR: [{ coreAttemptId: context.expiredTimedAttemptId }, { coreAttemptId: null }]
+    }, orderBy: { createdAt: "desc" } });
+    if (!submission) throw new AppError(409, "SAVED_RESPONSE_MISSING", "No saved response is available to finalize.");
+    return { submissionId: submission.id, answers: [] };
+  },
   methods: {
     PUT: async ({ context, readJson }) => {
       return saveCodingHomeworkChallengeAnswers(resolveStudentSubmissionScope(context), await readJson(), { finalize: false });

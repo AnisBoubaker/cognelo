@@ -1,8 +1,10 @@
+import { prisma as corePrisma, type Prisma as CorePrisma } from "@cognelo/db";
+import { acquireHomeworkUploadSlot, limitHomeworkUploads, lockHomeworkUploadBudget } from "./upload-budget";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { AppError } from "@cognelo/core";
+import { AppError, startActivityAttempt } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "./db-client";
 import { toStudentChallengeQuestionRecord } from "./generation";
@@ -148,6 +150,9 @@ export async function getLatestCodingHomeworkSubmission(scope: SubmissionScope) 
 }
 
 export async function runCodingHomeworkSubmission(scope: SubmissionScope, input: unknown) {
+  const releaseUploadSlot = acquireHomeworkUploadSlot();
+  try {
+  await limitHomeworkUploads(scope.activityId, scope.user.id);
   const parsed = submissionInputSchema.parse(input);
   assertZipUpload(parsed.fileName, parsed.mimeType, "Final submissions must be ZIP archives.");
 
@@ -171,17 +176,19 @@ export async function runCodingHomeworkSubmission(scope: SubmissionScope, input:
     };
   }
 
-  const zip = readCodingHomeworkZip(bytes);
+  const zip = readCodingHomeworkZip(bytes, requirements);
   const summary = await validateCodingHomeworkArchive({
     archiveSizeBytes: bytes.length,
     entries: zip.entries,
     requirements,
     zipDiagnostics: zip.diagnostics
   });
-  const documentationSnapshotId = await resolveDocumentationSnapshotId(scope, parsed.documentationSnapshotId ?? null);
+  const documentationSnapshotId = await resolveDocumentationSnapshotId(scope, null);
 
   if (!summary.isValid) {
-    const invalidSubmission = await prisma.pluginCodingHomeworkSubmission.create({
+    const invalidSubmission = await prisma.$transaction(async (tx) => {
+      await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, Buffer.byteLength(JSON.stringify(summary)) + 4096);
+      return tx.pluginCodingHomeworkSubmission.create({
       data: {
         activityId: scope.activityId,
         documentationSnapshotId,
@@ -208,6 +215,7 @@ export async function runCodingHomeworkSubmission(scope: SubmissionScope, input:
         userId: scope.user.id
       }
     });
+    });
 
     return {
       files: [],
@@ -216,75 +224,46 @@ export async function runCodingHomeworkSubmission(scope: SubmissionScope, input:
     };
   }
 
-  const submission = await prisma.pluginCodingHomeworkSubmission.create({
-    data: {
-      activityId: scope.activityId,
-      documentationSnapshotId,
-      groupId: scope.groupId,
-      kind: "final",
-      metadata: {
-        idempotencyKey,
-        originalName: parsed.fileName,
-        processingTimeline: [
-          buildProcessingEvent({
-            operationId,
-            stage: "upload",
-            status: "completed"
-          })
-        ],
-        uploadFingerprint,
-        uploadedAt: new Date().toISOString()
-      } as Prisma.InputJsonValue,
-      status: "validating",
-      structureValidationSummary: summary as Prisma.InputJsonValue,
-      userId: scope.user.id
-    }
-  });
-  const zipAttachment = await createSubmissionZipAttachment(submission.id, {
-    bytes,
-    mimeType: parsed.mimeType || "application/zip",
-    originalName: parsed.fileName
-  });
-  const files = await extractSubmissionFiles({
-    entries: zip.entries,
-    languageKey: requirements.languageKey,
-    submissionId: submission.id,
-    validFiles: new Set(summary.validFiles)
-  });
-  const updatedSubmission = await prisma.pluginCodingHomeworkSubmission.update({
-    where: { id: submission.id },
-    data: {
-      metadata: {
-        idempotencyKey,
-        originalName: parsed.fileName,
-        processingTimeline: [
-          buildProcessingEvent({
-            operationId,
-            stage: "upload",
-            status: "completed"
-          }),
-          buildProcessingEvent({
-            operationId,
-            stage: "extraction",
-            status: "completed"
-          })
-        ],
-        uploadFingerprint,
-        uploadedAt: new Date().toISOString(),
-        zipAttachmentId: zipAttachment.id,
-        extractedFileCount: files.length,
-        matchedFunctionCount: summary.validFunctions.length
-      } as Prisma.InputJsonValue,
-      status: "structure_valid",
-      zipAttachmentId: zipAttachment.id
-    }
-  });
-
-  return {
-    files: files.map(toSubmissionFileRecord),
-    submission: toSubmissionRecord(updatedSubmission),
-    summary
-  };
+  const submissionId = randomUUID();
+  try {
+    return await corePrisma.$transaction(async (tx) => {
+      await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, bytes.length + zip.entries.reduce((sum, entry) => sum + (entry.content?.length ?? 0), 0));
+      // Recheck after the lock: different retry keys must not create parallel
+      // question-generation workflows for the same learner and assignment.
+      const replay = idempotencyKey ? await findIdempotentSubmission(scope, idempotencyKey) : null;
+      if (replay) {
+        if (normalizeObject(replay.metadata).uploadFingerprint !== uploadFingerprint) throw new AppError(409, "CODING_HOMEWORK_IDEMPOTENCY_CONFLICT", "This retry key belongs to different file content.");
+        return { files: replay.files.map(toSubmissionFileRecord), questions: replay.questions.map(toStudentChallengeQuestionRecord), idempotent: true, submission: toSubmissionRecord(replay), summary: normalizeCodingHomeworkSubmissionSummary(replay.structureValidationSummary) };
+      }
+      const active = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "PluginCodingHomeworkSubmission"
+        WHERE "activityId" = ${scope.activityId} AND "groupId" = ${scope.groupId} AND "userId" = ${scope.user.id}
+        AND kind = 'final' AND status IN ('uploaded', 'validating', 'structure_valid', 'processing', 'challenge_ready', 'answered', 'failed')
+        AND NOT (metadata ? 'deletion')
+        AND ("coreAttemptId" IS NULL OR EXISTS (SELECT 1 FROM "ActivityAttempt" a WHERE a.id = "PluginCodingHomeworkSubmission"."coreAttemptId" AND a.lifecycle = 'started')) LIMIT 1`;
+      if (active.length) throw new AppError(409, "HOMEWORK_SUBMISSION_IN_PROGRESS", "Finish the existing submission before uploading another archive.");
+      const attempt = await startActivityAttempt(scope.user, { courseId: scope.courseId, groupId: scope.groupId,
+        activityId: scope.activityId, pluginKey: "coding-homework-grader", pluginVersion: "0.1.0", pluginAttemptRef: submissionId,
+        metadata: { submissionId, uploadReserved: true } }, tx);
+      const metadata = { idempotencyKey, originalName: parsed.fileName, uploadFingerprint, uploadedAt: new Date().toISOString(),
+        processingTimeline: [buildProcessingEvent({ operationId, stage: "upload", status: "completed" })] };
+      await tx.$executeRaw`INSERT INTO "PluginCodingHomeworkSubmission"
+        (id, "activityId", "groupId", "userId", "coreAttemptId", "documentationSnapshotId", kind, status, "structureValidationSummary", metadata, "createdAt", "updatedAt")
+        VALUES (${submissionId}, ${scope.activityId}, ${scope.groupId}, ${scope.user.id}, ${attempt.id}, ${documentationSnapshotId},
+          'final', 'validating', ${JSON.stringify(summary)}::jsonb, ${JSON.stringify(metadata)}::jsonb, NOW(), NOW())`;
+      const zipAttachment = await createSubmissionZipAttachment(submissionId, { bytes, mimeType: parsed.mimeType || "application/zip", originalName: parsed.fileName }, tx);
+      const files = await extractSubmissionFiles({ entries: zip.entries, languageKey: requirements.languageKey, submissionId, validFiles: new Set(summary.validFiles) }, tx);
+      const completedMetadata = { ...metadata, zipAttachmentId: zipAttachment.id, extractedFileCount: files.length, matchedFunctionCount: summary.validFunctions.length,
+        processingTimeline: [...metadata.processingTimeline, buildProcessingEvent({ operationId, stage: "extraction", status: "completed" })] };
+      const [updated] = await tx.$queryRaw<SubmissionRow[]>`UPDATE "PluginCodingHomeworkSubmission"
+        SET status = 'structure_valid', "zipAttachmentId" = ${zipAttachment.id}, metadata = ${JSON.stringify(completedMetadata)}::jsonb, "updatedAt" = NOW()
+        WHERE id = ${submissionId} RETURNING *`;
+      return { files: files.map(toSubmissionFileRecord), submission: toSubmissionRecord(updated), summary };
+    }, { timeout: 60_000 });
+  } catch (error) {
+    await rm(path.join(submissionStorageDir(), submissionId), { recursive: true, force: true });
+    throw error;
+  }
+  } finally { releaseUploadSlot(); }
 }
 
 async function getCourseActivityRequirements(activityId: string) {
@@ -379,6 +358,7 @@ function assertZipUpload(fileName: string, mimeType: string | undefined, message
 }
 
 function decodeUploadBytes(base64: string, maxBytes: number) {
+  if (base64.length > Math.ceil(maxBytes / 3) * 4 + 4) throw new AppError(413, "UPLOAD_TOO_LARGE", "Uploaded file is too large.");
   const bytes = Buffer.from(base64, "base64");
   if (!bytes.length) {
     throw new AppError(400, "UPLOAD_EMPTY", "Uploaded file is empty.");
@@ -389,66 +369,29 @@ function decodeUploadBytes(base64: string, maxBytes: number) {
   return bytes;
 }
 
-async function createSubmissionZipAttachment(
-  submissionId: string,
-  input: {
-    bytes: Buffer;
-    mimeType: string;
-    originalName: string;
-  }
-) {
+async function createSubmissionZipAttachment(submissionId: string, input: { bytes: Buffer; mimeType: string; originalName: string }, tx: CorePrisma.TransactionClient) {
   const originalName = input.originalName || "submission.zip";
   const storedName = `${submissionId}/${randomUUID()}-${safeFileName(originalName)}`;
   await writeStoredSubmissionFile(storedName, input.bytes);
-  const sha256 = createHash("sha256").update(input.bytes).digest("hex");
-
-  return prisma.pluginCodingHomeworkAttachment.create({
-    data: {
-      ownerKind: "submission",
-      ownerId: submissionId,
-      kind: "submission_zip",
-      originalName,
-      storedName,
-      mimeType: input.mimeType,
-      sizeBytes: BigInt(input.bytes.length),
-      sha256,
-      metadata: { temporary: false } as Prisma.InputJsonValue
-    }
-  });
+  const id = randomUUID(), sha256 = createHash("sha256").update(input.bytes).digest("hex");
+  await tx.$executeRaw`INSERT INTO "PluginCodingHomeworkAttachment"
+    (id, "ownerKind", "ownerId", kind, "originalName", "storedName", "mimeType", "sizeBytes", sha256, metadata, "createdAt", "updatedAt")
+    VALUES (${id}, 'submission', ${submissionId}, 'submission_zip', ${originalName}, ${storedName}, ${input.mimeType}, ${BigInt(input.bytes.length)}, ${sha256}, '{"temporary":false}'::jsonb, NOW(), NOW())`;
+  return { id };
 }
 
-async function extractSubmissionFiles(input: {
-  entries: CodingHomeworkZipEntry[];
-  languageKey: string;
-  submissionId: string;
-  validFiles: Set<string>;
-}) {
+async function extractSubmissionFiles(input: { entries: CodingHomeworkZipEntry[]; languageKey: string; submissionId: string; validFiles: Set<string> }, tx: CorePrisma.TransactionClient) {
   const rows: SubmissionFileRow[] = [];
   for (const entry of input.entries) {
-    if (entry.isDirectory || !entry.content || !input.validFiles.has(entry.path)) {
-      continue;
-    }
-
+    if (entry.isDirectory || !entry.content || !input.validFiles.has(entry.path)) continue;
     const storedName = `${input.submissionId}/files/${randomUUID()}-${safeFileName(path.posix.basename(entry.path))}`;
     await writeStoredSubmissionFile(storedName, entry.content);
-    const sha256 = createHash("sha256").update(entry.content).digest("hex");
+    const id = randomUUID(), sha256 = createHash("sha256").update(entry.content).digest("hex");
     const languageKey = isLikelySourceForLanguage(entry.path, input.languageKey) ? input.languageKey : null;
-    const row = await prisma.pluginCodingHomeworkSubmissionFile.create({
-      data: {
-        languageKey,
-        metadata: {
-          compressedSize: entry.compressedSize,
-          originalPath: entry.path,
-          sourceKind: languageKey ? "source" : "non_source",
-          uncompressedSize: entry.uncompressedSize
-        } as Prisma.InputJsonValue,
-        path: entry.path,
-        sha256,
-        sizeBytes: BigInt(entry.content.length),
-        storedName,
-        submissionId: input.submissionId
-      }
-    });
+    const metadata = { compressedSize: entry.compressedSize, originalPath: entry.path, sourceKind: languageKey ? "source" : "non_source", uncompressedSize: entry.uncompressedSize };
+    const [row] = await tx.$queryRaw<SubmissionFileRow[]>`INSERT INTO "PluginCodingHomeworkSubmissionFile"
+      (id, "submissionId", path, "languageKey", "sizeBytes", sha256, "storedName", metadata, "createdAt")
+      VALUES (${id}, ${input.submissionId}, ${entry.path}, ${languageKey}, ${BigInt(entry.content.length)}, ${sha256}, ${storedName}, ${JSON.stringify(metadata)}::jsonb, NOW()) RETURNING *`;
     rows.push(row);
   }
   return rows;
@@ -482,11 +425,11 @@ function toSubmissionRecord(row: SubmissionRow) {
     activityId: row.activityId,
     coreAttemptId: row.coreAttemptId,
     createdAt: row.createdAt.toISOString(),
-    documentationSnapshotId: row.documentationSnapshotId,
+    documentationSnapshotId: null,
     groupId: row.groupId,
     kind: row.kind,
-    metadata: normalizeObject(row.metadata),
-    processingError: row.processingError,
+    metadata: {},
+    processingError: row.processingError ? "Processing could not be completed. Contact your course staff." : null,
     status: row.status,
     structureValidationSummary: normalizeObject(row.structureValidationSummary),
     updatedAt: row.updatedAt.toISOString(),
@@ -500,11 +443,11 @@ function toSubmissionFileRecord(row: SubmissionFileRow) {
     id: row.id,
     createdAt: row.createdAt.toISOString(),
     languageKey: row.languageKey,
-    metadata: normalizeObject(row.metadata),
+    metadata: {},
     path: row.path,
     sha256: row.sha256,
     sizeBytes: Number(row.sizeBytes),
-    storedName: row.storedName,
+    storedName: "",
     submissionId: row.submissionId
   };
 }

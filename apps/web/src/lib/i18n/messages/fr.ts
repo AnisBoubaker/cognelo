@@ -360,6 +360,8 @@ export const frMessages = {
       submit: "Se connecter",
       submitting: "Connexion...",
       error: "Échec de la connexion.",
+      rateLimited: "Trop de tentatives. Patientez avant de réessayer.",
+      passwordTooLong: "Choisissez un mot de passe plus court.",
       activationError: "Impossible d'activer le compte."
     },
     emailVerification: {

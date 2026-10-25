@@ -73,3 +73,7 @@ The browser scenarios belong to `@regression` and use disposable MCQ fixtures wi
 ## Reopened submissions
 
 [Reopening the last submission](SUBMISSION_CONTINUATION.md) preserves its original start but resolves the current effective policy again. Extensions or team/student exceptions added after submission apply to the resumed work, including on compound Tests; reopening itself never adds time or changes assignment settings.
+
+## Finalization after the deadline
+
+The assigned dispatcher rechecks the effective deadline after reading an unsafe request body. Expiry-allowed plugin routes reconstruct input from saved server work through `expiredAttemptInput`; they cannot accept new answers/code/files after expiry. New homework uploads and draft deletion obey the ordinary write cutoff. This prevents slow request bodies from extending an attempt. See [Security boundaries](SECURITY_BOUNDARIES.md).

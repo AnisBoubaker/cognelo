@@ -139,14 +139,14 @@ export type DeletedSubmissionAudit = {
   gradeSnapshot: Record<string, unknown> | null;
 };
 
-export async function startActivityAttempt(user: CurrentUser, input: StartActivityAttemptInput) {
+export async function startActivityAttempt(user: CurrentUser, input: StartActivityAttemptInput, transaction?: Prisma.TransactionClient) {
   const now = input.now ?? new Date();
-  const context = await resolveAssignedActivityAttemptContext(user, input);
+  const context = await resolveAssignedActivityAttemptContext(user, input, transaction);
   const assessmentMode = assignmentAssessmentMode(context.groupActivity.metadata);
   if (input.assessmentMode && input.assessmentMode !== assessmentMode) {
     throw new AppError(409, "ATTEMPT_MODE_MISMATCH", "The attempt mode no longer matches the activity assignment mode.");
   }
-  return prisma.$transaction(async (tx) => {
+  const create = async (tx: Prisma.TransactionClient) => {
     // Serialize allowance checks and numbering even when no attempt exists yet.
     await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${JSON.stringify([context.gradebookItem.id, context.participant.id])}, 0))`;
     const resumableAttempt = await findResumableAttempt(context.groupActivity.id, context.participant.id, false, tx);
@@ -228,7 +228,8 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
         } as JsonInput
       }
     });
-  });
+  };
+  return transaction ? create(transaction) : prisma.$transaction(create);
 }
 
 export async function getActivityAttemptAvailability(user: CurrentUser, input: ActivityAttemptAvailabilityInput) {
@@ -275,6 +276,7 @@ async function findResumableAttempt(groupActivityId: string, participantId: stri
     (includeTestAttempts && attempt.pluginKey === "core:test")
     || activityAttemptTimeLimitMinutes(attempt.metadata) !== null
     || asJsonObject(attempt.metadata)?.continuation
+    || asJsonObject(attempt.metadata)?.uploadReserved === true
   )) ?? null;
 }
 
@@ -320,9 +322,10 @@ async function activityAttemptAvailabilityDetails(
   };
 }
 
-export async function submitActivityAttempt(user: CurrentUser, input: SubmitActivityAttemptInput) {
+export async function submitActivityAttempt(user: CurrentUser, input: SubmitActivityAttemptInput, transaction?: Prisma.TransactionClient) {
+  const db = transaction ?? prisma;
   const now = input.now ?? new Date();
-  const attempt = await prisma.activityAttempt.findUnique({
+  const attempt = await db.activityAttempt.findUnique({
     where: { id: input.attemptId },
     include: {
       gradebookItem: true,
@@ -342,7 +345,9 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
     return submittedAttempt;
   }
 
-  const exceptions = await loadAssignmentExceptions([attempt.groupActivityId]);
+  if (attempt.lifecycle === "deleted") throw new AppError(409, "SUBMISSION_DELETED", "A deleted attempt cannot be submitted.");
+
+  const exceptions = await loadAssignmentExceptions([attempt.groupActivityId], db);
   const effectiveAssignment = applyAssignmentExceptions(attempt.groupActivity, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
 
   if (attempt.assessmentMode !== "formative" && attempt.gradebookItem.gradesReleased && !asJsonObject(attempt.metadata)?.continuation) {
@@ -356,7 +361,7 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
   const lateness = computeAttemptLateness(effectiveAssignment.availableUntil, attempt.gradebookItem.lateGracePeriodMinutes, now);
   const durationSeconds = Math.max(0, Math.round((now.getTime() - attempt.startedAt.getTime()) / 1000));
 
-  return prisma.activityAttempt.update({
+  return db.activityAttempt.update({
     where: { id: attempt.id },
     data: {
       lifecycle: "submitted",
@@ -1943,8 +1948,8 @@ export async function getStudentActivitySubmissionAudit(user: CurrentUser, cours
   };
 }
 
-async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: StartActivityAttemptInput) {
-  const groupActivity = await prisma.courseGroupActivity.findFirst({
+async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: StartActivityAttemptInput, db: Prisma.TransactionClient | typeof prisma = prisma) {
+  const groupActivity = await db.courseGroupActivity.findFirst({
     where: {
       groupId: input.groupId,
       activityId: input.activityId,
@@ -1986,8 +1991,8 @@ async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: S
     throw new AppError(409, "GRADEBOOK_ITEM_MISSING", "This assigned activity does not have a gradebook item.");
   }
 
-  const participant = await resolveAttemptParticipant(user, input.courseId, input.groupId, input.participantId);
-  const exceptions = await loadAssignmentExceptions([groupActivity.id]);
+  const participant = await resolveAttemptParticipant(user, input.courseId, input.groupId, input.participantId, db);
+  const exceptions = await loadAssignmentExceptions([groupActivity.id], db);
   const overrides = exceptionsForParticipant(exceptions, groupActivity.id, participant.id);
 
   return {
@@ -1998,9 +2003,9 @@ async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: S
   };
 }
 
-async function resolveAttemptParticipant(user: CurrentUser, courseId: string, groupId: string, participantId?: string) {
+async function resolveAttemptParticipant(user: CurrentUser, courseId: string, groupId: string, participantId?: string, db: Prisma.TransactionClient | typeof prisma = prisma) {
   const where = participantId ? { id: participantId, groupId } : { groupId, userId: user.id };
-  const participant = await prisma.courseGroupParticipant.findFirst({ where });
+  const participant = await db.courseGroupParticipant.findFirst({ where });
 
   if (!participant) {
     throw forbidden();

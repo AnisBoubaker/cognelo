@@ -12,6 +12,16 @@ This guide deploys a production Cognelo instance across two Ubuntu VPSs. It uses
 
 The examples use `instance1.example.com` and the instance key `instance1`. Every example hostname, address, account, database, path, and port is a placeholder and must be replaced with values assigned to the target installation.
 
+Authentication throttling uses persistent, expiring account/source buckets. The default ignores forwarded IP headers. To enable distinct sources behind the exclusive Apache proxy, configure `AUTH_TRUST_PROXY=true` in the private application environment and overwrite the header in that virtual host:
+
+```apache
+RequestHeader unset X-Cognelo-Client-IP
+RequestHeader set X-Cognelo-Client-IP "expr=%{REMOTE_ADDR}"
+LimitRequestBody 37748736
+```
+
+Keep direct API listeners inaccessible to untrusted clients when trusting this header. Database migrations and encrypted-key backfill run through `npm run db:migrate:all`; retain the instance credential key and backup/rehearsal gates. See [Security boundaries](SECURITY_BOUNDARIES.md).
+
 ## 1. Recommended topology
 
 ```text
@@ -693,7 +703,7 @@ The supplied Judge0 configuration enables the synchronous `wait=true` submission
 
 ### 14.4 Build the pinned Playwright runner
 
-The repository currently depends on `@playwright/test` `1.59.1`, so the production Dockerfile deliberately uses `mcr.microsoft.com/playwright:v1.59.1-noble`. Playwright requires the image and package versions to match; update both in source and test them together rather than changing only the container tag. See [Playwright's Docker version guidance](https://playwright.dev/docs/docker#image-tags).
+The repository currently depends on `@playwright/test` `1.64.1`, so the production Dockerfile deliberately uses `mcr.microsoft.com/playwright:v1.64.1-noble`. Playwright requires the image and package versions to match; update both in source and test them together rather than changing only the container tag. See [Playwright's Docker version guidance](https://playwright.dev/docs/docker#image-tags).
 
 Build a local immutable image from the selected Cognelo tag:
 
@@ -707,7 +717,7 @@ sudo docker image inspect cognelo/web-design-runner:cognelo-0.5.0 \
   --format '{{.Id}}'
 ```
 
-Install the checked-in seccomp profile (based on Playwright 1.59.1, with `chroot` permitted for Chromium’s inner user-namespace sandbox even when outer container capabilities are dropped) and record its checksum:
+Install the checked-in seccomp profile (based on Playwright 1.64.1, with `chroot` permitted for Chromium’s inner user-namespace sandbox even when outer container capabilities are dropped) and record its checksum:
 
 ```bash
 sudo cp infra/production/playwright-seccomp.json \

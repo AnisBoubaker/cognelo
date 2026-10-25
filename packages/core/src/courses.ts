@@ -1,3 +1,4 @@
+import { listContentItems } from "./course-content";
 import { CourseInputSchema, CourseSettingsInputSchema, CourseUpdateSchema, EnrollmentInputSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -59,6 +60,7 @@ function buildVisibleStudentGroupWhere(userId: string) {
 function buildCourseIncludeForStudent(userId: string) {
   return {
     ...courseInclude,
+    subject: { include: { ...courseInclude.subject.include, materials: false } },
     memberships: {
       where: { userId },
       include: { user: { select: { id: true, email: true, name: true } } }
@@ -140,7 +142,7 @@ export async function listCourses(user: CurrentUser) {
   return [
     ...fullCourses,
     ...sectionCourses.map(stripStudentCourseActivityContent),
-    ...learnerCourses.map(stripStudentCourseActivityContent)
+    ...await Promise.all(learnerCourses.map((course) => projectStudentCourse(user, course)))
   ].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
 }
 
@@ -170,7 +172,7 @@ export async function getCourse(user: CurrentUser, courseId: string) {
     throw notFound("Course");
   }
   return {
-    ...(capabilities.canManageCourse ? course : stripStudentCourseActivityContent(course)),
+    ...(capabilities.canManageCourse ? course : capabilities.canViewGradebook ? stripStudentCourseActivityContent(course) : await projectStudentCourse(user, course)),
     permissions: capabilities
   };
 }
@@ -535,4 +537,11 @@ function asMetadataRecord(value: Prisma.JsonValue | undefined): Record<string, P
     return {};
   }
   return value as Record<string, Prisma.JsonValue>;
+}
+
+async function projectStudentCourse<T extends { id: string; activities: Array<{ id: string; description: string }>; materials?: Array<{ id: string }> }>(user: CurrentUser, course: T) {
+  const items = await listContentItems(user, course.id, { visibleOnly: true });
+  const ids = new Set(items.map((item) => item.activityId));
+  const materialIds = new Set(items.map((item) => item.materialId));
+  return { ...stripStudentCourseActivityContent(course), materials: course.materials?.filter((material) => materialIds.has(material.id)) ?? [], activities: course.activities.filter((activity) => ids.has(activity.id)).map((activity) => ({ ...activity, description: "" })) };
 }

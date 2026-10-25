@@ -360,6 +360,8 @@ export const enMessages = {
       submit: "Sign in",
       submitting: "Signing in...",
       error: "Login failed.",
+      rateLimited: "Too many attempts. Please wait and try again.",
+      passwordTooLong: "Choose a shorter password.",
       activationError: "Unable to activate the account."
     },
     emailVerification: {

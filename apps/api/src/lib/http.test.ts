@@ -131,12 +131,12 @@ describe("API HTTP helpers", () => {
     });
   });
 
-  it("returns an empty object for invalid JSON bodies", async () => {
+  it("rejects invalid JSON bodies", async () => {
     const request = new Request("http://test.local", {
       method: "POST",
       body: "{"
     });
 
-    await expect(readJson(request as never)).resolves.toEqual({});
+    await expect(readJson(request as never)).rejects.toMatchObject({ code: "INVALID_JSON", status: 400 });
   });
 });

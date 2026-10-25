@@ -9,7 +9,7 @@ import { LocaleSwitcher } from "@/components/locale-switcher";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import { getAuthenticatedLandingPath } from "@/lib/navigation";
+import { getAuthenticatedLandingPath, safeLoginReturnPath } from "@/lib/navigation";
 
 export default function LoginPage() {
   const { login, activateAccount } = useAuth();
@@ -30,10 +30,7 @@ export default function LoginPage() {
       const user = await login(email, password);
       router.replace(loginReturnPath() ?? getAuthenticatedLandingPath(user));
     } catch (err) {
-      if (err instanceof ApiError && err.code === "PENDING_ACCOUNT_SETUP") {
-        setMode("activate");
-      }
-      setError(err instanceof Error ? err.message : t("login.error"));
+      setError(t(err instanceof ApiError && err.code === "RATE_LIMIT_EXCEEDED" ? "login.rateLimited" : "login.error"));
     } finally {
       setLoading(false);
     }
@@ -44,10 +41,11 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
+      if (new TextEncoder().encode(password).byteLength > 72) { setError(t("login.passwordTooLong")); return; }
       const user = await activateAccount({ email, password, confirmPassword });
       router.replace(loginReturnPath() ?? getAuthenticatedLandingPath(user));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("login.activationError"));
+      setError(t(err instanceof ApiError && err.code === "RATE_LIMIT_EXCEEDED" ? "login.rateLimited" : "login.activationError"));
     } finally {
       setLoading(false);
     }
@@ -133,5 +131,5 @@ export default function LoginPage() {
 
 function loginReturnPath() {
   const returnTo = new URLSearchParams(window.location.search).get("returnTo");
-  return returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : null;
+  return safeLoginReturnPath(returnTo, window.location.origin);
 }

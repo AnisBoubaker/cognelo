@@ -6,6 +6,8 @@ The examples upgrade instance `instance1` from `cognelo-0.5.0` to `cognelo-0.6.0
 
 The normal upgrade does **not** copy `/srv/cognelo/instance1/shared` or its potentially large `storage` directory. Every deployment worktree links to the same persistent `.env` and `storage`. This procedure makes a small, protected copy of the application `.env` and a PostgreSQL database dump. Uploaded storage should already be covered by the installation's normal off-host backup or snapshot policy.
 
+Current security upgrades require the core `202610250001_security_rate_limits` and homework `202610250010_bounded_upload_requirements` migrations through `npm run db:migrate:all`. That command also encrypts legacy model keys with the existing instance credential key and disables legacy model URLs containing embedded credentials/query/fragment data after removing those components. Preserve that key with database backups. Personal model endpoints now require public HTTPS; configure private/local models as administrator-owned personal or global connections. The local credential helper is for development only. See [Security boundaries](SECURITY_BOUNDARIES.md) for request limits and compatibility details.
+
 ## Before starting
 
 You need:

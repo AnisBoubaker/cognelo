@@ -92,7 +92,7 @@ export async function updateUser(user: CurrentUser, userId: string, input: unkno
     where: { id: userId },
     data: {
       email,
-      ...(emailChanged ? { emailVerifiedAt: null } : {}),
+      ...(emailChanged ? { emailVerifiedAt: null, authVersion: { increment: 1 } } : {}),
       firstName: data.firstName,
       lastName: data.lastName,
       name: `${data.firstName} ${data.lastName}`.trim(),
@@ -226,7 +226,7 @@ export async function changeMyPassword(user: CurrentUser, input: unknown) {
   const passwordHash = await bcrypt.hash(data.newPassword, 12);
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash, mustChangePassword: false }
+    data: { passwordHash, mustChangePassword: false, authVersion: { increment: 1 } }
   });
   return { ok: true as const };
 }

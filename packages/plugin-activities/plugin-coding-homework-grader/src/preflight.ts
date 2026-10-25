@@ -1,5 +1,6 @@
+import { acquireHomeworkUploadSlot, limitHomeworkUploads, lockHomeworkUploadBudget } from "./upload-budget";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { AppError } from "@cognelo/core";
@@ -25,6 +26,9 @@ type PreflightScope = {
 };
 
 export async function runCodingHomeworkPreflight(scope: PreflightScope, input: unknown) {
+  const releaseUploadSlot = acquireHomeworkUploadSlot();
+  try {
+  await limitHomeworkUploads(scope.activityId, scope.user.id);
   const parsed = preflightInputSchema.parse(input);
   if (parsed.mimeType && parsed.mimeType !== "application/zip" && parsed.mimeType !== "application/x-zip-compressed") {
     throw new AppError(400, "CODING_HOMEWORK_ZIP_REQUIRED", "Preflight uploads must be ZIP archives.");
@@ -35,7 +39,7 @@ export async function runCodingHomeworkPreflight(scope: PreflightScope, input: u
 
   const requirements = await getCourseActivityRequirements(scope.activityId);
   const bytes = decodeUploadBytes(parsed.base64, requirements.maxArchiveBytes);
-  const zip = readCodingHomeworkZip(bytes);
+  const zip = readCodingHomeworkZip(bytes, requirements);
   const summary = await validateCodingHomeworkArchive({
     archiveSizeBytes: bytes.length,
     entries: zip.entries,
@@ -43,8 +47,12 @@ export async function runCodingHomeworkPreflight(scope: PreflightScope, input: u
     zipDiagnostics: zip.diagnostics
   });
 
+  const writtenFiles: string[] = [];
+  try {
+    return await prisma.$transaction(async (tx) => {
+      await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, bytes.length);
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  const submission = await prisma.pluginCodingHomeworkSubmission.create({
+  const submission = await tx.pluginCodingHomeworkSubmission.create({
     data: {
       activityId: scope.activityId,
       groupId: scope.groupId ?? PREVIEW_GROUP_ID,
@@ -63,8 +71,8 @@ export async function runCodingHomeworkPreflight(scope: PreflightScope, input: u
     bytes,
     mimeType: parsed.mimeType || "application/zip",
     originalName: parsed.fileName
-  });
-  await prisma.pluginCodingHomeworkSubmission.update({
+  }, tx, writtenFiles);
+  await tx.pluginCodingHomeworkSubmission.update({
     where: { id: submission.id },
     data: {
       zipAttachmentId: attachment.id,
@@ -92,14 +100,20 @@ export async function runCodingHomeworkPreflight(scope: PreflightScope, input: u
     },
     summary
   };
+    }, { timeout: 60_000 });
+  } catch (error) {
+    await Promise.all(writtenFiles.map((file) => unlink(file).catch(() => undefined)));
+    throw error;
+  }
+  } finally { releaseUploadSlot(); }
 }
-
 async function getCourseActivityRequirements(activityId: string) {
   const row = await prisma.pluginCodingHomeworkSubmissionRequirementSet.findUnique({ where: { activityId } });
   return normalizeCodingHomeworkSubmissionRequirements(row?.requirements);
 }
 
 function decodeUploadBytes(base64: string, maxBytes: number) {
+  if (base64.length > Math.ceil(maxBytes / 3) * 4 + 4) throw new AppError(413, "UPLOAD_TOO_LARGE", "Uploaded file is too large.");
   const bytes = Buffer.from(base64, "base64");
   if (!bytes.length) {
     throw new AppError(400, "UPLOAD_EMPTY", "Uploaded file is empty.");
@@ -116,15 +130,19 @@ async function createPreflightAttachment(
     bytes: Buffer;
     mimeType: string;
     originalName: string;
-  }
+  },
+  db: Pick<typeof prisma, "pluginCodingHomeworkAttachment">,
+  writtenFiles: string[]
 ) {
   const originalName = input.originalName || "preflight.zip";
   const storedName = `${randomUUID()}-${originalName.replace(SAFE_NAME_PATTERN, "_")}`;
   await mkdir(fileStorageDir(), { recursive: true });
-  await writeFile(path.join(fileStorageDir(), storedName), input.bytes);
+  const destination = path.join(fileStorageDir(), storedName);
+  writtenFiles.push(destination);
+  await writeFile(destination, input.bytes);
   const sha256 = createHash("sha256").update(input.bytes).digest("hex");
 
-  return prisma.pluginCodingHomeworkAttachment.create({
+  return db.pluginCodingHomeworkAttachment.create({
     data: {
       ownerKind: "submission",
       ownerId: submissionId,

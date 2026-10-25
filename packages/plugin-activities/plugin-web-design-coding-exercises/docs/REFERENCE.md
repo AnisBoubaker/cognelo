@@ -200,4 +200,8 @@ Tests support `const`, `await`, scalar/array/object literals, locator chains (`l
 
 The runner never evaluates test source in Node or `node:vm`. It allows one active request, rejects excess work with 429, limits command steps to 2,000, applies the requested per-test timeout and a 60-second request watchdog (the Cognelo HTTP client aborts after 65 seconds), closes timed-out browser work, bounds diagnostic text and screenshot dimensions, blocks browser network requests/service workers/downloads, and enables Chromium sandboxing. Docker additionally limits CPU, memory, processes, and temporary storage; runs non-root with a read-only filesystem, dropped capabilities, and no repository mount. Production requires the dedicated disposable host and internal network in the deployment guide. Development changes require rebuilding the image (`npm run dev:runner -- --build`).
 
-The checked-in seccomp profile is derived from [Playwright 1.59.1](https://github.com/microsoft/playwright/blob/v1.59.1/utils/docker/seccomp_profile.json), with `chroot` allowed for the inner Chromium namespace while outer capabilities remain dropped. Its Apache 2.0 license is retained beside the profile.
+The checked-in seccomp profile is derived from [Playwright 1.64.1](https://github.com/microsoft/playwright/blob/v1.64.1/utils/docker/seccomp_profile.json), with `chroot` allowed for the inner Chromium namespace while outer capabilities remain dropped. Its Apache 2.0 license is retained beside the profile.
+
+## Deadline finalization
+
+The shared assigned dispatcher checks the effective deadline after the request body arrives. At expiry, this plugin’s `expiredAttemptInput` supplies only its saved server response; incoming answer/code/file changes are ignored. Missing saved work follows the ordinary ungraded timeout fallback. This also applies to a request opened before the deadline whose body finishes later. See [security boundaries](../../../../docs/SECURITY_BOUNDARIES.md).

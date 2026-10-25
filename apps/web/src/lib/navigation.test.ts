@@ -1,3 +1,4 @@
+import { safeLoginReturnPath } from "./navigation";
 import { describe, expect, it } from "vitest";
 import { getAuthenticatedLandingPath, getPrimaryLandingPath, resolveCourseWorkspaceTab } from "./navigation";
 
@@ -33,4 +34,11 @@ describe("course workspace navigation", () => {
     expect(resolveCourseWorkspaceTab("unknown")).toBe("content");
     expect(resolveCourseWorkspaceTab(null)).toBe("content");
   });
+});
+
+it("keeps login return URLs on the current origin after URL normalization", () => {
+  for (const target of ["https://untrusted.example", "//untrusted.example", "/\\untrusted.example", "/%5cuntrusted.example", "/%2f%2funtrusted.example", "/\t/untrusted.example"]) {
+    expect(safeLoginReturnPath(target, "https://school.example")).toBeNull();
+  }
+  expect(safeLoginReturnPath("/courses/one?tab=content#item", "https://school.example")).toBe("/courses/one?tab=content#item");
 });

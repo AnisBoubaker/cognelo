@@ -7,7 +7,7 @@ import { assertTimedActivityWriteAllowed } from "./activity-timing";
 
 const MAX_ACTIVITY_RESPONSE_DRAFT_BYTES = 2 * 1024 * 1024;
 
-const activityResponseDraftStateSchema = z.record(z.unknown());
+const activityResponseDraftStateSchema = z.record(z.string(), z.unknown());
 
 export async function getActivityResponseDraft(
   user: CurrentUser,
