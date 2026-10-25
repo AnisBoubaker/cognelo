@@ -698,9 +698,9 @@ sudo nano /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
 sudo grep -n 'REPLACE_' /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
 ```
 
-The final `grep` must print nothing. In Cognelo, open **Settings → Runners → Judge0** and save base URL `http://10.80.0.2:2358`, authentication header `X-Auth-Token`, the same `AUTHN_TOKEN`, and enabled per-process/thread limits. Save the Web Design runner at `http://10.80.0.2:3456` with its dedicated `Authorization: Bearer <credential>` authentication from section 14.5. Use each card's capability test before activating the dependent plugin. Cognelo encrypts the Judge0 token in PostgreSQL with the instance credential key; it is not stored in the application `.env` or returned to the browser.
+The final `grep` must print nothing. In Cognelo, open **Settings → Runners → Judge0** and save base URL `http://10.80.0.2:2358`, authentication header `X-Auth-Token`, the same `AUTHN_TOKEN`, and disabled per-process/thread fallback so the production worker uses cgroup accounting. Save the Web Design runner at `http://10.80.0.2:3456` with its dedicated `Authorization: Bearer <credential>` authentication from section 14.5. Use each card's capability test before activating the dependent plugin. Cognelo encrypts the Judge0 token in PostgreSQL with the instance credential key; it is not stored in the application `.env` or returned to the browser.
 
-The supplied Judge0 configuration disables synchronous execution (`ENABLE_WAIT_RESULT=false`): Cognelo submits with `wait=false` and polls the result from the privileged worker. It permits Cognelo's per-process/thread limit flags, caps CPU at 5 seconds, wall time at 10 seconds, and memory at 128 MB, and disables submission networking, callbacks, command-line arguments, compiler options, batch requests, and additional files. Review these limits when Cognelo's execution contract changes. Judge0's complete option reference is its [versioned configuration file](https://github.com/judge0/judge0/blob/v1.13.1/judge0.conf).
+The supplied Judge0 configuration disables synchronous execution (`ENABLE_WAIT_RESULT=false`): Cognelo submits with `wait=false` and polls the result from the privileged worker. Student execution defaults remain 5 CPU seconds, 10 wall seconds, 128,000 KiB memory, and a 1 MiB file ceiling. Judge0 uses the separate maximums during compilation: 15 CPU seconds, 30 wall seconds, 256,000 KiB memory, and 16 MiB files. These allow ordinary Go/Rust binaries and TypeScript compilation without raising default student output limits. Workers use a private cgroup namespace so independent instances cannot collide on submission-derived box IDs. It permits the explicit per-process/thread fallback for supported development environments, and disables submission networking, callbacks, command-line arguments, compiler options, batch requests, and additional files. Review these limits when Cognelo's execution contract changes. Judge0's complete option reference is its [versioned configuration file](https://github.com/judge0/judge0/blob/v1.13.1/judge0.conf).
 
 ### 14.4 Build the pinned execution images
 
@@ -988,6 +988,14 @@ The listeners are host systemd sockets, so these connections pass through
 UFW's input policy; no Docker port is published. Verify from the application
 host that both ports work, and from a non-allowlisted source that both time out.
 Never add an unrestricted public rule for either port.
+
+#### Forward-only SSH alternative
+
+A dedicated application-host SSH service may provide encrypted transport to the sandbox container addresses without publishing new runner ports. Bind forwarded listeners only to application loopback and configure Cognelo with those loopback URLs plus the dedicated runner credentials. Keep the private key on the application host, pin the sandbox host key, and never forward an SSH agent.
+
+Use a dedicated sandbox account and key restricted to the application source address and exact runner destinations. Its SSH configuration must allow only local TCP forwarding (`AllowTcpForwarding local` and explicit `PermitOpen` entries), forbid remote and Unix-socket forwarding (`PermitListen none`, `AllowStreamLocalForwarding no`), and disable shell/subsystem sessions (`MaxSessions 0`), PTYs, passwords, agent forwarding, and X11. See the [OpenSSH forwarding controls](https://man.openbsd.org/sshd_config#AllowTcpForwarding) and [key restrictions](https://man.openbsd.org/sshd.8#AUTHORIZED_KEYS_FILE_FORMAT).
+
+Run the tunnel under an unprivileged service account with strict host-key checking, `ExitOnForwardFailure`, keepalives, and restart recovery. The API should order itself after and want that service without requiring it; an execution outage must not stop unrelated application features. Verify authenticated execution through the forwarded listeners, rejected unauthorized destinations/shell sessions, and absence of public runner listeners. Retain actual keys, units, and network inventory in private operator records.
 
 ### 14.7 Run end-to-end sandbox smoke tests
 

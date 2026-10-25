@@ -26,6 +26,7 @@ services:
     image: ${JUDGE0_IMAGE:?Set JUDGE0_IMAGE to the locally built hardened image}
     command: ["./scripts/workers"]
     privileged: true
+    cgroup: private
     restart: unless-stopped
     volumes:
       - ./judge0.conf:/judge0.conf:ro

@@ -4,7 +4,7 @@
 
 `rubric-generation-guidance.spec.ts` verifies guidance dialogs and real private persistence in course/bank exercises, failed-generation recovery, cancellation/clearing, unchanged grading instructions and rubric drafts, and authorization. Model responses are mocked.
 
-`action-buttons.spec.ts` checks consistent outlined actions and semantic icons across core/admin/plugin UI, actual saves/cancellation, danger and disabled states, keyboard focus, and login legibility.
+`action-buttons.spec.ts` waits for non-empty computed styles after action-bar hydration before comparing appearance; a detached reading must not be mistaken for a style regression. It checks consistent outlined actions and semantic icons across core/admin/plugin UI, actual saves/cancellation, danger and disabled states, keyboard focus, and login legibility.
 
 `assigned-activity-editor.spec.ts` verifies that active and expired section links open Class overview before the explicit Edit activity action opens the complete Activity / Concepts / Grading editor; it checks concept persistence, grading placement, learner-route preservation, and editor return to the same section overview after reload. `activity-report-settings.spec.ts` checks matching course/section report entry points, shared settings persistence/cancellation from both report tabs and course content, section-aware back navigation (including editor return to the currently selected report tab), messaging refresh, scroll restoration, and desktop/mobile header and dialog layout.
 

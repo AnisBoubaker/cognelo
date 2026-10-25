@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures/bank-course";
 import { createCourseActivity } from "./fixtures/activity-suite";
 
 async function appearance(button: Locator) {
-  return button.evaluate((element) => {
+  const read = () => button.evaluate((element) => {
     const style = getComputedStyle(element);
     return {
       background: style.backgroundImage,
@@ -14,6 +14,14 @@ async function appearance(button: Locator) {
       shadow: style.boxShadow
     };
   });
+  // Hydration can replace the action bar after visibility has been checked.
+  // Detached nodes return empty computed styles; wait for an attached reading.
+  let result = await read();
+  await expect.poll(async () => {
+    result = await read();
+    return Object.values(result).every((value) => value.length > 0);
+  }).toBe(true);
+  return result;
 }
 
 async function expectAction(button: Locator, icon: string) {

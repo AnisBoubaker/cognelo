@@ -56,3 +56,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - `expiredAttemptInput` must reconstruct final input from saved server state. Never accept a fresh learner request body after expiry; the host checks again after body upload. See [deadline enforcement](docs/REFERENCE.md#deadline-finalization).
 
 - Queue Judge0 with `wait=false`, then poll the validated token on the same resolved runner through core’s bounded client. Synchronous jobs require privileges in the API and must remain disabled. Runtime/build/credential requirements live in [security boundaries](../../../docs/SECURITY_BOUNDARIES.md).
+
+- Production workers need a private cgroup namespace when multiple stacks share a host. Keep per-process fallback disabled on cgroup-capable hosts, and preserve separate compilation ceilings: small source programs can produce Go/Rust binaries larger than the student output limit. See [Judge0 integration](docs/REFERENCE.md#judge0-integration).

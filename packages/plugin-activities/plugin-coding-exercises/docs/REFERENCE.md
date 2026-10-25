@@ -240,6 +240,8 @@ Core queues Judge0 with `wait=false`, validates the returned token, and polls th
 
 Docker Desktop’s per-process fallback limits virtual address space, unlike production cgroup memory accounting. Managed/compiling runtimes can fail under the default 128/256 MB limits even for small programs. A successful Python connection test does not validate every advertised language; run a representative compile/execute check for each language before assigning it, and keep execution limits enabled.
 
+Production workers use private cgroup namespaces and cgroup accounting (`enablePerProcessAndThreadLimits: false`). The provided compiler maxima are 15 CPU seconds, 30 wall seconds, 256,000 KiB memory, and 16 MiB files; default executions retain 5 CPU seconds, 10 wall seconds, 128,000 KiB memory, and 1 MiB files, with Cognelo normally requesting tighter time limits. Judge0 applies its `MAX_*` values while compiling; a 1 MiB compiler file ceiling rejects even small Go/Rust programs. Validate all required languages and compilation after changing these limits.
+
 ### Output matching
 
 Each visible or hidden test has an explicit output comparison mode:

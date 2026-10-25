@@ -110,3 +110,5 @@ Teachers can [export submitted answers as PDF or ZIP](../../../docs/ANSWER_EXPOR
 Timed finalization uses only server-saved work after expiry; see [deadline enforcement](docs/REFERENCE.md#deadline-finalization).
 
 Judge0 execution is queued and polled through core, keeping the API container unprivileged. See [Judge0 integration](docs/REFERENCE.md#judge0-integration) and the platform deployment runbooks.
+
+Production uses cgroup memory accounting and separate compiler ceilings; validate required languages after image or limit changes. See [Judge0 integration](docs/REFERENCE.md#judge0-integration).
