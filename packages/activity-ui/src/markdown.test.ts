@@ -114,3 +114,16 @@ describe("shared Markdown rendering", () => {
     expect(renderMarkdownToHtml("$$\\notARealCommand{x}$$")).toContain("\\notARealCommand");
   });
 });
+
+it("bounds explicit math dimensions in untrusted Markdown", () => {
+  const html = renderMarkdownToHtml("$\\rule{1000000em}{1000000em}$");
+  expect(html).not.toMatch(/style="[^"]*1000000/);
+  expect(html).toContain("50em");
+});
+
+it("retains basic raw formatting while escaping HTML that could alter the application UI", () => {
+  const html = renderMarkdownToHtml('<div><style>body{display:none}</style><form><input name="password"><button>Submit</button></form><span style="position:fixed" class="dialog-backdrop">Overlay</span></div>');
+  expect(html).not.toMatch(/<(style|form|input|button)\b/);
+  expect(html).not.toMatch(/<span[^>]*(style|class)=/);
+  expect(renderMarkdownToHtml("H<sub>2</sub>O<br>next")).toContain("H<sub>2</sub>O<br>next");
+});

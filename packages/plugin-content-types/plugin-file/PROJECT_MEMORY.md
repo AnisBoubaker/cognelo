@@ -13,3 +13,5 @@
 - Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.
 
 - Use bounded form parsing and the shared no-follow storage opener for downloads and extraction. Never trust a metadata path or restore the backtracking PDF literal regex; malformed and whitespace-heavy input must remain linear.
+
+- Validate multipart title and original filename through the existing shared/plugin schemas before writing bytes. A failed metadata validation must leave neither a staged file nor a changed resource.

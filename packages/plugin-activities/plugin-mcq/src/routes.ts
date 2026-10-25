@@ -22,7 +22,7 @@ import { prisma, type Prisma } from "@cognelo/db";
 import { prisma as mcqPrisma } from "./db-client";
 import { MCQ_AI_MAX_QUESTION_COUNT } from "./constants";
 import { buildMcqGradingResultFromConfig } from "./grading";
-import { mcqSelectedFeedback, parseMcqSource, type McqAnswerState, type McqParseError } from "./mcq";
+import { constrainMcqAnswers, mcqSelectedFeedback, parseMcqSource, type McqAnswerState, type McqParseError } from "./mcq";
 import { evaluateMcqWithAi } from "./ai-feedback";
 
 const mcqGenerateInputSchema = z.object({
@@ -125,6 +125,7 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
       }
 
       const input = mcqSubmissionInputSchema.parse(await readJson());
+      input.answers = constrainMcqAnswers(context.activity.config, input.answers);
       const participant = await findStudentParticipant(context.groupId, context.user.id);
       if (!participant) {
         throw new AppError(403, "PARTICIPANT_REQUIRED", "Only enrolled students can submit this activity.");
@@ -200,6 +201,7 @@ export const mcqFormativeFeedbackRoute: PluginRouteDefinition = {
         throw new AppError(409, "MCQ_SUMMATIVE_FEEDBACK_TEACHER_REQUIRED", "Summative MCQ feedback must be started by a teacher from the gradebook.");
       }
       const input = mcqSubmissionInputSchema.parse(await readJson());
+      input.answers = constrainMcqAnswers(context.activity.config, input.answers);
       const metadata = {
         mode: "formative",
         submittedAnswers: input.answers

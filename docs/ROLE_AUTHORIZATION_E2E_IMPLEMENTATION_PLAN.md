@@ -233,6 +233,10 @@ Do not reuse one browser context for distinct people. Multi-user scenarios need 
 - **FLOW-02 — Challenge lifecycle:** teacher releases; learner challenges; scoped staff reviews; course teacher regrades/resolves; learner sees the result and optional notification.
 - **FLOW-03 — Staff transition:** original teacher creates and grades; second teacher takes over; original teacher is removed; course data and historical ownership remain correct.
 
+### Grading configuration scope
+
+The generic activity GET permits scoped graders only when that activity has an assignment or retained attempt in an authorized section. Test children inherit parent assignment/attempt scope. Linked bank drafts and version objects are omitted from grader responses. The comprehensive security E2E covers allowed and denied sections plus retained Test-child review; course management remains a separate permission.
+
 ## Executable Coverage Map
 
 - `packages/core/src/authorization.test.ts`, `courses.test.ts`, `groups.test.ts`, `gradebook.test.ts`, and `ai-feedback-review.test.ts` cover the capability split, provenance, symmetric cleanup, actor events, release denial, and stale-write conflicts at the service boundary.

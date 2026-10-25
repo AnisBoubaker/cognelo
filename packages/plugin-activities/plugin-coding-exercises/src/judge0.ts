@@ -1,3 +1,4 @@
+import { readExecutionServiceJson, runJudge0Job } from "@cognelo/core";
 import { getServerEnv } from "@cognelo/config";
 import { AppError, resolveExecutionRunner } from "@cognelo/core";
 import { getJudge0LanguageCandidates } from "./coding-exercises";
@@ -73,15 +74,15 @@ type Judge0EncodedSubmissionResponse = {
 export async function listJudge0Languages(): Promise<Judge0Language[]> {
   const runner = await resolveExecutionRunner("judge0", getServerEnv().EMAIL_CREDENTIALS_ENCRYPTION_KEY);
   const response = await fetch(`${runner.baseUrl}/languages`, {
-    headers: runner.headers
+    headers: runner.headers, redirect: "error", signal: AbortSignal.timeout(10_000)
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Judge0 languages request failed with ${response.status}: ${errorText}`);
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error(`Judge0 languages request failed with ${response.status}.`);
   }
 
-  return (await response.json()) as Judge0Language[];
+  return (await readExecutionServiceJson(response)) as Judge0Language[];
 }
 
 export function getCodingExerciseProgrammingLanguages(languages: Judge0Language[]): CodingExerciseProgrammingLanguage[] {
@@ -142,33 +143,17 @@ export async function resolveJudge0Language(languageKey: string) {
 
 export async function runJudge0Submission(input: Judge0SubmissionInput): Promise<Judge0SubmissionResult> {
   const runner = await resolveExecutionRunner("judge0", getServerEnv().EMAIL_CREDENTIALS_ENCRYPTION_KEY);
-  const response = await fetch(`${runner.baseUrl}/submissions?base64_encoded=true&wait=true`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...runner.headers
-    },
-    body: JSON.stringify({
-      language_id: input.languageId,
-      source_code: encodeJudge0Text(input.sourceCode),
-      stdin: encodeJudge0Text(input.stdin),
-      expected_output: encodeJudge0Text(input.expectedOutput),
-      cpu_time_limit: input.cpuTimeLimit,
-      wall_time_limit: input.wallTimeLimit,
-      memory_limit: input.memoryLimitKb,
-      enable_per_process_and_thread_time_limit: input.enablePerProcessAndThreadTimeLimit
-        ?? runner.settings.enablePerProcessAndThreadLimits,
-      enable_per_process_and_thread_memory_limit: input.enablePerProcessAndThreadMemoryLimit
-        ?? runner.settings.enablePerProcessAndThreadLimits
-    })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Judge0 request failed with ${response.status}: ${errorText}`);
-  }
-
-  const result = (await response.json()) as Judge0EncodedSubmissionResponse;
+  const result = await runJudge0Job(runner, {
+    language_id: input.languageId,
+    source_code: encodeJudge0Text(input.sourceCode),
+    stdin: encodeJudge0Text(input.stdin),
+    expected_output: encodeJudge0Text(input.expectedOutput),
+    cpu_time_limit: input.cpuTimeLimit,
+    wall_time_limit: input.wallTimeLimit,
+    memory_limit: input.memoryLimitKb,
+    enable_per_process_and_thread_time_limit: input.enablePerProcessAndThreadTimeLimit ?? runner.settings.enablePerProcessAndThreadLimits,
+    enable_per_process_and_thread_memory_limit: input.enablePerProcessAndThreadMemoryLimit ?? runner.settings.enablePerProcessAndThreadLimits
+  }) as Judge0EncodedSubmissionResponse;
   const decodedResult = {
     ...result,
     stdout: decodeJudge0Text(result.stdout),

@@ -236,6 +236,10 @@ Behavior:
 - Cognelo compares the complete decoded Judge0 result first, then stores at most 16 KiB of each stdout/stderr/compiler-output stream and 4 KiB of each diagnostic message, cutting only at a UTF-8 character boundary. The same limits apply to hidden-test and reference-validation summaries. Execution/history and private validation responses apply the caps again to older oversized rows. Learners see a localized notice when a run or submission has shortened output; result status and scoring still reflect the complete Judge0 result.
 - enabled hidden tests are validated against the teacher reference solution before they are saved
 
+Core queues Judge0 with `wait=false`, validates the returned token, and polls that token on the same resolved runner. A single 90-second deadline includes submission and polling; each JSON body is capped at 8 MiB, redirects are rejected, and HTTP error bodies never reach clients. Language discovery uses the same bounded reader with a 10-second deadline. A timeout or malformed service result fails before producing a learner grade. The hardened Judge0 wrapper forces `ENABLE_WAIT_RESULT=false`; only its worker is privileged. See the [deployment runbook](../../../../docs/DEPLOYMENT_UBUNTU_APACHE.md#14-deploy-judge0-and-the-playwright-runner) for image builds and coordinated credential rotation.
+
+Docker Desktop’s per-process fallback limits virtual address space, unlike production cgroup memory accounting. Managed/compiling runtimes can fail under the default 128/256 MB limits even for small programs. A successful Python connection test does not validate every advertised language; run a representative compile/execute check for each language before assigning it, and keep execution limits enabled.
+
 ### Output matching
 
 Each visible or hidden test has an explicit output comparison mode:

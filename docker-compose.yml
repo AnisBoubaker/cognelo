@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine
     environment:
       POSTGRES_DB: cognelo
       POSTGRES_USER: postgres
@@ -16,7 +16,12 @@ services:
       retries: 10
 
   judge0-server:
-    image: ${JUDGE0_IMAGE:-ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2}
+    image: cognelo-judge0-hardened
+    build:
+      context: .
+      dockerfile: infra/production/judge0-hardened.Dockerfile
+      args:
+        JUDGE0_BASE_IMAGE: ${JUDGE0_IMAGE:-ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2}
     depends_on:
       - judge0-db
       - judge0-redis
@@ -25,11 +30,17 @@ services:
       - ./infra/judge0/isolate.dev.conf:/usr/local/etc/isolate:ro
     ports:
       - "127.0.0.1:2358:2358"
-    privileged: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     restart: unless-stopped
 
   judge0-worker:
-    image: ${JUDGE0_IMAGE:-ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2}
+    image: cognelo-judge0-hardened
+    build:
+      context: .
+      dockerfile: infra/production/judge0-hardened.Dockerfile
+      args:
+        JUDGE0_BASE_IMAGE: ${JUDGE0_IMAGE:-ghcr.io/anisboubaker/judge0-arm64:1.13.1-dev.2}
     command: ["./scripts/workers"]
     depends_on:
       judge0-db:
@@ -45,7 +56,7 @@ services:
     restart: unless-stopped
 
   judge0-language-config:
-    image: postgres:16.2
+    image: postgres:16.15-bookworm
     restart: "no"
     env_file:
       - ./infra/judge0/judge0.conf
@@ -70,7 +81,7 @@ services:
         psql -h "$${POSTGRES_HOST}" -p "$${POSTGRES_PORT}" -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -v ON_ERROR_STOP=1 -f /configure-languages.sql
 
   judge0-db:
-    image: postgres:16.2
+    image: postgres:16.15-bookworm
     env_file:
       - ./infra/judge0/judge0.conf
     volumes:
@@ -78,7 +89,7 @@ services:
     restart: unless-stopped
 
   judge0-redis:
-    image: redis:7.2.4
+    image: redis:7.2.16-bookworm
     command: ["bash", "-c", "docker-entrypoint.sh --appendonly no --requirepass \"$${REDIS_PASSWORD}\""]
     env_file:
       - ./infra/judge0/judge0.conf

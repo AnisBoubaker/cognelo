@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
-const mocks = vi.hoisted(() => ({ activity: { findFirst: vi.fn() }, activityAttempt: { findMany: vi.fn() }, scope: vi.fn(), content: vi.fn(), handler: vi.fn(), grades: vi.fn() }));
-vi.mock("@cognelo/db", () => ({ prisma: { activity: mocks.activity, activityAttempt: mocks.activityAttempt, grade: { findMany: mocks.grades } } }));
+const mocks = vi.hoisted(() => ({ bytes: vi.fn(), activity: { findFirst: vi.fn() }, activityAttempt: { findMany: vi.fn() }, scope: vi.fn(), content: vi.fn(), handler: vi.fn(), grades: vi.fn() }));
+vi.mock("@cognelo/db", () => ({ prisma: { $queryRaw: mocks.bytes, activity: mocks.activity, activityAttempt: mocks.activityAttempt, grade: { findMany: mocks.grades } } }));
 vi.mock("./authorization", () => ({ assertCanViewCourseGradebook: mocks.scope }));
 vi.mock("./course-time", () => ({ getCourseTimeSettings: async () => ({ timeZone: "UTC" }) }));
 vi.mock("@cognelo/activity-sdk/server", async (original) => ({ ...await original<object>(), getSubmissionExportHandler: mocks.handler }));
@@ -14,10 +14,18 @@ const record = (id: string, n: number) => ({ ...summary(id, n), userId: "student
 const input = { participantIds: ["student"], includePrompt: true, includeGrading: false };
 beforeEach(() => {
   vi.resetAllMocks(); mocks.grades.mockResolvedValue([]); mocks.scope.mockResolvedValue({ gradingGroupIds: ["allowed"] }); mocks.activity.findFirst.mockResolvedValue(activity);
+  mocks.bytes.mockResolvedValue([{ bytes: 0n }]);
   mocks.content.mockResolvedValue({ prompt: [], answer: [{ kind: "code", text: "saved answer" }], grading: [{ kind: "markdown", text: "PRIVATE GRADE" }] }); mocks.handler.mockReturnValue(mocks.content);
   mocks.activityAttempt.findMany.mockImplementation(async (query) => query.select ? [summary("latest", 2), summary("first", 1)] : [record("first", 1), record("latest", 2)].filter((r) => query.where.id.in.includes(r.id)));
 });
 describe("authorized answer exports", () => {
+  it("rejects oversized stored histories before loading their payloads or invoking plugins", async () => {
+    mocks.bytes.mockResolvedValue([{ bytes: 32_000_001n }]);
+    await expect(buildAnswerExport(user, "course", "activity", input, answerExportLabels("en"))).rejects.toMatchObject({ status: 413, code: "ANSWER_EXPORT_TOO_LARGE" });
+    expect(mocks.activityAttempt.findMany).toHaveBeenCalledTimes(1);
+    expect(mocks.activityAttempt.findMany.mock.calls[0][0].select).toBeDefined();
+    expect(mocks.content).not.toHaveBeenCalled();
+  });
   it("selects only the latest submitted attempt by default and suppresses all grading fields", async () => {
     const result = await buildAnswerExport(user, "course", "activity", input, answerExportLabels("en"));
     expect(result.documents[0].attempts.map((a) => a.id)).toEqual(["latest"]);

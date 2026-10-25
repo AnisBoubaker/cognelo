@@ -10,3 +10,5 @@
 - Keep host integration generic through renderer, editor, settings, and presentation registry keys. See [reference](docs/REFERENCE.md) and [media lifecycle](../../../docs/MEDIA_ASSETS.md).
 
 - Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.
+
+- Keep rendering behind the shared raw-HTML allowlist and sanitizer. Authored styles/forms/attributes must never become live page markup; use the editor’s Markdown image and formatting features instead.

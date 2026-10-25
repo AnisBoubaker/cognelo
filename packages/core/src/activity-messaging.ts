@@ -72,11 +72,17 @@ export async function getLearnerActivityConversation(
     where: { groupActivityId: activity.assignment.id, participantId: participant.id, attemptNumber: { not: attemptNumber }, closedAt: null },
     data: { closedAt: now }
   });
-  const conversation = await prisma.activityConversation.upsert({
+  const upsertConversation = () => prisma.activityConversation.upsert({
     where: { groupActivityId_participantId_attemptNumber: { groupActivityId: activity.assignment.id, participantId: participant.id, attemptNumber } },
     create: { courseId, groupId, groupActivityId: activity.assignment.id, activityId, participantId: participant.id,
       attemptId: activeAttempt?.id ?? null, attemptNumber, lastSeenAt: now },
     update: { attemptId: activeAttempt?.id ?? undefined, lastSeenAt: now, closedAt: null }, select: conversationIdentity
+  });
+  // Prisma can lose a concurrent upsert race on the second unique key
+  // (attemptId). Retry the same scoped write after the winner has committed.
+  const conversation = await upsertConversation().catch((error: unknown) => {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
+    return upsertConversation();
   });
   // Presence exists even with messaging off; it never creates a private-chat tab.
   return courseActivityMessagingEnabled(activity.metadata)

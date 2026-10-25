@@ -196,7 +196,12 @@ export const AiAgentConnectionInputSchema = z.object({
   displayName: z.string().trim().min(2).max(160),
   provider: AiAgentProviderSchema,
   model: z.string().trim().min(1).max(160),
-  baseUrl: z.string().trim().url().max(500).refine((value) => { const url = new URL(value); return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash; }, "Use an HTTP(S) base URL without credentials, query parameters, or fragments.").optional().nullable(),
+  baseUrl: z.string().trim().url().max(500).refine((value) => {
+    try {
+      const url = new URL(value);
+      return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash;
+    } catch { return false; }
+  }, "Use an HTTP(S) base URL without credentials, query parameters, or fragments.").optional().nullable(),
   apiKey: z.string().trim().max(2000).optional().nullable(),
   scope: AiAgentScopeSchema.optional().default("personal"),
   isEnabled: z.boolean().optional().default(true)
@@ -641,14 +646,21 @@ const CourseMaterialBaseSchema = z.object({
   kind: MaterialKindSchema,
   parentId: RecordIdSchema.nullable().optional(),
   body: z.string().max(20000).optional(),
-  url: z.string().url().optional(),
+  url: z.string().trim().url().refine((value) => {
+    try {
+      const url = new URL(value);
+      return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password;
+    } catch { return false; }
+  }, "Use an HTTP(S) URL without embedded credentials.").optional(),
   metadata: z.record(z.string(), z.unknown()).prefault({}),
   position: z.number().int().min(0).optional().default(0)
 });
 
 function validateCourseMaterialUrl(value: { kind?: MaterialKind; url?: string }, context: z.RefinementCtx) {
   if (value.kind === "github_repo" && value.url) {
-    const host = new URL(value.url).host.toLowerCase();
+    let host: string;
+    try { host = new URL(value.url).host.toLowerCase(); }
+    catch { return; } // The URL field reports malformed input as a validation error.
     if (host !== "github.com" && !host.endsWith(".github.com")) {
       context.addIssue({
         code: z.ZodIssueCode.custom,

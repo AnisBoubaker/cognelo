@@ -214,7 +214,7 @@ export async function changeMyPassword(user: CurrentUser, input: unknown) {
   const data = UserPasswordChangeSchema.parse(input);
   const account = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { isActive: true, passwordHash: true }
+    select: { isActive: true, passwordHash: true, authVersion: true }
   });
   if (!account?.isActive) {
     throw unauthorized();
@@ -224,9 +224,12 @@ export async function changeMyPassword(user: CurrentUser, input: unknown) {
   }
 
   const passwordHash = await bcrypt.hash(data.newPassword, 12);
-  await prisma.user.update({
-    where: { id: user.id },
+  const changed = await prisma.user.updateMany({
+    where: { id: user.id, isActive: true, passwordHash: account.passwordHash, authVersion: account.authVersion },
     data: { passwordHash, mustChangePassword: false, authVersion: { increment: 1 } }
   });
+  if (changed.count !== 1) {
+    throw new AppError(409, "PASSWORD_CHANGE_CONFLICT", "Your account changed. Sign in again before changing your password.");
+  }
   return { ok: true as const };
 }

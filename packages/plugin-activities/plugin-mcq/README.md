@@ -56,3 +56,5 @@ Interface actions use the shared [button style and semantic icons](../../../docs
 Teachers can [export submitted answers as PDF or ZIP](../../../docs/ANSWER_EXPORTS.md), including selectable prompts and grading content. See [export details](docs/REFERENCE.md#answer-exports).
 
 Timed finalization uses only server-saved work after expiry; see [deadline enforcement](docs/REFERENCE.md#deadline-finalization).
+
+Submitted answers are constrained to authored questions and choices before grading or persistence. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).

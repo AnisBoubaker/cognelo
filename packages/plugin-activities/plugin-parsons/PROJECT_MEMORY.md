@@ -36,3 +36,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - [Answer exports](../../../docs/ANSWER_EXPORTS.md) are read-only plugin projections: Exports preserve submitted block order and indentation from the host snapshot or retained attempt. They never call the evaluator or substitute reference code.
 
 - `expiredAttemptInput` must reconstruct final input from saved server state. Never accept a fresh learner request body after expiry; the host checks again after body upload. See [deadline enforcement](docs/REFERENCE.md#deadline-finalization).
+
+- Use the shared Markdown renderer for prompts and feedback: raw styles/forms/attributes stay inert and math stays untrusted and bounded. See [the shared rendering contract](../../../docs/plugin-authoring/03-core-services.md#what-markdownrenderer-gives-you).

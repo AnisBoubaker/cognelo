@@ -2,7 +2,7 @@ import { Prisma, prisma } from "./db-client";
 import { AppError } from "@cognelo/core";
 import { z } from "zod";
 import { runWebDesignTestsInRunner } from "./runner";
-import { webDesignExerciseFileSchema, type WebDesignExerciseFile } from "./web-design-coding-exercises";
+import { constrainWebDesignStudentFiles, webDesignExerciseFileSchema, type WebDesignExerciseFile } from "./web-design-coding-exercises";
 
 export const webDesignExerciseRunInputSchema = z.object({
   files: z.array(webDesignExerciseFileSchema).min(1).max(12)
@@ -90,11 +90,13 @@ export async function listWebDesignExerciseReviewSubmissionAttempts(params: { ac
 
 export async function runWebDesignExercise(params: {
   activityId: string;
+  activityConfig: unknown;
   userId: string;
   input: z.infer<typeof webDesignExerciseRunInputSchema>;
 }) {
   return executeWebDesignExercise({
     activityId: params.activityId,
+    activityConfig: params.activityConfig,
     userId: params.userId,
     kind: "run",
     testKind: "sample",
@@ -104,11 +106,13 @@ export async function runWebDesignExercise(params: {
 
 export async function submitWebDesignExercise(params: {
   activityId: string;
+  activityConfig: unknown;
   userId: string;
   input: z.infer<typeof webDesignExerciseRunInputSchema>;
 }) {
   return executeWebDesignExercise({
     activityId: params.activityId,
+    activityConfig: params.activityConfig,
     userId: params.userId,
     kind: "submit",
     testKind: "hidden",
@@ -118,11 +122,13 @@ export async function submitWebDesignExercise(params: {
 
 export async function previewWebDesignExercise(params: {
   activityId: string;
+  activityConfig: unknown;
   userId: string;
   kind: "run" | "submit";
   input: z.infer<typeof webDesignExerciseRunInputSchema>;
 }) {
   const input = webDesignExerciseRunInputSchema.parse(params.input);
+  input.files = constrainWebDesignStudentFiles(params.activityConfig, input.files);
   const testKind = params.kind === "run" ? "sample" : "hidden";
   const tests = await prisma.pluginWebDesignExerciseTest.findMany({
     where: { activityId: params.activityId, kind: testKind, isEnabled: true },
@@ -188,12 +194,14 @@ export async function previewWebDesignExercise(params: {
 
 async function executeWebDesignExercise(params: {
   activityId: string;
+  activityConfig: unknown;
   userId: string;
   kind: "run" | "submit";
   testKind: "sample" | "hidden";
   input: z.infer<typeof webDesignExerciseRunInputSchema>;
 }) {
   const input = webDesignExerciseRunInputSchema.parse(params.input);
+  input.files = constrainWebDesignStudentFiles(params.activityConfig, input.files);
   const tests = await prisma.pluginWebDesignExerciseTest.findMany({
     where: {
       activityId: params.activityId,

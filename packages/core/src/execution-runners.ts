@@ -1,3 +1,4 @@
+import { readExecutionServiceJson, runJudge0Job } from "./judge0-jobs";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import {
   ExecutionRunnerConfigurationInputSchema,
@@ -159,12 +160,12 @@ async function testJudge0Capabilities(runner: ResolvedExecutionRunner, fetchImpl
   try {
     const response = await fetchImplementation(`${runner.baseUrl}/languages`, {
       headers: runner.headers,
-      signal: AbortSignal.timeout(5000)
+      redirect: "error", signal: AbortSignal.timeout(5000)
     });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
-    const body = await response.json();
+    const body = await readExecutionServiceJson(response);
     if (!Array.isArray(body)) throw new Error("The languages response is invalid.");
     languages = body.filter((entry): entry is { id: number; name: string } => (
       Boolean(entry) && typeof entry === "object" &&
@@ -180,7 +181,7 @@ async function testJudge0Capabilities(runner: ResolvedExecutionRunner, fetchImpl
       detail: error instanceof Error ? error.message : "Unknown connection error."
     });
     capabilities.push({ key: "languages", label: "Language discovery", ok: false, detail: "Could not be checked." });
-    capabilities.push({ key: "execute", label: "Synchronous sandbox execution", ok: false, detail: "Could not be checked." });
+    capabilities.push({ key: "execute", label: "Queued sandbox execution", ok: false, detail: "Could not be checked." });
     return { ok: false, capabilities };
   }
 
@@ -195,44 +196,32 @@ async function testJudge0Capabilities(runner: ResolvedExecutionRunner, fetchImpl
   if (!smokeTest) {
     capabilities.push({
       key: "execute",
-      label: "Synchronous sandbox execution",
+      label: "Queued sandbox execution",
       ok: false,
       detail: "A C, Python, JavaScript, or Bash runtime is required for the execution check."
     });
   } else {
     try {
-      const executionResponse = await fetchImplementation(
-        `${runner.baseUrl}/submissions?base64_encoded=true&wait=true`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...runner.headers },
-          signal: AbortSignal.timeout(10000),
-          body: JSON.stringify({
-            language_id: smokeTest.languageId,
-            source_code: Buffer.from(smokeTest.sourceCode, "utf8").toString("base64"),
-            expected_output: Buffer.from("cognelo-runner-check\n", "utf8").toString("base64"),
-            enable_per_process_and_thread_time_limit: runner.settings.enablePerProcessAndThreadLimits,
-            enable_per_process_and_thread_memory_limit: runner.settings.enablePerProcessAndThreadLimits
-          })
-        }
-      );
-      const executionBody = await executionResponse.json().catch(() => ({})) as {
-        token?: unknown;
-        status?: { id?: unknown; description?: unknown };
-      };
-      const accepted = executionResponse.ok && executionBody.status?.id === 3;
+      const executionBody = await runJudge0Job(runner, {
+        language_id: smokeTest.languageId,
+        source_code: Buffer.from(smokeTest.sourceCode, "utf8").toString("base64"),
+        expected_output: Buffer.from("cognelo-runner-check\n", "utf8").toString("base64"),
+        enable_per_process_and_thread_time_limit: runner.settings.enablePerProcessAndThreadLimits,
+        enable_per_process_and_thread_memory_limit: runner.settings.enablePerProcessAndThreadLimits
+      }, { fetch: fetchImplementation, timeoutMs: 15_000 });
+      const accepted = executionBody.status?.id === 3;
       capabilities.push({
         key: "execute",
-        label: "Synchronous sandbox execution",
+        label: "Queued sandbox execution",
         ok: accepted,
         detail: accepted
           ? `Execution succeeded with ${smokeTest.languageName}.`
-          : `Execution check failed${executionBody.status?.description ? `: ${String(executionBody.status.description)}` : ` (HTTP ${executionResponse.status})`}.`
+          : `Execution check failed${executionBody.status?.description ? `: ${String(executionBody.status.description)}` : ""}.`
       });
     } catch (error) {
       capabilities.push({
         key: "execute",
-        label: "Synchronous sandbox execution",
+        label: "Queued sandbox execution",
         ok: false,
         detail: error instanceof Error ? error.message : "Unknown execution error."
       });
@@ -249,10 +238,10 @@ async function testHealthCapabilities(runner: ResolvedExecutionRunner, fetchImpl
   try {
     const response = await fetchImplementation(`${runner.baseUrl}/health`, {
       headers: runner.headers,
-      signal: AbortSignal.timeout(5000)
+      redirect: "error", signal: AbortSignal.timeout(5000)
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const body = await response.json().catch(() => ({})) as { ok?: unknown; capabilities?: unknown };
+    const body = await readExecutionServiceJson(response) as { ok?: unknown; capabilities?: unknown };
     capabilities.push({
       key: "connection",
       label: "Endpoint and authentication",

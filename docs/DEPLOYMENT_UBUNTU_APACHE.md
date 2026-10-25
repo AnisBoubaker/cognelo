@@ -553,7 +553,7 @@ This section is required when the corresponding plugins are enabled:
 
 MCQ, Parsons problems, tests composed only of those activities, and ordinary course materials do not use either service.
 
-Judge0 executes learner programs in privileged containers. The Playwright runner executes teacher-authored test code against learner-authored HTML, CSS, and JavaScript in Chromium. Treat the whole sandbox machine as disposable and untrusted: give it no Cognelo database credentials, JWT secret, deploy key for the application host, mounted application storage, or access to PostgreSQL. The reference setup uses a dedicated Ubuntu VM and a separate Compose project for each Cognelo instance.
+Judge0 workers execute learner programs in privileged containers; its API container is unprivileged and accepts queued work only. The Playwright runner executes teacher-authored test code against learner-authored HTML, CSS, and JavaScript in Chromium. Treat the whole sandbox machine as disposable and untrusted: give it no Cognelo database credentials, JWT secret, deploy key for the application host, mounted application storage, or access to PostgreSQL. The reference setup uses a dedicated Ubuntu VM and a separate Compose project for each Cognelo instance.
 
 The `judge0-db` PostgreSQL container is Judge0's own private implementation dependency, not Cognelo's application database. Keeping Cognelo PostgreSQL on the application host and Judge0's official DB/Redis pair inside the disposable sandbox stack avoids exposing either database across hosts.
 
@@ -561,6 +561,7 @@ The checked-in production files are:
 
 - `infra/production/sandbox.compose.yml` — Judge0, its private PostgreSQL/Redis dependencies, and the web-design runner;
 - `infra/production/judge0.conf.example` — restricted Judge0 defaults matching Cognelo's requests;
+- `infra/production/judge0-hardened.Dockerfile` — required startup wrapper for both Judge0 API and workers;
 - `infra/judge0/configure-languages.sql` — idempotent C/C++ system-library configuration applied before Judge0 workers start;
 - `infra/production/web-design-runner.Dockerfile` — a non-root runner image using the repository's exact Playwright version.
 
@@ -699,9 +700,21 @@ sudo grep -n 'REPLACE_' /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
 
 The final `grep` must print nothing. In Cognelo, open **Settings → Runners → Judge0** and save base URL `http://10.80.0.2:2358`, authentication header `X-Auth-Token`, the same `AUTHN_TOKEN`, and enabled per-process/thread limits. Save the Web Design runner at `http://10.80.0.2:3456` with its dedicated `Authorization: Bearer <credential>` authentication from section 14.5. Use each card's capability test before activating the dependent plugin. Cognelo encrypts the Judge0 token in PostgreSQL with the instance credential key; it is not stored in the application `.env` or returned to the browser.
 
-The supplied Judge0 configuration enables the synchronous `wait=true` submissions Cognelo uses, permits Cognelo's per-process/thread limit flags, caps CPU at 5 seconds, wall time at 10 seconds, and memory at 128 MB, and disables submission networking, callbacks, command-line arguments, compiler options, batch requests, and additional files. Review these limits when Cognelo's execution contract changes. Judge0's complete option reference is its [versioned configuration file](https://github.com/judge0/judge0/blob/v1.13.1/judge0.conf).
+The supplied Judge0 configuration disables synchronous execution (`ENABLE_WAIT_RESULT=false`): Cognelo submits with `wait=false` and polls the result from the privileged worker. It permits Cognelo's per-process/thread limit flags, caps CPU at 5 seconds, wall time at 10 seconds, and memory at 128 MB, and disables submission networking, callbacks, command-line arguments, compiler options, batch requests, and additional files. Review these limits when Cognelo's execution contract changes. Judge0's complete option reference is its [versioned configuration file](https://github.com/judge0/judge0/blob/v1.13.1/judge0.conf).
 
-### 14.4 Build the pinned Playwright runner
+### 14.4 Build the pinned execution images
+
+Build the required Judge0 wrapper from the selected Cognelo release. It forces queued execution, suppresses credential-bearing startup output, makes the cron environment file mode `0600`, and removes unused global npm. The API drops all capabilities and forbids privilege escalation; cron starts only in workers. The build fails if upstream scripts no longer match the expected layout. The base still contains legacy dependencies with unresolved advisories; keep the dedicated-host, restricted-network, and blocked-egress boundaries below, and evaluate upstream replacements separately.
+
+```bash
+cd /srv/cognelo-sandboxes/instance1/deployments/cognelo-0.5.0
+sudo docker build \
+  --file infra/production/judge0-hardened.Dockerfile \
+  --build-arg JUDGE0_BASE_IMAGE=judge0/judge0:1.13.1 \
+  --tag cognelo/judge0-hardened:cognelo-0.5.0 \
+  .
+sudo docker image inspect cognelo/judge0-hardened:cognelo-0.5.0 --format '{{.Id}}'
+```
 
 The repository currently depends on `@playwright/test` `1.64.1`, so the production Dockerfile deliberately uses `mcr.microsoft.com/playwright:v1.64.1-noble`. Playwright requires the image and package versions to match; update both in source and test them together rather than changing only the container tag. See [Playwright's Docker version guidance](https://playwright.dev/docs/docker#image-tags).
 
@@ -726,7 +739,7 @@ sudo chmod 0644 /srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
 sha256sum /srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
 ```
 
-Microsoft's image includes browser binaries and system dependencies but not the Node package. The Cognelo image adds the locked runner package, switches to `pwuser`, and starts only the runner. The Compose service adds the Chromium seccomp profile, drops Linux capabilities, makes the root filesystem read-only, gives Chromium bounded temporary storage, and applies CPU, memory, and PID limits. The official image alone is not a complete security boundary for untrusted content; the dedicated host and blocked outbound network are also required. See [Playwright's Docker security notes](https://playwright.dev/docs/docker#run-the-image).
+Microsoft's image includes browser binaries and system dependencies but not the Node package. The Cognelo build removes unused Firefox/WebKit, bad GStreamer plugins, and global npm, and launches Node directly. The Cognelo image adds the locked runner package, switches to `pwuser`, and starts only the runner. The Compose service adds the Chromium seccomp profile, drops Linux capabilities, makes the root filesystem read-only, gives Chromium bounded temporary storage, and applies CPU, memory, and PID limits. The official image alone is not a complete security boundary for untrusted content; the dedicated host and blocked outbound network are also required. See [Playwright's Docker security notes](https://playwright.dev/docs/docker#run-the-image).
 
 ### 14.5 Configure the sandbox stack
 
@@ -741,7 +754,7 @@ WEB_DESIGN_RUNNER_TOKEN=
 SANDBOX_DOCKER_SUBNET=172.30.0.0/24
 JUDGE0_SERVER_CONTAINER_IP=172.30.0.10
 WEB_DESIGN_RUNNER_CONTAINER_IP=172.30.0.11
-JUDGE0_IMAGE=judge0/judge0:1.13.1
+JUDGE0_IMAGE=cognelo/judge0-hardened:cognelo-0.5.0
 WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:cognelo-0.5.0
 PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
 ```
@@ -756,12 +769,12 @@ cd /srv/cognelo-sandboxes/instance1/runtime
 
 sudo docker compose --env-file .env -f sandbox.compose.yml config --quiet
 sudo docker compose --env-file .env -f sandbox.compose.yml \
-  pull judge0-server judge0-workers judge0-language-config judge0-db judge0-redis
+  pull judge0-language-config judge0-db judge0-redis
 ```
 
-`judge0/judge0:1.13.1`, `postgres:16.2`, `redis:7.2.4`, and the Playwright base image are pinned rather than `latest`. For even stricter supply-chain control, replace each tag with the image digest printed by `docker image inspect --format '{{index .RepoDigests 0}}' IMAGE` after the first approved pull.
+The wrapper base `judge0/judge0:1.13.1`, `postgres:16.15-bookworm`, `redis:7.2.16-bookworm`, and the Playwright base image are pinned rather than `latest`. For even stricter supply-chain control, replace each tag with the image digest printed by `docker image inspect --format '{{index .RepoDigests 0}}' IMAGE` after the first approved pull.
 
-The one-shot `judge0-language-config` service waits for Judge0's language table, then idempotently appends `-pthread -lm -ldl -lrt` to every active C and C++ compile command. These are the ordinary math and POSIX system libraries expected in programming courses; the compiler driver already links the C or C++ standard library. Judge0 submission-controlled compiler options remain disabled. Workers depend on successful completion of this service, so a missing runtime or failed configuration stops code execution instead of silently accepting a partially configured sandbox.
+The hardened API also applies its embedded copy of this SQL after every upstream seed and before listening, because seeding can reset compiler commands on existing volumes. Rebuild the wrapper whenever this SQL changes. The one-shot `judge0-language-config` service waits for Judge0's language table, then idempotently appends `-pthread -lm -ldl -lrt` to every active C and C++ compile command. These are the ordinary math and POSIX system libraries expected in programming courses; the compiler driver already links the C or C++ standard library. Judge0 submission-controlled compiler options remain disabled. Workers depend on successful completion of this service, so a missing runtime or failed configuration stops code execution instead of silently accepting a partially configured sandbox.
 
 The Compose network remains internal and has no direct port publishing. Section
 14.6 creates host socket proxies that listen only on the selected sandbox bind
@@ -1017,6 +1030,24 @@ sudo apt install -y jq
 read -rsp "Judge0 AUTHN_TOKEN: " JUDGE0_SMOKE_TOKEN
 echo
 
+judge0_wait() {
+  local job_token="$1" job_result job_status attempt
+  [[ "$job_token" =~ ^[a-zA-Z0-9_-]{1,128}$ ]] || return 1
+  for attempt in $(seq 1 90); do
+    job_result=$(curl --fail --silent --show-error --max-time 10 \
+      --header "X-Auth-Token: ${JUDGE0_SMOKE_TOKEN}" \
+      "http://10.80.0.2:2358/submissions/${job_token}?base64_encoded=false") || return 1
+    job_status=$(jq -er '.status.id' <<<"$job_result") || return 1
+    if (( job_status >= 3 && job_status <= 14 )); then
+      jq . <<<"$job_result"
+      return 0
+    fi
+    (( job_status == 1 || job_status == 2 )) || return 1
+    sleep 1
+  done
+  return 1
+}
+
 PYTHON_LANGUAGE_ID=$(
   curl --fail --silent --show-error \
     --header "X-Auth-Token: ${JUDGE0_SMOKE_TOKEN}" \
@@ -1025,13 +1056,16 @@ PYTHON_LANGUAGE_ID=$(
 )
 test -n "${PYTHON_LANGUAGE_ID}" && test "${PYTHON_LANGUAGE_ID}" != "null"
 
+JUDGE0_SMOKE_JOB=$(
 curl --fail --silent --show-error \
   --request POST \
   --header "Content-Type: application/json" \
   --header "X-Auth-Token: ${JUDGE0_SMOKE_TOKEN}" \
   --data "{\"language_id\":${PYTHON_LANGUAGE_ID},\"source_code\":\"print(2 + 3)\",\"expected_output\":\"5\"}" \
-  'http://10.80.0.2:2358/submissions?base64_encoded=false&wait=true' \
-  | jq
+  'http://10.80.0.2:2358/submissions?base64_encoded=false&wait=false' \
+  | jq -er '.token'
+)
+judge0_wait "$JUDGE0_SMOKE_JOB"
 ```
 
 The result must have status `Accepted` and stdout `5`. Then verify the complete C/C++ system-library configuration with a C program that uses all four configured libraries:
@@ -1079,16 +1113,20 @@ jq -n \
   '{language_id: $language_id, source_code: $source_code, expected_output: "2.000\n"}' \
   >/tmp/cognelo-judge0-c-smoke.json
 
+JUDGE0_SMOKE_JOB=$(
 curl --fail --silent --show-error \
   --request POST \
   --header "Content-Type: application/json" \
   --header "X-Auth-Token: ${JUDGE0_SMOKE_TOKEN}" \
   --data-binary @/tmp/cognelo-judge0-c-smoke.json \
-  'http://10.80.0.2:2358/submissions?base64_encoded=false&wait=true' \
-  | jq
+  'http://10.80.0.2:2358/submissions?base64_encoded=false&wait=false' \
+  | jq -er '.token'
+)
+judge0_wait "$JUDGE0_SMOKE_JOB"
 
 rm /tmp/cognelo-judge0-c-smoke.c /tmp/cognelo-judge0-c-smoke.json
-unset C_LANGUAGE_ID JUDGE0_SMOKE_TOKEN PYTHON_LANGUAGE_ID
+unset C_LANGUAGE_ID JUDGE0_SMOKE_TOKEN PYTHON_LANGUAGE_ID JUDGE0_SMOKE_JOB
+unset -f judge0_wait
 ```
 
 The C result must have status `Accepted` and stdout `2.000`. Next, create a Playwright request without putting difficult JSON quoting on the command line:
@@ -1138,7 +1176,7 @@ The runner result must report `status: "completed"`, `score: 1`, and `maxScore: 
 For a small non-production installation with only one Ubuntu server, the same
 Compose project can run there with both systemd socket proxies listening on
 `127.0.0.1`; omit WireGuard and use loopback URLs in Cognelo's `.env`. This is
-operationally simpler, but Judge0's server and worker containers are
+operationally simpler, but Judge0's worker containers are
 privileged. A container escape or kernel vulnerability would then place
 Cognelo, PostgreSQL, uploaded files, and every co-located instance in the same
 failure domain. The two-VPS deployment is therefore the production reference,
@@ -1171,7 +1209,7 @@ WEB_DESIGN_RUNNER_PORT=3457
 SANDBOX_DOCKER_SUBNET=172.30.1.0/24
 JUDGE0_SERVER_CONTAINER_IP=172.30.1.10
 WEB_DESIGN_RUNNER_CONTAINER_IP=172.30.1.11
-JUDGE0_IMAGE=judge0/judge0:1.13.1
+JUDGE0_IMAGE=cognelo/judge0-hardened:cognelo-0.5.0
 WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:cognelo-0.5.0
 PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/instance2/runtime/seccomp_profile.json
 ```
@@ -1330,7 +1368,7 @@ Never build over the active deployment and never deploy a mutable branch head su
 11. Verify local health, public health, login, file download, and one representative activity.
 12. Retain at least one previous tagged deployment until the deployment is accepted.
 
-When the tag changes `packages/web-design-runner`, its dependencies, or `infra/production`, update the sandbox first:
+When the tag changes execution services or `infra/production`, follow the coordinated procedure in [the upgrade runbook](DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md#3-update-the-sandbox-only-when-the-private-upgrade-checklist-requires-it). Switching from synchronous Judge0 to the hardened queued stack requires an application maintenance window; do not put old synchronous clients against the new API. For a compatible Web Design-only update:
 
 1. fetch the new tag on the sandbox host and add a detached worktree as in Section 14.2;
 2. build `cognelo/web-design-runner:<new-tag>` from that worktree;

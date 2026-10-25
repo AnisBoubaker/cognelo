@@ -18,3 +18,11 @@ it("rejects invalid JSON and bounds depth and collection validation work", async
   expect(() => assertJsonComplexity(nested)).toThrow();
   expect(() => assertJsonComplexity({ source: "legitimate source", files: [1, 2] })).not.toThrow();
 });
+
+it("keeps optional empty bodies bounded without accepting malformed or deeply nested JSON", async () => {
+  const request = (body: string) => new Request("http://example.test", { method: "DELETE", body });
+  await expect(readBoundedJson(request(" \n"), 100, { allowEmpty: true })).resolves.toEqual({});
+  await expect(readBoundedJson(request(" ".repeat(101)), 100, { allowEmpty: true })).rejects.toMatchObject({ status: 413 });
+  await expect(readBoundedJson(request("{"), 100, { allowEmpty: true })).rejects.toMatchObject({ code: "INVALID_JSON" });
+  await expect(readBoundedJson(request("[".repeat(34) + "0" + "]".repeat(34)), 100, { allowEmpty: true })).rejects.toMatchObject({ code: "REQUEST_TOO_COMPLEX" });
+});

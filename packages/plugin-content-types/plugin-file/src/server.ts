@@ -51,8 +51,8 @@ export const fileContentServerPlugin: ServerContentTypePlugin = {
           if (file.size > MAX_UPLOAD_BYTES) {
             return Response.json({ error: { code: "UPLOAD_TOO_LARGE", message: "Files must be 25 MB or smaller." } }, { status: 413 });
           }
-          const title = typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : file.name || context.resource?.title || "File";
-          const originalName = file.name || "course-file";
+          const title = filePayloadSchema.parse({ title: typeof titleValue === "string" && titleValue.trim() ? titleValue.trim() : file.name || context.resource?.title || "File" }).title!;
+          const originalName = z.string().max(255).parse(file.name || "course-file");
           const storedName = `${randomUUID()}-${originalName.replace(SAFE_NAME_PATTERN, "_").slice(0, 180)}`;
           const storageDir = fileStorageDir(context.courseId);
           await mkdir(storageDir, { recursive: true });

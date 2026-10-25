@@ -60,3 +60,5 @@ The shared [activity content closure setting](../../../docs/ACTIVITY_CONTENT_ACC
 Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.
 
 Teachers can [export submitted answers as PDF or ZIP](../../../docs/ANSWER_EXPORTS.md), including selectable prompts and grading content. See [export details](docs/REFERENCE.md#answer-exports).
+
+Prompt and feedback rendering follows the [shared Markdown security contract](../../../docs/plugin-authoring/03-core-services.md#what-markdownrenderer-gives-you); raw attributed HTML is shown literally.

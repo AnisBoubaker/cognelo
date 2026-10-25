@@ -698,6 +698,14 @@ export function readMcqConfig(config: Record<string, unknown>): ParsedMcq {
     : parseMcqSource(String(config.source ?? ""), String(config.defaultCodeLanguage ?? "none"));
 }
 
+/** Persist only actual question/choice identifiers, never arbitrary client data. */
+export function constrainMcqAnswers(config: Record<string, unknown> | undefined, answers: McqAnswerState): McqAnswerState {
+  return Object.fromEntries(readMcqConfig(config ?? {}).questions.filter((question) => Object.hasOwn(answers, question.id)).map((question) => {
+    const choices = new Set(question.choices.map((choice) => choice.id));
+    return [question.id, [...new Set(answers[question.id])].filter((id) => choices.has(id))];
+  }));
+}
+
 export function mcqSelectedFeedback(config: Record<string, unknown> | undefined, answers: McqAnswerState) {
   const parsed = readMcqConfig(config ?? {});
   const result = gradeMcqAnswers(parsed, answers);

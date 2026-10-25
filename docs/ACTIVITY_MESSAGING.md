@@ -55,7 +55,7 @@ The dialog's small speaker button controls sound; the preference persists per ac
 
 Opening a chat focuses its message field when available, otherwise its non-action heading. When a composer finishes loading, it takes focus only if focus is still on that initial heading/dialog; it must not steal focus from another deliberately selected control. Read-only chats retain heading focus, and closing restores the prior focus. The speaker button remains keyboard-accessible but never receives automatic opening focus, so Space cannot accidentally mute sound.
 
-Presence remains independent of messaging. Recently present, unfinished attempts (45-second window) drive the **Students are answering** warning for live settings changes, even when messaging is off. Timed activities and Tests require a started attempt to renew presence; untimed activities use the next logical attempt. A broadcast created for an offline student uses a closed, inactive delivery record. Review/history requests do not renew presence.
+Presence remains independent of messaging. Recently present, unfinished attempts (45-second window) drive the **Students are answering** warning for live settings changes, even when messaging is off. Timed activities and Tests require a started attempt to renew presence; untimed activities use the next logical attempt. A broadcast created for an offline student uses a closed, inactive delivery record. Review/history requests do not renew presence. Simultaneous presence requests retry a unique-key upsert conflict once using the same enrollment/assignment/attempt identity; a competing successful creation must not block a reopened activity with a server error.
 
 ## Authorization and retained access
 

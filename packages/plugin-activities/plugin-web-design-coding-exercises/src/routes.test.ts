@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   assertCanManageCourse: vi.fn(),
   assertCanManageCourseOrViewGradebook: vi.fn(),
   clearActivityResponseDraft: vi.fn(),
+  getActivityAttemptAvailability: vi.fn(),
   recordActivityAttemptGradingResult: vi.fn(),
   startActivityAttempt: vi.fn(),
   submitActivityAttempt: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock("@cognelo/core", async () => {
     assertCanManageCourse: mocks.assertCanManageCourse,
     assertCanManageCourseOrViewGradebook: mocks.assertCanManageCourseOrViewGradebook,
     clearActivityResponseDraft: mocks.clearActivityResponseDraft,
+    getActivityAttemptAvailability: mocks.getActivityAttemptAvailability,
     recordActivityAttemptGradingResult: mocks.recordActivityAttemptGradingResult,
     startActivityAttempt: mocks.startActivityAttempt,
     submitActivityAttempt: mocks.submitActivityAttempt
@@ -71,12 +73,13 @@ describe("web design coding exercise routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.clearActivityResponseDraft.mockResolvedValue({ ok: true });
+    mocks.getActivityAttemptAvailability.mockResolvedValue({ canStart: true, reason: null });
     mocks.listWebDesignExerciseTests.mockResolvedValue({ tests: [] });
     mocks.replaceWebDesignExerciseTests.mockResolvedValue({ tests: [{ id: "test-1" }] });
     mocks.getWebDesignExpectedResult.mockResolvedValue({ expectedResult: null });
     mocks.listRecentWebDesignExerciseSubmissions.mockResolvedValue([{ id: "submission-1" }]);
     mocks.runWebDesignExercise.mockResolvedValue({ id: "run-1" });
-    mocks.submitWebDesignExercise.mockResolvedValue({ id: "submit-1" });
+    mocks.submitWebDesignExercise.mockResolvedValue({ id: "submit-1", score: 1, maxScore: 1, files: [file] });
     mocks.startActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
     mocks.submitActivityAttempt.mockResolvedValue({ id: "core-attempt-1" });
   });
@@ -91,6 +94,16 @@ describe("web design coding exercise routes", () => {
         submissions: [{ ...submission, status: "completed", score: null, maxScore: null, message: null, resultSummary: { gradingWithheld: true }, testResults: [] }]
       });
     }
+  });
+
+  it("rejects exhausted attempts before invoking the runner or persisting a plugin submission", async () => {
+    mocks.getActivityAttemptAvailability.mockResolvedValue({ canStart: false, reason: "ATTEMPT_LIMIT_REACHED" });
+    await expect(webDesignExerciseSubmitRoute.methods.POST!({
+      request: new Request("http://test.local", { method: "POST" }),
+      context: { ...context, groupId: "group-1" }, readJson: async () => ({ files: [file] })
+    })).rejects.toMatchObject({ status: 409, code: "ATTEMPT_LIMIT_REACHED" });
+    expect(mocks.submitWebDesignExercise).not.toHaveBeenCalled();
+    expect(mocks.startActivityAttempt).not.toHaveBeenCalled();
   });
 
   it("manages tests and expected results in course context", async () => {
@@ -111,6 +124,17 @@ describe("web design coding exercise routes", () => {
     ).resolves.toEqual({ expectedResult: null });
   });
 
+  it.each([null, undefined, Number.NaN, 0])("does not consume an attempt when the runner returns an invalid maximum (%s)", async (maxScore) => {
+    mocks.submitWebDesignExercise.mockResolvedValue({ id: "failed-submit", score: 1, maxScore, files: [file] });
+    await expect(webDesignExerciseSubmitRoute.methods.POST!({
+      request: new Request("http://test.local", { method: "POST" }),
+      context: { ...context, groupId: "group-1" }, readJson: async () => ({ files: [file] })
+    })).rejects.toMatchObject({ status: 502, code: "WEB_DESIGN_RESULT_INVALID" });
+    expect(mocks.startActivityAttempt).not.toHaveBeenCalled();
+    expect(mocks.submitActivityAttempt).not.toHaveBeenCalled();
+    expect(mocks.clearActivityResponseDraft).not.toHaveBeenCalled();
+  });
+
   it("runs and submits student files", async () => {
     await expect(webDesignExerciseRunRoute.methods.GET?.({ request: new Request("http://test.local"), context, readJson: async () => ({}) })).resolves.toEqual({
       submissions: [{ id: "submission-1" }]
@@ -126,7 +150,7 @@ describe("web design coding exercise routes", () => {
         context: { ...context, groupId: "group-1" },
         readJson: async () => ({ files: [file] })
       })
-    ).resolves.toEqual({ submission: { id: "submit-1" } });
+    ).resolves.toEqual({ submission: { id: "submit-1", score: 1, maxScore: 1, files: [file] } });
     expect(mocks.clearActivityResponseDraft).toHaveBeenCalledWith(
       context.user,
       "course-1",

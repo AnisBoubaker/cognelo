@@ -32,3 +32,5 @@ When changing this plugin, update:
 - `packages/plugin-content-types/plugin-github-repo/PROJECT_MEMORY.md`
 
 Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.
+
+Repository URLs reject embedded credentials and non-HTTP(S) schemes; HTTP is normalized to HTTPS. Run `npm run db:migrate:all` to strip legacy URL userinfo and invalidate its derived index (`202610250020_github_url_credentials`).

@@ -8,8 +8,9 @@ x-logging: &default-logging
 
 services:
   judge0-server:
-    image: ${JUDGE0_IMAGE:-judge0/judge0:1.13.1}
-    privileged: true
+    image: ${JUDGE0_IMAGE:?Set JUDGE0_IMAGE to the locally built hardened image}
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     restart: unless-stopped
     volumes:
       - ./judge0.conf:/judge0.conf:ro
@@ -22,7 +23,7 @@ services:
     logging: *default-logging
 
   judge0-workers:
-    image: ${JUDGE0_IMAGE:-judge0/judge0:1.13.1}
+    image: ${JUDGE0_IMAGE:?Set JUDGE0_IMAGE to the locally built hardened image}
     command: ["./scripts/workers"]
     privileged: true
     restart: unless-stopped
@@ -40,7 +41,7 @@ services:
     logging: *default-logging
 
   judge0-language-config:
-    image: postgres:16.2
+    image: postgres:16.15-bookworm
     restart: "no"
     env_file:
       - ./judge0.conf
@@ -68,7 +69,7 @@ services:
     logging: *default-logging
 
   judge0-db:
-    image: postgres:16.2
+    image: postgres:16.15-bookworm
     restart: unless-stopped
     env_file:
       - ./judge0.conf
@@ -79,7 +80,7 @@ services:
     logging: *default-logging
 
   judge0-redis:
-    image: redis:7.2.4
+    image: redis:7.2.16-bookworm
     command:
       - bash
       - -c

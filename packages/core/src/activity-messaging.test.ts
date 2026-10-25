@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
+import { Prisma } from "@cognelo/db";
 
 const db = vi.hoisted(() => ({
   activity: { findFirst: vi.fn() },
@@ -140,6 +141,17 @@ describe("activity attempt messaging", () => {
     expect(db.activityConversation.upsert).toHaveBeenCalledWith(expect.objectContaining({
       create: expect.objectContaining({ attemptNumber: 3, attemptId: null })
     }));
+  });
+
+  it("retries a simultaneous presence upsert on the same scoped attempt", async () => {
+    db.activityAttempt.findMany.mockResolvedValue([{ id: "attempt-1", attemptNumber: 1, lifecycle: "started" }]);
+    db.activityConversation.upsert.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("Concurrent unique key", {
+      code: "P2002", clientVersion: "test", meta: { target: ["attemptId"] }
+    })).mockResolvedValue({ id: "conversation-1", attemptId: "attempt-1", attemptNumber: 1 });
+    await expect(getLearnerActivityConversation(student, "course-1", "group-1", "activity-1", now))
+      .resolves.toMatchObject({ conversation: { id: "conversation-1", attemptId: "attempt-1" } });
+    expect(db.activityConversation.upsert).toHaveBeenCalledTimes(2);
+    expect(db.activityConversation.upsert.mock.calls[1]).toEqual(db.activityConversation.upsert.mock.calls[0]);
   });
 
   it("keeps presence while disabled and reveals the same attempt when enabled live", async () => {

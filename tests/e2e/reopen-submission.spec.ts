@@ -58,6 +58,9 @@ for (const policy of ["untimed", "general extension", "student exception"] as co
       expect(await prisma.gradebookItem.findUniqueOrThrow({ where: { id: before.gradebookItemId } })).toEqual(itemBefore);
       expect(await prisma.grade.findFirst({ where: { selectedAttemptId: before.id, isActive: true } })).toBeNull();
       expect((await teacherApi.post(reopenPath)).status()).toBe(409);
+      const presence = await Promise.all(Array.from({ length: 8 }, () => studentApi.get(`${path}/content-access?messaging=presence`)));
+      expect(presence.map((response) => response.status())).toEqual(Array(8).fill(200));
+      expect(await prisma.activityConversation.count({ where: { attemptId: before.id } })).toBe(1);
       await studentPage.goto(path.replace("/api", ""));
       await expect(studentPage.getByLabel("Four", { exact: true })).toBeChecked();
       await expect(studentPage.getByRole("button", { name: "Submit", exact: true })).toBeEnabled();
@@ -119,6 +122,9 @@ test("reopens all compound Test answers and resubmits the same sitting", { tag: 
     expect(runtime.timing.expiresAt).toBe(new Date(before.startedAt.getTime() + 60 * 60_000).toISOString());
     expect(runtime.test.items[0]!.itemAttempt!.lifecycle).toBe("started");
     expect(runtime.test.items[0]!.itemAttempt!.state).toEqual((before.testItemAttempts[0]!.result as { state: unknown }).state);
+    const presence = await Promise.all(Array.from({ length: 8 }, () => studentApi.get(`${path}/content-access?messaging=presence`)));
+    expect(presence.map((response) => response.status())).toEqual(Array(8).fill(200));
+    expect(await prisma.activityConversation.count({ where: { attemptId: before.id } })).toBe(1);
     await studentPage.goto(path.replace("/api", ""));
     await expect(studentPage.getByLabel("Four", { exact: true })).toBeChecked();
     await studentPage.getByLabel("Five", { exact: true }).check();

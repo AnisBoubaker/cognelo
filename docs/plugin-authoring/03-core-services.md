@@ -141,7 +141,11 @@ These are especially useful for programming-learning activities.
 
 - shared Markdown display for authored prompts and descriptions
 - one rendering path for both core pages and plugins
-- safer HTML handling instead of ad hoc `dangerouslySetInnerHTML` usage in each plugin
+- one sanitizer boundary; raw HTML is escaped except a fixed set of attribute-free formatting tags
+- authored styles, forms, IDs/classes, and attributes remain inert; ordinary Markdown links/images/tables keep their renderer-owned markup
+- untrusted KaTeX with bounded size/macro expansion; plugins must not enable trusted HTML commands or bypass this boundary
+
+Older attributed HTML is displayed literally without changing stored source. Use ordinary Markdown/editor formatting. See [security boundaries](../SECURITY_BOUNDARIES.md) for the complete contract.
 
 ### What `RichTextEditor` Gives You
 

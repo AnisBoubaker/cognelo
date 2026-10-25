@@ -1,3 +1,4 @@
+import { constrainMcqAnswers } from "./mcq";
 import { exportMcqSubmission } from "./submission-export";
 import { AppError } from "@cognelo/core";
 import { prisma } from "@cognelo/db";
@@ -87,6 +88,7 @@ export const mcqServerPlugin: ServerActivityPlugin = {
       const input = z.object({
         answers: z.record(z.string(), z.array(z.string().min(1).max(120)).default([])).prefault({})
       }).parse(payload);
+      input.answers = constrainMcqAnswers(activity.config, input.answers);
       return {
         state: { answers: input.answers },
         gradingResult: buildMcqGradingResultFromConfig(activity.config, input.answers)
@@ -98,6 +100,7 @@ export const mcqServerPlugin: ServerActivityPlugin = {
     actions: {
       submit: async ({ activity, payload }) => {
         const input = z.object({ answers: z.record(z.string(), z.array(z.string().min(1).max(120)).default([])).prefault({}) }).parse(payload);
+        input.answers = constrainMcqAnswers(activity.config, input.answers);
         return {
           submission: {
             id: `student-preview-${crypto.randomUUID()}`,
@@ -112,6 +115,7 @@ export const mcqServerPlugin: ServerActivityPlugin = {
       },
       feedback: async ({ activity, payload }) => {
         const input = z.object({ answers: z.record(z.string(), z.array(z.string().min(1).max(120)).default([])).prefault({}) }).parse(payload);
+        input.answers = constrainMcqAnswers(activity.config, input.answers);
         return { feedback: buildMcqGradingResultFromConfig(activity.config, input.answers).feedback ?? {} };
       }
     }

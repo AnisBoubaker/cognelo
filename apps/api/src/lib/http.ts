@@ -94,8 +94,8 @@ export function progressJson<TProgress>(run: (report: (progress: TProgress) => v
   } }) });
 }
 
-export async function readJson(request: NextRequest, maximum?: number) {
-  return readBoundedJson(request, maximum);
+export async function readJson(request: NextRequest, maximum?: number, options?: { allowEmpty?: boolean }) {
+  return readBoundedJson(request, maximum, options);
 }
 
 export async function handleRoute(handler: () => Promise<Response>) {

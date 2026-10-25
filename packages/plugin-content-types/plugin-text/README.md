@@ -7,3 +7,5 @@ The plugin stores Markdown and presentation preferences in generic resource meta
 See [Text material reference](docs/REFERENCE.md) for routes, defaults, image lifecycle, and validation.
 
 Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.
+
+Raw attributed HTML is displayed literally; ordinary Markdown, attribute-free formatting, images, and bounded untrusted math remain supported through the shared renderer. See [student display](docs/REFERENCE.md#student-display).

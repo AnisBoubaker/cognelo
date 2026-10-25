@@ -10,6 +10,7 @@ import {
   normalizeWebDesignExerciseConfig,
   normalizeWebDesignFilePath,
   parseWebDesignExerciseConfig,
+  constrainWebDesignStudentFiles,
   webDesignExpectedResultTokenPattern,
   webDesignPromptIncludesExpectedResult,
   webDesignPromptRequestsCroppedExpectedResult,
@@ -549,7 +550,7 @@ export function WebDesignCodingExerciseActivityView({
         if (cancelled) return;
         const nextConfig = parseWebDesignExerciseConfig({
           ...activity.config,
-          files: Array.isArray(saved?.files) ? saved.files : initialConfig.files
+          files: constrainWebDesignStudentFiles(activity.config, saved?.files ?? initialConfig.files)
         });
         setStarterFiles(nextConfig.files);
         lastSavedFilesRef.current = JSON.stringify(normalizeWorkspaceFiles(nextConfig.files));

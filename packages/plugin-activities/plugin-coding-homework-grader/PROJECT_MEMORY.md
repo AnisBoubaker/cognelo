@@ -30,3 +30,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - [Answer exports](../../../docs/ANSWER_EXPORTS.md) are read-only plugin projections: Exports read retained submitted text/source files and challenge answers, with optional assignment Markdown/PDF, question text, and teacher comments. Binary files remain identified attachments; no analysis or question generation is run.
 
 - Keep ZIP directory/expansion limits, upload/storage budgets, staff-only internal analysis, and atomic finalization together. Expiry finalizes saved answers only; no new archive is accepted after the deadline. See [upload boundaries](docs/REFERENCE.md#upload-and-finalization-boundaries).
+
+- Use the shared Markdown renderer for prompts and feedback: raw styles/forms/attributes stay inert and math stays untrusted and bounded. See [the shared rendering contract](../../../docs/plugin-authoring/03-core-services.md#what-markdownrenderer-gives-you).

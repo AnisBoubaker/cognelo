@@ -5,6 +5,7 @@ import {
   AppError,
   assertCanManageCourseOrViewGradebook,
   assertCanViewCourseGradebook,
+  getActivityAttemptAvailability,
   clearActivityResponseDraft,
   recordActivityAttemptGradingResult,
   startActivityAttempt,
@@ -106,6 +107,7 @@ export const webDesignExerciseRunRoute: PluginRouteDefinition = {
       const input = webDesignExerciseRunInputSchema.parse(await readJson());
       const submission = await runWebDesignExercise({
         activityId: context.activity.id,
+        activityConfig: context.activity.config,
         userId: context.user.id,
         input
       });
@@ -132,17 +134,27 @@ export const webDesignExerciseSubmitRoute: PluginRouteDefinition = {
     },
     POST: async ({ context, readJson }) => {
       const input = webDesignExerciseRunInputSchema.parse(await readJson());
+      if (context.courseId && context.groupId) {
+        const availability = await getActivityAttemptAvailability(context.user, {
+          courseId: context.courseId, groupId: context.groupId, activityId: context.activity.id
+        });
+        if (!availability.canStart) throw new AppError(409, availability.reason ?? "ATTEMPT_UNAVAILABLE", "No submission attempt is currently available.");
+      }
       const submission = await submitWebDesignExercise({
         activityId: context.activity.id,
+        activityConfig: context.activity.config,
         userId: context.user.id,
         input
       });
       if (context.courseId && context.groupId) {
+        if (submission.score === null || submission.maxScore === null || !Number.isFinite(submission.score) || !Number.isFinite(submission.maxScore) || submission.maxScore <= 0) {
+          throw new AppError(502, "WEB_DESIGN_RESULT_INVALID", "The execution service did not return a valid result. Try again shortly.");
+        }
         const assessmentMode = context.activity.assignment?.metadata?.assessmentMode === "summative" ? "summative" : "formative";
         const metadata = {
           mode: assessmentMode,
           submissionId: submission.id,
-          submittedFiles: input.files
+          submittedFiles: submission.files
         } as Prisma.InputJsonValue;
         const coreAttempt = await startActivityAttempt(context.user, {
           courseId: context.courseId,
@@ -160,9 +172,6 @@ export const webDesignExerciseSubmitRoute: PluginRouteDefinition = {
           metadata
         });
         if (assessmentMode === "summative") {
-          if (submission.score === null || submission.maxScore === null || submission.maxScore <= 0) {
-            throw new AppError(409, "WEB_DESIGN_RESULT_INVALID", "The web design exercise did not return a valid score.");
-          }
           await recordActivityAttemptGradingResult(context.user, {
             attemptId: submittedAttempt.id,
             rawScore: submission.score,

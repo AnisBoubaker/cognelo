@@ -69,14 +69,14 @@ describe("web design execution persistence", () => {
   });
 
   it("runs sample tests, submits hidden tests, and persists runner results", async () => {
-    await expect(runWebDesignExercise({ activityId: "activity-1", userId: "user-1", input: { files: [file] } })).resolves.toMatchObject({
+    await expect(runWebDesignExercise({ activityId: "activity-1", activityConfig: { files: [file] }, userId: "user-1", input: { files: [file] } })).resolves.toMatchObject({
       id: "submission-1",
       status: "completed"
     });
     expect(mockPrisma.pluginWebDesignExerciseTest.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ kind: "sample" }) }));
     expect(mockPrisma.pluginWebDesignExerciseTestResult.createMany).toHaveBeenCalled();
 
-    await submitWebDesignExercise({ activityId: "activity-1", userId: "user-1", input: { files: [file] } });
+    await submitWebDesignExercise({ activityId: "activity-1", activityConfig: { files: [file] }, userId: "user-1", input: { files: [file] } });
     expect(mockPrisma.pluginWebDesignExerciseTest.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: expect.objectContaining({ kind: "hidden" }) }));
   });
 
@@ -86,7 +86,7 @@ describe("web design execution persistence", () => {
       submission({ status: "failed", score: null, maxScore: null, message: "runner down" })
     );
 
-    await expect(runWebDesignExercise({ activityId: "activity-1", userId: "user-1", input: { files: [file] } })).resolves.toMatchObject({
+    await expect(runWebDesignExercise({ activityId: "activity-1", activityConfig: { files: [file] }, userId: "user-1", input: { files: [file] } })).resolves.toMatchObject({
       status: "failed",
       message: "runner down"
     });
@@ -98,6 +98,7 @@ describe("web design execution persistence", () => {
   it("runs a Student view preview without creating submission or test-result rows", async () => {
     await expect(previewWebDesignExercise({
       activityId: "activity-1",
+      activityConfig: { files: [file] },
       userId: "teacher-1",
       kind: "submit",
       input: { files: [file] }
@@ -106,5 +107,22 @@ describe("web design execution persistence", () => {
     expect(mockPrisma.pluginWebDesignExerciseSubmission.create).not.toHaveBeenCalled();
     expect(mockPrisma.pluginWebDesignExerciseSubmission.update).not.toHaveBeenCalled();
     expect(mockPrisma.pluginWebDesignExerciseTestResult.createMany).not.toHaveBeenCalled();
+  });
+
+  it("uses authored file identities and locked contents for runs, submissions and preview", async () => {
+    const locked = { ...file, isEditable: false, starterCode: "<h1>Authored content</h1>" };
+    const editable = { ...file, id: "css", path: "style.css", language: "css" as const, starterCode: "", orderIndex: 1 };
+    const supplied = [
+      { ...locked, isEditable: true, starterCode: "<script>injected()</script>" },
+      { ...editable, path: "attack.js", language: "javascript" as const, starterCode: "h1 { color: green; }" },
+      { ...file, id: "extra", path: "extra.js", language: "javascript" as const }
+    ];
+    const params = { activityId: "activity-1", userId: "user-1", activityConfig: { files: [locked, editable] }, input: { files: supplied } };
+    const expected = [locked, { ...editable, starterCode: "h1 { color: green; }" }];
+    await runWebDesignExercise(params);
+    await submitWebDesignExercise(params);
+    await previewWebDesignExercise({ ...params, kind: "submit" });
+    for (const [input] of mocks.runWebDesignTestsInRunner.mock.calls) expect(input.files).toEqual(expected);
+    for (const [input] of mockPrisma.pluginWebDesignExerciseSubmission.create.mock.calls) expect(input.data.files).toEqual(expected);
   });
 });

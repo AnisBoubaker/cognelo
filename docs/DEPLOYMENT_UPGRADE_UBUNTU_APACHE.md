@@ -267,7 +267,7 @@ curl --fail -H "Authorization: Bearer ${WEB_DESIGN_RUNNER_TOKEN}" http://10.80.0
 
 If the private upgrade checklist specifies changes to `sandbox.compose.yml`, `judge0.conf`, Playwright, Judge0, Redis, the sandbox PostgreSQL version, seccomp, ports, or WireGuard, follow those exact release-specific steps. Do not overwrite the persistent runtime `.env` or `judge0.conf`, because they contain instance-specific settings and secrets. Do not use mutable image tags such as `latest`.
 
-When a release changes the Judge0 language configuration, copy both versioned files from that release, validate them, stop workers, run the configuration once, and recreate the workers only after it succeeds:
+When a release changes the Judge0 language configuration, rebuild/select the hardened wrapper with its embedded SQL, then copy both versioned files from that release, validate them, stop workers, run the configuration once, and recreate the workers only after it succeeds:
 
 ```bash
 sudo install -m 0644 \
@@ -287,6 +287,21 @@ sudo docker compose --env-file .env -f sandbox.compose.yml \
 ```
 
 The configuration is idempotent. Compose waits for its successful exit before recreating the workers. `judge0-language-config` must show `Exited (0)` and its logs must show every active C/C++ runtime with `-pthread -lm -ldl -lrt`. Complete the Python and C Judge0 smoke tests from the initial deployment runbook after this change.
+
+### First upgrade to queued, hardened Judge0
+
+This change requires a coordinated maintenance window: the old Cognelo client uses synchronous execution, which the new image refuses. Back up the application, runner configuration, and any retained Judge0 database first. Stop application/API background traffic before changing the stack; leave the private PostgreSQL service available for credential rotation. Do not use the local-development credential helper on production.
+
+1. Build `cognelo/judge0-hardened:<new-tag>` with `infra/production/judge0-hardened.Dockerfile` and the approved `JUDGE0_BASE_IMAGE=judge0/judge0:1.13.1`, as shown in [initial deployment](DEPLOYMENT_UBUNTU_APACHE.md#144-build-the-pinned-execution-images). Build the matching Web Design image too.
+2. Stop `judge0-server`, `judge0-workers`, and `judge0-redis`. Upstream startup logs may have contained the four Judge0 service credentials. Keep any required evidence in restricted incident storage; rotate `AUTHN_TOKEN`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, and `SECRET_KEY_BASE`. Update the existing PostgreSQL role interactively using `docker compose --env-file .env -f sandbox.compose.yml exec judge0-db psql -U judge0 -d postgres` and `\password judge0`, then store the matching password in protected `judge0.conf`. Do not remove database volumes or merely change the config without updating the existing role.
+3. Copy the new Compose template and language SQL. Preserve instance-specific settings/secrets, set `ENABLE_WAIT_RESULT=false` in `judge0.conf`, and set runtime `JUDGE0_IMAGE=cognelo/judge0-hardened:<new-tag>` plus the new `WEB_DESIGN_RUNNER_IMAGE`. Pull only `judge0-db`, `judge0-redis`, and `judge0-language-config` (PostgreSQL 16.15 / Redis 7.2.16). Both Judge0 services must use the locally built wrapper; only workers remain privileged, and the API drops all capabilities with `no-new-privileges`.
+4. Validate with `docker compose config --quiet`, recreate the private databases and execution services with the preserved volumes, and require `judge0-language-config` to exit successfully. Repeat the queued Python/C smoke tests in the initial runbook. Verify `/api/environment` is mode `0600`, current logs contain none of the rotated values, and the old authentication token returns 401.
+5. Run `npm run db:migrate:all` and activate the matching Cognelo release during the same window. Update the encrypted Judge0 token through **Settings → Runners** using restricted administrator access before restoring learner traffic; run both runner capability tests. The GitHub plugin migration `202610250020_github_url_credentials` strips legacy URL userinfo and invalidates its derived index; Core migration `202610250030_legacy_material_urls` performs the same cleanup for course, section, and retained subject material URLs and clears unsupported URL schemes. Rotate any real credential that had been embedded in these URLs.
+6. Keep rollback artifacts for the application, wrapper image, configuration, and database together. An older synchronous client is incompatible with the queued-only stack; rehearse rollback as a coordinated pair. Credentials already exposed in old logs must stay rotated.
+
+The wrapper fixes startup secret handling and API privilege separation, not all upstream Judge0 OS/language dependencies. Retain the dedicated disposable sandbox host, authenticated restricted listeners, internal network, and blocked egress. Record scan applicability and remaining upstream advisories in the private release checklist.
+
+Shared Markdown also stops activating attributed raw HTML: review older materials that used HTML styles/forms and use ordinary Markdown/editor formatting. The stored source is preserved. Ordinary Markdown links/images/tables, attribute-free formatting, and bounded untrusted math remain supported.
 
 ## 4. Back up the database
 

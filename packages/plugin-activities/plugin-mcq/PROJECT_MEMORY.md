@@ -43,3 +43,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - [Answer exports](../../../docs/ANSWER_EXPORTS.md) are read-only plugin projections: Exports preserve selected choices. Prompt-off exports omit stems and unselected choices; grading-off exports omit answer keys and feedback. No checking or model call occurs.
 
 - `expiredAttemptInput` must reconstruct final input from saved server state. Never accept a fresh learner request body after expiry; the host checks again after body upload. See [deadline enforcement](docs/REFERENCE.md#deadline-finalization).
+
+- Filter ordinary, formative, preview, and Test submissions through `constrainMcqAnswers`: retain known identifiers, deduplicate choices, and preserve multiple selected choices so invalid single-choice input cannot become correct. Shared/direct math rendering stays untrusted and bounded.

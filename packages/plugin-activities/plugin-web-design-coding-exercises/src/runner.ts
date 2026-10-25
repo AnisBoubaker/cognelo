@@ -1,5 +1,5 @@
 import { getServerEnv } from "@cognelo/config";
-import { AppError, resolveExecutionRunner } from "@cognelo/core";
+import { AppError, readExecutionServiceJson, resolveExecutionRunner } from "@cognelo/core";
 import { z } from "zod";
 import type { WebDesignExerciseFile } from "./web-design-coding-exercises";
 
@@ -50,6 +50,7 @@ export async function runWebDesignTestsInRunner(params: {
   try {
     const response = await fetch(`${runner.baseUrl}/run`, {
       method: "POST",
+      redirect: "error",
       signal: AbortSignal.timeout(65_000),
       headers: {
         "Content-Type": "application/json",
@@ -61,18 +62,10 @@ export async function runWebDesignTestsInRunner(params: {
         timeoutMs: params.timeoutMs ?? 8000
       })
     });
-    const body = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(body?.error?.message ?? "Runner request failed.");
-    }
+    const body = await readExecutionServiceJson(response);
 
     return runnerResultSchema.parse(body);
   } catch (error) {
-    if (error instanceof AppError) {
-      throw error;
-    }
-
     throw new AppError(
       502,
       "WEB_DESIGN_RUNNER_FAILED",
@@ -95,6 +88,7 @@ export async function captureWebDesignScreenshotInRunner(params: {
   try {
     const response = await fetch(`${runner.baseUrl}/screenshot`, {
       method: "POST",
+      redirect: "error",
       signal: AbortSignal.timeout(65_000),
       headers: {
         "Content-Type": "application/json",
@@ -107,18 +101,10 @@ export async function captureWebDesignScreenshotInRunner(params: {
         viewport: params.viewport ?? { width: 1024, height: 768 }
       })
     });
-    const body = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(body?.error?.message ?? "Runner screenshot request failed.");
-    }
+    const body = await readExecutionServiceJson(response, 32 * 1024 * 1024);
 
     return runnerScreenshotSchema.parse(body);
   } catch (error) {
-    if (error instanceof AppError) {
-      throw error;
-    }
-
     throw new AppError(
       502,
       "WEB_DESIGN_SCREENSHOT_FAILED",

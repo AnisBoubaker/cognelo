@@ -1,4 +1,4 @@
-import { readBoundedJson, MAX_UPLOAD_JSON_BYTES } from "@cognelo/core";
+import { assertCanViewCourseGradebook, readBoundedJson } from "@cognelo/core";
 import { getServerEnv } from "@cognelo/config";
 import { NextRequest } from "next/server";
 import { AnswerExportRequestSchema } from "@cognelo/contracts";
@@ -18,9 +18,9 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function POST(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser(); const { courseId, activityId } = await params;
-    const input = AnswerExportRequestSchema.parse(await readBoundedJson(request, MAX_UPLOAD_JSON_BYTES));
-    const data = await buildAnswerExport(user, courseId, activityId, input, answerExportLabels(input.locale));
-    const file = await createAnswerExportFile(data, user);
+    await assertCanViewCourseGradebook(user, courseId);
+    const input = AnswerExportRequestSchema.parse(await readBoundedJson(request));
+    const file = await createAnswerExportFile(() => buildAnswerExport(user, courseId, activityId, input, answerExportLabels(input.locale)), user);
     return new Response(new Uint8Array(file.bytes), { headers: { "Cache-Control": "no-store", "Content-Type": file.mime,
       "Content-Disposition": `attachment; filename="answers.${input.format}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
       "Access-Control-Allow-Origin": getServerEnv().CORS_ORIGIN, "Access-Control-Allow-Credentials": "true", "Access-Control-Expose-Headers": "Content-Disposition" } });

@@ -602,3 +602,7 @@ Frontend tests where practical:
 - `docs/PROJECT_MEMORY.md`: durable platform decisions
 - `docs/plugin-authoring/`: plugin grading contract and examples
 - relevant plugin `README.md` and `PROJECT_MEMORY.md` files when each plugin adopts core grading
+
+### Export security invariants
+
+Both legacy course CSV and activity-result CSV use the shared cell escaper. Student-controlled text beginning with a spreadsheet formula marker, including leading whitespace/control characters, is literal text; numeric score cells remain numeric. PDF/ZIP preparation and rendering follow the aggregate budgets in [answer exports](ANSWER_EXPORTS.md).

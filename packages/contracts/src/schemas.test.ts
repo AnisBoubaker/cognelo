@@ -212,6 +212,15 @@ describe("shared contract schemas", () => {
     ).toMatchObject({ url: "https://github.com/org/repo" });
   });
 
+  it.each(["https://synthetic:credential@github.com/example/repo", "javascript:alert(1)", "data:text/html,synthetic", "ftp://github.com/example/repo", "not a URL", "https://%"])("rejects unsafe legacy material URLs even on a partial update: %s", (url) => {
+    expect(CourseMaterialInputSchema.safeParse({ title: "Material", kind: "github_repo", url }).success).toBe(false);
+    expect(CourseMaterialUpdateSchema.safeParse({ url }).success).toBe(false);
+  });
+
+  it.each(["not a URL", "https://%"])("reports malformed model endpoints as validation errors: %s", (baseUrl) => {
+    expect(AiAgentConnectionInputSchema.safeParse({ displayName: "Model", provider: "openai", model: "test-model", baseUrl }).success).toBe(false);
+  });
+
   it("rejects group availability windows that end before they start", () => {
     expect(() =>
       CourseGroupUpdateSchema.parse({

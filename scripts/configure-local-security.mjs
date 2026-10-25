@@ -6,7 +6,8 @@ import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
 import { parseEnv } from "node:util";
 import { execFileSync } from "node:child_process";
 
-const rotate = process.argv.includes("--rotate-existing");
+const rotateRunner = process.argv.includes("--rotate-runner-credentials");
+const rotate = process.argv.includes("--rotate-existing") || rotateRunner;
 const envPath = ".env", judgePath = "infra/judge0/judge0.conf";
 const text = existsSync(envPath) ? await readFile(envPath, "utf8") : await readFile(".env.example", "utf8");
 const previous = parseEnv(text), next = { ...previous };
@@ -22,12 +23,14 @@ if (needsKey) next.EMAIL_CREDENTIALS_ENCRYPTION_KEY = random();
 if (!next.WEB_DESIGN_RUNNER_TOKEN) next.WEB_DESIGN_RUNNER_TOKEN = random();
 const oldPassword = decodeURIComponent(database.password);
 const replacePassword = !oldPassword || oldPassword === "postgres" || oldPassword === "CONFIGURE_LOCALLY";
+if (rotateRunner && (needsKey || replacePassword)) throw new Error("Configure the existing local application credentials before rotating only the Judge0 services.");
 if (replacePassword) database.password = random();
 next.DATABASE_URL = database.href;
 next.POSTGRES_PASSWORD = decodeURIComponent(database.password);
 for (const [key, fallback] of Object.entries({ AUTHN_TOKEN: "dev-local-token", POSTGRES_PASSWORD: "judge0", REDIS_PASSWORD: "judge0-redis-password", SECRET_KEY_BASE: "dev-judge0-secret-key-base" })) {
-  if (!judge[key] || judge[key] === fallback || judge[key].startsWith("GENERATE_")) judge[key] = random();
+  if (rotateRunner || !judge[key] || judge[key] === fallback || judge[key].startsWith("GENERATE_")) judge[key] = random();
 }
+judge.ENABLE_WAIT_RESULT = "false";
 next.JUDGE0_AUTH_TOKEN = judge.AUTHN_TOKEN;
 next.COGNELO_ALLOW_DEMO_SEED = "true";
 const dockerEnv = { ...process.env, ...next };
@@ -73,14 +76,15 @@ if (appDb && rotate) {
     await db.$transaction(async (tx) => {
       for (const row of await tx.executionRunner.findMany()) {
         const localJudge = row.runnerType === "judge0" && ["http://localhost:2358", "http://127.0.0.1:2358"].includes(row.baseUrl);
+        if (rotateRunner && !localJudge) continue;
         const value = localJudge ? judge.AUTHN_TOKEN : decrypt(row.authTokenEncrypted);
         await tx.executionRunner.update({ where: { id: row.id }, data: { authTokenEncrypted: encrypt(value, next.EMAIL_CREDENTIALS_ENCRYPTION_KEY), ...(localJudge ? { authHeader: "X-Auth-Token" } : {}) } });
       }
-      for (const row of await tx.emailDeliveryConfiguration.findMany()) await tx.emailDeliveryConfiguration.update({ where: { id: row.id }, data: {
+      for (const row of rotateRunner ? [] : await tx.emailDeliveryConfiguration.findMany()) await tx.emailDeliveryConfiguration.update({ where: { id: row.id }, data: {
         smtpPasswordEncrypted: encrypt(decrypt(row.smtpPasswordEncrypted), next.EMAIL_CREDENTIALS_ENCRYPTION_KEY),
         graphClientSecretEncrypted: encrypt(decrypt(row.graphClientSecretEncrypted), next.EMAIL_CREDENTIALS_ENCRYPTION_KEY)
       } });
-      for (const row of await tx.aiAgentConnection.findMany()) if (row.apiKey) await tx.aiAgentConnection.update({ where: { id: row.id }, data: { apiKey: encrypt(decrypt(row.apiKey, "ai"), next.EMAIL_CREDENTIALS_ENCRYPTION_KEY, "ai") } });
+      for (const row of rotateRunner ? [] : await tx.aiAgentConnection.findMany()) if (row.apiKey) await tx.aiAgentConnection.update({ where: { id: row.id }, data: { apiKey: encrypt(decrypt(row.apiKey, "ai"), next.EMAIL_CREDENTIALS_ENCRYPTION_KEY, "ai") } });
       if (needsKey) await tx.emailVerificationChallenge.deleteMany({});
     });
   } finally { await db.$disconnect(); }

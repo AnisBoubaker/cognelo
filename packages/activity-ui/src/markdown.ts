@@ -27,6 +27,12 @@ function createMarkdownParser(protectMath: boolean) {
     },
     {
       renderer: {
+        html({ text }: Tokens.HTML | Tokens.Tag) {
+          // Raw HTML may keep attribute-free formatting, but cannot supply
+          // page-wide styles, forms, classes or IDs. Generated math/image HTML
+          // uses its own bounded renderers and still passes through DOMPurify.
+          return escapeHtml(text).replace(/&lt;(\/?(?:b|strong|i|em|s|del|u|sub|sup|kbd|mark|small|br|p|div|span|blockquote|ul|ol|li|h[1-6]|table|thead|tbody|tfoot|tr|td|th|hr|pre|code|details|summary)\s*\/?)&gt;/gi, "<$1>");
+        },
         code({ text, lang, escaped }: Tokens.Code) {
           const language = lang?.match(/^\S*/)?.[0] ?? "";
           const renderedCode = `${text.replace(/\n$/, "")}\n`;
@@ -121,7 +127,10 @@ function renderMathToken(token: MathToken, protectMath: boolean) {
   const rendered = katex.renderToString(token.expression, {
     displayMode: token.displayMode,
     strict: "ignore",
-    throwOnError: false
+    throwOnError: false,
+    trust: false,
+    maxSize: 50,
+    maxExpand: 1000
   });
   const protectedAttributes = protectMath
     ? ` contenteditable="false" data-markdown-math-source="${escapeHtmlAttribute(encodeURIComponent(token.raw.trimEnd()))}" data-markdown-math-display="${String(token.displayMode)}"`

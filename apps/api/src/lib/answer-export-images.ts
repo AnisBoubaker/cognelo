@@ -12,32 +12,55 @@ export function publicImageUrl(value: string) {
   if (isIP(url.hostname) && blocked.check(url.hostname)) throw new Error("Private image address");
   return url;
 }
-/** No cookies/auth, DNS-pinned public IPv4, bounded bytes/time, every redirect revalidated. */
-export async function fetchPublicExportImage(value: string, redirects = 0): Promise<{ bytes: Buffer; mime: string }> {
+export type AnswerExportImageBudget = { remainingBytes: number; deadline: number };
+export const createAnswerExportImageBudget = (): AnswerExportImageBudget => ({ remainingBytes: 20_000_000, deadline: Date.now() + 30_000 });
+export function consumeAnswerExportImageBytes(budget: AnswerExportImageBudget, bytes: number) {
+  if (bytes > budget.remainingBytes) { budget.remainingBytes = 0; throw new Error("Export image budget exceeded"); }
+  budget.remainingBytes -= bytes;
+}
+
+/** No cookies/auth, pinned public IPv4, shared transfer/deadline limits across redirects. */
+export async function fetchPublicExportImage(value: string, budget = createAnswerExportImageBudget(), redirects = 0): Promise<{ bytes: Buffer; mime: string }> {
   const url = publicImageUrl(value);
-  const addresses = await lookup(url.hostname, { family: 4, all: true });
+  const remainingMs = Math.min(5000, budget.deadline - Date.now());
+  if (remainingMs <= 0 || budget.remainingBytes <= 0) throw new Error("Export image budget exceeded");
+  const signal = AbortSignal.timeout(remainingMs);
+  const addresses = await Promise.race([
+    lookup(url.hostname, { family: 4, all: true }),
+    new Promise<never>((_, reject) => signal.addEventListener("abort", () => reject(new Error("Image lookup timed out")), { once: true }))
+  ]);
   if (!addresses.length || addresses.some(({ address }) => blocked.check(address))) throw new Error("Private image address");
   const response = await new Promise<{ bytes: Buffer; mime: string; redirect?: string }>((resolve, reject) => {
-    const request = (url.protocol === "https:" ? https : http).get(url, { lookup: (_host, options, callback) => {
+    const request = (url.protocol === "https:" ? https : http).get(url, { signal, agent: false, maxHeaderSize: 16 * 1024, lookup: (_host, options, callback) => {
       const address = addresses[0].address;
       if (typeof options === "object" && options.all) callback(null, [{ address, family: 4 }]); else callback(null, address, 4);
     }, headers: { Accept: "image/png,image/jpeg,image/webp,image/gif", "User-Agent": "Cognelo-AnswerExport" } }, (incoming) => {
       if ([301, 302, 303, 307, 308].includes(incoming.statusCode ?? 0) && incoming.headers.location) {
-        incoming.resume(); resolve({ bytes: Buffer.alloc(0), mime: "", redirect: new URL(incoming.headers.location, url).href }); return;
+        incoming.destroy();
+        try { resolve({ bytes: Buffer.alloc(0), mime: "", redirect: new URL(incoming.headers.location, url).href }); }
+        catch { reject(new Error("Invalid image redirect")); }
+        return;
       }
       const mime = incoming.headers["content-type"]?.split(";")[0].trim() ?? "";
-      if (incoming.statusCode !== 200 || !/^image\/(png|jpeg|webp|gif)$/.test(mime)) { incoming.resume(); reject(new Error("Unsupported image response")); return; }
+      if (incoming.statusCode !== 200 || !/^image\/(png|jpeg|webp|gif)$/.test(mime)) { incoming.destroy(); reject(new Error("Unsupported image response")); return; }
       const chunks: Buffer[] = []; let size = 0;
-      incoming.on("data", (chunk: Buffer) => { size += chunk.length; if (size > 10_000_000) { request.destroy(new Error("Image too large")); return; } chunks.push(chunk); });
+      incoming.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        try {
+          consumeAnswerExportImageBytes(budget, chunk.length);
+          if (size > 10_000_000) throw new Error("Image too large");
+          chunks.push(chunk);
+        } catch (error) { reject(error); incoming.destroy(); request.destroy(); }
+      });
       incoming.on("end", () => resolve({ bytes: Buffer.concat(chunks), mime }));
       incoming.on("error", reject);
+      incoming.on("aborted", () => reject(new Error("Image response interrupted")));
     });
-    const timer = setTimeout(() => request.destroy(new Error("Image request timed out")), 5000);
-    request.on("close", () => clearTimeout(timer)); request.on("error", reject);
+    request.on("error", reject);
   });
   if (response.redirect) {
     if (redirects >= 3) throw new Error("Too many image redirects");
-    return fetchPublicExportImage(response.redirect, redirects + 1);
+    return fetchPublicExportImage(response.redirect, budget, redirects + 1);
   }
   return response;
 }

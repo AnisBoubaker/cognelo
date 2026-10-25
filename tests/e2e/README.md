@@ -107,7 +107,7 @@ Run the independent authoring-recovery, bank-synchronization, course-loading, st
 npm run test:e2e -- --grep @regression
 ```
 
-`test-timeout-recovery.spec.ts` covers browser clock skew, delayed retries after a live extension defers submission, recovery when teacher results/gradebook are read, effective exceptions and disabled timing, active/stale claims, preserved responses, idempotence, and teacher grading of recovered work. It requires no execution runner.
+`test-timeout-recovery.spec.ts` covers browser clock skew, delayed retries after a live extension defers submission, recovery when teacher results/gradebook are read, effective exceptions and disabled timing, active/stale claims, preserved responses, idempotence, and teacher grading of recovered work. It requires no execution runner. Its submission-count assertion waits for response parsing as well as the database commit; the commit can become visible first.
 
 `live-test-content.spec.ts` adds prompt/answer-key edits during an active Test, preserved answers, cancellation/notices, composition history, standalone prompt refresh, and release/re-hide API checks. Its coding cases cover test-free submission and live private-test corrections with audit evidence, and require Judge0.
 
@@ -167,3 +167,7 @@ Link-summary coverage also checks the default-off same-domain checkbox, its gene
 `security-hardening.spec.ts` checks hidden lists/downloads and section isolation, bounded authentication, concurrent email-code guesses, password-session invalidation, purpose-bound model-key encryption/private-endpoint denial, atomic homework reservation/finalization, and a submission body crossing its deadline. Its homework case uses the same running worker and configured question-authoring model as the broad activity suite. It waits for the exact disposable job to complete before concurrent finalization, rather than inserting questions that race the worker, and removes that job during cleanup. Keep `COGNELO_BACKGROUND_JOBS_DISABLED` unset or false for the complete suite.
 
 `safe-exam-browser.spec.ts` verifies launch dismissal, return to section Content, focus/back navigation after handoff, fresh configuration issuance when reopening, and no academic attempt or question disclosure. It uses the real launch API and intercepts only the OS protocol handoff; native SEB startup itself is outside this browser test.
+
+`security-comprehensive.spec.ts` covers section-scoped private configuration (including current/retained Test children), concurrent password writes, bounded optional DELETE bodies, file metadata limits, credential-free repository URLs, real foreign framing and CSS/form injection, authored Web Design file/locked-content integrity, exhausted attempts, MCQ identifier filtering, and literal CSV export cells. It requires the ordinary local runners and uses disposable records.
+
+Judge0 uses queued submissions and authenticated result polling. Run a real compile/execute probe for each required language when changing images or limits; the normal E2E coding scenarios mainly execute Python and do not validate every advertised runtime. Keep Docker Desktop address-space fallback limitations distinct from production cgroup memory accounting.

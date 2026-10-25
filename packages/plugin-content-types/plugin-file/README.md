@@ -12,4 +12,4 @@ Course content duplication copies the safe file metadata while sharing the immut
 
 Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.
 
-Uploads use bounded multipart reads and remove staged files after persistence failures. Download and extraction share the server-owned storage containment check. Basic PDF extraction scans literal strings in linear time, including malformed files. See [security boundaries](../../../docs/SECURITY_BOUNDARIES.md).
+Uploads validate titles (180 characters) and original filenames (255 characters) before staging, use bounded multipart reads and remove staged files after persistence failures. Download and extraction share the server-owned storage containment check. Basic PDF extraction scans literal strings in linear time, including malformed files. See [security boundaries](../../../docs/SECURITY_BOUNDARIES.md).

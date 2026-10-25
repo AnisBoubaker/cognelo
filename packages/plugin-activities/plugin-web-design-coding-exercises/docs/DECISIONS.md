@@ -50,3 +50,5 @@ This document preserves detailed Web Design Coding Exercises decisions. Load onl
 
 - Maintain the authenticated command-interpreter boundary and container limits documented in the reference; never restore Node evaluation of test source. The runner carries only its dedicated service credential, never application/database credentials.
 - Add result history and teacher-facing review surfaces for submissions, test failures, and future research/analytics data.
+
+- Reconstruct learner bundles from trusted activity configuration for ordinary, Test, preview, and reopened drafts. Preserve file identity/path/language/order and locked text; use only editable submitted text. Regrading uses the original trusted config for file constraints and preserves the original submitted bundle. Reject exhausted attempts before execution and operationally invalid results before creating a core attempt.

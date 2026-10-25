@@ -7,8 +7,8 @@ JUDGE0_TELEMETRY_ENABLE=false
 RESTART_MAX_TRIES=10
 MAINTENANCE_MODE=false
 
-# Cognelo currently creates synchronous submissions with wait=true.
-ENABLE_WAIT_RESULT=true
+# Queue jobs for the privileged worker; the API server must not execute them.
+ENABLE_WAIT_RESULT=false
 ENABLE_COMPILER_OPTIONS=false
 ENABLE_COMMAND_LINE_ARGUMENTS=false
 ENABLE_SUBMISSION_DELETE=false

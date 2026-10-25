@@ -91,6 +91,7 @@ describe("web design coding exercises server plugin lifecycle hooks", () => {
     executionMocks.runWebDesignExercise.mockResolvedValue({ id: "run-1" });
     executionMocks.submitWebDesignExercise.mockResolvedValue({
       id: "submit-1",
+      files,
       score: 2,
       maxScore: 3,
       resultSummary: { phase: "finished" },

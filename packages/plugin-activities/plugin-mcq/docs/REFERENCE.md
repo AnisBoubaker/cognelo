@@ -139,6 +139,8 @@ The plugin implements `submissionExport.getContent` for the [shared PDF/ZIP expo
 
 Learner transport uses `studentConfig` to return question/choice display blocks and single/multiple mode without source, correctness flags, or private instructions. Server checks and release-gated history return correctness only for selected choices; complete keys remain behind explicit solution release.
 
+Ordinary, formative, preview, and Test submissions discard unknown question/choice identifiers and duplicate selections before grading or persistence. Multiple distinct selections remain distinct so invalid single-choice input does not become a correct answer. Direct math and shared Markdown use untrusted KaTeX with bounded size and macro expansion; raw attributed HTML is escaped by the shared renderer.
+
 ## Deadline finalization
 
 The shared assigned dispatcher checks the effective deadline after the request body arrives. At expiry, this plugin’s `expiredAttemptInput` supplies only its saved server response; incoming answer/code/file changes are ignored. Missing saved work follows the ordinary ungraded timeout fallback. This also applies to a request opened before the deadline whose body finishes later. See [security boundaries](../../../../docs/SECURITY_BOUNDARIES.md).

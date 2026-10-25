@@ -19,6 +19,8 @@ Older materials without presentation metadata display inline. Page readers use `
 
 Course-wide reader API requests require course management. Section reader requests verify membership, publication/availability, content visibility (including folder ancestry and section overrides), and plugin activation. A direct URL therefore does not bypass visibility. Student mutation requests remain forbidden.
 
+The shared renderer permits only a fixed set of attribute-free raw HTML formatting tags. Raw styles, forms, IDs/classes, and attributed HTML are shown as text, preventing course material from changing the surrounding interface. Ordinary Markdown links/images/tables and untrusted, size/expansion-bounded KaTeX remain supported. Stored text is preserved; migrate any old attributed HTML to ordinary Markdown when editing it.
+
 ## Media and duplication
 
 The definition declares `markdownFields: ["body"]`. Core reconciles the resulting `MediaAssetReference.contentResourceId` references in the save transaction, activates staged uploads, and preserves references on duplication without copying image bytes. Student image delivery requires an accessible section where that resource is visible and its plugin is active. Deleting an original does not remove a duplicate's image references. Final-reference cleanup uses the shared media retention policy.

@@ -41,7 +41,9 @@ test('@regression server countdown ignores browser clock skew and submits once a
   await prisma.activityAttempt.update({ where: { id: attempt.id }, data: { startedAt: new Date(Date.now() - 61_000) } });
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect.poll(async () => (await prisma.activityAttempt.findUniqueOrThrow({ where: { id: attempt.id } })).lifecycle).toBe('graded');
-  expect(responses).toHaveLength(1);
+  // The commit is observable before the browser finishes reading its response.
+  await expect.poll(() => responses).toHaveLength(1);
+  expect(responses[0]).toMatchObject({ status: 200, onlyIfExpired: true, lifecycle: 'graded' });
   const child = await prisma.testItemAttempt.findFirstOrThrow({ where: { parentAttemptId: attempt.id } });
   expect(child.rawScore).toBe(1);
 });

@@ -6,11 +6,11 @@ export const MAX_MULTIPART_BYTES = 26 * 1024 * 1024;
 const bodyState = globalThis as typeof globalThis & { cogneloLargeBodyReads?: { active: number } };
 const largeReads = bodyState.cogneloLargeBodyReads ??= { active: 0 };
 
-export async function readBoundedBody(request: Request, maximum: number): Promise<Uint8Array<ArrayBuffer>> {
+export async function readBoundedBody(request: Request | Response, maximum: number): Promise<Uint8Array<ArrayBuffer>> {
   const declared = request.headers.get("content-length");
   if (declared && (!/^\d+$/.test(declared) || Number(declared) > maximum)) throw new AppError(413, "REQUEST_TOO_LARGE", "The request exceeds the size limit.");
   if (!request.body) return new Uint8Array();
-  const large = maximum > MAX_JSON_BYTES && (!declared || Number(declared) > MAX_JSON_BYTES);
+  const large = "method" in request && maximum > MAX_JSON_BYTES && (!declared || Number(declared) > MAX_JSON_BYTES);
   if (large && largeReads.active >= 4) throw new AppError(429, "UPLOAD_CAPACITY_REACHED", "Uploads are busy. Try again shortly.", { retryAfterSeconds: 2 });
   const reader = request.body.getReader();
   if (large) largeReads.active++;
@@ -50,16 +50,18 @@ export function assertJsonComplexity(value: unknown) {
   }
 }
 
-export async function readBoundedJson(request: Request, maximum = MAX_JSON_BYTES): Promise<unknown> {
+export async function readBoundedJson(request: Request | Response, maximum = MAX_JSON_BYTES, options: { allowEmpty?: boolean } = {}): Promise<unknown> {
   const bytes = await readBoundedBody(request, maximum);
+  const text = new TextDecoder().decode(bytes);
+  if (options.allowEmpty && !text.trim()) return {};
   let result: unknown;
-  try { result = JSON.parse(new TextDecoder().decode(bytes)); }
+  try { result = JSON.parse(text); }
   catch { throw new AppError(400, "INVALID_JSON", "A valid JSON request body is required."); }
   assertJsonComplexity(result);
   return result;
 }
 
-export async function readBoundedFormData(request: Request, maximum = MAX_MULTIPART_BYTES) {
+export async function readBoundedFormData(request: Request | Response, maximum = MAX_MULTIPART_BYTES) {
   const bytes = await readBoundedBody(request, maximum);
   try { return await new Response(bytes, { headers: { "Content-Type": request.headers.get("content-type") ?? "" } }).formData(); }
   catch { throw new AppError(400, "INVALID_FORM_DATA", "A valid upload form is required."); }

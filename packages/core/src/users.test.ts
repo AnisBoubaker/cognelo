@@ -8,7 +8,8 @@ const mockPrisma = vi.hoisted(() => ({
     findMany: vi.fn(),
     count: vi.fn(),
     create: vi.fn(),
-    update: vi.fn()
+    update: vi.fn(),
+    updateMany: vi.fn()
   },
   role: { findMany: vi.fn() }
 }));
@@ -83,10 +84,10 @@ describe("user services", () => {
   });
 
   it("changes the password after verifying the current password", async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({ isActive: true, passwordHash: "old-hash" });
+    mockPrisma.user.findUnique.mockResolvedValue({ isActive: true, passwordHash: "old-hash", authVersion: 2 });
     bcryptMocks.compare.mockResolvedValue(true);
     bcryptMocks.hash.mockResolvedValue("new-hash");
-    mockPrisma.user.update.mockResolvedValue({ id: "user-1" });
+    mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
 
     await expect(
       changeMyPassword(
@@ -101,10 +102,24 @@ describe("user services", () => {
 
     expect(bcryptMocks.compare).toHaveBeenCalledWith("OldPassword123!", "old-hash");
     expect(bcryptMocks.hash).toHaveBeenCalledWith("NewPassword456!", 12);
-    expect(mockPrisma.user.update).toHaveBeenCalledWith({
-      where: { id: "user-1" },
+    expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
+      where: { id: "user-1", isActive: true, passwordHash: "old-hash", authVersion: 2 },
       data: { passwordHash: "new-hash", mustChangePassword: false, authVersion: { increment: 1 } }
     });
+  });
+
+  it("cannot overwrite a password reset or account invalidation that happened during hashing", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ isActive: true, passwordHash: "old-hash", authVersion: 2 });
+    bcryptMocks.compare.mockResolvedValue(true);
+    bcryptMocks.hash.mockResolvedValue("stale-change-hash");
+    mockPrisma.user.updateMany.mockResolvedValue({ count: 0 });
+    await expect(changeMyPassword(admin, {
+      currentPassword: "OldPassword123!", newPassword: "NewPassword456!", confirmNewPassword: "NewPassword456!"
+    })).rejects.toMatchObject({ status: 409, code: "PASSWORD_CHANGE_CONFLICT" });
+    expect(mockPrisma.user.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: admin.id, isActive: true, passwordHash: "old-hash", authVersion: 2 }
+    }));
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
   });
 
   it("lets an administrator set a temporary password and invalidate existing sessions", async () => {

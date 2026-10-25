@@ -40,10 +40,20 @@ export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
   },
   compositeExecution: {
     activityTypeKeys: ["web-design-coding-exercise"],
+    regrade: async (input) => {
+      const originalConfig = input.previousConfig && typeof input.previousConfig === "object" && !Array.isArray(input.previousConfig)
+        ? input.previousConfig as Record<string, unknown> : input.activity.config;
+      const result = await webDesignCodingExercisesServerPlugin.compositeExecution!.submit({
+        ...input, activity: { ...input.activity, config: originalConfig }
+      });
+      // Current tests may change, but a regrade never rewrites submitted answers.
+      return { ...result, state: { ...result.state, files: webDesignExerciseRunInputSchema.parse(input.payload).files } };
+    },
     actions: {
       run: async ({ activity, payload, user }) => ({
         submission: await runWebDesignExercise({
           activityId: activity.id,
+          activityConfig: activity.config,
           userId: user.id,
           input: webDesignExerciseRunInputSchema.parse(payload)
         })
@@ -51,12 +61,12 @@ export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
     },
     submit: async ({ activity, payload, user }) => {
       const input = webDesignExerciseRunInputSchema.parse(payload);
-      const submission = await submitWebDesignExercise({ activityId: activity.id, userId: user.id, input });
+      const submission = await submitWebDesignExercise({ activityId: activity.id, activityConfig: activity.config, userId: user.id, input });
       if (submission.score === null || submission.maxScore === null || submission.maxScore <= 0) {
         throw new AppError(409, "WEB_DESIGN_RESULT_INVALID", "The web design exercise did not return a valid score.");
       }
       return {
-        state: { files: input.files, submissionId: submission.id },
+        state: { files: submission.files, submissionId: submission.id },
         gradingResult: {
           rawScore: submission.score,
           rawMaxScore: submission.maxScore,
@@ -72,6 +82,7 @@ export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
       run: async ({ activity, payload, user }) => ({
         submission: await previewWebDesignExercise({
           activityId: activity.id,
+          activityConfig: activity.config,
           userId: user.id,
           kind: "run",
           input: webDesignExerciseRunInputSchema.parse(payload)
@@ -80,6 +91,7 @@ export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
       submit: async ({ activity, payload, user }) => ({
         submission: await previewWebDesignExercise({
           activityId: activity.id,
+          activityConfig: activity.config,
           userId: user.id,
           kind: "submit",
           input: webDesignExerciseRunInputSchema.parse(payload)

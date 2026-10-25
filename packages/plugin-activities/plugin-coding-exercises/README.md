@@ -108,3 +108,5 @@ Interface actions use the shared [button style and semantic icons](../../../docs
 Teachers can [export submitted answers as PDF or ZIP](../../../docs/ANSWER_EXPORTS.md), including selectable prompts and grading content. See [export details](docs/REFERENCE.md#answer-exports).
 
 Timed finalization uses only server-saved work after expiry; see [deadline enforcement](docs/REFERENCE.md#deadline-finalization).
+
+Judge0 execution is queued and polled through core, keeping the API container unprivileged. See [Judge0 integration](docs/REFERENCE.md#judge0-integration) and the platform deployment runbooks.

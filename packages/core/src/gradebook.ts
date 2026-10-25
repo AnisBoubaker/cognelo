@@ -1,3 +1,4 @@
+import { escapeCsvCell } from "./csv";
 import { getActivityPlugin } from "@cognelo/activity-sdk";
 import { resolveAttemptContinuationHandler } from "@cognelo/activity-sdk/server";
 import { Prisma, prisma } from "@cognelo/db";
@@ -1596,7 +1597,7 @@ export async function getCourseGradebookCsv(user: CurrentUser, courseId: string,
       row.needsGradingCount
     ])
   ];
-  return lines.map((line) => line.map(csvCell).join(",")).join("\n");
+  return lines.map((line) => line.map(escapeCsvCell).join(",")).join("\n");
 }
 
 export async function setGradebookItemRelease(
@@ -2311,10 +2312,6 @@ function formatParticipantName(participant: { firstName: string; lastName: strin
   return name || participant.email;
 }
 
-function csvCell(value: string | number | null | undefined) {
-  const text = value === null || value === undefined ? "" : String(value);
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
 
 function computeAttemptLateness(availableUntil: Date | null, graceMinutes: number | null, now: Date) {
   if (!availableUntil) {

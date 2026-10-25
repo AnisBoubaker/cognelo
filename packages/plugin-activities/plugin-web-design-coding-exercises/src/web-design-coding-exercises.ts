@@ -32,9 +32,18 @@ export function hasWebDesignExerciseAnswer(config: Record<string, unknown>, stat
     if (!parsed.success) return false;
     const file = parsed.data;
     const starter = starterFiles.find((candidate) => candidate.id === file.id);
-    return starter?.isEditable !== false && file.starterCode.trim().length > 0
+    return Boolean(starter) && starter?.isEditable !== false && file.starterCode.trim().length > 0
       && file.starterCode.trim() !== (starter?.starterCode ?? "").trim();
   });
+}
+
+/** Only authored editable content can come from a learner; file identity and
+ * executable language remain server-owned even when a request bypasses the UI. */
+export function constrainWebDesignStudentFiles(activityConfig: unknown, value: unknown): WebDesignExerciseFile[] {
+  const config = parseWebDesignExerciseConfig(activityConfig);
+  const submitted = z.array(webDesignExerciseFileSchema).max(12).safeParse(value);
+  const byId = new Map((submitted.success ? submitted.data : []).map((file) => [file.id, file]));
+  return config.files.map((file) => ({ ...file, starterCode: file.isEditable ? byId.get(file.id)?.starterCode ?? file.starterCode : file.starterCode }));
 }
 
 export const webDesignExerciseTestKindSchema = z.enum(["sample", "hidden"]);

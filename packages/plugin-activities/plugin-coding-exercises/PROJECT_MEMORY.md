@@ -54,3 +54,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - [Answer exports](../../../docs/ANSWER_EXPORTS.md) are read-only plugin projections: Exports use the exact submitted source, latest stored test evaluation, and saved rubric/comments. Missing tests or ungraded work never block export. No Judge0 or model call occurs.
 
 - `expiredAttemptInput` must reconstruct final input from saved server state. Never accept a fresh learner request body after expiry; the host checks again after body upload. See [deadline enforcement](docs/REFERENCE.md#deadline-finalization).
+
+- Queue Judge0 with `wait=false`, then poll the validated token on the same resolved runner through core’s bounded client. Synchronous jobs require privileges in the API and must remain disabled. Runtime/build/credential requirements live in [security boundaries](../../../docs/SECURITY_BOUNDARIES.md).

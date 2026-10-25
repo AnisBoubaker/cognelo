@@ -424,3 +424,14 @@ describe("MCQ composite Test execution", () => {
     expect(result.gradingResult).toMatchObject({ rawScore: 0, rawMaxScore: 1 });
   });
 });
+
+it("constrains submitted answers to authored identifiers without treating a multi-selection as a single choice", async () => {
+  const { constrainMcqAnswers, gradeMcqAnswers, parseMcqSource } = await import("./mcq");
+  const config = { source: "## Sum\nChoose one.\n- [x] Four\n- [ ] Five" };
+  const answers = constrainMcqAnswers(config, {
+    "question-1": ["question-1-choice-1", "question-1-choice-2", "invented", "question-1-choice-1"],
+    "invented-question": ["arbitrary client data"]
+  });
+  expect(answers).toEqual({ "question-1": ["question-1-choice-1", "question-1-choice-2"] });
+  expect(gradeMcqAnswers(parseMcqSource(config.source, "none"), answers).rawScore).toBe(0);
+});

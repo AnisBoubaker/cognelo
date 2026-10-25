@@ -30,7 +30,7 @@ describe("Judge0 client", () => {
     );
 
     await expect(listJudge0Languages()).resolves.toEqual([{ id: 71, name: "Python (3.8.1)" }]);
-    expect(fetchMock).toHaveBeenCalledWith("https://judge0.test/languages", { headers: { "X-Auth": "token" } });
+    expect(fetchMock).toHaveBeenCalledWith("https://judge0.test/languages", expect.objectContaining({ headers: { "X-Auth": "token" }, redirect: "error", signal: expect.any(AbortSignal) }));
 
     fetchMock.mockResolvedValueOnce(Response.json([{ id: 71, name: "Python (3.8.1)" }]));
     await expect(resolveJudge0Language("python")).resolves.toMatchObject({
@@ -88,6 +88,7 @@ describe("Judge0 client", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       Response.json({
         token: "submission-1",
+        status: { id: 3, description: "Accepted" },
         stdout: Buffer.from("allô élève\n", "utf8").toString("base64"),
         stderr: Buffer.from("avertissement : déjà défini", "utf8").toString("base64"),
         compile_output: null,
@@ -111,7 +112,7 @@ describe("Judge0 client", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://judge0.test/submissions?base64_encoded=true&wait=true",
+      "https://judge0.test/submissions?base64_encoded=true&wait=false",
       expect.objectContaining({
         body: JSON.stringify({
           language_id: 71,
@@ -128,7 +129,7 @@ describe("Judge0 client", () => {
   it("surfaces non-2xx submission failures", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("down", { status: 503 }));
 
-    await expect(runJudge0Submission({ languageId: 71, sourceCode: "print('ok')" })).rejects.toThrow("Judge0 request failed");
+    await expect(runJudge0Submission({ languageId: 71, sourceCode: "print('ok')" })).rejects.toMatchObject({ status: 502, code: "EXECUTION_SERVICE_HTTP_ERROR" });
   });
 
   it("surfaces Judge0 internal errors as service failures instead of grading results", async () => {

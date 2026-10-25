@@ -23,6 +23,14 @@ describe("GitHub repo content plugin", () => {
     expect(() => normalizeGithubRepoUrl("https://example.com/cognelo/examples")).toThrow(/github.com/i);
   });
 
+  it.each(["https://synthetic-token@github.com/org/repo", "https://user:synthetic-password@github.com/org/repo", "ftp://github.com/org/repo"])("rejects credentials and unsupported schemes before publishing %s", async (url) => {
+    expect(() => normalizeGithubRepoUrl(url)).toThrow(/without embedded credentials/);
+    await expect(githubRepoContentServerPlugin.handlers!.create!({
+      user: { id: "user-1", email: "u@example.test", name: null, firstName: null, lastName: null, roles: ["teacher"] },
+      courseId: "course-1", contentTypeKey: "github-repo", payload: { title: "Private token must not become public metadata", url }
+    })).rejects.toMatchObject({ name: "ZodError" });
+  });
+
   it("creates and updates safe generic metadata through server handlers", async () => {
     await expect(
       githubRepoContentServerPlugin.handlers?.create?.({

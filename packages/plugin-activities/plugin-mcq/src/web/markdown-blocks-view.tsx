@@ -67,7 +67,10 @@ function MathView({ expression, displayMode, compact = false }: { expression: st
   const html = katex.renderToString(expression, {
     displayMode,
     strict: "ignore",
-    throwOnError: false
+    throwOnError: false,
+    trust: false,
+    maxSize: 50,
+    maxExpand: 1000
   });
 
   if (displayMode) {

@@ -1,3 +1,4 @@
+import { escapeCsvCell } from "@cognelo/core";
 import { strToU8, zipSync } from "fflate";
 import type { ActivityGradeExportRow } from "./activity-grade-export";
 
@@ -10,7 +11,7 @@ export function createActivityGradeCsv(rows: ActivityGradeExportRow[]) {
     [...headers],
     ...rows.map((row) => [row.email, row.firstName, row.lastName, row.grade])
   ];
-  return `\uFEFF${values.map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
+  return `\uFEFF${values.map((row) => row.map(escapeCsvCell).join(",")).join("\r\n")}\r\n`;
 }
 
 export function createActivityGradeXlsx(rows: ActivityGradeExportRow[], createdAt = new Date()) {
@@ -109,11 +110,6 @@ export function activityGradeExportContentDisposition(fileName: string, format: 
   return `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`;
 }
 
-function csvCell(value: string | number) {
-  if (typeof value === "number") return String(value);
-  const safeValue = /^[=+\-@]/.test(value) ? `'${value}` : value;
-  return /[",\r\n]/.test(safeValue) ? `"${safeValue.replace(/"/g, '""')}"` : safeValue;
-}
 
 function worksheetRow(rowNumber: number, values: readonly (string | number)[], header = false) {
   const cells = values.map((value, index) => {

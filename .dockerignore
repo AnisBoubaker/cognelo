@@ -1,4 +1,4 @@
-# The runner image needs no application source, storage, or operator configuration.
+# Execution images need no application source, storage, or operator configuration.
 **
 !package.json
 !package-lock.json
@@ -8,3 +8,6 @@
 !packages/web-design-runner/**
 packages/web-design-runner/node_modules
 packages/web-design-runner/src/*.test.ts
+!infra/
+!infra/judge0/
+!infra/judge0/configure-languages.sql

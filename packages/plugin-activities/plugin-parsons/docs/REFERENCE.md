@@ -186,3 +186,7 @@ Learner config and state contain displayed blocks and learner indentation only. 
 ## Deadline finalization
 
 The shared assigned dispatcher checks the effective deadline after the request body arrives. At expiry, this plugin’s `expiredAttemptInput` supplies only its saved server response; incoming answer/code/file changes are ignored. Missing saved work follows the ordinary ungraded timeout fallback. This also applies to a request opened before the deadline whose body finishes later. See [security boundaries](../../../../docs/SECURITY_BOUNDARIES.md).
+
+## Shared Markdown safety
+
+Prompts and feedback use the shared renderer’s fixed attribute-free HTML allowlist and bounded, untrusted math. Raw attributed HTML is displayed literally; retain ordinary Markdown links, images, tables, and formatting. See [the shared rendering contract](../../../../docs/plugin-authoring/03-core-services.md#what-markdownrenderer-gives-you).

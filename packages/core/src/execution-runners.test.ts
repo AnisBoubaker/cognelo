@@ -89,7 +89,7 @@ describe("execution runner registry", () => {
     }));
   });
 
-  it("tests Judge0 language discovery and an actual synchronous execution", async () => {
+  it("tests Judge0 language discovery and a queued execution", async () => {
     mockPrisma.executionRunner.findUnique.mockResolvedValue({
       id: "execution-runner-judge0-primary",
       runnerType: "judge0",
@@ -119,7 +119,7 @@ describe("execution runner registry", () => {
     });
     expect(fetchImplementation).toHaveBeenNthCalledWith(
       2,
-      "https://judge0.example.test/submissions?base64_encoded=true&wait=true",
+      "https://judge0.example.test/submissions?base64_encoded=true&wait=false",
       expect.objectContaining({ method: "POST" })
     );
   });

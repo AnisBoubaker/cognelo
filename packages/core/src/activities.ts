@@ -47,15 +47,22 @@ export async function getActivity(user: CurrentUser, courseId: string, activityI
 }
 
 export async function getActivityForGradebook(user: CurrentUser, courseId: string, activityId: string) {
-  await assertCanViewCourseGradebook(user, courseId);
+  const { gradingGroupIds } = await assertCanViewCourseGradebook(user, courseId);
+  const sectionAssignments = { some: { groupId: { in: gradingGroupIds ?? [] } } };
   const activity = await prisma.activity.findFirst({
-    where: { id: activityId, courseId },
-    include: { activityType: true, bankActivity: true, activityVersion: true, knowledgeConcepts: { include: { concept: true } } }
+    where: { id: activityId, courseId, ...(gradingGroupIds === null ? {} : { OR: [
+      { groupAssignments: sectionAssignments },
+      { activityAttempts: sectionAssignments },
+      { testItem: { test: { activity: { groupAssignments: sectionAssignments } } } },
+      { testItemAttempts: { some: { parentAttempt: { groupId: { in: gradingGroupIds } } } } }
+    ] }) },
+    include: { activityType: true, knowledgeConcepts: { include: { concept: true } } }
   });
   if (!activity) {
     throw notFound("Activity");
   }
-  return activity;
+  // Grading uses the course copy, never the linked bank's current authoring draft.
+  return { ...activity, bankActivity: null, activityVersion: null };
 }
 
 export async function listActivities(user: CurrentUser, courseId: string) {

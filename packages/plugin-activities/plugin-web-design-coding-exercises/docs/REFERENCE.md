@@ -202,6 +202,10 @@ The runner never evaluates test source in Node or `node:vm`. It allows one activ
 
 The checked-in seccomp profile is derived from [Playwright 1.64.1](https://github.com/microsoft/playwright/blob/v1.64.1/utils/docker/seccomp_profile.json), with `chroot` allowed for the inner Chromium namespace while outer capabilities remain dropped. Its Apache 2.0 license is retained beside the profile.
 
+Run, submit, Test, and preview requests reconstruct files from trusted activity configuration: IDs, paths, languages, editability, ordering, and locked text are server-owned. Extra files are ignored; only editable file text is accepted and the evaluated bundle is what persistence/gradebook metadata records. Draft restoration applies the same constraint. Test regrading uses the original trusted configuration for file constraints and preserves the submitted answer. Standalone submit checks attempt availability before invoking the runner, then retains the atomic core attempt check at persistence; an invalid operational result does not consume a core attempt. Runner calls reject redirects, bound JSON results to 8 MiB (screenshots to 32 MiB), and use a 65-second deadline. HTTP error bodies are withheld.
+
 ## Deadline finalization
 
 The shared assigned dispatcher checks the effective deadline after the request body arrives. At expiry, this plugin’s `expiredAttemptInput` supplies only its saved server response; incoming answer/code/file changes are ignored. Missing saved work follows the ordinary ungraded timeout fallback. This also applies to a request opened before the deadline whose body finishes later. See [security boundaries](../../../../docs/SECURITY_BOUNDARIES.md).
+
+The production runner image starts Node directly, omits global npm and unused Firefox/WebKit engines, and removes unused bad GStreamer plugins. Keep Chromium/package versions aligned and repeat actual grading plus cropped-screenshot checks when rebuilding; package audit alone does not cover OS/browser dependencies.
