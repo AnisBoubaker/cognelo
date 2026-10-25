@@ -44,6 +44,9 @@ for (const navigationMode of ["free", "sequential"] as const) {
     await expect(studentPage.getByRole("button", { name: "Submit the test", exact: true })).toHaveCount(0);
     await studentPage.getByRole("button", { name: "Next activity", exact: true }).click();
     await expect(studentPage.getByRole("heading", { name: "Arrange the program", exact: true })).toBeVisible();
+    // The heading renders before the saved arrangement and its controls finish
+    // loading. Wait for that readiness before clicking the footer as it settles.
+    await expect(studentPage.getByRole("button", { name: "Move block down", exact: true }).first()).toBeEnabled();
     await expect(studentPage.getByRole("button", { name: "Next activity", exact: true })).toHaveCount(0);
     await studentPage.getByRole("button", { name: "Submit the test", exact: true }).click();
     const review = studentPage.getByRole("region", { name: "Review your answers" });
@@ -78,6 +81,9 @@ for (const navigationMode of ["free", "sequential"] as const) {
       delayRestore = false;
       releaseRestore();
     }
+    // Restore may reorder keyed rows. Resolve the first control only after it
+    // is enabled, so a click begun on the old first row cannot follow it down.
+    await expect(studentPage.getByRole("button", { name: "Move block down", exact: true }).first()).toBeEnabled();
     await studentPage.getByRole("button", { name: "Move block down", exact: true }).first().click();
     await studentPage.getByRole("button", { name: "Submit the test", exact: true }).click();
     await expect(review.getByRole("listitem").filter({ hasText: "Arrange the program" }).getByText("Answered", { exact: true })).toBeVisible();

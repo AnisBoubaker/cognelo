@@ -58,7 +58,8 @@ test.describe("team and student activity exceptions", { tag: "@regression" }, ()
     await studentPage.goto(ex.assignedPath.replace("/api", ""));
     await studentPage.getByRole("button", { name: "Start timed attempt" }).click();
     await studentPage.getByLabel("Four", { exact: true }).check();
-    await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeVisible();
+    // Starting an attempt makes presence eligible on the shared 20-second heartbeat.
+    await expect(studentPage.getByRole("button", { name: "Open activity messages" })).toBeVisible({ timeout: 30_000 });
     const before = await responseJson<{ runtime: { attempt: { id: string }; timing: { expiresAt: string } } }>(await studentApi.get(`${ex.assignedPath}/timing`));
     const dialog = await openSettings(teacherPage, data.courseId, data.title);
     await dialog.getByLabel("Time limit (minutes)", { exact: true }).fill("60");

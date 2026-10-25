@@ -78,10 +78,10 @@ test("Test messages capture the selected exercise and retain it after navigation
     expect((await student.post(`${assigned}/messages`, { data: { body: "Forged title", testItem: { parentAttemptId: attempt.id, testItemId: first.id, title: "Fake title" } } })).status()).toBe(400);
     expect(await prisma.activityConversationMessage.count({ where: { conversation: { activityId }, senderKind: "student" } })).toBe(messageCount);
 
-    await responseJson(await teacherApi.patch(`/api/courses/${data.courseId}/activities/${second.activityId}`, { data: { title: "Renamed after the message", confirmActiveStudents: true } }));
+    await responseJson(await teacherApi.patch(`/api/courses/${data.courseId}/activities/${second.activity.id}`, { data: { title: "Renamed after the message", confirmActiveStudents: true } }));
     await responseJson(await teacherApi.delete(`/api/courses/${data.courseId}/activities/${activityId}/test/items/${second.id}`, { data: { confirmActiveStudents: true } }));
     const { conversation } = await responseJson<{ conversation: StaffActivityConversation }>(await teacherApi.get(`${staffMessages}/conversations/${attempt.participantId}?attemptId=${attempt.id}`));
-    expect(conversation.messages.find((message) => message.body === "I need help here.")?.testItemContext).toEqual({ testItemId: second.id, activityId: second.activityId, title: second.activity.title, exerciseNumber: 2 });
+    expect(conversation.messages.find((message) => message.body === "I need help here.")?.testItemContext).toEqual({ testItemId: second.id, activityId: second.activity.id, title: second.activity.title, exerciseNumber: 2 });
     await teacherPage.reload();
     await teacherPage.getByRole("button", { name: "Message students", exact: true }).click();
     await teacherDialog.getByRole("tab").filter({ hasText: studentName }).click();

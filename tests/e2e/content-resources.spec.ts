@@ -58,7 +58,11 @@ test.describe.serial("course content resources and folders", () => {
     });
     const copyTitle = `${textTitle} independent copy`;
     await duplicate.locator("input").fill(copyTitle);
+    const duplicated = teacherPage.waitForResponse((response) =>
+      response.request().method() === "POST" && response.url().endsWith("/duplicate")
+    );
     await duplicate.getByRole("button", { name: "Duplicate", exact: true }).click();
+    expect((await duplicated).ok()).toBe(true);
     await expect(duplicate).toBeHidden();
     await expect(teacherPage.getByText(copyTitle, { exact: true })).toBeVisible();
 

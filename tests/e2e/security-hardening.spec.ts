@@ -63,15 +63,23 @@ test("homework reserves one workflow and finalizes answers atomically", async ({
     await expect(access(path.join(process.cwd(), "storage/coding-homework-grader/preflight", temporary.storedName))).rejects.toMatchObject({ code: "ENOENT" });
     expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(1);
     expect(await homeworkDb.pluginCodingHomeworkSubmission.count({ where: { activityId, kind: "final" } })).toBe(1);
-    // A disposable question fixture avoids invoking an external model in this audit.
-    await homeworkDb.pluginCodingHomeworkChallengeQuestion.create({ data: { submissionId, orderIndex: 0, questionText: "Explain the return value.", generationModel: "regression-fixture", generationPromptVersion: "regression-fixture", nearestExamples: [], metadata: {} } });
-    await homeworkDb.pluginCodingHomeworkSubmission.update({ where: { id: submissionId }, data: { status: "challenge_ready", metadata: { internalPrompt: "PRIVATE_ARTIFACT" } } });
-    const question = await homeworkDb.pluginCodingHomeworkChallengeQuestion.findFirstOrThrow({ where: { submissionId } });
-    const answers = [{ questionId: question.id, answer: "The program returns zero." }];
+    // Let the real worker finish before exercising concurrent finalization. Inserting
+    // questions while it is running races its replace-on-process question writes.
+    await expect.poll(async () => {
+      const jobs = await prisma.$queryRaw<Array<{ status: string }>>`SELECT status FROM "BackgroundJob" WHERE metadata->>'activityId' = ${activityId}`;
+      return jobs[0]?.status;
+    }, { timeout: 90_000, message: "Homework background processing must complete before answers are finalized" }).toBe("succeeded");
+    const ready = await homeworkDb.pluginCodingHomeworkSubmission.findUniqueOrThrow({ where: { id: submissionId } });
+    expect(ready.status).toBe("challenge_ready");
+    const metadata = ready.metadata && typeof ready.metadata === "object" && !Array.isArray(ready.metadata) ? ready.metadata : {};
+    await homeworkDb.pluginCodingHomeworkSubmission.update({ where: { id: submissionId }, data: { metadata: { ...metadata, internalPrompt: "PRIVATE_ARTIFACT" } } });
+    const questions = await homeworkDb.pluginCodingHomeworkChallengeQuestion.findMany({ where: { submissionId }, orderBy: { orderIndex: "asc" } });
+    expect(questions.length).toBeGreaterThan(0);
+    const answers = questions.map((question) => ({ questionId: question.id, answer: "The program returns zero." }));
     const finals = await Promise.all(Array.from({ length: 4 }, () => student.post(`${assigned}/challenge-answers`, { data: { submissionId, answers } })));
     for (const response of finals) expect(response.ok(), await response.text()).toBe(true);
     expect(await prisma.activityAttempt.count({ where: { activityId, lifecycle: "submitted" } })).toBe(1);
-    expect((await student.put(`${assigned}/challenge-answers`, { data: { submissionId, answers: [{ questionId: question.id, answer: "changed" }] } })).status()).toBe(409);
+    expect((await student.put(`${assigned}/challenge-answers`, { data: { submissionId, answers: [{ questionId: questions[0].id, answer: "changed" }] } })).status()).toBe(409);
     const latest = await responseJson(await student.get(`${assigned}/submission`));
     expect(JSON.stringify(latest)).not.toContain("PRIVATE_ARTIFACT");
     expect((await student.post(`${assigned}/submission`, { data: { base64, fileName: "another.zip", idempotencyKey: `${data.token}-again` } })).ok()).toBe(false);

@@ -121,6 +121,14 @@ Activity-exception scenarios cover all ten section override categories, teacher-
 
 Only deliberate save/session failures and content/gradebook latency are intercepted. Recovery, synchronization, submission, and persistence assertions use the real services. Loading tests release their pending responses in `finally`; they use request/UI state instead of fixed sleeps. The `@regression` tag selects this focused set, not every regression assertion in the wider suite.
 
+Messaging assertions that wait for the shared 20-second heartbeat allow 30 seconds, including the first presence update after a timed start. Learner Test fixtures use the public nested `item.activity.id`; authoring-only duplicate fields are not part of that response contract.
+
+The content-resource duplication scenario waits for the successful duplicate response before opening the learner page. The teacher's optimistic copy title can appear before the database transaction commits; using that title alone as the completion signal caused the intermittent missing-copy observation recorded on October 12.
+
+Parsons restoration tests wait for enabled controls before resolving the first block to move. Restoring a saved shuffle can move keyed rows while Playwright is waiting on a disabled button; otherwise the pending click can follow the old first row into the last position and perform no move.
+
+The plugin-composition check provisions its own root-level activities and submitted coding answer, and follows the teacher report’s Edit activity action. It does not depend on mutable seed titles, folder expansion, or seed availability dates.
+
 The broader suite still runs only the configured Chromium project. Useful next additions include the remaining synchronization branches (restore-original and both-copies-changed), compound-Test resume/navigation boundaries, and Firefox/WebKit coverage if those browsers become supported test targets.
 
 Playwright transpiles the specs without type-checking them, and the root `npm run typecheck` currently omits `tests/e2e`. A dedicated E2E TypeScript gate is another useful follow-up; existing specs need type corrections before that gate can pass across the entire suite.
@@ -156,4 +164,4 @@ Link-summary coverage also checks the default-off same-domain checkbox, its gene
 
 `security-boundaries.spec.ts` uses disposable fixtures to verify public activity projections, teacher-only Test authoring, future-Test denial, and concurrent one-attempt enforcement. Runner credential, command isolation, browser network, and cropped screenshot checks live in `packages/web-design-runner/src/security.test.ts`.
 
-`security-hardening.spec.ts` checks hidden lists/downloads and section isolation, bounded authentication, concurrent email-code guesses, password-session invalidation, purpose-bound model-key encryption/private-endpoint denial, atomic homework reservation/finalization, and a submission body crossing its deadline. Run it against a disposable local server with `COGNELO_BACKGROUND_JOBS_DISABLED=true`; the homework case supplies its own questions and removes its exact queued job, avoiding external model calls.
+`security-hardening.spec.ts` checks hidden lists/downloads and section isolation, bounded authentication, concurrent email-code guesses, password-session invalidation, purpose-bound model-key encryption/private-endpoint denial, atomic homework reservation/finalization, and a submission body crossing its deadline. Its homework case uses the same running worker and configured question-authoring model as the broad activity suite. It waits for the exact disposable job to complete before concurrent finalization, rather than inserting questions that race the worker, and removes that job during cleanup. Keep `COGNELO_BACKGROUND_JOBS_DISABLED` unset or false for the complete suite.
