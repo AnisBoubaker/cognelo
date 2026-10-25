@@ -63,9 +63,17 @@ async function verifyAuthSession(token: string | undefined, secret: string) {
 
   let payload: Awaited<ReturnType<typeof jwtVerify>>["payload"];
   try {
-    ({ payload } = await jwtVerify(token, jwtSecret(secret)));
+    ({ payload } = await jwtVerify(token, jwtSecret(secret), {
+      algorithms: ["HS256"], issuer: "cognelo", audience: "cognelo-session",
+      requiredClaims: ["sub", "iat", "exp", "authVersion"]
+    }));
   } catch (error) {
     logSessionRejection(sessionVerificationFailureReason(error), sessionRejectionUserId(error), secret);
+    throw unauthorized();
+  }
+
+  if (typeof payload.authVersion !== "number" || !Number.isInteger(payload.authVersion) || payload.authVersion < 0) {
+    logSessionRejection("token_invalid");
     throw unauthorized();
   }
 
@@ -207,6 +215,8 @@ async function createAuthToken(user: CurrentUser, authVersion: number, secret: s
     authVersion
   })
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuer("cognelo")
+    .setAudience("cognelo-session")
     .setSubject(user.id)
     .setIssuedAt()
     .setExpirationTime("8h")

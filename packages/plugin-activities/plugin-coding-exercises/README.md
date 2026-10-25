@@ -62,6 +62,8 @@ Compound Test submission includes a final answer review with plugin-owned respon
 
 Live course-question edits preserve active responses and use the shared warning/audit workflow; summative outcomes remain hidden until grade release. Exercises without enabled hidden tests still submit and await grading. See [Live authoring and grade visibility](docs/REFERENCE.md#live-authoring-and-grade-visibility).
 
+Learner responses use an explicit public projection; see [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
+
 ## Read By Topic
 
 - [Shared submission deletion and retained student history](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md#submission-deletion)

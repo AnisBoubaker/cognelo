@@ -15,6 +15,7 @@ import {
 import { prisma } from "@cognelo/db";
 import { evaluateParsonsAttemptStateForConfig, ensureParsonsAttempt, findLatestParsonsAttempt, listParsonsGradebookAttempts, updateParsonsAttempt } from "./attempts";
 import {
+  projectParsonsState,
   parsonsAttemptEnsureInputSchema,
   parsonsAttemptStateSchema,
   parsonsAttemptUpdateInputSchema,
@@ -236,9 +237,10 @@ export const parsonsStudentSubmissionsRoute: PluginRouteDefinition = {
           return [{
             attempt: {
               ...attempt,
-              latestState: { ...submittedState, lastEvaluation: evaluation },
-              submittedState: { ...submittedState, lastEvaluation: evaluation },
-              resultSummary: showGrade ? attempt.resultSummary : {}
+              latestState: { ...projectParsonsState(submittedState), lastEvaluation: evaluation },
+              submittedState: { ...projectParsonsState(submittedState), lastEvaluation: evaluation },
+              events: [],
+              resultSummary: evaluation ? { latestResult: evaluation } : {}
             },
             grade: grade
               ? {
@@ -367,5 +369,6 @@ async function listSubmittedStatesByPluginAttempt(input: {
 }
 
 async function studentAttempt<T extends { latestState: { lastEvaluation?: unknown } }>(context: Parameters<typeof canShowStudentActivityGrade>[0], attempt: T): Promise<T> {
-  return await canShowStudentActivityGrade(context) ? attempt : { ...attempt, resultSummary: {}, latestState: { ...attempt.latestState, lastEvaluation: null } };
+  const showGrade = await canShowStudentActivityGrade(context);
+  return { ...attempt, resultSummary: {}, latestState: { ...projectParsonsState(attempt.latestState), lastEvaluation: showGrade ? attempt.latestState.lastEvaluation : null } } as T;
 }

@@ -687,7 +687,7 @@ sudo nano /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
 sudo grep -n 'REPLACE_' /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
 ```
 
-The final `grep` must print nothing. In Cognelo, open **Settings → Runners → Judge0** and save base URL `http://10.80.0.2:2358`, authentication header `X-Auth-Token`, the same `AUTHN_TOKEN`, and enabled per-process/thread limits. Save the Web Design runner at `http://10.80.0.2:3456`. Use each card's capability test before activating the dependent plugin. Cognelo encrypts the Judge0 token in PostgreSQL with the instance credential key; it is not stored in the application `.env` or returned to the browser.
+The final `grep` must print nothing. In Cognelo, open **Settings → Runners → Judge0** and save base URL `http://10.80.0.2:2358`, authentication header `X-Auth-Token`, the same `AUTHN_TOKEN`, and enabled per-process/thread limits. Save the Web Design runner at `http://10.80.0.2:3456` with its dedicated `Authorization: Bearer <credential>` authentication from section 14.5. Use each card's capability test before activating the dependent plugin. Cognelo encrypts the Judge0 token in PostgreSQL with the instance credential key; it is not stored in the application `.env` or returned to the browser.
 
 The supplied Judge0 configuration enables the synchronous `wait=true` submissions Cognelo uses, permits Cognelo's per-process/thread limit flags, caps CPU at 5 seconds, wall time at 10 seconds, and memory at 128 MB, and disables submission networking, callbacks, command-line arguments, compiler options, batch requests, and additional files. Review these limits when Cognelo's execution contract changes. Judge0's complete option reference is its [versioned configuration file](https://github.com/judge0/judge0/blob/v1.13.1/judge0.conf).
 
@@ -707,11 +707,11 @@ sudo docker image inspect cognelo/web-design-runner:cognelo-0.5.0 \
   --format '{{.Id}}'
 ```
 
-Download the seccomp profile from the same Playwright release and record its checksum:
+Install the checked-in seccomp profile (based on Playwright 1.59.1, with `chroot` permitted for Chromium’s inner user-namespace sandbox even when outer container capabilities are dropped) and record its checksum:
 
 ```bash
-sudo curl -fsSLo /srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json \
-  https://raw.githubusercontent.com/microsoft/playwright/v1.59.1/utils/docker/seccomp_profile.json
+sudo cp infra/production/playwright-seccomp.json \
+  /srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
 sudo chmod 0644 /srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
 sha256sum /srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
 ```
@@ -727,6 +727,7 @@ COMPOSE_PROJECT_NAME=instance1-sandbox
 SANDBOX_BIND_ADDRESS=10.80.0.2
 JUDGE0_PORT=2358
 WEB_DESIGN_RUNNER_PORT=3456
+WEB_DESIGN_RUNNER_TOKEN=
 SANDBOX_DOCKER_SUBNET=172.30.0.0/24
 JUDGE0_SERVER_CONTAINER_IP=172.30.0.10
 WEB_DESIGN_RUNNER_CONTAINER_IP=172.30.0.11
@@ -734,6 +735,8 @@ JUDGE0_IMAGE=judge0/judge0:1.13.1
 WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:cognelo-0.5.0
 PLAYWRIGHT_SECCOMP_PROFILE=/srv/cognelo-sandboxes/instance1/runtime/seccomp_profile.json
 ```
+
+Generate a dedicated runner credential with `openssl rand -hex 32` and fill `WEB_DESIGN_RUNNER_TOKEN` in this private runtime file. Do not reuse the JWT, database, or Judge0 credential. Set **Settings → Runners → Web Design** to authentication header `Authorization` and token `Bearer <generated credential>`. Health checks below require the same `WEB_DESIGN_RUNNER_TOKEN` in the operator shell. The service refuses startup without it, and every endpoint rejects missing or invalid credentials.
 
 Set restrictive permissions, validate the resolved Compose model, and pull the pinned upstream images:
 
@@ -956,7 +959,7 @@ public IPv4 addresses and use a firewall-only connection instead:
      to SANDBOX_PUBLIC_IPV4 port 3456 proto tcp
    ```
 
-4. In every consuming instance, save the public restricted URLs under **Settings → Runners**: `http://SANDBOX_PUBLIC_IPV4:2358` for Judge0 and `http://SANDBOX_PUBLIC_IPV4:3456` for Web Design. Retain the Judge0 authentication header/token and run both capability tests.
+4. In every consuming instance, save the public restricted URLs under **Settings → Runners**: `http://SANDBOX_PUBLIC_IPV4:2358` for Judge0 and `http://SANDBOX_PUBLIC_IPV4:3456` for Web Design. Retain both services’ dedicated authentication headers/tokens and run both capability tests.
 
 The listeners are host systemd sockets, so these connections pass through
 UFW's input policy; no Docker port is published. Verify from the application
@@ -982,7 +985,7 @@ sudo docker compose --env-file .env -f sandbox.compose.yml \
 sudo docker compose --env-file .env -f sandbox.compose.yml logs --tail=200
 SANDBOX_LISTENER_ADDRESS=10.80.0.2 # or the accepted firewall-only public IPv4
 sudo ss -ltnp | grep -E "${SANDBOX_LISTENER_ADDRESS}:(2358|3456)\\b"
-curl --fail "http://${SANDBOX_LISTENER_ADDRESS}:3456/health"
+curl --fail -H "Authorization: Bearer ${WEB_DESIGN_RUNNER_TOKEN}" "http://${SANDBOX_LISTENER_ADDRESS}:3456/health"
 ```
 
 `judge0-language-config` must report `Exited (0)`, and its log must list the active C/C++ compile commands with exactly one occurrence of each required flag. Do not start Cognelo coding-exercise traffic if that service failed or if the workers did not start.
@@ -1340,7 +1343,7 @@ cd /srv/cognelo-sandboxes/instance1/runtime
 sudo docker compose --env-file .env -f sandbox.compose.yml config --quiet
 sudo docker compose --env-file .env -f sandbox.compose.yml \
   up -d --no-deps web-design-runner
-curl --fail http://10.80.0.2:3456/health
+curl --fail -H "Authorization: Bearer ${WEB_DESIGN_RUNNER_TOKEN}" http://10.80.0.2:3456/health
 ```
 
 Judge0, PostgreSQL, Redis, and Playwright base-image upgrades are separate dependency upgrades, not routine restarts. Change a pinned version in a reviewed Cognelo tag, read its upstream migration notes, back up any retained Judge0 data, pull/build it, run the smoke tests, and then roll it into production. Never use an unattended `docker compose pull` against mutable tags.
@@ -1440,7 +1443,7 @@ sudo docker compose --env-file .env -f sandbox.compose.yml logs -f judge0-server
 sudo docker compose --env-file .env -f sandbox.compose.yml logs -f web-design-runner
 sudo docker stats
 sudo ss -ltnp | grep -E '10\.80\.0\.2:(2358|3456)\b'
-curl --fail http://10.80.0.2:3456/health
+curl --fail -H "Authorization: Bearer ${WEB_DESIGN_RUNNER_TOKEN}" http://10.80.0.2:3456/health
 ```
 
 Common failure causes:

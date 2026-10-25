@@ -153,3 +153,5 @@ Link-summary coverage also checks the default-off same-domain checkbox, its gene
 - `course-time.spec.ts`: default-off administrator permission, inherited course defaults, owner-only editing and audit, Save/Cancel/reload, cross-course isolation, scheduling and learner display, disable/re-enable, and returning to inheritance. It restores the instance policy and removes disposable courses.
 
 `text-content.spec.ts` also verifies that display settings for long imported notes send only presentation fields and preserve both the full body and concurrent content edits.
+
+`security-boundaries.spec.ts` uses disposable fixtures to verify public activity projections, teacher-only Test authoring, future-Test denial, and concurrent one-attempt enforcement. Runner credential, command isolation, browser network, and cropped screenshot checks live in `packages/web-design-runner/src/security.test.ts`.

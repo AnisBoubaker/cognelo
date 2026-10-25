@@ -575,8 +575,14 @@ export function ParsonsActivityView({
     });
   }
 
-  function checkSolution() {
+  async function checkSolution() {
     if (isReadOnlyStudentAttempt) {
+      return;
+    }
+    if (activity.config?.studentBlocks) {
+      const checked = await persistAttemptUpdate({ state: buildAttemptStateSnapshot(blocksRef.current, selectedBlockIdRef.current), event: { type: "check" } });
+      const evaluation = checked?.latestState.lastEvaluation;
+      if (evaluation) setFeedback(formatFeedback(evaluation));
       return;
     }
     const result = evaluateParsonsSolution(blocksRef.current, parseParsonsConfig(activity.config));
@@ -608,8 +614,8 @@ export function ParsonsActivityView({
       return false;
     }
     setSubmitting(true);
-    const result = evaluateParsonsSolution(blocksRef.current, parseParsonsConfig(activity.config));
-    if (!isSummativeStudentSession) {
+    const result = activity.config?.studentBlocks ? undefined : evaluateParsonsSolution(blocksRef.current, parseParsonsConfig(activity.config));
+    if (!isSummativeStudentSession && result) {
       const nextFeedback = formatFeedback(result);
       setFeedback(nextFeedback);
       if (result.isCorrect) {
@@ -625,9 +631,9 @@ export function ParsonsActivityView({
         event: {
           type: "submit",
           payload: {
-            isCorrect: result.isCorrect,
-            misplacedBlocks: result.misplacedBlocks,
-            incorrectIndents: result.incorrectIndents
+            isCorrect: result?.isCorrect,
+            misplacedBlocks: result?.misplacedBlocks,
+            incorrectIndents: result?.incorrectIndents
           }
         },
         result,

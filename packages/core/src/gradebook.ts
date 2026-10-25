@@ -1,3 +1,4 @@
+import { getActivityPlugin } from "@cognelo/activity-sdk";
 import { resolveAttemptContinuationHandler } from "@cognelo/activity-sdk/server";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -145,28 +146,29 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
   if (input.assessmentMode && input.assessmentMode !== assessmentMode) {
     throw new AppError(409, "ATTEMPT_MODE_MISMATCH", "The attempt mode no longer matches the activity assignment mode.");
   }
-  const resumableAttempt = await findResumableAttempt(context.groupActivity.id, context.participant.id);
-  if (resumableAttempt) {
-    return prisma.activityAttempt.update({
-      where: { id: resumableAttempt.id },
-      data: {
-        pluginKey: input.pluginKey,
-        pluginVersion: input.pluginVersion,
-        pluginAttemptRef: input.pluginAttemptRef ?? resumableAttempt.pluginAttemptRef,
-        activityConfigFingerprint: asJsonObject(resumableAttempt.metadata)?.continuation
-          ? resumableAttempt.activityConfigFingerprint : input.activityConfigFingerprint ?? resumableAttempt.activityConfigFingerprint,
-        testRevisionId: asJsonObject(resumableAttempt.metadata)?.continuation
-          ? resumableAttempt.testRevisionId : input.testRevisionId ?? resumableAttempt.testRevisionId,
-        metadata: {
-          ...(asJsonObject(resumableAttempt.metadata) ?? {}),
-          ...(asJsonObject(input.metadata) ?? {})
-        } as JsonInput
-      }
-    });
-  }
-  await assertAttemptCanStart(context, now, assessmentMode);
-
   return prisma.$transaction(async (tx) => {
+    // Serialize allowance checks and numbering even when no attempt exists yet.
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${JSON.stringify([context.gradebookItem.id, context.participant.id])}, 0))`;
+    const resumableAttempt = await findResumableAttempt(context.groupActivity.id, context.participant.id, false, tx);
+    if (resumableAttempt) {
+      return tx.activityAttempt.update({
+        where: { id: resumableAttempt.id },
+        data: {
+          pluginKey: input.pluginKey,
+          pluginVersion: input.pluginVersion,
+          pluginAttemptRef: input.pluginAttemptRef ?? resumableAttempt.pluginAttemptRef,
+          activityConfigFingerprint: asJsonObject(resumableAttempt.metadata)?.continuation
+            ? resumableAttempt.activityConfigFingerprint : input.activityConfigFingerprint ?? resumableAttempt.activityConfigFingerprint,
+          testRevisionId: asJsonObject(resumableAttempt.metadata)?.continuation
+            ? resumableAttempt.testRevisionId : input.testRevisionId ?? resumableAttempt.testRevisionId,
+          metadata: {
+            ...(asJsonObject(resumableAttempt.metadata) ?? {}),
+            ...(asJsonObject(input.metadata) ?? {})
+          } as JsonInput
+        }
+      });
+    }
+    await assertAttemptCanStart(context, now, assessmentMode, tx);
     const latestAttempt = await tx.activityAttempt.findFirst({
       where: {
         gradebookItemId: context.gradebookItem.id,
@@ -264,8 +266,8 @@ export function activityAttemptTimeLimitMinutes(value: unknown): number | null {
     : null;
 }
 
-async function findResumableAttempt(groupActivityId: string, participantId: string, includeTestAttempts = false) {
-  const attempts = await prisma.activityAttempt.findMany({
+async function findResumableAttempt(groupActivityId: string, participantId: string, includeTestAttempts = false, db: Pick<typeof prisma, "activityAttempt"> = prisma) {
+  const attempts = await db.activityAttempt.findMany({
     where: { groupActivityId, participantId, lifecycle: "started" },
     orderBy: [{ attemptNumber: "desc" }]
   });
@@ -2014,7 +2016,8 @@ async function resolveAttemptParticipant(user: CurrentUser, courseId: string, gr
 async function assertAttemptCanStart(
   context: Awaited<ReturnType<typeof resolveAssignedActivityAttemptContext>>,
   now: Date,
-  assessmentMode: ActivityAttemptAssessmentMode
+  assessmentMode: ActivityAttemptAssessmentMode,
+  db: Pick<typeof prisma, "activityAttempt"> = prisma
 ) {
   const availableUntil = context.groupActivity.availableUntil;
   const item = context.gradebookItem;
@@ -2035,7 +2038,7 @@ async function assertAttemptCanStart(
     return;
   }
 
-  const usedAttempts = await prisma.activityAttempt.count({
+  const usedAttempts = await db.activityAttempt.count({
     where: {
       gradebookItemId: item.id,
       participantId: context.participant.id,
@@ -2290,7 +2293,7 @@ function deletedSubmissionAuditsForParticipant(
         actor: event.actor ? { id: event.actor.id, name: event.actor.name, email: event.actor.email } : null,
         pluginKey: typeof attempt.pluginKey === "string" ? attempt.pluginKey : null,
         pluginAttemptRef: typeof attempt.pluginAttemptRef === "string" ? attempt.pluginAttemptRef : null,
-        metadata: asJsonObject(attempt.metadata) ?? {},
+        metadata: includeGradeSnapshot ? asJsonObject(attempt.metadata) ?? {} : studentDeletedMetadata(attempt),
         // Preserve the original grade in staff/audit records, never expose the
         // raw snapshot through learner deletion history (even before release).
         gradeSnapshot: includeGradeSnapshot ? grade : null
@@ -2664,4 +2667,15 @@ function stringArray(value: unknown) {
 
 function asNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function studentDeletedMetadata(attempt: Record<string, unknown>): Record<string, unknown> {
+  const metadata = asJsonObject(attempt.metadata) ?? {};
+  const result = Object.fromEntries(["submittedAnswers", "submittedSourceCode", "submittedFiles"].flatMap((key) =>
+    metadata[key] === undefined ? [] : [[key, metadata[key]]]));
+  if (metadata.submittedState) {
+    const definition = typeof attempt.pluginKey === "string" ? getActivityPlugin(attempt.pluginKey)?.activities[0] : undefined;
+    result.submittedState = definition?.studentResponseState?.(asJsonObject(metadata.submittedState) ?? {}) ?? {};
+  }
+  return result;
 }

@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest } from "next/server";
-import { createMaterial } from "@cognelo/core";
+import { createMaterial, assertCanManageCourse } from "@cognelo/core";
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string }> };
@@ -18,6 +18,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId } = await params;
+    await assertCanManageCourse(user, courseId);
     const formData = await request.formData();
     const file = formData.get("file");
     const titleValue = formData.get("title");
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         size: file.size
       },
       position: typeof positionValue === "string" ? Number(positionValue) : 0
-    });
+    }, true).catch(async (error) => { await unlink(path.join(storageDir, storedName)); throw error; });
 
     return json({ material }, { status: 201 });
   });

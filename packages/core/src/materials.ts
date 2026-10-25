@@ -1,3 +1,4 @@
+import { assertMaterialStorageUnchanged } from "./material-storage";
 import { CourseMaterialInputSchema, CourseMaterialUpdateSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -12,9 +13,10 @@ export async function listMaterials(user: CurrentUser, courseId: string) {
   });
 }
 
-export async function createMaterial(user: CurrentUser, courseId: string, input: unknown) {
+export async function createMaterial(user: CurrentUser, courseId: string, input: unknown, serverUpload = false) {
   await assertCanManageCourse(user, courseId);
   const data = CourseMaterialInputSchema.parse(input);
+  assertMaterialStorageUnchanged(data.metadata, null, serverUpload);
   await assertValidParent(courseId, data.parentId);
   return prisma.courseMaterial.create({
     data: { ...data, metadata: data.metadata as Prisma.InputJsonValue, courseId, createdById: user.id }
@@ -30,13 +32,14 @@ export async function getMaterialForDownload(user: CurrentUser, courseId: string
   return material;
 }
 
-export async function updateMaterial(user: CurrentUser, courseId: string, materialId: string, input: unknown) {
+export async function updateMaterial(user: CurrentUser, courseId: string, materialId: string, input: unknown, serverUpload = false) {
   await assertCanManageCourse(user, courseId);
   const data = CourseMaterialUpdateSchema.parse(input);
   const material = await prisma.courseMaterial.findFirst({ where: { id: materialId, courseId } });
   if (!material) {
     throw notFound("Course material");
   }
+  assertMaterialStorageUnchanged(data.metadata, material.metadata, serverUpload);
   if (data.parentId === materialId) {
     throw new AppError(400, "INVALID_MATERIAL_PARENT", "A material cannot be moved inside itself.");
   }

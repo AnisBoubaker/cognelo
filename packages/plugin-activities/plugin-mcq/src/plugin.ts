@@ -1,4 +1,4 @@
-import { reconcileMcqResponseState } from "./mcq";
+import { reconcileMcqResponseState, projectMcqConfig } from "./mcq";
 import { z } from "zod";
 import type { ActivityPlugin } from "@cognelo/activity-sdk";
 import { mcqDatabaseModule } from "./db";
@@ -98,6 +98,7 @@ export const mcqPlugin: ActivityPlugin = {
   activities: [
     {
       key: "mcq",
+      studentConfig: projectMcqConfig,
       reconcileResponseState: reconcileMcqResponseState,
       name: "Multpiple choice questions",
       description: "Single-choice and multiple-choice activities authored in a text-first Markdown-like format.",

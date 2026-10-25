@@ -110,6 +110,8 @@ export type ActivityProvider =
 export type ActivityCreationScope = "bank" | "course";
 
 export type ActivityDefinition = {
+  /** Allowlisted learner config. Omission fails closed to an empty config. */
+  studentConfig?: (config: Record<string, unknown>) => Record<string, unknown>;
   /** Opt-in reference solution, served only through the host's release gate. */
   supportsSolution?: boolean;
   /** Preserve response identity when authored questions change during an attempt. Pure and student-safe. */

@@ -159,3 +159,7 @@ Teacher, learner, and settings actions follow the platform [button and icon cont
 ## Answer exports
 
 The plugin implements `submissionExport.getContent` for the [shared PDF/ZIP export](../../../../docs/ANSWER_EXPORTS.md). Exports read retained submitted text/source files and challenge answers, with optional assignment Markdown/PDF, question text, and teacher comments. Assignment-PDF pages accompany their own attempt and are omitted when prompts are disabled. Binary files remain identified attachments; no analysis or question generation is run. The host enforces teacher/section scope, submission lifecycle, exact attempt selection, and prompt/grading switches. Private provider requests, credentials, and provenance are never exported.
+
+## Learner data boundaries
+
+The definition’s `studentConfig` returns only grading mode, attempt-display settings, and repository template URL; generic authoring metadata and nested bank/version records are excluded from learner transport.

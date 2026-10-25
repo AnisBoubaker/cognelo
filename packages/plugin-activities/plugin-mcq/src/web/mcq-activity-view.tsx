@@ -10,6 +10,8 @@ import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import { CodeEditor, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, ProgressDialog, RichTextEditor, codeLanguageOptions, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   parseMcqSource,
+  readMcqConfig,
+  withMcqSelectedFeedback,
   reconcileMcqResponseState,
   type McqChoice,
   type McqQuestion,
@@ -333,6 +335,7 @@ export function McqActivityView({
   const [submissionStatusReady, setSubmissionStatusReady] = useState(false);
   const [error, setError] = useState("");
   const [studentAnswers, setStudentAnswers] = useState<StudentAnswerState>({});
+  const [studentGrade, setStudentGrade] = useState<Record<string, unknown> | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const lastTimedAutoSubmitRequestRef = useRef(0);
@@ -372,12 +375,13 @@ export function McqActivityView({
     setQuestionCount(normalizeQuestionCount(activity.config?.aiQuestionCount));
   }, [activity.id, activity.title, activity.description, activityConfigKey]);
 
-  const parsedMcq = useMemo(() => parseMcqSource(source, "none"), [source]);
+  const parsedMcq = useMemo(() => activity.config?.studentDocument ? readMcqConfig(activity.config) : parseMcqSource(source, "none"), [source, activity.config]);
   const score = useMemo(() => {
     if (!submitted) {
       return null;
     }
 
+    if (activity.config?.studentDocument) return studentGrade ? { correct: Number(studentGrade.correctCount ?? studentGrade.rawScore), total: Number(studentGrade.rawMaxScore) } : null;
     let correct = 0;
     for (const question of parsedMcq.questions) {
       const expected = question.choices.filter((choice) => choice.isCorrect).map((choice) => choice.id).sort();
@@ -391,7 +395,7 @@ export function McqActivityView({
       correct,
       total: parsedMcq.questions.length
     };
-  }, [parsedMcq.questions, studentAnswers, submitted]);
+  }, [parsedMcq.questions, studentAnswers, submitted, studentGrade, activity.config]);
 
   const currentSnapshot = useMemo(
     () => ({
@@ -429,6 +433,7 @@ export function McqActivityView({
         onPreviousSubmissionsAvailabilityChange?.(isCompletedSubmission);
         setStudentAnswers(attemptState.answers);
         setSubmitted(attemptState.submitted);
+        setStudentGrade(attemptState.submitted ? status.grade ?? null : null);
         const reviews = status.attempts?.map((attempt) => ({
           id: attempt.submission.id,
           attemptNumber: attempt.submission.attemptNumber,
@@ -638,6 +643,7 @@ export function McqActivityView({
       try {
         if (submissionClient?.feedback) {
           const feedback = await submissionClient.feedback(activity.id, studentAnswers);
+          setStudentGrade((feedback?.deterministicGrade as Record<string, unknown>) ?? null);
           if (aiFeedbackEnabled && feedback) setAiFeedback(feedback);
         }
       } catch {
@@ -940,7 +946,7 @@ export function McqActivityView({
           ) : null}
           <McqStudentView
             studentPrompt={description}
-            parsedMcq={parsedMcq}
+            parsedMcq={withMcqSelectedFeedback(parsedMcq, selectedSubmissionReview.grade)}
             studentAnswers={selectedSubmissionReview.answers}
             submitted
             showAnswerKey={showAnswerKey}
@@ -973,7 +979,7 @@ export function McqActivityView({
         <>
           <McqStudentView
             studentPrompt={description}
-            parsedMcq={parsedMcq}
+            parsedMcq={withMcqSelectedFeedback(parsedMcq, submitted ? studentGrade : null)}
             studentAnswers={studentAnswers}
             submitted={submitted}
             showAnswerKey={showAnswerKey}
@@ -1210,10 +1216,11 @@ function McqQuestionCard({
   disabled: boolean;
 }) {
   const expected = question.choices.filter((choice) => choice.isCorrect).map((choice) => choice.id).sort();
-  const pointUnit = expected.length ? questionMaxScore / expected.length : 0;
+  const showQuestionFeedback = showFeedback && (Boolean(question.learnerGrade) || question.choices.every((choice) => typeof choice.isCorrect === "boolean"));
+  const pointUnit = question.learnerGrade ? question.learnerGrade.pointUnit * questionMaxScore : expected.length ? questionMaxScore / expected.length : 0;
   const correctSelectedCount = selected.filter((choiceId) => expected.includes(choiceId)).length;
   const incorrectSelectedCount = selected.filter((choiceId) => !expected.includes(choiceId)).length;
-  const questionScore = clampScore((correctSelectedCount - incorrectSelectedCount) * pointUnit, 0, questionMaxScore);
+  const questionScore = question.learnerGrade ? question.learnerGrade.score * questionMaxScore : clampScore((correctSelectedCount - incorrectSelectedCount) * pointUnit, 0, questionMaxScore);
 
   return (
     <article className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 18 }}>
@@ -1223,7 +1230,7 @@ function McqQuestionCard({
           <h3 style={{ margin: 0 }}>{question.title}</h3>
           <MarkdownBlocksView blocks={question.promptBlocks} />
         </div>
-        {showFeedback ? (
+        {showQuestionFeedback ? (
           <span
             aria-label={`${pointsLabel}: ${formatPoints(questionScore)} / ${formatPoints(questionMaxScore)}`}
             style={{
@@ -1250,11 +1257,11 @@ function McqQuestionCard({
       <div className="stack" style={{ gap: 12 }}>
         {question.choices.map((choice) => {
           const checked = selected.includes(choice.id);
-          const isCorrectChoice = choice.isCorrect;
-          const isMissedCorrectChoice = showFeedback && showAnswerKey && isCorrectChoice && !checked;
-          const isWrongSelectedChoice = showFeedback && checked && !isCorrectChoice;
-          const isRightSelectedChoice = showFeedback && checked && isCorrectChoice;
-          const pointImpact = showFeedback && (checked || isMissedCorrectChoice)
+          const isCorrectChoice = Boolean(choice.isCorrect);
+          const isMissedCorrectChoice = showQuestionFeedback && showAnswerKey && isCorrectChoice && !checked;
+          const isWrongSelectedChoice = showQuestionFeedback && checked && !isCorrectChoice;
+          const isRightSelectedChoice = showQuestionFeedback && checked && isCorrectChoice;
+          const pointImpact = showQuestionFeedback && (checked || isMissedCorrectChoice)
             ? isRightSelectedChoice
               ? pointUnit
               : -pointUnit
@@ -1286,7 +1293,7 @@ function McqQuestionCard({
                 padding: 12
               }}
               >
-              {showFeedback ? (
+              {showQuestionFeedback ? (
                 <AnswerStatusIcon
                   isCorrectChoice={isCorrectChoice}
                   isMissedCorrectChoice={isMissedCorrectChoice}

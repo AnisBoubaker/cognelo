@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +24,7 @@ services:
       - ./infra/judge0/judge0.conf:/judge0.conf:ro
       - ./infra/judge0/isolate.dev.conf:/usr/local/etc/isolate:ro
     ports:
-      - "2358:2358"
+      - "127.0.0.1:2358:2358"
     privileged: true
     restart: unless-stopped
 
@@ -85,19 +85,29 @@ services:
     restart: unless-stopped
 
   web-design-runner:
-    image: mcr.microsoft.com/playwright:v1.59.1-noble
-    working_dir: /workspace
-    command: ["bash", "-lc", "npm install && npm run dev --workspace @cognelo/web-design-runner"]
+    build:
+      context: .
+      dockerfile: infra/production/web-design-runner.Dockerfile
+    init: true
+    user: pwuser
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true", "seccomp=./infra/production/playwright-seccomp.json"]
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: 2.0
+    shm_size: 1gb
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+      - /home/pwuser:rw,nosuid,size=128m
     environment:
       PORT: "3456"
+      RUNNER_BIND_ADDRESS: "0.0.0.0"
+      WEB_DESIGN_RUNNER_TOKEN: ${WEB_DESIGN_RUNNER_TOKEN:-}
     ports:
-      - "3456:3456"
-    volumes:
-      - .:/workspace
-      - web-design-runner-node-modules:/workspace/node_modules
+      - "127.0.0.1:3456:3456"
     restart: unless-stopped
 
 volumes:
   postgres-data:
   judge0-postgres-data:
-  web-design-runner-node-modules:

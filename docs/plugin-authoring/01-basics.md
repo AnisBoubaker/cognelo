@@ -105,6 +105,8 @@ At a high level, it:
 3. finds the renderer for that activity type
 4. renders the matching plugin UI
 
+Learner transport must use the activity definition’s `studentConfig(config)` allowlist; absence returns `{}`. Keep authoring keys, solutions, private instructions, and private fingerprints out of it, including nested data. Use `studentResponseState` for private evidence embedded in legacy response states. Server plugin execution still receives the authorized original configuration.
+
 That renderer lookup happens in:
 
 - [apps/web/src/lib/activity-renderers.tsx](../../apps/web/src/lib/activity-renderers.tsx)

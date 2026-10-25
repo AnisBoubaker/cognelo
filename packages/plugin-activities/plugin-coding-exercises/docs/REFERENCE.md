@@ -311,3 +311,7 @@ Teacher, learner, and settings actions follow the platform [button and icon cont
 ## Answer exports
 
 The plugin implements `submissionExport.getContent` for the [shared PDF/ZIP export](../../../../docs/ANSWER_EXPORTS.md). Exports use the exact submitted source, latest stored test evaluation, and saved rubric/comments. Missing tests or ungraded work never block export. No Judge0 or model call occurs. The host enforces teacher/section scope, submission lifecycle, exact attempt selection, and prompt/grading switches. Private provider requests, credentials, and provenance are never exported.
+
+## Learner data boundaries
+
+The definition’s `studentConfig` validates learner transport with the public config schema, stripping unknown authoring fields. Private plugin storage and grading access are unchanged.

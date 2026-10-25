@@ -245,7 +245,6 @@ export function evaluateParsonsAttemptStateForConfig(value: unknown, config: Par
 function remapSubmittedBlocksToCurrentConfig(blocks: ParsonsBlock[], config: ParsonsConfig): ParsonsBlock[] {
   const sourceLines = getParsonsSourceLines(config);
   const currentBlocksByText = new Map<string, ParsonsBlock[]>();
-  const currentBlocksByPhysicalLine = new Map<number, ParsonsBlock>();
 
   sourceLines.forEach((line) => {
     const block = {
@@ -259,17 +258,17 @@ function remapSubmittedBlocksToCurrentConfig(blocks: ParsonsBlock[], config: Par
       expectedIndent: Math.max(0, Math.floor(countLeadingSpaces(line.text) / 2)),
       currentIndent: config.stripIndentation ? 0 : Math.max(0, Math.floor(countLeadingSpaces(line.text) / 2))
     };
-    const textMatches = currentBlocksByText.get(line.text) ?? [];
+    const textMatches = currentBlocksByText.get(config.stripIndentation ? line.text.trimStart() : line.text) ?? [];
     textMatches.push(block);
-    currentBlocksByText.set(line.text, textMatches);
-    currentBlocksByPhysicalLine.set(line.physicalLineIndex, block);
+    currentBlocksByText.set(config.stripIndentation ? line.text.trimStart() : line.text, textMatches);
   });
 
+  if (blocks.length !== sourceLines.length) throw new Error("The Parsons response must contain every line exactly once.");
   return blocks.map((block) => {
-    const textMatch = currentBlocksByText.get(block.originalText)?.shift();
-    const currentBlock = textMatch ?? currentBlocksByPhysicalLine.get(block.physicalLineIndex);
+    const textMatch = currentBlocksByText.get(block.displayText)?.shift();
+    const currentBlock = textMatch;
     if (!currentBlock) {
-      return block;
+      throw new Error("The Parsons response contains an unknown or duplicated line.");
     }
     return {
       ...currentBlock,

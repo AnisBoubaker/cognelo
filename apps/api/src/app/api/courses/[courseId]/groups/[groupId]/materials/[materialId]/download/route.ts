@@ -1,7 +1,7 @@
+import { Readable } from "node:stream";
 import path from "node:path";
-import { access, readFile } from "node:fs/promises";
 import { NextRequest } from "next/server";
-import { getGroupMaterialForDownload } from "@cognelo/core";
+import { getGroupMaterialForDownload, openStoredMaterial } from "@cognelo/core";
 import { handleRoute, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; groupId: string; materialId: string }> };
@@ -20,11 +20,10 @@ export async function GET(_request: NextRequest, { params }: Params) {
       throw new Error("Stored file metadata is missing.");
     }
 
-    const filePath = path.join(process.cwd(), "../../storage/group-materials", courseId, groupId, metadata.storedName);
-    await access(filePath);
-    const buffer = await readFile(filePath);
+    const file = await openStoredMaterial(path.resolve(process.cwd(), "../../storage/group-materials"), [courseId, groupId], metadata.storedName);
+    const stream = Readable.toWeb(file.createReadStream()) as ReadableStream;
 
-    return new Response(buffer, {
+    return new Response(stream, {
       status: 200,
       headers: {
         "Cache-Control": "no-store, max-age=0",

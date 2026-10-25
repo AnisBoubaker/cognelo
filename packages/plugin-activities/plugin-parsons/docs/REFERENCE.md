@@ -178,3 +178,7 @@ Teacher, learner, and settings actions follow the platform [button and icon cont
 ## Answer exports
 
 The plugin implements `submissionExport.getContent` for the [shared PDF/ZIP export](../../../../docs/ANSWER_EXPORTS.md). Exports preserve submitted block order and indentation from the host snapshot or retained attempt. They never call the evaluator or substitute reference code. The host enforces teacher/section scope, submission lifecycle, exact attempt selection, and prompt/grading switches. Private provider requests, credentials, and provenance are never exported.
+
+## Learner data boundaries
+
+Learner config and state contain displayed blocks and learner indentation only. Reference solution, source positions, expected indentation, groups/rules, and private fingerprints remain server-side. Public block identifiers derive only from displayed text; grading resolves the complete line multiset against server config and ignores client correctness fields. Checks use server feedback. Live edits retain matching displayed lines and append new lines.

@@ -29,6 +29,8 @@ The activity definition explicitly declares read-only Student view support. The 
 
 Teachers can [reopen the last submission](../../../docs/SUBMISSION_CONTINUATION.md) so its saved answers can be continued using the original start and current effective settings.
 
+Learner responses use an explicit public projection; see [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)

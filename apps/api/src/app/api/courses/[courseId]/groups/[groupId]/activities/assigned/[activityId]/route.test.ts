@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@cognelo/core", () => ({
+  projectStudentActivity: (activity: unknown) => activity,
   getGroupAssignedActivity: mocks.getGroupAssignedActivity
 }));
 
@@ -33,7 +34,7 @@ describe("assigned group activity detail route", () => {
       params: Promise.resolve({ courseId: "course-1", groupId: "group-1", activityId: "activity-1" })
     });
 
-    await expect(response.json()).resolves.toEqual({ activity: { id: "activity-1", title: "Assigned" } });
+    await expect(response.json()).resolves.toEqual({ activity: { id: "activity-1", title: "Assigned", assignment: { config: {} } } });
     expect(mocks.getGroupAssignedActivity).toHaveBeenCalledWith(
       { id: "teacher-1", roles: ["teacher"] },
       "course-1",

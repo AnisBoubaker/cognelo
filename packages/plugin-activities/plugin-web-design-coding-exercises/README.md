@@ -14,6 +14,8 @@ Teachers can opt into the shared [Solution tab](../../../docs/ACTIVITY_SOLUTIONS
 
 Deleted submissions display retained student files and the teacher’s reason through the [shared history flow](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md#submission-deletion).
 
+Learner responses use an explicit public projection; see [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
@@ -32,7 +34,7 @@ Deleted submissions display retained student files and the teacher’s reason th
 - Fast preview is client-side and sandboxed; graded execution is server-mediated through the external runner.
 - Editor assets and HTML/CSS/JavaScript workers use the shared first-party [Monaco loader](../../../docs/reference/PLATFORM_DECISIONS.md#frontend-platform-decisions), including when staff inspect expired assignments.
 - The definition declares interactive, plugin-executed Student view support and uses that learner UI plus stateless runner evaluation; it never writes submission, test-result, attempt, grade, or analytics rows.
-- Administrators configure the endpoint under **Settings → Runners**. Core persists the endpoint and optional encrypted authentication token and resolves it through the pool-ready runner selector.
+- Administrators configure the endpoint under **Settings → Runners**. Core persists the endpoint and required encrypted Bearer token and resolves it through the pool-ready runner selector.
 - Enabled tests must pass against the private reference bundle before they are saved.
 - Bank/course private data is copied, synchronized, duplicated, and deleted through explicit plugin hooks.
 - Reusable bank Tests invoke those hooks for every independently owned web-design child across bank copy, course import/publication, duplication, and deletion.

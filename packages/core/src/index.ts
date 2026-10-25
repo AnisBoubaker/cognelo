@@ -42,3 +42,6 @@ export * from "./course-time";
 export * from "./activity-content-access";
 export * from "./activity-content-finalization";
 export * from "./answer-export";
+
+export * from "./material-storage";
+export * from "./student-activity";

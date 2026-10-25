@@ -1,3 +1,5 @@
+import { projectParsonsConfig } from "./parsons";
+import { projectParsonsState } from "./attempt-types";
 import { z } from "zod";
 import type { ActivityPlugin } from "@cognelo/activity-sdk";
 import { parsonsDatabaseModule } from "./db";
@@ -67,7 +69,8 @@ export const parsonsPlugin: ActivityPlugin = {
   activities: [
     {
       key: "parsons-problem",
-      studentResponseState: (state) => ({ ...state, lastEvaluation: null }),
+      studentResponseState: projectParsonsState,
+      studentConfig: projectParsonsConfig,
       reconcileResponseState: reconcileParsonsResponseState,
       name: "Parsons problem",
       description: "Reorder scrambled code blocks and optionally restore indentation to rebuild a working program.",

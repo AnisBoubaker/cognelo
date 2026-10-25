@@ -4,7 +4,7 @@ import { TestCreateSchema, TestDuplicateSchema, TestItemCreateSchema, TestItemUp
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { createActivity } from "./activities";
-import { assertCanManageCourse, assertCanViewCourse } from "./authorization";
+import { assertCanManageCourse } from "./authorization";
 import { AppError, notFound } from "./errors";
 import { ensureCoreActivityTypes } from "./plugins";
 import { reconcileMediaAssetReferences } from "./media-assets";
@@ -73,7 +73,7 @@ export async function createTest(user: CurrentUser, courseId: string, input: unk
 }
 
 export async function getTestByActivityId(user: CurrentUser, courseId: string, activityId: string) {
-  await assertCanViewCourse(user, courseId);
+  await assertCanManageCourse(user, courseId);
   const test = await prisma.test.findFirst({ where: { courseId, activityId }, include: testInclude });
   if (!test) {
     throw notFound("Test");

@@ -2887,7 +2887,7 @@ export const api = {
       }
     ),
   groupMcqFormativeFeedback: (courseId: string, groupId: string, activityId: string, answers: Record<string, string[]>) =>
-    request<{ evaluation: { feedback: Record<string, unknown> } }>(
+    request<{ evaluation: { feedback: Record<string, unknown> } | null; grade: Record<string, unknown> }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/mcq/feedback`,
       { method: "POST", body: JSON.stringify({ answers }) }
     ),

@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const tx = vi.hoisted(() => ({
+  $queryRaw: vi.fn(),
   activityAttempt: {
+    count: vi.fn(),
+    findMany: vi.fn(),
     create: vi.fn(),
     findFirst: vi.fn(),
     update: vi.fn()
@@ -160,6 +163,8 @@ describe("gradebook attempt services", () => {
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
     mockPrisma.courseGroupActivity.findFirst.mockResolvedValue(groupActivity);
     mockPrisma.courseGroupParticipant.findFirst.mockResolvedValue(participant);
+    tx.activityAttempt.count.mockImplementation((input) => mockPrisma.activityAttempt.count(input));
+    tx.activityAttempt.findMany.mockImplementation((input) => mockPrisma.activityAttempt.findMany(input));
     mockPrisma.activityAttempt.count.mockResolvedValue(0);
     mockPrisma.activityAttempt.findMany.mockResolvedValue([]);
     mockPrisma.activityAttempt.update.mockImplementation(async ({ data }) => ({ id: "attempt-1", ...data }));
@@ -246,7 +251,7 @@ describe("gradebook attempt services", () => {
       courseId: "course-1", groupId: "group-1", activityId: "activity-1", pluginKey: "mcq", pluginVersion: "0.1.0",
       pluginAttemptRef: "new-artifact", activityConfigFingerprint: "later-config", testRevisionId: "later-revision"
     });
-    expect(mockPrisma.activityAttempt.update).toHaveBeenCalledWith({
+    expect(tx.activityAttempt.update).toHaveBeenCalledWith({
       where: { id: "reopened-attempt" },
       data: expect.objectContaining({ pluginAttemptRef: "new-artifact", activityConfigFingerprint: "original-config", testRevisionId: "original-revision" })
     });
@@ -284,7 +289,7 @@ describe("gradebook attempt services", () => {
       metadata: { responseStored: true }
     })).resolves.toMatchObject({ id: "attempt-1", pluginKey: "mcq" });
 
-    expect(mockPrisma.activityAttempt.update).toHaveBeenCalledWith({
+    expect(tx.activityAttempt.update).toHaveBeenCalledWith({
       where: { id: "timed-attempt-1" },
       data: expect.objectContaining({
         pluginKey: "mcq",
@@ -1342,7 +1347,7 @@ describe("gradebook attempt services", () => {
     const audit = await getStudentActivitySubmissionAudit(studentUser, "course-1", "group-1", "activity-1");
     expect(audit.submittedAttemptCount).toBe(0);
     expect(audit.deletedSubmissions).toEqual([expect.objectContaining({
-      attemptId: "attempt-1", reason: "Incorrect upload", lifecycle: "deleted", gradeSnapshot: null, metadata: { submittedState }
+      attemptId: "attempt-1", reason: "Incorrect upload", lifecycle: "deleted", gradeSnapshot: null, metadata: { submittedState: {} }
     })]);
   });
 

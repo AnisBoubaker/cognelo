@@ -1,5 +1,6 @@
 # Programming Exercises Memory
 
+- Learner payloads use the definition’s allowlisted `studentConfig`; keep keys, solutions, private instructions, and authoring metadata server-side. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
 - The [student solution contract](../../../docs/ACTIVITY_SOLUTIONS.md) is capability-driven and default-off. Core gates explicit reveals by current assignment access and the summative grade release; the plugin returns only displayable reference content, never grading internals.

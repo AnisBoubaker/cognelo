@@ -1,3 +1,5 @@
+import { assertMaterialStorageUnchanged } from "./material-storage";
+import { projectStudentActivity } from "./student-activity";
 import bcrypt from "bcryptjs";
 import {
   CourseAllGroupsActivityAssignmentInputSchema,
@@ -167,7 +169,7 @@ export async function getCourseGroup(user: CurrentUser, courseId: string, groupI
               activityVersion: null
             }
           }
-        : assignment),
+        : { ...assignment, config: {}, activity: projectStudentActivity(assignment.activity, false) }),
     participants: isManager || canTeach ? group.participants : group.participants.filter((participant) => participant.userId === user.id),
     hiddenCourseMaterialIds: group.hiddenCourseMaterials.map((entry) => entry.courseMaterialId)
   };
@@ -689,10 +691,11 @@ export async function listGroupMaterials(user: CurrentUser, courseId: string, gr
   });
 }
 
-export async function createGroupMaterial(user: CurrentUser, courseId: string, groupId: string, input: unknown) {
+export async function createGroupMaterial(user: CurrentUser, courseId: string, groupId: string, input: unknown, serverUpload = false) {
   await assertCanManageCourse(user, courseId);
   await assertGroupBelongsToCourse(courseId, groupId);
   const data = CourseGroupMaterialInputSchema.parse(input);
+  assertMaterialStorageUnchanged(data.metadata, null, serverUpload);
   await assertValidGroupMaterialParent(groupId, data.parentId);
   return prisma.courseGroupMaterial.create({
     data: {
@@ -712,6 +715,7 @@ export async function updateGroupMaterial(user: CurrentUser, courseId: string, g
   if (!material) {
     throw notFound("Group material");
   }
+  assertMaterialStorageUnchanged(data.metadata, material.metadata);
   if (data.parentId === materialId) {
     throw new AppError(400, "INVALID_MATERIAL_PARENT", "A material cannot be moved inside itself.");
   }

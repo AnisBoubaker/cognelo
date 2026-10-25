@@ -447,6 +447,8 @@ Regression coverage is in `tests/e2e/test-timeout-recovery.spec.ts`, alongside t
 
 ## API and Service Boundaries
 
+All Test authoring reads and mutations require course-management permission. Learners use only assigned runtime routes, whose current and submitted child activities use the owning `studentConfig` projection. Authoring revisions, private config fingerprints, and nested bank/version records remain server-side. Autosave config snapshots are selected by the server, not accepted from a learner.
+
 Core service modules: `packages/core/src/tests.ts` for course authoring/execution and `packages/core/src/bank-tests.ts` for reusable Test ownership and bank/course deep-copy boundaries.
 
 Planned operations:

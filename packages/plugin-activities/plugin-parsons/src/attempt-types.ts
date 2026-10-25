@@ -1,15 +1,15 @@
 import { z } from "zod";
-import { buildParsonsBlocks, parseParsonsConfig, resetParsonsBlocks, type ParsonsBlock, type ParsonsConfig } from "./parsons";
+import { buildParsonsBlocks, projectParsonsBlocks, parseParsonsConfig, resetParsonsBlocks, type ParsonsBlock, type ParsonsConfig } from "./parsons";
 
 export const parsonsBlockSchema = z.object({
   id: z.string().min(1).max(160),
   displayText: z.string(),
-  originalText: z.string(),
-  sourceIndex: z.number().int().min(0),
-  physicalLineIndex: z.number().int().min(0),
-  unitId: z.string().min(1).max(160),
-  groupId: z.string().min(1).max(80).nullable(),
-  expectedIndent: z.number().int().min(0).max(12),
+  originalText: z.string().default(""),
+  sourceIndex: z.number().int().min(0).default(0),
+  physicalLineIndex: z.number().int().min(0).default(0),
+  unitId: z.string().min(1).max(160).default("student"),
+  groupId: z.string().min(1).max(80).nullable().default(null),
+  expectedIndent: z.number().int().min(0).max(12).default(0),
   currentIndent: z.number().int().min(0).max(12)
 });
 
@@ -86,6 +86,7 @@ export function buildParsonsAttemptState(
 }
 
 export function getParsonsConfigFingerprint(config: ParsonsConfig) {
+  if (config.studentBlocks) return "student";
   return hashValue(
     JSON.stringify({
       solution: config.solution,
@@ -104,14 +105,14 @@ export function reconcileParsonsResponseState(_previousConfig: unknown, nextConf
   if (!parsed.success) return value;
   const state = parsed.data;
   const configFingerprint = getParsonsConfigFingerprint(config);
-  if (state.configFingerprint === configFingerprint) return { ...state, lastEvaluation: null };
-  const available = buildParsonsBlocks(`revision-${configFingerprint}`, config);
+  if (!config.studentBlocks && state.configFingerprint === configFingerprint) return { ...state, lastEvaluation: null };
+  const available = buildParsonsBlocks("revision", config).sort((a, b) => a.displayText.localeCompare(b.displayText));
   // Reserve text matches first, so a removed/edited line cannot steal another line's identity.
-  const matches = state.blocks.map((block) => available.find((candidate) => candidate.originalText === block.originalText));
+  const matches = state.blocks.map((block) => available.find((candidate) => candidate.displayText === block.displayText));
   const used = new Set<ParsonsBlock>();
-  const blocks = state.blocks.flatMap((block, index) => {
-    const current = (matches[index] && !used.has(matches[index]!)) ? matches[index] : available.find((candidate) =>
-      !used.has(candidate) && !matches.includes(candidate) && candidate.physicalLineIndex === block.physicalLineIndex);
+  const blocks = state.blocks.flatMap((block) => {
+    const current = available.find((candidate) => !used.has(candidate) && candidate.displayText === block.displayText) ?? available.find((candidate) =>
+      !used.has(candidate) && !matches.includes(candidate) && state.configFingerprint !== "student" && candidate.physicalLineIndex === block.physicalLineIndex);
     if (!current) return [];
     used.add(current);
     return [{ ...current, id: block.id, currentIndent: config.stripIndentation ? block.currentIndent : current.currentIndent }];
@@ -126,4 +127,13 @@ function hashValue(value: string) {
     hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
   }
   return hash.toString(16);
+}
+
+export function projectParsonsState(value: Record<string, unknown>): Record<string, unknown> {
+  const parsed = parsonsAttemptStateSchema.safeParse(value);
+  if (!parsed.success) return {};
+  const blocks = projectParsonsBlocks(parsed.data.blocks);
+  const selected = parsed.data.blocks.findIndex((block) => block.id === parsed.data.selectedBlockId);
+  return { configFingerprint: "student", blocks, hasAnswer: parsed.data.hasAnswer,
+    selectedBlockId: blocks[selected]?.id ?? null, lastEvaluation: null };
 }

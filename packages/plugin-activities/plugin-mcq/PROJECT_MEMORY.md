@@ -1,5 +1,6 @@
 # MCQ Memory
 
+- Learner payloads use the definition’s allowlisted `studentConfig`; keep keys, solutions, private instructions, and authoring metadata server-side. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
 - Never autosave current answers from `studentViewMode="previous"`; history may mount before the explicit timed start.

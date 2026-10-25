@@ -1,3 +1,4 @@
+import { projectStudentActivity } from "./student-activity";
 import { orderedLiveTestItems as orderedLiveItems } from "./test-item-order";
 import { applyAssignmentExceptions, exceptionsForParticipant, loadAssignmentExceptions } from "./activity-assignment-exceptions";
 import { lockTestAuthoring } from "./activity-authoring-live";
@@ -200,13 +201,13 @@ export async function saveTestItemAttemptState(
     }
     return tx.testItemAttempt.upsert({
       where: { parentAttemptId_testItemId: { parentAttemptId, testItemId } },
-      update: { result: { ...asRecord(context.itemAttempt?.result), state, configSnapshot: options.configSnapshot ?? context.item.activity.config } as Prisma.InputJsonValue },
+      update: { result: { ...asRecord(context.itemAttempt?.result), state, configSnapshot: context.item.activity.config } as Prisma.InputJsonValue },
       create: {
         parentAttemptId,
         testItemId,
         activityId: context.item.activityId,
         lifecycle: "started",
-        result: { state, configSnapshot: options.configSnapshot ?? context.item.activity.config } as Prisma.InputJsonValue,
+        result: { state, configSnapshot: context.item.activity.config } as Prisma.InputJsonValue,
         activityConfigFingerprint: fingerprint(context.item.activity.config)
       }
     });
@@ -775,8 +776,8 @@ function buildTestRuntime(
     const itemAttempt = itemAttempts.get(itemId);
     const saved = attempt?.lifecycle !== "started" ? revision?.items.find((entry) => entry.sourceTestItemId === item.id) : null;
     return [{
-      ...item,
-      ...(saved ? { pointsPossible: saved.pointsPossible, activity: { ...item.activity, title: saved.title, description: saved.description, config: saved.config, metadata: saved.metadata } } : {}),
+      id: item.id, position: item.position, pointsPossible: saved?.pointsPossible ?? item.pointsPossible,
+      activity: projectStudentActivity(saved ? { ...item.activity, title: saved.title, description: saved.description, config: saved.config } : item.activity),
       itemAttempt: itemAttempt ? {
         id: String(itemAttempt.id),
         lifecycle: String(itemAttempt.lifecycle),
@@ -817,7 +818,7 @@ function buildTestRuntime(
   return {
     test: {
       id: context.test.id,
-      activity: revision && attempt?.lifecycle !== "started" ? { ...context.test.activity, title: revision.title, description: revision.description } : context.test.activity,
+      activity: projectStudentActivity(revision && attempt?.lifecycle !== "started" ? { ...context.test.activity, title: revision.title, description: revision.description } : context.test.activity),
       settings: runtimeSettings,
       items
     },

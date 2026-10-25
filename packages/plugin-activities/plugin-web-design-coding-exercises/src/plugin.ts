@@ -15,6 +15,7 @@ export const webDesignCodingExercisesPlugin: ActivityPlugin = {
       defaultCategoryIds: ["programming"],
       icon: "browser-code",
       supportsSolution: true,
+      studentConfig: (config) => webDesignExerciseConfigSchema.parse(config),
       studentView: { mode: "interactive", execution: "plugin" },
       authoring: {
         supportsVariations: true

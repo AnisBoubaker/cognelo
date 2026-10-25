@@ -138,7 +138,9 @@ The Playwright runner lives in `packages/web-design-runner` and is intended to r
 npm run dev:runner
 ```
 
-The runner listens on port `3456`. Administrators configure its base URL and optional authentication header/token under **Settings → Runners**; the local development seed creates `http://localhost:3456`. Runtime plugin code resolves the endpoint through core rather than reading an environment variable. Running `docker compose up -d web-design-runner` is equivalent to `npm run dev:runner`.
+The runner listens on port `3456`. Administrators configure its base URL and required `Authorization` header with token `Bearer <credential>` under **Settings → Runners**; the local development seed creates `http://localhost:3456`, encrypting the configured `WEB_DESIGN_RUNNER_TOKEN` for new settings or leaving the new row disabled if no token is configured. Existing settings are preserved. Runtime plugin code resolves the endpoint through core rather than reading an environment variable. Running `docker compose up -d web-design-runner` is equivalent to `npm run dev:runner`.
+
+Every endpoint authenticates before parsing work. Set a unique `WEB_DESIGN_RUNNER_TOKEN` of at least 32 characters on the runner (for example, generate 32 random bytes with `openssl rand -hex 32`) and store the matching Bearer credential in the application runner settings. Restart the runner and update that setting together when rotating. Missing configuration prevents startup; missing/incorrect credentials return 401. Local binding defaults to loopback; containers explicitly bind internally and development publishes only loopback.
 
 `GET /health` returns `{ ok: true, capabilities: ["run", "screenshot"] }`. The settings card uses this manifest to verify the endpoint, authentication path, browser-test execution contract, and screenshot capability before reporting the runner ready.
 
@@ -187,3 +189,15 @@ Teacher, learner, and settings actions follow the platform [button and icon cont
 ## Answer exports
 
 The plugin implements `submissionExport.getContent` for the [shared PDF/ZIP export](../../../../docs/ANSWER_EXPORTS.md). Exports display submitted HTML/CSS/JavaScript as escaped source and optionally include stored test results. Prompt image tokens resolve to the already-stored expected-result screenshot; exporting never captures a new screenshot. They never execute student files or invoke the runner. The host enforces teacher/section scope, submission lifecycle, exact attempt selection, and prompt/grading switches. Private provider requests, credentials, and provenance are never exported.
+
+## Learner data boundaries
+
+The definition’s `studentConfig` validates learner transport with the public starter-file schema. The runner requires a dedicated Bearer credential and interprets a bounded Playwright command subset; test source never executes in Node. See the runner contract below.
+
+## Runner command contract
+
+Tests support `const`, `await`, scalar/array/object literals, locator chains (`locator`, `getByRole`, `getByText`, `getByLabel`, `getByPlaceholder`, `getByTestId`, `getByAltText`, `getByTitle`, `first`, `last`, `nth`, `filter`), common locator actions, and explicit `expect` assertions with optional `.not`. The exact allowlists live in `packages/web-design-runner/src/test-program.ts`. DOM computations may run inside `page.evaluate` or `locator.evaluate` callbacks in Chromium. Imports, Node globals, arbitrary property/method access, helper functions, loops outside callbacks, regex literals, and browser/context/network APIs are rejected. Existing tests using unsupported syntax must be rewritten and reference-validated before use.
+
+The runner never evaluates test source in Node or `node:vm`. It allows one active request, rejects excess work with 429, limits command steps to 2,000, applies the requested per-test timeout and a 60-second request watchdog (the Cognelo HTTP client aborts after 65 seconds), closes timed-out browser work, bounds diagnostic text and screenshot dimensions, blocks browser network requests/service workers/downloads, and enables Chromium sandboxing. Docker additionally limits CPU, memory, processes, and temporary storage; runs non-root with a read-only filesystem, dropped capabilities, and no repository mount. Production requires the dedicated disposable host and internal network in the deployment guide. Development changes require rebuilding the image (`npm run dev:runner -- --build`).
+
+The checked-in seccomp profile is derived from [Playwright 1.59.1](https://github.com/microsoft/playwright/blob/v1.59.1/utils/docker/seccomp_profile.json), with `chroot` allowed for the inner Chromium namespace while outer capabilities remain dropped. Its Apache 2.0 license is retained beside the profile.

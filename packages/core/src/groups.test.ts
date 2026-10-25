@@ -1322,7 +1322,7 @@ describe("group services", () => {
       .mockResolvedValueOnce({
         id: "group-1",
         courseId: "course-1",
-        activities: [{ id: "visible-assignment", activity: { metadata: {} } }, { id: "hidden-assignment", activity: { metadata: {} } }],
+        activities: [{ id: "visible-assignment", activity: { activityType: { key: "mcq", name: "MCQ", description: "" }, metadata: {} } }, { id: "hidden-assignment", activity: { activityType: { key: "mcq", name: "MCQ", description: "" }, metadata: {} } }],
         participants: [{ id: "participant-1", userId: "student-1" }],
         hiddenCourseMaterials: []
       })

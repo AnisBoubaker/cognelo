@@ -299,3 +299,14 @@ describe("auth services", () => {
     });
   });
 });
+
+it("rejects both SEB token purposes as sessions and refuses to refresh them", async () => {
+  const { createSafeExamBrowserLaunchToken, createSafeExamBrowserAccessToken } = await import("./safe-exam-browser");
+  const scope = { userId: activeUser.id, courseId: "course", groupId: "group", activityId: "activity" };
+  mockPrisma.user.findUnique.mockResolvedValue(activeUser);
+  for (const createToken of [createSafeExamBrowserLaunchToken, createSafeExamBrowserAccessToken]) {
+    const token = await createToken(scope, secret);
+    await expect(verifyAuthToken(token, secret)).rejects.toMatchObject({ status: 401 });
+    await expect(refreshAuthSession(token, secret)).rejects.toMatchObject({ status: 401 });
+  }
+});

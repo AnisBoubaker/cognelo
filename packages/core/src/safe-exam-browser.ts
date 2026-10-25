@@ -37,6 +37,8 @@ async function signScopedToken(scope: SafeExamBrowserScope, secret: string, audi
 async function verifyScopedToken(token: string, secret: string, audience: string, errorCode: string) {
   try {
     const { payload } = await jwtVerify(token, secretBytes(secret), {
+      algorithms: ["HS256"],
+      requiredClaims: ["sub", "iat", "exp"],
       issuer: TOKEN_ISSUER,
       audience
     });

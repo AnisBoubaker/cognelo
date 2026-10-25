@@ -3005,6 +3005,8 @@ async function main() {
 }
 
 async function seedExecutionRunners(updatedById: string) {
+  const webDesignToken = process.env.WEB_DESIGN_RUNNER_TOKEN;
+  if (webDesignToken && webDesignToken.length < 32) throw new Error("WEB_DESIGN_RUNNER_TOKEN must contain at least 32 characters.");
   await prisma.executionRunner.upsert({
     where: { id: "execution-runner-judge0-primary" },
     update: {},
@@ -3027,6 +3029,9 @@ async function seedExecutionRunners(updatedById: string) {
       runnerType: "web_design",
       displayName: "Web Design runner",
       baseUrl: "http://localhost:3456",
+      authHeader: webDesignToken ? "Authorization" : null,
+      authTokenEncrypted: webDesignToken ? encryptSeedCredential(`Bearer ${webDesignToken}`) : null,
+      isEnabled: Boolean(webDesignToken),
       settings: {},
       updatedById
     }

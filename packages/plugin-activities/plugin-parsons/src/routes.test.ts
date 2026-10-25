@@ -74,7 +74,7 @@ const context = {
 describe("Parsons plugin routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.ensureParsonsAttempt.mockResolvedValue({ id: "attempt-1" });
+    mocks.ensureParsonsAttempt.mockResolvedValue({ id: "attempt-1", latestState: { configFingerprint: "private", blocks: [] } });
     mocks.findLatestParsonsAttempt.mockResolvedValue({ id: "completed-attempt-1", status: "completed" });
     mocks.getActivityAttemptAvailability.mockResolvedValue({ canStart: true, reason: null });
     mocks.updateParsonsAttempt.mockResolvedValue({ id: "attempt-1", latestState: { configFingerprint: "fingerprint-1" } });
@@ -101,7 +101,7 @@ describe("Parsons plugin routes", () => {
         context,
         readJson: async () => ({ forceNew: true })
       })
-    ).resolves.toEqual({ attempt: { id: "attempt-1" } });
+    ).resolves.toMatchObject({ attempt: { id: "attempt-1", latestState: { configFingerprint: "student" } } });
 
     await expect(
       parsonsAttemptRoute.methods.PATCH?.({
@@ -179,7 +179,7 @@ describe("Parsons plugin routes", () => {
           result: { isCorrect: true, orderCorrect: true, indentationCorrect: true, misplacedBlocks: 0, incorrectIndents: 0 }
         })
       })
-    ).resolves.toMatchObject({ attempt: { id: "attempt-1", latestState: { configFingerprint: "fingerprint-1", lastEvaluation: null }, resultSummary: {} } });
+    ).resolves.toMatchObject({ attempt: { id: "attempt-1", latestState: { lastEvaluation: null }, resultSummary: {} } });
 
     expect(mocks.startActivityAttempt).toHaveBeenCalledWith(
       context.user,

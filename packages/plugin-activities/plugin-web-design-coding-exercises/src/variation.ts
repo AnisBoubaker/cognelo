@@ -117,6 +117,7 @@ function buildSystemPrompt(input: Parameters<BankActivityVariationHandler>[0]) {
     "Make the solution meaningfully different in structure, styling, behavior, or implementation—not merely a renamed or rethemed copy.",
     "starterCode is the incomplete student starting point; referenceCode is the complete private solution for the same file.",
     "Each Playwright test receives a page object and must pass against the generated reference files.",
+    "Use only const declarations, await, literal arguments, page.locator/getByRole/getByText, locator actions, and expect assertions. DOM logic belongs inside page.evaluate or locator.evaluate callbacks. No imports, Node globals, loops outside callbacks, regex literals, helper functions, network or browser-context access.",
     `Write all learner-facing text and test names in ${localeName(input.locale)}.`,
     "",
     "Subject context:",

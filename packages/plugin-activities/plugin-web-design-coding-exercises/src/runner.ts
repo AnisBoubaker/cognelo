@@ -50,6 +50,7 @@ export async function runWebDesignTestsInRunner(params: {
   try {
     const response = await fetch(`${runner.baseUrl}/run`, {
       method: "POST",
+      signal: AbortSignal.timeout(65_000),
       headers: {
         "Content-Type": "application/json",
         ...runner.headers
@@ -94,6 +95,7 @@ export async function captureWebDesignScreenshotInRunner(params: {
   try {
     const response = await fetch(`${runner.baseUrl}/screenshot`, {
       method: "POST",
+      signal: AbortSignal.timeout(65_000),
       headers: {
         "Content-Type": "application/json",
         ...runner.headers

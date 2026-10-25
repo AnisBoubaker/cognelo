@@ -243,11 +243,15 @@ sudo docker build \
   .
 ```
 
-Edit only the runner image in `/srv/cognelo-sandboxes/instance1/runtime/.env`:
+For the first upgrade to authenticated runners, add a fresh `WEB_DESIGN_RUNNER_TOKEN` (at least 32 characters, generated with `openssl rand -hex 32`) to the private sandbox runtime `.env`, and configure the same `Authorization` / `Bearer <credential>` in **Settings → Runners**. Keep the value available in the operator shell for authenticated health checks. Later upgrades retain it. Existing unscoped login cookies require users to sign in again after session-purpose enforcement. Revalidate existing Web Design tests against the [supported command subset](../packages/plugin-activities/plugin-web-design-coding-exercises/docs/REFERENCE.md#runner-command-contract).
+
+Update the runner image in `/srv/cognelo-sandboxes/instance1/runtime/.env`:
 
 ```dotenv
 WEB_DESIGN_RUNNER_IMAGE=cognelo/web-design-runner:cognelo-0.6.0
 ```
+
+Copy `infra/production/playwright-seccomp.json` from this release to the runtime `seccomp_profile.json` before recreating the runner. It allows the inner Chromium sandbox to use `chroot` while outer container capabilities remain dropped.
 
 Validate and restart the runner:
 
@@ -256,7 +260,7 @@ cd /srv/cognelo-sandboxes/instance1/runtime
 sudo docker compose --env-file .env -f sandbox.compose.yml config --quiet
 sudo docker compose --env-file .env -f sandbox.compose.yml \
   up -d --no-deps web-design-runner
-curl --fail http://10.80.0.2:3456/health
+curl --fail -H "Authorization: Bearer ${WEB_DESIGN_RUNNER_TOKEN}" http://10.80.0.2:3456/health
 ```
 
 If the private upgrade checklist specifies changes to `sandbox.compose.yml`, `judge0.conf`, Playwright, Judge0, Redis, the sandbox PostgreSQL version, seccomp, ports, or WireGuard, follow those exact release-specific steps. Do not overwrite the persistent runtime `.env` or `judge0.conf`, because they contain instance-specific settings and secrets. Do not use mutable image tags such as `latest`.

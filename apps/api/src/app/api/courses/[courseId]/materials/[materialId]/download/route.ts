@@ -1,9 +1,7 @@
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { NextRequest, NextResponse } from "next/server";
-import { getMaterialForDownload } from "@cognelo/core";
+import { getMaterialForDownload, openStoredMaterial } from "@cognelo/core";
 import { handleRoute, options, requireUser } from "@/lib/http";
 
 type Params = { params: Promise<{ courseId: string; materialId: string }> };
@@ -27,9 +25,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: { code: "NOT_DOWNLOADABLE", message: "This material has no stored file." } }, { status: 400 });
     }
 
-    const filePath = path.join(process.cwd(), "../../storage/course-materials", courseId, metadata.storedName);
-    const fileStat = await stat(filePath);
-    const stream = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
+    const file = await openStoredMaterial(path.resolve(process.cwd(), "../../storage/course-materials"), [courseId], metadata.storedName);
+    const fileStat = await file.stat();
+    const stream = Readable.toWeb(file.createReadStream()) as ReadableStream;
 
     return new NextResponse(stream, {
       headers: {

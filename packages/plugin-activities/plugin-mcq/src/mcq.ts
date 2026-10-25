@@ -11,10 +11,11 @@ export type McqBlock =
 export type McqChoice = {
   id: string;
   blocks: McqBlock[];
-  isCorrect: boolean;
+  isCorrect?: boolean;
 };
 
 export type McqQuestion = {
+  learnerGrade?: { score: number; pointUnit: number };
   id: string;
   title: string;
   leadingBlocks: McqBlock[];
@@ -40,7 +41,7 @@ export type McqAnswerState = Record<string, string[]>;
 export function hasMcqAnswer(config: Record<string, unknown>, state: Record<string, unknown> | null) {
   const answers = state?.answers;
   if (!answers || typeof answers !== "object" || Array.isArray(answers)) return false;
-  const { questions } = parseMcqSource(String(config.source ?? ""), String(config.defaultCodeLanguage ?? "none"));
+  const { questions } = readMcqConfig(config);
   return questions.length > 0 && questions.every((question) => {
     const selected = (answers as Record<string, unknown>)[question.id];
     return Array.isArray(selected) && selected.some((id) => question.choices.some((choice) => choice.id === id));
@@ -647,8 +648,8 @@ export function renderInlineTokens(tokens: InlineToken[], render: (token: Inline
 
 /** Match unchanged questions/choices by their authored text before using position for corrections. */
 export function reconcileMcqResponseState(previousConfig: unknown, nextConfig: unknown, state: Record<string, unknown>) {
-  const previous = parseMcqSource(String((previousConfig as { source?: string })?.source ?? ""), "none");
-  const next = parseMcqSource(String((nextConfig as { source?: string })?.source ?? ""), "none");
+  const previous = readMcqConfig(previousConfig as Record<string, unknown> ?? {});
+  const next = readMcqConfig(nextConfig as Record<string, unknown> ?? {});
   const answers = state.answers && typeof state.answers === "object" ? state.answers as Record<string, string[]> : {};
   const mapped: Record<string, string[]> = {};
   const reservedQuestions = new Set<string>();
@@ -677,4 +678,44 @@ export function reconcileMcqResponseState(previousConfig: unknown, nextConfig: u
     });
   }
   return { ...state, answers: mapped };
+}
+
+export function projectMcqConfig(config: Record<string, unknown>) {
+  const parsed = parseMcqSource(String(config.source ?? ""), String(config.defaultCodeLanguage ?? "none"));
+  return {
+    defaultCodeLanguage: config.defaultCodeLanguage, randomizeChoices: config.randomizeChoices, aiFeedbackEnabled: config.aiFeedbackEnabled === true,
+    studentDocument: {
+      introBlocks: parsed.introBlocks, errors: [],
+      questions: parsed.questions.map(({ choices, ...question }) => ({
+        ...question, choices: choices.map(({ id, blocks }) => ({ id, blocks }))
+      }))
+    }
+  };
+}
+
+export function readMcqConfig(config: Record<string, unknown>): ParsedMcq {
+  return config.studentDocument ? config.studentDocument as ParsedMcq
+    : parseMcqSource(String(config.source ?? ""), String(config.defaultCodeLanguage ?? "none"));
+}
+
+export function mcqSelectedFeedback(config: Record<string, unknown> | undefined, answers: McqAnswerState) {
+  const parsed = readMcqConfig(config ?? {});
+  const result = gradeMcqAnswers(parsed, answers);
+  return {
+    rawScore: result.rawScore, rawMaxScore: result.rawMaxScore,
+    correctCount: result.questions.filter((question) => question.isCorrect).length,
+    questionGrades: Object.fromEntries(result.questions.map((question) => [question.questionId, { score: question.rawScore, pointUnit: question.correctChoiceIds.length ? 1 / question.correctChoiceIds.length : 0 }])),
+    selectedChoiceCorrectness: Object.fromEntries(parsed.questions.map((question) => [question.id,
+      Object.fromEntries(question.choices.filter((choice) => answers[question.id]?.includes(choice.id)).map((choice) => [choice.id, Boolean(choice.isCorrect)]))
+    ]))
+  };
+}
+
+export function withMcqSelectedFeedback(parsed: ParsedMcq, feedback: unknown): ParsedMcq {
+  const grade = feedback as ReturnType<typeof mcqSelectedFeedback> | null;
+  const correctness = grade?.selectedChoiceCorrectness;
+  if (!correctness) return parsed;
+  return { ...parsed, questions: parsed.questions.map((question) => ({ ...question, learnerGrade: grade?.questionGrades?.[question.id],
+    choices: question.choices.map((choice) => ({ ...choice, isCorrect: correctness[question.id]?.[choice.id] }))
+  })) };
 }

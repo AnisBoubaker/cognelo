@@ -62,7 +62,7 @@ The web app uses `http://localhost:3000`; the API uses `http://localhost:3001`.
 Some plugins need additional services:
 
 - Programming Exercises: start the Judge0 services described in [Platform details](docs/reference/PLATFORM_DETAILS.md#run-locally).
-- Web Design Coding Exercises: run `npm run dev:runner`.
+- Web Design Coding Exercises: set a dedicated `WEB_DESIGN_RUNNER_TOKEN` in `.env`, enter the same Bearer credential in **Settings → Runners**, then run `npm run dev:runner -- --build`. See the [runner contract](packages/plugin-activities/plugin-web-design-coding-exercises/docs/REFERENCE.md#docker-runner).
 - Coding Homework Grader challenge generation: configure a supported question-authoring model and run the API worker path documented by that plugin.
 
 Teacher answer PDF/ZIP exports use an API-side Chromium renderer. See [answer exports](docs/ANSWER_EXPORTS.md#runtime-installation) for browser and font setup.

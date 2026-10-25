@@ -13,6 +13,7 @@ export type ParsonsGroup = {
 };
 
 export type ParsonsConfig = {
+  studentBlocks?: ParsonsBlock[];
   prompt: string;
   solution: string;
   language: string;
@@ -59,6 +60,7 @@ export function defaultParsonsConfig(): ParsonsConfig {
 
 export function parseParsonsConfig(value: Record<string, unknown> | undefined): ParsonsConfig {
   const fallback = defaultParsonsConfig();
+  if (Array.isArray(value?.studentBlocks)) return { prompt: String(value.prompt ?? ""), language: String(value.language ?? "python"), stripIndentation: Boolean(value.stripIndentation), solution: "", groups: [], precedenceRules: [], studentBlocks: value.studentBlocks as ParsonsBlock[] };
   const solution = typeof value?.solution === "string" && value.solution.trim() ? value.solution : fallback.solution;
   const lineCount = getSolutionLineCount(solution);
   const groups = normalizeParsonsGroups(value?.groups, lineCount);
@@ -96,6 +98,7 @@ export function getSolutionLineCount(solution: string) {
 }
 
 export function buildParsonsBlocks(seed: string, config: ParsonsConfig): ParsonsBlock[] {
+  if (config.studentBlocks) return shuffleWithSeed(config.studentBlocks, seed);
   const sourceLines = getParsonsSourceLines(config);
 
   const blocks = sourceLines.map((line) => {
@@ -581,4 +584,24 @@ function longestIncreasingSubsequenceIndices(values: number[]) {
   }
 
   return lisIndices;
+}
+
+/** Transport blocks contain only the displayed lines and the learner's indentation. */
+export function projectParsonsBlocks(blocks: ParsonsBlock[]): ParsonsBlock[] {
+  const occurrences = new Map<string, number>();
+  return blocks.map((block) => {
+    const text = block.displayText;
+    const occurrence = occurrences.get(text) ?? 0;
+    occurrences.set(text, occurrence + 1);
+    return { id: `line-${hashLine(text)}-${occurrence}`, displayText: text, currentIndent: block.currentIndent } as ParsonsBlock;
+  });
+}
+
+export function projectParsonsConfig(value: Record<string, unknown>) {
+  const config = parseParsonsConfig(value);
+  // Sort by public text before shuffling; no authored order, indices, grouping,
+  // indentation key, or solution fingerprint crosses this boundary.
+  const blocks = buildParsonsBlocks("student", config).sort((a, b) => a.displayText.localeCompare(b.displayText));
+  return { prompt: config.prompt, language: config.language, stripIndentation: config.stripIndentation,
+    studentBlocks: projectParsonsBlocks(blocks) };
 }

@@ -14,6 +14,8 @@ Teachers can opt into the shared [Solution tab](../../../docs/ACTIVITY_SOLUTIONS
 
 Previous submissions can be inspected before starting another timed attempt; the [shared history flow](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md#submission-deletion) is read-only.
 
+Learner responses use an explicit public projection; see [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)

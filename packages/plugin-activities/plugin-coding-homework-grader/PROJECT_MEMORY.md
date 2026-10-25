@@ -1,5 +1,6 @@
 # Coding Homework Grader Memory
 
+- Learner payloads use the definition’s allowlisted `studentConfig`; keep keys, solutions, private instructions, and authoring metadata server-side. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
 - Assignment PDFs and provided files are activity-owned plugin attachments, not course content resources.

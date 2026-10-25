@@ -1,5 +1,7 @@
+import { timingSafeEqual } from "node:crypto";
+import { runTestProgram } from "./test-program";
 import { createServer, type IncomingMessage } from "node:http";
-import { chromium, expect, type Page } from "@playwright/test";
+import { chromium, type Page } from "@playwright/test";
 import sharp from "sharp";
 import { z } from "zod";
 
@@ -37,20 +39,33 @@ const screenshotInputSchema = z.object({
 type RunInput = z.infer<typeof runInputSchema>;
 type ScreenshotInput = z.infer<typeof screenshotInputSchema>;
 
+const runnerToken = process.env.WEB_DESIGN_RUNNER_TOKEN;
+if (!runnerToken || runnerToken.length < 32) throw new Error("Set WEB_DESIGN_RUNNER_TOKEN to a dedicated credential of at least 32 characters.");
+const expectedCredential = Buffer.from(`Bearer ${runnerToken}`);
+let activeRequest = false;
 const port = Number(process.env.PORT ?? 3456);
+const browserEnvironment = Object.fromEntries(["PATH", "HOME", "TMPDIR", "DISPLAY", "LD_LIBRARY_PATH", "FONTCONFIG_PATH"].flatMap((key) =>
+  typeof process.env[key] === "string" ? [[key, process.env[key]!]] : []));
 const screenshotWhitespacePadding = 150;
 const screenshotBackgroundTolerance = 12;
 
 const server = createServer(async (request, response) => {
   response.setHeader("Content-Type", "application/json");
 
+  let acquired = false;
   try {
+    const credential = Buffer.from(request.headers.authorization ?? "");
+    if (credential.length !== expectedCredential.length || !timingSafeEqual(credential, expectedCredential)) {
+      response.writeHead(401); response.end(JSON.stringify({ error: { message: "Unauthorized." } })); return;
+    }
     if (request.method === "GET" && request.url === "/health") {
       response.writeHead(200);
       response.end(JSON.stringify({ ok: true, capabilities: ["run", "screenshot"] }));
       return;
     }
 
+    if (activeRequest) { response.writeHead(429); response.end(JSON.stringify({ error: { message: "Runner is busy." } })); return; }
+    activeRequest = true; acquired = true;
     if (request.method === "POST" && request.url === "/screenshot") {
       const input = screenshotInputSchema.parse(JSON.parse(await readBody(request)));
       const result = await captureWebDesignScreenshot(input);
@@ -74,34 +89,42 @@ const server = createServer(async (request, response) => {
     response.end(
       JSON.stringify({
         error: {
-          message: error instanceof Error ? error.message : "Runner request failed."
+          message: (error instanceof Error ? error.message : "Runner request failed.").slice(0, 4000)
         }
       })
     );
-  }
+  } finally { if (acquired) activeRequest = false; }
 });
 
-server.listen(port, () => {
-  console.log(`Web design runner listening on ${port}`);
+server.requestTimeout = 15_000;
+server.headersTimeout = 10_000;
+server.listen(port, process.env.RUNNER_BIND_ADDRESS ?? "127.0.0.1", () => {
+  const address = server.address();
+  console.log(`Web design runner listening on ${typeof address === "object" && address ? address.port : port}`);
 });
 
 async function captureWebDesignScreenshot(input: ScreenshotInput) {
   const browser = await chromium.launch({
-    headless: true
+    env: browserEnvironment,
+    headless: true, chromiumSandbox: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
   });
+  const watchdog = setTimeout(() => { void browser.close(); }, 60_000);
   const startedAt = Date.now();
 
   try {
     const context = await browser.newContext({
-      javaScriptEnabled: true,
+      javaScriptEnabled: true, serviceWorkers: "block", acceptDownloads: false,
       viewport: input.viewport
     });
+    await context.route("**/*", (route) => route.abort());
     const page = await context.newPage();
     page.setDefaultTimeout(input.timeoutMs);
     await page.setContent(buildPreviewDocument(input.files), {
       waitUntil: "load",
       timeout: input.timeoutMs
     });
+    const dimensions = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight }));
+    if (dimensions.width * dimensions.height > 16_000_000 || dimensions.height > 8000) throw new Error("Screenshot dimensions exceed the runner limit.");
     const image = await page.screenshot({
       fullPage: true,
       type: "png"
@@ -114,6 +137,7 @@ async function captureWebDesignScreenshot(input: ScreenshotInput) {
       viewport: input.viewport
     };
   } finally {
+    clearTimeout(watchdog);
     await browser.close();
   }
 }
@@ -190,20 +214,24 @@ function isBackgroundPixel(data: Buffer, offset: number, background: ReturnType<
 
 async function runWebDesignTests(input: RunInput) {
   const browser = await chromium.launch({
-    headless: true
+    env: browserEnvironment,
+    headless: true, chromiumSandbox: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
   });
+  const watchdog = setTimeout(() => { void browser.close(); }, 60_000);
   const startedAt = Date.now();
 
   try {
     const context = await browser.newContext({
-      javaScriptEnabled: true
+      javaScriptEnabled: true, serviceWorkers: "block", acceptDownloads: false
     });
+    await context.route("**/*", (route) => route.abort());
     const previewDocument = buildPreviewDocument(input.files);
 
     const results = [];
     for (const test of input.tests) {
       const testStartedAt = Date.now();
-      const page = await context.newPage();
+      await context.route("**/*", (route) => route.abort());
+    const page = await context.newPage();
       page.setDefaultTimeout(input.timeoutMs);
       try {
         await page.setContent(previewDocument, {
@@ -229,7 +257,7 @@ async function runWebDesignTests(input: RunInput) {
           weight: test.weight,
           score: 0,
           durationMs: Date.now() - testStartedAt,
-          message: error instanceof Error ? error.message : "Test failed.",
+          message: (error instanceof Error ? error.message : "Test failed.").slice(0, 4000),
           details: {}
         });
       } finally {
@@ -247,30 +275,19 @@ async function runWebDesignTests(input: RunInput) {
       tests: results
     };
   } finally {
+    clearTimeout(watchdog);
     await browser.close();
   }
 }
 
 async function runSingleTest(page: Page, testCode: string, timeoutMs: number) {
-  if (isFunctionWrappedTestCode(testCode)) {
-    throw new Error("Use plain Playwright test code. Do not wrap the test in a function.");
-  }
-
-  const execute = new Function("page", "expect", `"use strict"; return (async () => {\n${testCode}\n})();`) as (
-    page: Page,
-    expectApi: typeof expect
-  ) => Promise<unknown>;
-  await Promise.race([
-    execute(page, expect),
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`Test timed out after ${timeoutMs}ms.`)), timeoutMs + 1000);
-    })
-  ]);
-}
-
-function isFunctionWrappedTestCode(testCode: string) {
-  const normalized = testCode.trim().replace(/;+\s*$/, "");
-  return /^(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/s.test(normalized) || /^async\s+function\b/s.test(normalized);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      runTestProgram(page, testCode, timeoutMs),
+      new Promise((_, reject) => { timer = setTimeout(() => { void page.close(); reject(new Error("Test timed out.")); }, timeoutMs); })
+    ]);
+  } finally { clearTimeout(timer); }
 }
 
 function buildPreviewDocument(files: RunInput["files"]) {
@@ -292,6 +309,7 @@ function buildPreviewDocument(files: RunInput["files"]) {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>${css}</style>
 </head>

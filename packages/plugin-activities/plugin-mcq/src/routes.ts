@@ -21,7 +21,7 @@ import { prisma, type Prisma } from "@cognelo/db";
 import { prisma as mcqPrisma } from "./db-client";
 import { MCQ_AI_MAX_QUESTION_COUNT } from "./constants";
 import { buildMcqGradingResultFromConfig } from "./grading";
-import { parseMcqSource, type McqAnswerState, type McqParseError } from "./mcq";
+import { mcqSelectedFeedback, parseMcqSource, type McqAnswerState, type McqParseError } from "./mcq";
 import { evaluateMcqWithAi } from "./ai-feedback";
 
 const mcqGenerateInputSchema = z.object({
@@ -101,7 +101,7 @@ export const mcqSubmissionRoute: PluginRouteDefinition = {
       const showGrade = await canShowStudentActivityGrade(context);
       const attempts = submissions.map((submission) => ({
         submission: { ...submission, aiFeedback: feedbackByAttemptId.get(submission.id) ?? null },
-        grade: showGrade ? toMcqSubmissionGrade(buildMcqGradingResultFromConfig(context.activity.config, submission.answers)) : null
+        grade: showGrade ? { ...toMcqSubmissionGrade(buildMcqGradingResultFromConfig(context.activity.config, submission.answers)), ...mcqSelectedFeedback(context.activity.config, submission.answers) } : null
       }));
       return {
         submission: attempts[0]?.submission ?? null,
@@ -230,7 +230,8 @@ export const mcqFormativeFeedbackRoute: PluginRouteDefinition = {
         : null;
       return {
         attempt: toMcqSubmissionRecord(submittedAttempt.metadata, submittedAttempt),
-        evaluation
+        evaluation,
+        grade: mcqSelectedFeedback(context.activity.config, input.answers)
       };
     }
   }

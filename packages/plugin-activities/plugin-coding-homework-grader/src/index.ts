@@ -19,6 +19,7 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
       description: "Programming assignment submission and grading workflow.",
       defaultCategoryIds: ["programming"],
       icon: "file-code",
+      studentConfig: (config) => ({ gradingMode: config.gradingMode, maxAttempts: config.maxAttempts, repositoryTemplateUrl: config.repositoryTemplateUrl }),
       studentView: { mode: "read_only" },
       grading: {
         supportsAttempts: true,

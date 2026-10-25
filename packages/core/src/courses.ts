@@ -64,7 +64,7 @@ function buildCourseIncludeForStudent(userId: string) {
       include: { user: { select: { id: true, email: true, name: true } } }
     },
     activities: {
-      where: { testItem: null },
+      where: { testItem: null, groupAssignments: { some: { group: buildVisibleStudentGroupWhere(userId) } } },
       select: {
         id: true,
         bankActivityId: true,

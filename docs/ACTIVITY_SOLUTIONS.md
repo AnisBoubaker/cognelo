@@ -15,7 +15,7 @@ Summative assignments require both **Release solution** and the section gradeboo
 - Programming Exercises: only the private reference source and programming language. Hidden tests, templates, rubric instructions, validation summaries, and model artifacts are excluded.
 - Web Design: the reference HTML/CSS/JavaScript files, identified by path. Tests and private validation/screenshot metadata are excluded. An expected-result image explicitly included in the prompt remains visible independently of solution release.
 
-The solution uses the current saved course activity/reference, not a snapshot of a student's submission. Solutions are separate from grade reports and from optional teacher/AI feedback; manually authored instructional text can itself contain an answer. MCQ and Parsons retain their existing generic authored-config model; this feature controls their dedicated solution display, rather than migrating their public execution configuration to private storage.
+The solution uses the current saved course activity/reference, not a snapshot of a student's submission. Solutions are separate from grade reports and from optional teacher/AI feedback; manually authored instructional text can itself contain an answer. MCQ and Parsons retain generic authored config in server storage, but learner transport uses explicit projections: MCQ receives a parsed document without correctness flags; Parsons receives displayed blocks without reference order, indentation keys, or solution fingerprints. Ordinary checks are graded server-side. Only the release-gated provider exposes complete solutions.
 
 ## Compound Tests
 

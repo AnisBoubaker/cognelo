@@ -134,3 +134,7 @@ Teacher, learner, and settings actions follow the platform [button and icon cont
 ## Answer exports
 
 The plugin implements `submissionExport.getContent` for the [shared PDF/ZIP export](../../../../docs/ANSWER_EXPORTS.md). Exports preserve selected choices. Prompt-off exports omit stems and unselected choices; grading-off exports omit answer keys and feedback. No checking or model call occurs. The host enforces teacher/section scope, submission lifecycle, exact attempt selection, and prompt/grading switches. Private provider requests, credentials, and provenance are never exported.
+
+## Learner data boundaries
+
+Learner transport uses `studentConfig` to return question/choice display blocks and single/multiple mode without source, correctness flags, or private instructions. Server checks and release-gated history return correctness only for selected choices; complete keys remain behind explicit solution release.

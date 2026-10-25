@@ -48,5 +48,5 @@ This document preserves detailed Web Design Coding Exercises decisions. Load onl
 
 ## Planned Next Modules
 
-- Harden the Docker Playwright runner for production deployment with stricter resource constraints, no secrets in the runner, and constrained network access.
+- Maintain the authenticated command-interpreter boundary and container limits documented in the reference; never restore Node evaluation of test source. The runner carries only its dedicated service credential, never application/database credentials.
 - Add result history and teacher-facing review surfaces for submissions, test failures, and future research/analytics data.

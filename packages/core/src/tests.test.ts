@@ -200,3 +200,11 @@ describe("Test authoring services", () => {
     expect(result.activityCopies).toEqual([expect.objectContaining({ sourceActivityId: "child-1" })]);
   });
 });
+
+it("denies Test authoring reads before querying test contents", async () => {
+  const { getTestByActivityId } = await import("./tests");
+  authorization.assertCanManageCourse.mockRejectedValueOnce({ status: 403 });
+  db.test.findFirst.mockClear();
+  await expect(getTestByActivityId({ ...teacher, roles: ["student"] }, "course-1", "activity-test")).rejects.toMatchObject({ status: 403 });
+  expect(db.test.findFirst).not.toHaveBeenCalled();
+});

@@ -111,6 +111,8 @@ services:
       - /home/pwuser:rw,nosuid,size=128m
     environment:
       PORT: 3456
+      RUNNER_BIND_ADDRESS: "0.0.0.0"
+      WEB_DESIGN_RUNNER_TOKEN: ${WEB_DESIGN_RUNNER_TOKEN:?Set a dedicated runner credential}
       NODE_ENV: production
     networks:
       sandbox:
@@ -121,7 +123,7 @@ services:
         - CMD
         - node
         - -e
-        - "fetch('http://127.0.0.1:3456/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        - "fetch('http://127.0.0.1:3456/health',{headers:{Authorization:'Bearer '+process.env.WEB_DESIGN_RUNNER_TOKEN}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 30s
       timeout: 5s
       retries: 3

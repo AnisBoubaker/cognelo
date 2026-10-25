@@ -653,7 +653,7 @@ function McqActivityRenderer(props: ActivityRendererProps<typeof McqActivityView
       },
       feedback: async (activityId: string, answers: Record<string, string[]>) => {
         const result = await api.groupMcqFormativeFeedback(courseId, groupId, activityId, answers);
-        return result.evaluation?.feedback ?? null;
+        return { ...result.evaluation?.feedback, deterministicGrade: result.grade };
       }
     };
   }, [courseId, groupId, mcqClient, responseDraftHost, studentPreview]);

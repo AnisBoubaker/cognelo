@@ -1,5 +1,6 @@
 # Web Design Coding Exercises Memory
 
+- Learner payloads use the definition’s allowlisted `studentConfig`; keep keys, solutions, private instructions, and authoring metadata server-side. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
 - Keep `submittedFiles` in the core submission snapshot. Deleted history renders these retained learner files as code, never by substituting the private reference bundle.
@@ -13,7 +14,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Keep this plugin separate from Programming Exercises: browser preview and Playwright grading have different trust and runtime boundaries from Judge0.
 - Student starter files are public config; solution files, tests, screenshots, and grading artifacts are private plugin data.
 - The learner browser may run only its own bundle in a sandboxed iframe. Graded execution goes through Cognelo to the external Playwright runner. Browser modal APIs are allowed only inside that learner-authored preview; Cognelo teacher UI uses the platform shared dialog provider.
-- The endpoint and optional authentication token are admin-managed core runner settings, not plugin environment variables. Resolve them through core so later round-robin pooling remains a platform concern.
+- The endpoint and required authentication token are admin-managed core runner settings, not plugin environment variables. Resolve them through core so later round-robin pooling remains a platform concern.
 - Saving enabled tests is reference-validation dependent and atomic; failed validation leaves prior tests unchanged.
 - Expected-result prompt tokens expose only generated PNG artifacts, never solution source.
 - Standalone drafts use `ActivityResponseDraft`; embedded Test drafts use `TestItemAttempt`.
@@ -24,7 +25,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Teacher review routes consume core course capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs are restricted to their assigned groups. Test mutation, authoring, and grade release remain course-management operations.
 - Every private bank-owned table must participate in copy, sync, duplication, and deletion hooks, including when a reusable bank Test owns the activity as a hidden child.
 - Bank variation starts from that independent copy, preserves exact concept, skill, and misconception selections, then regenerates prompt, starter/reference code, and every Playwright test while preserving file paths and test grading structure. Saving must still validate enabled tests and regenerate any requested expected-result screenshot through the runner.
-- The runner remains free of Cognelo application/database secrets and requires production hardening, isolation, and smoke coverage for screenshot cropping. An optional runner-specific request token may be stored encrypted by the application registry.
+- The runner remains free of Cognelo application/database secrets and requires production hardening, isolation, and smoke coverage for screenshot cropping. A dedicated runner-specific Bearer token is required and is stored encrypted by the application registry.
 
 - [Submission continuation](../../../docs/SUBMISSION_CONTINUATION.md): Restores files from the exact learner-owned submission to the core response draft without changing the immutable submitted bundle or test results. Ordinary resubmission attaches fresh evidence to the same core attempt. Restore through the host transaction; reopening preserves the original start and applies current exceptions.
 
