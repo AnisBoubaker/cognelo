@@ -60,3 +60,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Queue Judge0 with `wait=false`, then poll the validated token on the same resolved runner through core’s bounded client. Synchronous jobs require privileges in the API and must remain disabled. Runtime/build/credential requirements live in [security boundaries](../../../docs/SECURITY_BOUNDARIES.md).
 
 - Production workers need a private cgroup namespace when multiple stacks share a host. Keep per-process fallback disabled on cgroup-capable hosts, and preserve separate compilation ceilings: small source programs can produce Go/Rust binaries larger than the student output limit. See [Judge0 integration](docs/REFERENCE.md#judge0-integration).
+
+- Manual Test review may use a validated core response without an execution; AI evaluation still requires execution evidence. Use the same teacher-review handlers and rubric calculations as standalone work; never execute code while loading or saving manual feedback. See [Test review](docs/REFERENCE.md#teacher-review-inside-tests).

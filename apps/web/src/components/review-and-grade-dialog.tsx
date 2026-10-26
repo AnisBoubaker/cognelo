@@ -3,6 +3,7 @@
 import { ActivityChatDialog } from "@/components/activity-chat";
 import { StaffActivityChat } from "@/components/activity-broadcast-dialog";
 import { AppIcon } from "@/components/app-icon";
+import { ReviewGradeField } from "@/components/review-grade-field";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ProgressDialog, useDialogs, useNotifications } from "@cognelo/activity-ui";
@@ -58,11 +59,13 @@ type FeedbackReviewState = {
   error: string;
 };
 
-export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
+export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRows, onSelectRow }: {
   courseId: string;
   row: CourseGradebookRow;
   onClose: () => void;
   onSaved?: () => Promise<void> | void;
+  classRows?: CourseGradebookRow[];
+  onSelectRow?: (row: CourseGradebookRow) => void;
 }) {
   const { locale, t } = useI18n();
   const dialogs = useDialogs();
@@ -77,6 +80,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   const [feedbackReview, setFeedbackReview] = useState<FeedbackReviewState | null>(null);
   const [savingAction, setSavingAction] = useState<"delete" | "override" | "regrade" | null>(null);
   const [showMessages, setShowMessages] = useState(false);
+  const [manualDirty, setManualDirty] = useState(false);
   const [regradeProgress, setRegradeProgress] = useState<TestRegradeProgress | null>(null);
   const loadReviewRef = useRef<() => void>(() => undefined);
   const loadedReviewIdentityRef = useRef<string | null>(null);
@@ -92,6 +96,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
     const identity = `${courseId}:${row.gradebookItemId}:${row.participantId}`;
     if (loadedReviewIdentityRef.current === identity) return;
     loadedReviewIdentityRef.current = identity;
+    setManualDirty(false);
     loadReviewRef.current();
   }, [courseId, row.gradebookItemId, row.participantId]);
 
@@ -238,6 +243,8 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
   }
 
   async function selectManualAttemptIndex(selectedIndex: number) {
+    if (manualDirty && !await dialogs.confirm({ message: t("courseDetail.feedbackReviewDiscardConfirm"), confirmVariant: "danger" })) return;
+    setManualDirty(false);
     const current = manualReview;
     if (!current || selectedIndex < 0 || selectedIndex >= current.attemptCount) return;
     if (selectedIndex < current.attempts.length) {
@@ -352,7 +359,8 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
     setRegradeProgress(null);
     try {
       const result = await api.regradeActivityAttempt(courseId, reference.coreAttemptId, { reason: t("courseDetail.regradeReason") }, setRegradeProgress);
-      await onSaved?.();
+      if (row.activityTypeKey === "test") await refreshTestReview();
+      else await onSaved?.();
       if (!result.result && result.items) notifications.warning(t("courseDetail.testRegradeIncomplete", {
         activities: result.items.filter((item) => item.status !== "graded").map((item) => `${item.title}: ${item.message ?? ""}`).join("; ")
       }));
@@ -408,15 +416,13 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
     }
   }
 
-  async function gradeTestItem(parentAttemptId: string, testItemId: string, score: number, reason: string | null) {
-    try {
-      await api.gradeTestItem(courseId, parentAttemptId, testItemId, { score, reason });
-      await onSaved?.();
-      onClose();
-      notifications.success("Test item grade saved.");
-    } catch (err) {
-      notifications.error(err instanceof Error ? err.message : t("courseDetail.overrideGradeError"));
+  async function refreshTestReview() {
+    const current = manualReview?.attempts[manualReview.selectedIndex];
+    if (current) {
+      const { review } = await api.testAttemptReview(courseId, current.id);
+      setManualReview(state => state ? { ...state, attempts: state.attempts.map(attempt => attempt.id === review.id ? review : attempt) } : state);
     }
+    await onSaved?.();
   }
 
   const selectedAttempt = manualReview?.attempts[manualReview.selectedIndex] ?? null;
@@ -424,11 +430,20 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
     ? feedbackReview?.attemptReferences[feedbackReview.selectedAttemptIndex]?.coreAttemptId
     : row.attempts.find((attempt) => attempt.id === selectedAttempt?.id || attempt.pluginAttemptRef === selectedAttempt?.id)?.id;
   const close = async () => {
-    if (!feedbackReview || !hasUnsavedFeedbackReview(feedbackReview) || await dialogs.confirm({
+    if (!(manualDirty || (feedbackReview && hasUnsavedFeedbackReview(feedbackReview))) || await dialogs.confirm({
       message: t("courseDetail.feedbackReviewDiscardConfirm"),
       confirmVariant: "danger"
     })) onClose();
   };
+  const classIndex = classRows?.findIndex(candidate => candidate.gradebookItemId === row.gradebookItemId && candidate.participantId === row.participantId) ?? -1;
+  async function selectClassRow(index: number) {
+    const next = classRows?.[index];
+    if (!next || !onSelectRow) return;
+    if ((manualDirty || (feedbackReview && hasUnsavedFeedbackReview(feedbackReview))) && !await dialogs.confirm({
+      message: t("courseDetail.feedbackReviewDiscardConfirm"), confirmVariant: "danger"
+    })) return;
+    setManualDirty(false); onSelectRow(next);
+  }
 
   return (
     <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => {
@@ -442,7 +457,14 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
           completed: regradeProgress.completed, total: regradeProgress.total
         }) : undefined} />
       <div className="review-chat-workspace">
-        <div className="review-chat-toolbar"><button type="button" className="secondary" onClick={() => setShowMessages(true)}><AppIcon name="messages" />{t("activityMessenger.title")}</button></div>
+        <div className="review-chat-toolbar">
+          {classRows && classIndex >= 0 && onSelectRow ? <nav className="row wrap" aria-label={t("courseDetail.testReviewStudents")}>
+            <button className="button secondary" type="button" disabled={classIndex === 0} onClick={() => { void selectClassRow(classIndex - 1); }}><AppIcon name="back" />{t("courseDetail.feedbackReviewPrevious")}</button>
+            <span>{classIndex + 1} / {classRows.length}</span>
+            <button className="button secondary" type="button" disabled={classIndex === classRows.length - 1} onClick={() => { void selectClassRow(classIndex + 1); }}><AppIcon name="next" />{t("courseDetail.feedbackReviewNext")}</button>
+          </nav> : null}
+          <button type="button" className="secondary" onClick={() => setShowMessages(true)}><AppIcon name="messages" />{t("activityMessenger.title")}</button>
+        </div>
       {useFeedbackReview ? feedbackReview ? (
           <AiFeedbackReviewPanel
           row={row}
@@ -468,6 +490,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
         />
         ) : <LoadingReviewDialog onClose={onClose} t={t} />
       : manualRenderer ? manualReview ? manualRenderer({
+        courseId,
         row,
         activityConfig: manualReview.activityConfig,
         locale,
@@ -482,13 +505,14 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved }: {
         isSavingOverride: savingAction === "override",
         isSavingRegrade: savingAction === "regrade",
         isSavingDelete: savingAction === "delete",
-        onClose,
+        onClose: () => { void close(); },
         onIncludeAttemptsChange: loadManualReview,
         onSelectAttemptIndex: (selectedIndex) => void selectManualAttemptIndex(selectedIndex),
         onOverrideGrade: overrideGrade,
         onRegradeAttempt: regradeAttempt,
         onDeleteSubmission: () => deleteSelectedSubmission(selectedAttempt),
-        onGradeTestItem: gradeTestItem,
+        onTestReviewSaved: refreshTestReview,
+        onDirtyChange: setManualDirty,
         t
       }) : <LoadingReviewDialog onClose={onClose} t={t} />
       : (
@@ -582,24 +606,8 @@ function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeC
       {!state.loading && state.review && !renderer ? <p className="error-text">{t("courseDetail.feedbackReviewUnavailable")}</p> : null}
       {!state.loading && state.review && state.draft && renderer && !readOnly ? (
         <div className="stack">
-          <div className="inline-panel form">
-            <div className="field" style={{ maxWidth: 260 }}>
-              <label htmlFor={`review-grade-${row.gradebookItemId}-${row.participantId}`}>
-                {t("courseDetail.finalGrade", { max: formatGradeNumber(row.maxScore) })}
-              </label>
-              <input
-                id={`review-grade-${row.gradebookItemId}-${row.participantId}`}
-                inputMode="decimal"
-                max={row.maxScore}
-                min={0}
-                step="any"
-                type="number"
-                value={state.gradeDraft}
-                onChange={(event) => onGradeChange(event.target.value)}
-              />
-              <span className="muted">{t("courseDetail.finalGradeHelp")}</span>
-            </div>
-          </div>
+          <ReviewGradeField id={`review-grade-${row.gradebookItemId}-${row.participantId}`} maxScore={row.maxScore}
+            value={state.gradeDraft} disabled={state.saving} onChange={onGradeChange} t={t} />
           <div className="row wrap dialog-actions">
             <button className="button primary" disabled={state.saving} type="button" onClick={() => void onSave()}>
               <AppIcon name="save" />

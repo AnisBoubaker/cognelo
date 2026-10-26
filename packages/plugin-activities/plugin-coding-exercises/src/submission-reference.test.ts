@@ -41,6 +41,15 @@ describe("submitted Test coding evidence", () => {
     expect(mocks.execution).not.toHaveBeenCalled();
   });
 
+  it("allows manual review of a saved response without preparing an execution", async () => {
+    mocks.child.mockResolvedValue(child(null, { sourceCode: "print(1)" }));
+    await expect(resolveCodingTestSubmission({ ...input, allowMissingExecution: true })).resolves.toBeNull();
+    expect(mocks.execution).not.toHaveBeenCalled();
+    mocks.child.mockResolvedValue(child());
+    mocks.execution.mockResolvedValue(null);
+    await expect(resolveCodingTestSubmission({ ...input, allowMissingExecution: true })).rejects.toMatchObject({ code: "CODING_EXERCISE_EXECUTION_NOT_FOUND" });
+  });
+
   it("rejects conflicting references instead of selecting a different submission", async () => {
     mocks.child.mockResolvedValue(child("other-execution"));
     await expect(resolveCodingTestSubmission(input)).rejects.toMatchObject({ code: "CODING_EXERCISE_EXECUTION_NOT_FOUND" });

@@ -43,31 +43,31 @@ const teacherFeedbackRevisionSchema = z.object({
 
 export async function createCodingExerciseTeacherFeedbackDraft(input: {
   activityId: string;
-  executionId: string;
+  executionId: string | null;
 }) {
   const [execution, reference] = await Promise.all([
-    prisma.pluginCodingExerciseExecution.findFirst({
+    input.executionId ? prisma.pluginCodingExerciseExecution.findFirst({
       where: { id: input.executionId, activityId: input.activityId },
       select: { resultSummary: true, aiFeedbackConfigSnapshot: true }
-    }),
+    }) : Promise.resolve(null),
     prisma.pluginCodingExerciseReferenceSolution.findUnique({
       where: { activityId: input.activityId },
       select: { privateConfig: true }
     })
   ]);
-  if (!execution) {
+  if (input.executionId && !execution) {
     throw new AppError(404, "CODING_EXERCISE_EXECUTION_NOT_FOUND", "The coding exercise submission was not found.");
   }
   const currentFeedbackConfig = parseCodingExercisePrivateConfig(reference?.privateConfig).aiFeedback;
-  const snapshotFeedbackConfig = execution.aiFeedbackConfigSnapshot
+  const snapshotFeedbackConfig = execution?.aiFeedbackConfigSnapshot
     ? parseCodingExercisePrivateConfig({ aiFeedback: execution.aiFeedbackConfigSnapshot }).aiFeedback
     : null;
   const feedbackConfig = reference ? currentFeedbackConfig : snapshotFeedbackConfig ?? currentFeedbackConfig;
-  const latestTests = await getLatestCodingExerciseTestResult({
+  const latestTests = input.executionId && execution ? await getLatestCodingExerciseTestResult({
     activityId: input.activityId,
     executionId: input.executionId,
     originalResultSummary: execution.resultSummary
-  });
+  }) : { resultSummary: {} };
   const resultSummary = toRecord(latestTests.resultSummary);
   const earnedWeight = finiteNumber(resultSummary.earnedWeight);
   const totalWeight = finiteNumber(resultSummary.totalWeight);
@@ -105,18 +105,23 @@ export async function createCodingExerciseTeacherFeedbackDraft(input: {
 
 export async function getCodingExerciseAiFeedbackTeacherSubmission(input: {
   activityId: string;
-  executionId: string;
+  executionId: string | null;
   activity: ServerActivityRecord;
+  savedSourceCode?: string;
 }) {
+  if (!input.executionId && input.savedSourceCode !== undefined) return {
+    kind: "coding-exercise", sourceCode: input.savedSourceCode,
+    language: parseCodingExerciseConfig(input.activity.config).language, resultSummary: {}, submittedAt: null
+  };
   const execution = await prisma.pluginCodingExerciseExecution.findFirst({
-    where: { id: input.executionId, activityId: input.activityId }
+    where: { id: input.executionId ?? "", activityId: input.activityId }
   });
   if (!execution) {
     throw new AppError(404, "CODING_EXERCISE_EXECUTION_NOT_FOUND", "The coding exercise submission was not found.");
   }
   const latestTests = await getLatestCodingExerciseTestResult({
     activityId: input.activityId,
-    executionId: input.executionId,
+    executionId: execution.id,
     originalResultSummary: execution.resultSummary
   });
   return {

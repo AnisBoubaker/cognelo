@@ -186,6 +186,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             }
           });
           await recordTestItemAiFeedback(user, courseId, attemptId, item.testItemId, {
+            expectedUpdatedAt: item.itemAttempt.updatedAt,
             feedback: evaluation.feedback,
             feedbackRef: evaluation.feedbackRef,
             feedbackVersion: evaluation.feedbackVersion,

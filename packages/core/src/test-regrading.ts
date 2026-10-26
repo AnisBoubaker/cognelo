@@ -95,6 +95,7 @@ export async function regradeTestAttempt(
             ...(grade ? { lifecycle: "graded", gradedAt: new Date(), rawScore: grade.rawScore, rawMaxScore: grade.rawMaxScore,
               normalizedScore: grade.rawScore / grade.rawMaxScore * points, normalizedMaxScore: points } : {}),
             result: { ...saved, state: result.state, gradingConfigSnapshot: item.activity.config,
+              ...(grade && saved.manualGrading ? { manualGrading: null } : {}),
               ...(grade ? { analyticsPayload: grade.analyticsPayload ?? {}, metadata: grade.metadata ?? {} } : {}) } as Prisma.InputJsonValue,
             feedback: { ...asRecord(item.feedback), ...grade?.feedback } as Prisma.InputJsonValue
           } });

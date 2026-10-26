@@ -16,6 +16,8 @@ Previous submissions can be inspected before starting another timed attempt; the
 
 Learner responses use an explicit public projection; see [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
 
+Teacher review inside Tests uses the same submitted-choice and feedback form as a standalone MCQ, with a separate explicit item-grade override. See [assessment feedback](docs/REFERENCE.md#ai-assessment-feedback).
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)

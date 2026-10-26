@@ -111,6 +111,7 @@ type BankActivityRendererContext = {
 };
 
 type ManualGradingRendererContext = {
+  courseId: string;
   row: CourseGradebookRow;
   activityConfig?: Record<string, unknown>;
   locale: Locale;
@@ -131,7 +132,8 @@ type ManualGradingRendererContext = {
   onOverrideGrade: (input: { score: number; maxScore: number; reason: string | null; feedbackText?: string | null }) => Promise<void>;
   onRegradeAttempt: () => Promise<void>;
   onDeleteSubmission: () => Promise<void>;
-  onGradeTestItem?: (parentAttemptId: string, testItemId: string, score: number, reason: string | null) => Promise<void>;
+  onTestReviewSaved?: () => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
@@ -1418,7 +1420,9 @@ export const manualGradingRenderers: Record<string, (context: ManualGradingRende
       attempts={context.attempts as CourseTestAttemptReview[]}
       selectedAttempt={context.selectedAttempt as CourseTestAttemptReview | null}
       readOnly={Boolean(context.readOnly)}
-      onGradeTestItem={context.onGradeTestItem ?? (async () => undefined)}
+      onReviewed={context.onTestReviewSaved ?? (async () => undefined)}
+      feedbackRendererFor={getAiFeedbackReviewRenderer}
+      calculateGradePercent={getAiFeedbackReviewCalculatedGradePercent}
       renderItemReview={(item) => {
         const Renderer = testGradebookReviewRenderers[item.activityTypeKey];
         return Renderer ? <Renderer item={item} /> : null;

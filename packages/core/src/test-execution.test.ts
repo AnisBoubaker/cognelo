@@ -33,6 +33,7 @@ import {
   getTestRuntime,
   getTestItemExecutionContext,
   getTestAttemptReview,
+  recordTestItemAiFeedback,
   saveTestItemAttemptState,
   startOrResumeTestAttempt,
   submitTestAttempt,
@@ -93,6 +94,7 @@ const testRecord = {
 
 function parentAttempt(overrides: Record<string, unknown> = {}) {
   return {
+    gradebookItem: { gradesReleased: false },
     id: "parent-attempt-1",
     courseId: "course-1",
     groupId: "group-1",
@@ -582,6 +584,7 @@ describe("compound Test execution", () => {
       submittedAt: new Date("2026-08-07T11:00:00.000Z"),
       testItemAttempts: [{
         id: "item-attempt-1",
+        updatedAt: new Date("2026-08-07T11:00:00.000Z"),
         testItemId: "item-1",
         activityId: "mcq-1",
         lifecycle: "graded",
@@ -608,5 +611,26 @@ describe("compound Test execution", () => {
         }
       }]
     });
+  });
+
+  it("rejects delayed AI feedback after a teacher edit and clears a replaced manual-grade marker", async () => {
+    const gradedItemAttempt = { id: "item-attempt-1", testItemId: "item-1", normalizedMaxScore: 10, feedback: {} };
+    db.activityAttempt.findFirst.mockResolvedValue(parentAttempt({ lifecycle: "submitted", testItemAttempts: [{
+      ...gradedItemAttempt, updatedAt: new Date("2026-08-07T11:00:00.000Z"), result: { state: {}, manualGrading: { score: 5 } }
+    }] }));
+    const feedback = { feedback: { summary: "Generated" }, feedbackRef: "evaluation", feedbackVersion: 1, feedbackHash: "hash",
+      gradingResult: { rawScore: 1, rawMaxScore: 1 } };
+    await expect(recordTestItemAiFeedback(student, "course-1", "parent-attempt-1", "item-1", {
+      ...feedback, expectedUpdatedAt: "2026-08-07T10:00:00.000Z"
+    })).rejects.toMatchObject({ code: "TEST_REVIEW_CONFLICT" });
+    expect(db.testItemAttempt.update).not.toHaveBeenCalled();
+    db.testItemAttempt.update.mockResolvedValue({});
+    await recordTestItemAiFeedback(student, "course-1", "parent-attempt-1", "item-1", {
+      ...feedback, expectedUpdatedAt: "2026-08-07T11:00:00.000Z"
+    });
+    expect(db.testItemAttempt.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: gradedItemAttempt.id, updatedAt: new Date("2026-08-07T11:00:00.000Z") },
+      data: expect.objectContaining({ result: expect.objectContaining({ manualGrading: null }) })
+    }));
   });
 });

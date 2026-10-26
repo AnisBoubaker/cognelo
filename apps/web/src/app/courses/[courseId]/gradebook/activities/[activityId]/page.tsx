@@ -20,6 +20,7 @@ import { AppIcon } from "@/components/app-icon";
 import { TestReviewAllPanel } from "@/components/test-review-all-panel";
 import { ActivityReviewAllPanel, toActivityReviewResponse, type ActivityReviewResponse } from "@/components/activity-review-all-panel";
 import { codingRubricResultsFromFeedback, type CodingRubricCriterion } from "@/lib/activity-review-all";
+import { ReviewGradeField } from "@/components/review-grade-field";
 import { ReviewAndGradeDialog } from "@/components/review-and-grade-dialog";
 import { AnswerExportDialog } from "@/components/answer-export-dialog";
 import { GradebookExportDialog } from "@/components/gradebook-export-dialog";
@@ -992,8 +993,11 @@ export default function GradebookActivityResultsPage() {
                   {savingGradeKey === "__all:ai-feedback" ? t("common.saving") : t("courseDetail.generateAiFeedbackAll")}
                 </button>
               ) : null}
-              {isSummativeActivity && activityActions.canReviewAndGrade && supportsAiFeedbackReview(activityTypeKey) ? (
-                <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts} type="button" onClick={() => void openFeedbackReview(groupedRows)}>
+              {isSummativeActivity && activityActions.canReviewAndGrade && (supportsAiFeedbackReview(activityTypeKey) || activityTypeKey === "test") ? (
+                <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts} type="button" onClick={() => {
+                  if (activityTypeKey === "test") setReviewAndGradeRow(groupedRows.find(row => selectedSubmittedAttempt(row)) ?? null);
+                  else void openFeedbackReview(groupedRows);
+                }}>
                   <AppIcon name="review" />
                   {t("courseDetail.gradeAllManually")}
                 </button>
@@ -1184,8 +1188,11 @@ export default function GradebookActivityResultsPage() {
         ) : null}
         {reviewAndGradeRow ? (
           <ReviewAndGradeDialog
+            key={`${reviewAndGradeRow.gradebookItemId}:${reviewAndGradeRow.participantId}`}
             courseId={courseId}
-            row={reviewAndGradeRow}
+            row={groupedRows.find(row => row.gradebookItemId === reviewAndGradeRow.gradebookItemId && row.participantId === reviewAndGradeRow.participantId) ?? reviewAndGradeRow}
+            classRows={activityTypeKey === "test" ? groupedRows.filter(row => selectedSubmittedAttempt(row)) : undefined}
+            onSelectRow={setReviewAndGradeRow}
             onClose={() => setReviewAndGradeRow(null)}
             onSaved={refresh}
           />
@@ -1320,24 +1327,8 @@ function AiFeedbackReviewPanel({ courseId, state, onClose, onFeedbackChange, onG
       {!state.loading && state.review && !renderer ? <p className="error-text">{t("courseDetail.feedbackReviewUnavailable")}</p> : null}
       {!state.loading && state.review && state.draft && renderer ? (
         <div className="stack">
-          <div className="inline-panel form">
-            <div className="field" style={{ maxWidth: 260 }}>
-              <label htmlFor={`review-grade-${row.gradebookItemId}-${row.participantId}`}>
-                {t("courseDetail.finalGrade", { max: formatGradeNumber(row.maxScore) })}
-              </label>
-              <input
-                id={`review-grade-${row.gradebookItemId}-${row.participantId}`}
-                inputMode="decimal"
-                max={row.maxScore}
-                min={0}
-                step="any"
-                type="number"
-                value={state.gradeDraft}
-                onChange={(event) => onGradeChange(event.target.value)}
-              />
-              <span className="muted">{t("courseDetail.finalGradeHelp")}</span>
-            </div>
-          </div>
+          <ReviewGradeField id={`review-grade-${row.gradebookItemId}-${row.participantId}`} maxScore={row.maxScore}
+            value={state.gradeDraft} disabled={state.saving} onChange={onGradeChange} t={t} />
           <div className="row wrap dialog-actions">
             <button className="button primary" disabled={state.saving} type="button" onClick={() => void onSave()}>
               <AppIcon name="save" />

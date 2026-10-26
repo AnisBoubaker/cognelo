@@ -50,8 +50,10 @@ export const mcqServerPlugin: ServerActivityPlugin = {
         summary: "",
         questionFeedback: []
       }),
-      getSubmission: async ({ coreAttemptId, activity }) => {
-        const attempt = await prisma.activityAttempt.findUnique({ where: { id: coreAttemptId }, select: { metadata: true, submittedAt: true } });
+      getSubmission: async ({ coreAttemptId, activity, testItemAttempt }) => {
+        const attempt = testItemAttempt
+          ? { metadata: { submittedAnswers: testItemAttempt.state.answers }, submittedAt: null }
+          : await prisma.activityAttempt.findUnique({ where: { id: coreAttemptId }, select: { metadata: true, submittedAt: true } });
         if (!attempt) throw new AppError(404, "MCQ_ATTEMPT_NOT_FOUND", "The MCQ attempt was not found.");
         return {
           kind: "mcq",

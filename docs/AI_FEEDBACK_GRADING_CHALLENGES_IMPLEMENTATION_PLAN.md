@@ -243,6 +243,7 @@ Core Tests are always summative, so their AI feedback never runs automatically o
 - Test submission stores deterministic child results and any child states needed for AI evaluation.
 - A teacher starts AI evaluation for the parent Test/selected attempts from the gradebook.
 - Each participating child plugin evaluates its own item and returns its component result.
+- Manual [Test review](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading) reuses the same plugin feedback form and `teacherReview` handlers as a standalone activity, with an optional authorized child context. Revision metadata is shared; child audit and parent grade updates are transactional, and manual review makes no model or runner call.
 - Programming Test questions use the teacher's current rubric and verified original execution, including legacy children whose execution reference exists only in saved state. Rubric-only grading requires zero deterministic weight and retains an absent test score as null; see the [plugin compatibility reference](../packages/plugin-activities/plugin-coding-exercises/docs/REFERENCE.md#test-ai-grading-compatibility).
 - Required AI-graded children must finish before the parent Test grade is recomputed.
 - Child feedback remains hidden until the parent Test gradebook item is released.

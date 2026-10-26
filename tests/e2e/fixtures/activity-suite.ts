@@ -316,7 +316,8 @@ export async function createCourseTestThroughUi(
 export async function assignCourseTest(
   data: ActivitySuiteData,
   activityId: string,
-  title: string
+  title: string,
+  maxAttempts = 1
 ): Promise<AssignedActivity> {
   const api = await createAuthenticatedApi("teacher");
   try {
@@ -337,7 +338,7 @@ export async function assignCourseTest(
           gradebookSettings: {
             attemptLimitMode: "max_attempts",
             gradeStrategy: "latest",
-            maxAttempts: 1,
+            maxAttempts,
             pointsPossible: 20
           },
           metadata: { assessmentMode: "summative" },

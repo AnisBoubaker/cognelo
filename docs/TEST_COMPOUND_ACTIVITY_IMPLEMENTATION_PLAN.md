@@ -359,6 +359,18 @@ Manual-grading behavior:
 - a teacher may override the final parent grade through the normal gradebook override flow;
 - item feedback remains hidden until the parent Test gradebook item is released.
 
+### Teacher review and grading
+
+**Review and grade** opens one submitted Test with the same numbered activity navigation as the learner workspace. Selecting a child loads its review on demand. Programming Exercises and MCQ reuse their standalone feedback renderers and `aiFeedback.teacherReview` handlers; other types retain their answer inspector with comments and a final item score. **Review and grade all** uses this same dialog with student navigation. The legacy manual-grading page links to it too.
+
+Programming children expose Summary, Strengths, Improvements, criterion comments and scores, the calculated component breakdown, and the final item grade. A rubric edit updates the calculated grade unless the teacher has explicitly overridden that item. Explicit automatic/AI regrading replaces that override marker when it replaces the score. The Test total remains a separate override and survives child score edits. Narrative-only saves refresh the parent feedback snapshot without recalculating scores or changing grading timestamps. Unsaved child edits are guarded when changing activity, student, submission, or closing; older submitted attempts are inspectable but cannot be saved through the review endpoint.
+
+`GET/PATCH /api/courses/:courseId/gradebook/attempts/:attemptId/test-items/:testItemId/review` rechecks course/section grading scope, the exact parent and frozen manifest child, and the latest submitted attempt. Plugins receive an optional, host-authorized `testItemAttempt` context rather than treating the parent as a standalone submission. Reads never execute code or call a model. Saved programming responses can be reviewed without an execution artifact; existing references still require exact learner/activity/source ownership validation.
+
+Each save carries the child update time and a hash of its loaded feedback or rubric draft. Stale edits, reopened work, and active automatic regrading fail without overwriting the review. Child feedback/score, actor-attributed `CourseAuditEvent`, feedback research revision, and parent grade recomputation share one transaction. A reviewed child can remain saved while other children await grading; the host does not manufacture their grades. Existing plugin evaluation artifacts, answers, timing, submitted point weights, and release state stay fixed. AI results started before a teacher edit also check the original child version before attaching feedback. Challenges keep their immutable snapshot and receive linked review provenance.
+
+Regression coverage is in `test-manual-feedback.spec.ts`, the broader activity workflow, and core/plugin unit tests. No schema migration is required.
+
 ### Teacher automatic regrading
 
 **Rerun automatic grading** reevaluates every child in the selected submitted/graded attempt's frozen manifest against current child authoring, then recalculates the weighted Test total. It does not add questions created after submission or change the attempt's original points, answers, start, submission time, or grade-release state. The learner owns execution evidence; the requesting teacher owns the grading audit. **Rerun automatic grading for all** applies the identical batch to each selected student submission in the report's section scope.

@@ -16,6 +16,8 @@ Previous submissions can be inspected before starting another timed attempt thro
 
 Learner responses use an explicit public projection; see [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
 
+Teacher Test review provides numbered activity navigation, the saved arrangement, comments, and an item-grade override through the [shared review workflow](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading).
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)

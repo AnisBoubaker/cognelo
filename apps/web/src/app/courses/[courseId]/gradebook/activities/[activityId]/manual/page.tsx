@@ -17,6 +17,7 @@ import { createParsonsClient, type ParsonsAttemptEvaluation, type ParsonsGradebo
 import { AppShell } from "@/components/app-shell";
 import { AppIcon } from "@/components/app-icon";
 import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
+import { ReviewAndGradeDialog } from "@/components/review-and-grade-dialog";
 import {
   api,
   apiRequest,
@@ -65,6 +66,7 @@ export default function ManualActivityGradingPage() {
   const [draftsByRowKey, setDraftsByRowKey] = useState<Record<string, DraftGrade>>({});
   const [loadingAttempts, setLoadingAttempts] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testReviewRow, setTestReviewRow] = useState<CourseGradebookRow | null>(null);
   const [saveProgress, setSaveProgress] = useState<{ completed: number; total: number } | null>(null);
   const [appliedParticipantId, setAppliedParticipantId] = useState<string | null>(null);
 
@@ -440,7 +442,10 @@ export default function ManualActivityGradingPage() {
                     ) : null}
 
                     {row.activityTypeKey === "test" ? (
-                      <TestGradeBreakdown feedback={row.feedback} heading={t("groupPage.gradingBreakdownTitle")} />
+                      <div className="stack">
+                        <TestGradeBreakdown feedback={row.feedback} heading={t("groupPage.gradingBreakdownTitle")} />
+                        <button type="button" className="button secondary" disabled={!row.attempts.some(attempt => ["submitted", "graded"].includes(attempt.lifecycle))} onClick={() => setTestReviewRow(row)}><AppIcon name="review" />{t("courseDetail.reviewAndGrade")}</button>
+                      </div>
                     ) : selectedAttempt && "answers" in selectedAttempt ? (
                       <div className="stack">
                         {mcqReviewAnswers.map((answer, index) => (
@@ -609,6 +614,10 @@ export default function ManualActivityGradingPage() {
           progress={saveProgress && saveProgress.total > 0 ? (saveProgress.completed / saveProgress.total) * 100 : 0}
           progressSummary={saveProgress ? t("courseDetail.batchActionProgress", saveProgress) : undefined}
         />
+        {testReviewRow ? <ReviewAndGradeDialog key={rowKey(testReviewRow)} courseId={courseId}
+          row={rows.find(row => rowKey(row) === rowKey(testReviewRow)) ?? testReviewRow}
+          classRows={rows.filter(row => row.attempts.some(attempt => attempt.assessmentMode === "summative" && ["submitted", "graded"].includes(attempt.lifecycle)))}
+          onSelectRow={setTestReviewRow} onClose={() => setTestReviewRow(null)} onSaved={refresh} /> : null}
       </main>
     </AppShell>
   );

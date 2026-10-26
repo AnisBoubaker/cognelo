@@ -382,9 +382,9 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
   });
 }
 
-export async function recordActivityAttemptGradingResult(user: CurrentUser, input: RecordActivityAttemptGradingResultInput) {
+export async function recordActivityAttemptGradingResult(user: CurrentUser, input: RecordActivityAttemptGradingResultInput, transaction?: Prisma.TransactionClient) {
   const now = input.now ?? new Date();
-  const attempt = await prisma.activityAttempt.findUnique({
+  const attempt = await (transaction ?? prisma).activityAttempt.findUnique({
     where: { id: input.attemptId },
     include: {
       participant: true,
@@ -408,7 +408,7 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
   const overrides = exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId);
   const effectiveAttempt = { ...attempt, gradebookItem: applyGradebookExceptions(attempt.gradebookItem, overrides) };
 
-  return prisma.$transaction(async (tx) => {
+  const record = async (tx: Prisma.TransactionClient) => {
     const previousGrade = await tx.grade.findUnique({
       where: {
         gradebookItemId_participantId: {
@@ -529,7 +529,8 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
     });
 
     return { attempt: gradedAttempt, grade };
-  });
+  };
+  return transaction ? record(transaction) : prisma.$transaction(record);
 }
 
 export async function reopenActivitySubmission(user: CurrentUser, courseId: string, attemptId: string) {
@@ -792,10 +793,10 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
   });
 }
 
-export async function overrideGradebookGrade(user: CurrentUser, courseId: string, input: OverrideGradebookGradeInput) {
+export async function overrideGradebookGrade(user: CurrentUser, courseId: string, input: OverrideGradebookGradeInput, transaction?: Prisma.TransactionClient) {
   await assertCanViewCourseGradebook(user, courseId);
   const now = input.now ?? new Date();
-  const item = await prisma.gradebookItem.findFirst({
+  const item = await (transaction ?? prisma).gradebookItem.findFirst({
     where: {
       id: input.gradebookItemId,
       courseId,
@@ -851,7 +852,7 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
     normalizedMaxScore: maxScore
   });
   try {
-    return await prisma.$transaction(async (tx) => {
+    const override = async (tx: Prisma.TransactionClient) => {
     const previousGrade = await tx.grade.findUnique({
       where: {
         gradebookItemId_participantId: {
@@ -956,7 +957,8 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
     });
 
       return grade;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    };
+    return transaction ? await override(transaction) : await prisma.$transaction(override, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
     if (
       input.expectedGradeUpdatedAt !== undefined &&

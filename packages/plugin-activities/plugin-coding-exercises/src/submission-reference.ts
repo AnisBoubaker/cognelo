@@ -8,6 +8,8 @@ export async function resolveCodingTestSubmission(input: {
   activityId: string;
   parentAttemptId: string;
   itemAttemptId: string;
+  /** Manual review can work from a recovered answer without running code. */
+  allowMissingExecution?: boolean;
 }) {
   const child = await corePrisma.testItemAttempt.findFirst({
     where: {
@@ -25,7 +27,10 @@ export async function resolveCodingTestSubmission(input: {
   const state = record(result.state);
   const savedId = typeof state.executionId === "string" ? state.executionId : null;
   const executionId = child.pluginAttemptRef || savedId;
-  if (!executionId) throw missingSubmission();
+  if (!executionId) {
+    if (input.allowMissingExecution) return null;
+    throw missingSubmission();
+  }
   if (savedId && savedId !== executionId) throw mismatchedSubmission();
   const execution = await prisma.pluginCodingExerciseExecution.findFirst({
     where: { id: executionId, activityId: input.activityId, userId: child.parentAttempt.userId, kind: "submit" },

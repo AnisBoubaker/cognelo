@@ -38,3 +38,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - `expiredAttemptInput` must reconstruct final input from saved server state. Never accept a fresh learner request body after expiry; the host checks again after body upload. See [deadline enforcement](docs/REFERENCE.md#deadline-finalization).
 
 - Use the shared Markdown renderer for prompts and feedback: raw styles/forms/attributes stay inert and math stays untrusted and bounded. See [the shared rendering contract](../../../docs/plugin-authoring/03-core-services.md#what-markdownrenderer-gives-you).
+
+- Test review uses the host comment/grade form around the existing arrangement inspector. Reviewing and saving comments must not evaluate or modify the submitted arrangement; see [Test teacher review](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading).

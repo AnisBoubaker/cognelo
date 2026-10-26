@@ -42,3 +42,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - `expiredAttemptInput` must reconstruct final input from saved server state. Never accept a fresh learner request body after expiry; the host checks again after body upload. See [deadline enforcement](docs/REFERENCE.md#deadline-finalization).
 
 - Reconstruct learner bundles from trusted activity configuration for ordinary, Test, preview, and reopened drafts. Preserve file identity/path/language/order and locked text; use only editable submitted text. Regrading uses the original trusted config for file constraints and preserves the original submitted bundle. Reject exhausted attempts before execution and operationally invalid results before creating a core attempt.
+
+- Test review uses the host comment/grade form around the retained-file inspector. Manual review must not execute submitted HTML/JavaScript or call the runner; see [Test teacher review](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading).

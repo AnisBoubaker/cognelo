@@ -48,6 +48,8 @@ After release, the learner's grading report presents the available automatic-tes
 
 Teachers can opt into the shared [Solution tab](../../../docs/ACTIVITY_SOLUTIONS.md) in course-content settings. Students explicitly reveal it; summative work also requires released grades. A compound Test uses its parent switch.
 
+Teacher review inside Tests reuses the standalone feedback/rubric form, with numbered question navigation and per-question final grades. Recovered saved code can be reviewed without running it. See [Test teacher review](docs/REFERENCE.md#teacher-review-inside-tests).
+
 ## Boundaries
 
 - `Activity.config` contains only student-safe prompt, language, starter/template projection, visible tests, and editor settings.

@@ -157,6 +157,10 @@ Shared confirmation, submitted-Test snapshots, and concurrency are documented in
 
 This type supports the shared [Solution tab](../../../../docs/ACTIVITY_SOLUTIONS.md). Course settings must opt in; summative work additionally requires grade release. The learner first sees encouragement to try independently and must press **Show solution**. The same provider serves this type inside a Test under the parent switch. See the linked reference for formats, live revocation, API boundaries, and current-reference semantics.
 
+## Teacher review inside Tests
+
+The [shared Test review](../../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading) selects one activity at a time with numbered buttons, reuses the saved-answer inspector, and supplies comments plus a final item-grade override. It preserves submitted work and performs no execution. Core handles scoped authorization, stale-edit rejection, historical read-only views, atomic audit/parent aggregation, and unchanged release visibility.
+
 ## Test automatic regrading
 
 The core [Test regrading batch](../../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-automatic-regrading) reevaluates every submitted child against current grading rules, including previously graded work. Individual and whole-class actions show measured progress. Saved answers, original timing, submitted composition/point weights, and grade-release state remain fixed. Each successful rerun is audited; an individual failure does not stop later exercises, and an incomplete batch leaves the parent total unchanged. Recovery may initially preserve responses without a grade or runner artifact; later teacher regrading uses the same batch. No AI feedback is requested automatically. Standalone behavior is unchanged.

@@ -1461,6 +1461,21 @@ export type CourseTestAttemptReview = {
   }>;
 };
 
+export type TestItemTeacherReview = {
+  testItemId: string;
+  activityTypeKey: string;
+  submission: Record<string, unknown> | null;
+  feedback: Record<string, unknown> | null;
+  feedbackHash: string | null;
+  feedbackText: string;
+  score: number | null;
+  maxScore: number;
+  manuallyGraded: boolean;
+  updatedAt: string;
+  gradesReleased: boolean;
+  readOnly: boolean;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export function apiAbsoluteUrl(path: string) {
@@ -2062,6 +2077,14 @@ export const api = {
   ) => request<{ challenge: GradeChallenge }>(`/courses/${courseId}/grade-challenges/${challengeId}`, {
     method: "PATCH",
     body: JSON.stringify(input)
+  }),
+  testItemTeacherReview: (courseId: string, attemptId: string, testItemId: string) =>
+    request<{ review: TestItemTeacherReview }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/test-items/${testItemId}/review`),
+  saveTestItemTeacherReview: (courseId: string, attemptId: string, testItemId: string, input: {
+    expectedUpdatedAt: string; expectedFeedbackHash: string | null; feedback?: unknown;
+    feedbackText?: string; score?: number; reason?: string | null;
+  }) => request<{ review: TestItemTeacherReview }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/test-items/${testItemId}/review`, {
+    method: "PATCH", body: JSON.stringify(input)
   }),
   gradeTestItem: (
     courseId: string,

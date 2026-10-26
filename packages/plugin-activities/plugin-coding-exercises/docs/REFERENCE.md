@@ -292,6 +292,14 @@ Shared confirmation, submitted-Test snapshots, and concurrency are documented in
 
 This type supports the shared [Solution tab](../../../../docs/ACTIVITY_SOLUTIONS.md). Course settings must opt in; summative work additionally requires grade release. The learner first sees encouragement to try independently and must press **Show solution**. The same provider serves this type inside a Test under the parent switch. See the linked reference for formats, live revocation, API boundaries, and current-reference semantics.
 
+## Teacher review inside Tests
+
+The shared Test host selects one activity at a time with numbered buttons and calls this plugin's existing teacher-review handlers and renderer. Teachers can edit Summary, Strengths, Improvements, rubric comments/scores, and an independent final item grade. Explicit item overrides survive later rubric edits; an explicit automatic or AI regrade replaces the override marker when it replaces the score. Class review reuses this same view with student navigation.
+
+Legacy Test references use the validated execution lookup. Manual review may also display a recovered, server-saved source without an execution, using the current rubric and no deterministic score; it never executes code. Rubric-only grading and explicit teacher grades remain available. Missing weighted test evidence is not fabricated. AI evaluation still requires an execution as described below.
+
+Core handles revision conflicts, history restrictions, audit/research records, parent aggregation, and release visibility through [Test teacher review](../../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Plugin evaluation artifacts and original submission snapshots remain immutable. The reused final-grade field and feedback form are also used for standalone review.
+
 ## Test AI grading compatibility
 
 Composite submission returns the immutable execution ID both in plugin-owned state and in the generic `pluginAttemptRef`, even when no deterministic grade is available. Automatic regrading returns and persists that reference too, including recovered work awaiting rubric grading.

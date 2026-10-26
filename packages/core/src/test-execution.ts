@@ -450,13 +450,13 @@ export async function releaseTestAttemptSubmission(parentAttemptId: string) {
 
 /** Recompute only: AI/manual child grading must not rerun deterministic graders. */
 export async function recalculateTestAttemptGrade(
-  user: CurrentUser, courseId: string, parentAttemptId: string, reason?: string | null
+  user: CurrentUser, courseId: string, parentAttemptId: string, reason?: string | null, transaction?: Prisma.TransactionClient
 ) {
   await getActivityAttemptRegradeContext(user, courseId, parentAttemptId);
-  return recordTestAttemptGrade(user, courseId, parentAttemptId, "regrade", reason);
+  return recordTestAttemptGrade(user, courseId, parentAttemptId, "regrade", reason, transaction);
 }
 
-export async function getTestAttemptReview(user: CurrentUser, courseId: string, parentAttemptId: string) {
+export async function getTestAttemptReview(user: CurrentUser, courseId: string, parentAttemptId: string, testItemId?: string) {
   const context = await getActivityAttemptRegradeContext(user, courseId, parentAttemptId);
   if (context.activityTypeKey !== "test") {
     throw new AppError(400, "TEST_ATTEMPT_REQUIRED", "This attempt does not belong to a Test.");
@@ -464,8 +464,10 @@ export async function getTestAttemptReview(user: CurrentUser, courseId: string, 
   const parentAttempt = await prisma.activityAttempt.findFirst({
     where: { id: parentAttemptId, courseId, pluginKey: CORE_TEST_RUNTIME_KEY, lifecycle: { in: ["submitted", "graded"] } },
     include: {
+      gradebookItem: { select: { gradesReleased: true } },
       testRevision: { include: { items: true } },
       testItemAttempts: {
+        ...(testItemId ? { where: { testItemId } } : {}),
         include: {
           activity: { include: { activityType: true } }
         }
@@ -477,6 +479,12 @@ export async function getTestAttemptReview(user: CurrentUser, courseId: string, 
   const revisionItemBySourceId = new Map((parentAttempt.testRevision?.items ?? []).map((item) => [item.sourceTestItemId, item]));
   return {
     id: parentAttempt.id,
+    groupId: parentAttempt.groupId,
+    gradebookItemId: parentAttempt.gradebookItemId,
+    participantId: parentAttempt.participantId,
+    userId: parentAttempt.userId,
+    updatedAt: parentAttempt.updatedAt.toISOString(),
+    gradesReleased: parentAttempt.gradebookItem.gradesReleased,
     attemptNumber: parentAttempt.attemptNumber,
     lifecycle: parentAttempt.lifecycle,
     submittedAt: parentAttempt.submittedAt?.toISOString() ?? null,
@@ -507,6 +515,8 @@ export async function getTestAttemptReview(user: CurrentUser, courseId: string, 
         },
         itemAttempt: {
           id: itemAttempt.id,
+          updatedAt: itemAttempt.updatedAt.toISOString(),
+          manuallyGraded: Boolean(asRecord(itemAttempt.result).manualGrading),
           pluginAttemptRef: itemAttempt.pluginAttemptRef,
           lifecycle: itemAttempt.lifecycle,
           rawScore: itemAttempt.rawScore,
@@ -531,19 +541,23 @@ export async function recordTestItemAiFeedback(
     feedbackRef: string;
     feedbackVersion: number;
     feedbackHash: string;
+    expectedUpdatedAt?: string;
     gradingResult?: { rawScore: number; rawMaxScore: number; isPass?: boolean | null };
   }
 ) {
   const context = await getActivityAttemptRegradeContext(user, courseId, parentAttemptId);
   if (context.activityTypeKey !== "test") throw new AppError(400, "TEST_ATTEMPT_REQUIRED", "This attempt does not belong to a Test.");
   const parent = await prisma.activityAttempt.findFirst({
-    where: { id: parentAttemptId, courseId, pluginKey: CORE_TEST_RUNTIME_KEY },
+    where: { id: parentAttemptId, courseId, pluginKey: CORE_TEST_RUNTIME_KEY, lifecycle: { in: ["submitted", "graded"] } },
     include: { testItemAttempts: true }
   });
   if (!parent) throw notFound("Test attempt");
   const manifestItem = manifestItems(parent.metadata).find((item) => item.testItemId === testItemId);
   const itemAttempt = parent.testItemAttempts.find((attempt) => attempt.testItemId === testItemId);
   if (!manifestItem || !itemAttempt) throw notFound("Test item attempt");
+  if (input.expectedUpdatedAt && itemAttempt.updatedAt.toISOString() !== input.expectedUpdatedAt) {
+    throw new AppError(409, "TEST_REVIEW_CONFLICT", "This question was reviewed while feedback was being generated. Reload the latest review.");
+  }
   const pointsPossible = manifestItem.pointsPossible ?? itemAttempt.normalizedMaxScore ?? 0;
   const grading = input.gradingResult && input.gradingResult.rawMaxScore > 0
     ? {
@@ -554,7 +568,7 @@ export async function recordTestItemAiFeedback(
       }
     : null;
   return prisma.testItemAttempt.update({
-    where: { id: itemAttempt.id },
+    where: { id: itemAttempt.id, updatedAt: itemAttempt.updatedAt },
     data: {
       ...(grading ? { ...grading, lifecycle: "graded" as const, gradedAt: new Date() } : {}),
       feedback: {
@@ -570,9 +584,13 @@ export async function recordTestItemAiFeedback(
       result: {
         ...asRecord(itemAttempt.result),
         aiFeedbackRef: input.feedbackRef,
-        aiFeedbackVersion: input.feedbackVersion
+        aiFeedbackVersion: input.feedbackVersion,
+        ...(grading && asRecord(itemAttempt.result).manualGrading ? { manualGrading: null } : {})
       } as Prisma.InputJsonValue
     }
+  }).catch(error => {
+    if (asRecord(error).code === "P2025") throw new AppError(409, "TEST_REVIEW_CONFLICT", "This question changed while feedback was being saved. Reload the latest review.");
+    throw error;
   });
 }
 
@@ -629,14 +647,8 @@ export async function gradeTestItemManually(
   return recordTestAttemptGrade(user, courseId, parentAttemptId, "manual", input.reason);
 }
 
-async function recordTestAttemptGrade(
-  user: CurrentUser,
-  courseId: string,
-  parentAttemptId: string,
-  source: "auto" | "manual" | "regrade",
-  reason?: string | null
-) {
-  const parentAttempt = await prisma.activityAttempt.findFirst({
+async function loadTestGradingAttempt(courseId: string, parentAttemptId: string, database: Prisma.TransactionClient | typeof prisma = prisma) {
+  const parentAttempt = await database.activityAttempt.findFirst({
     where: {
       id: parentAttemptId,
       courseId,
@@ -649,6 +661,11 @@ async function recordTestAttemptGrade(
     throw notFound("Submitted Test attempt");
   }
 
+  return parentAttempt;
+}
+
+function testAttemptGradingInput(parentAttempt: Awaited<ReturnType<typeof loadTestGradingAttempt>>,
+  source: "auto" | "manual" | "regrade", reason?: string | null) {
   const manifest = manifestItems(parentAttempt.metadata);
   const attemptByItemId = new Map(parentAttempt.testItemAttempts.map((attempt) => [attempt.testItemId, attempt]));
   const incompleteItemIds: string[] = [];
@@ -690,7 +707,7 @@ async function recordTestAttemptGrade(
     throw new AppError(409, "TEST_POINTS_REQUIRED", "The Test must have a positive total point value before it can be graded.");
   }
 
-  return recordActivityAttemptGradingResult(user, {
+  const gradingInput = {
     attemptId: parentAttempt.id,
     rawScore,
     rawMaxScore,
@@ -712,7 +729,40 @@ async function recordTestAttemptGrade(
       gradedItemCount: items.length
     } as Prisma.InputJsonValue,
     reason: reason ?? null
-  });
+  };
+  return gradingInput;
+}
+
+async function recordTestAttemptGrade(user: CurrentUser, courseId: string, parentAttemptId: string,
+  source: "auto" | "manual" | "regrade", reason?: string | null, transaction?: Prisma.TransactionClient) {
+  const parent = await loadTestGradingAttempt(courseId, parentAttemptId, transaction);
+  const gradingInput = testAttemptGradingInput(parent, source, reason);
+  return transaction ? recordActivityAttemptGradingResult(user, gradingInput, transaction) : recordActivityAttemptGradingResult(user, gradingInput);
+}
+
+/** Refresh released/selected feedback without changing scores, selection, or grading timestamps. */
+export async function refreshTestAttemptFeedback(user: CurrentUser, courseId: string, parentAttemptId: string, tx: Prisma.TransactionClient) {
+  await getActivityAttemptRegradeContext(user, courseId, parentAttemptId);
+  const parent = await loadTestGradingAttempt(courseId, parentAttemptId, tx);
+  const grade = await tx.grade.findUnique({ where: { gradebookItemId_participantId: {
+    gradebookItemId: parent.gradebookItemId, participantId: parent.participantId
+  } } });
+  if (!grade?.isActive || (grade.source !== "override" && grade.selectedAttemptId !== parent.id)) return grade;
+  let projected: Record<string, unknown>;
+  try { projected = asRecord(asRecord(testAttemptGradingInput(parent, "regrade").normalizedResult).studentFeedback); }
+  catch (error) { if (error instanceof AppError && error.code === "TEST_ITEMS_NOT_GRADED") return grade; throw error; }
+  const previous = asRecord(asRecord(grade.normalizedResult).studentFeedback);
+  const feedback = { ...previous, ...projected, details: { ...asRecord(previous.details), ...asRecord(projected.details) } };
+  const updated = await tx.grade.update({ where: { id: grade.id, updatedAt: grade.updatedAt },
+    data: { normalizedResult: { ...asRecord(grade.normalizedResult), studentFeedback: feedback } as Prisma.InputJsonValue } });
+  await tx.gradeEvent.create({ data: {
+    gradeId: grade.id, gradebookItemId: parent.gradebookItemId, participantId: parent.participantId,
+    attemptId: parent.id, actorUserId: user.id, eventType: "ai_feedback_recorded",
+    previousValue: { studentFeedback: previous } as Prisma.InputJsonValue,
+    nextValue: { studentFeedback: feedback } as Prisma.InputJsonValue,
+    reason: "Teacher Test feedback review", metadata: { action: "test_item_review" }
+  } });
+  return updated;
 }
 
 async function resolveTestRuntimeContext(user: CurrentUser, courseId: string, groupId: string, testActivityId: string) {

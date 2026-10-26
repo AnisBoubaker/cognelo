@@ -242,6 +242,8 @@ export type PluginAiFeedbackTeacherReviewContext = {
   coreAttemptId: string;
   pluginAttemptRef?: string | null;
   activity: ServerActivityRecord;
+  /** Authorized, persisted child state supplied by the Test host. */
+  testItemAttempt?: NonNullable<Parameters<PluginAiFeedbackHandler>[0]["testItemAttempt"]>;
 };
 
 export type PluginAiFeedbackTeacherReviewHandler = {

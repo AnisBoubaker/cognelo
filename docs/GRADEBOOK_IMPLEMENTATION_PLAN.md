@@ -167,6 +167,7 @@ Teachers see:
 - group/section gradebook
 - activity submissions view
 - individual student history
+- [Compound Test review](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading) with numbered activity navigation, shared standalone feedback/rubric controls, item grades, and whole-class navigation
 - filters for group, activity, missing, late, and needs grading
 - CSV or XLSX per-activity final-grade export from content and gradebook surfaces, with optional group scope and an editable identifiable filename
 - later LMS-compatible export

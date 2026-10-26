@@ -179,62 +179,7 @@ export async function reviseTeacherAttemptAiFeedback(
     : null;
 
   const now = new Date();
-  const teacherRevision = typeof currentFeedback.teacherRevision === "number"
-    ? Math.max(0, Math.floor(currentFeedback.teacherRevision)) + 1
-    : 1;
-  const revisedContent = Object.fromEntries(Object.entries(revisedFeedback).filter(([key]) => ![
-    "feedbackRef",
-    "feedbackVersion",
-    "feedbackHash",
-    "challengeAllowed",
-    "kind",
-    "feedbackOrigin",
-    "authoredByTeacher",
-    "authoredAt",
-    "teacherRevision",
-    "reviewedByTeacher",
-    "reviewedAt"
-  ].includes(key)));
-  const kind = hasCurrentFeedback && typeof currentFeedback.kind === "string"
-    ? currentFeedback.kind
-    : typeof revisedFeedback.kind === "string" && revisedFeedback.kind.trim()
-      ? revisedFeedback.kind.trim()
-      : "assessment_feedback";
-  const feedbackOrigin = typeof currentFeedback.feedbackOrigin === "string"
-    ? currentFeedback.feedbackOrigin
-    : kind === "ai_assessment_feedback"
-      ? "generated"
-      : "teacher";
-  const challengeAllowed = feedbackOrigin === "teacher" || (hasCurrentFeedback && currentFeedback.challengeAllowed === true);
-  const feedbackForHash = {
-    ...revisedContent,
-    kind,
-    feedbackRef,
-    feedbackVersion,
-    challengeAllowed
-  };
-  const previousFeedbackHash = hasCurrentFeedback && typeof currentFeedback.feedbackHash === "string"
-    ? currentFeedback.feedbackHash
-    : hasCurrentFeedback
-      ? hashAiFeedbackValue(currentFeedback)
-      : null;
-  const feedbackHash = hashAiFeedbackValue(feedbackForHash);
-  const nextFeedback = {
-    ...revisedContent,
-    kind,
-    feedbackRef,
-    feedbackVersion,
-    feedbackHash,
-    challengeAllowed,
-    feedbackOrigin,
-    ...(feedbackOrigin === "teacher" ? {
-      authoredByTeacher: true,
-      authoredAt: typeof currentFeedback.authoredAt === "string" ? currentFeedback.authoredAt : now.toISOString()
-    } : {}),
-    teacherRevision,
-    reviewedByTeacher: true,
-    reviewedAt: now.toISOString()
-  };
+  const { teacherRevision, feedbackOrigin, previousFeedbackHash, feedbackHash, nextFeedback } = buildTeacherFeedbackRevision({ currentFeedback, revisedFeedback, feedbackRef, feedbackVersion, hasCurrentFeedback, now });
   const nextNormalizedResult = { ...normalizedResult, studentFeedback: nextFeedback };
   const gradeSnapshot = selectedGrade
     ? {
@@ -391,4 +336,68 @@ function isStoredTeacherFeedback(value: Record<string, unknown>) {
   return typeof value.kind === "string"
     && typeof value.feedbackRef === "string"
     && typeof value.feedbackVersion === "number";
+}
+
+/** Shared revision metadata; immutable provider artifacts are never rewritten. */
+export function buildTeacherFeedbackRevision({ currentFeedback, revisedFeedback, feedbackRef, feedbackVersion, hasCurrentFeedback, now }: {
+  currentFeedback: Record<string, unknown>; revisedFeedback: Record<string, unknown>;
+  feedbackRef: string; feedbackVersion: number; hasCurrentFeedback: boolean; now: Date;
+}) {
+  const teacherRevision = typeof currentFeedback.teacherRevision === "number"
+    ? Math.max(0, Math.floor(currentFeedback.teacherRevision)) + 1
+    : 1;
+  const revisedContent = Object.fromEntries(Object.entries(revisedFeedback).filter(([key]) => ![
+    "feedbackRef",
+    "feedbackVersion",
+    "feedbackHash",
+    "challengeAllowed",
+    "kind",
+    "feedbackOrigin",
+    "authoredByTeacher",
+    "authoredAt",
+    "teacherRevision",
+    "reviewedByTeacher",
+    "reviewedAt"
+  ].includes(key)));
+  const kind = hasCurrentFeedback && typeof currentFeedback.kind === "string"
+    ? currentFeedback.kind
+    : typeof revisedFeedback.kind === "string" && revisedFeedback.kind.trim()
+      ? revisedFeedback.kind.trim()
+      : "assessment_feedback";
+  const feedbackOrigin = typeof currentFeedback.feedbackOrigin === "string"
+    ? currentFeedback.feedbackOrigin
+    : kind === "ai_assessment_feedback"
+      ? "generated"
+      : "teacher";
+  const challengeAllowed = feedbackOrigin === "teacher" || (hasCurrentFeedback && currentFeedback.challengeAllowed === true);
+  const feedbackForHash = {
+    ...revisedContent,
+    kind,
+    feedbackRef,
+    feedbackVersion,
+    challengeAllowed
+  };
+  const previousFeedbackHash = hasCurrentFeedback && typeof currentFeedback.feedbackHash === "string"
+    ? currentFeedback.feedbackHash
+    : hasCurrentFeedback
+      ? hashAiFeedbackValue(currentFeedback)
+      : null;
+  const feedbackHash = hashAiFeedbackValue(feedbackForHash);
+  const nextFeedback = {
+    ...revisedContent,
+    kind,
+    feedbackRef,
+    feedbackVersion,
+    feedbackHash,
+    challengeAllowed,
+    feedbackOrigin,
+    ...(feedbackOrigin === "teacher" ? {
+      authoredByTeacher: true,
+      authoredAt: typeof currentFeedback.authoredAt === "string" ? currentFeedback.authoredAt : now.toISOString()
+    } : {}),
+    teacherRevision,
+    reviewedByTeacher: true,
+    reviewedAt: now.toISOString()
+  };
+  return { teacherRevision, feedbackOrigin, previousFeedbackHash, feedbackHash, nextFeedback };
 }
