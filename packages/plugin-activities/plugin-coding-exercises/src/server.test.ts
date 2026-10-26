@@ -28,6 +28,8 @@ const aiFeedbackMocks = vi.hoisted(() => ({
   updateCodingExerciseAiGradingInstructions: vi.fn()
 }));
 const regradeMocks = vi.hoisted(() => ({ findExecution: vi.fn(), regrade: vi.fn() }));
+const resolveTestSubmission = vi.hoisted(() => vi.fn());
+vi.mock("./submission-reference", () => ({ resolveCodingTestSubmission: resolveTestSubmission }));
 
 vi.mock("./hidden-tests", () => hiddenTestMocks);
 vi.mock("./executions", () => executionMocks);
@@ -70,7 +72,7 @@ describe("coding exercises server plugin lifecycle hooks", () => {
     const result = await codingExercisesServerPlugin.compositeExecution!.regrade!(input);
     expect(regradeMocks.findExecution).toHaveBeenCalledWith({ where: { id: "original", activityId: input.activity.id, userId: "learner", kind: "submit" } });
     expect(regradeMocks.regrade).toHaveBeenCalledWith(expect.objectContaining({ user: actor, executionId: "original", coreAttemptId: "parent", feedback: { aiScore: 70 } }));
-    expect(result).toMatchObject({ state, gradingResult: { rawScore: 80, feedback: { aiFeedback: { summary: "Keep the rubric" } } } });
+    expect(result).toMatchObject({ state, pluginAttemptRef: "original", gradingResult: { rawScore: 80, feedback: { aiFeedback: { summary: "Keep the rubric" } } } });
     expect(executionMocks.submitCodingExercise).not.toHaveBeenCalled();
     regradeMocks.findExecution.mockResolvedValue(null);
     await expect(codingExercisesServerPlugin.compositeExecution!.regrade!(input)).rejects.toMatchObject({ code: "CODING_EXERCISE_EXECUTION_NOT_FOUND" });
@@ -178,12 +180,24 @@ describe("coding exercises server plugin lifecycle hooks", () => {
       payload: { sourceCode: "print(1)" }
     })).resolves.toEqual(expect.objectContaining({
       state: { sourceCode: "print(1)", executionId: "submit-1" },
+      pluginAttemptRef: "submit-1",
       gradingResult: expect.objectContaining({ rawScore: 3, rawMaxScore: 4 })
     }));
     expect(aiFeedbackMocks.snapshotCodingExerciseAiFeedbackConfig).toHaveBeenCalledWith({
       activityId: "activity-1",
       executionId: "submit-1"
     });
+  });
+
+  it("uses verified legacy Test evidence for AI grading instead of trusting caller state", async () => {
+    resolveTestSubmission.mockResolvedValue("verified-execution");
+    await codingExercisesServerPlugin.aiFeedback!.evaluateAttempt({
+      user: testUser(), courseId: "course-1", groupId: "group-1", activityId: "activity-1", coreAttemptId: "parent",
+      pluginAttemptRef: null, activity: testActivity("coding-exercise"), triggerKind: "test_child",
+      testItemAttempt: { id: "child", parentAttemptId: "parent", pluginAttemptRef: null, state: { executionId: "untrusted" } }
+    });
+    expect(resolveTestSubmission).toHaveBeenCalledWith({ courseId: "course-1", activityId: "activity-1", parentAttemptId: "parent", itemAttemptId: "child" });
+    expect(aiFeedbackMocks.evaluateCodingExerciseAttemptWithAi).toHaveBeenCalledWith(expect.objectContaining({ executionId: "verified-execution", triggerKind: "test_child" }));
   });
 
   it("uses only stateless preview execution handlers in Student view", async () => {

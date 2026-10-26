@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   hashAiFeedbackValue: vi.fn(),
   recordAiFeedbackResearchEvent: vi.fn(),
   courseFindUnique: vi.fn(),
+  attemptFindFirst: vi.fn(),
   referenceFindUnique: vi.fn(),
   referenceUpdate: vi.fn(),
   executionFindFirst: vi.fn(),
@@ -28,7 +29,8 @@ vi.mock("@cognelo/core", async () => {
 
 vi.mock("@cognelo/db", () => ({
   prisma: {
-    course: { findUnique: mocks.courseFindUnique }
+    course: { findUnique: mocks.courseFindUnique },
+    activityAttempt: { findFirst: mocks.attemptFindFirst }
   }
 }));
 
@@ -50,7 +52,7 @@ vi.mock("./executions", () => ({
 const { AppError } = await import("@cognelo/core");
 const { evaluateCodingExerciseAttemptWithAi, updateCodingExerciseAiGradingInstructions } = await import("./ai-feedback");
 
-function evaluationInput(triggerKind: "teacher_single" | "formative_submission" = "teacher_single") {
+function evaluationInput(triggerKind: "teacher_single" | "formative_submission" | "test_child" = "teacher_single") {
   return {
     user: {
       id: "teacher-1",
@@ -85,6 +87,7 @@ describe("coding exercise generated feedback language", () => {
       model: "feedback-model"
     });
     mocks.courseFindUnique.mockResolvedValue({ subject: { teachingLanguage: "fr" } });
+    mocks.attemptFindFirst.mockResolvedValue({ userId: "student-1", participantId: "participant", gradebookItemId: "item" });
     mocks.referenceFindUnique.mockResolvedValue({
       sourceCode: "print('reference')",
       privateConfig: {
@@ -181,6 +184,40 @@ describe("coding exercise generated feedback language", () => {
         })
       })
     }));
+  });
+
+  it("uses criteria added after a Test submission while retaining the original snapshot", async () => {
+    const execution = await mocks.executionFindFirst();
+    execution.aiFeedbackConfigSnapshot = { enabled: false, gradingEnabled: false, criteria: [] };
+    await expect(evaluateCodingExerciseAttemptWithAi(evaluationInput("test_child"))).resolves.toMatchObject({
+      gradingResult: { rawScore: 100, rawMaxScore: 100 }, feedback: { criteria: [expect.objectContaining({ id: "correctness" })] }
+    });
+    expect(execution.aiFeedbackConfigSnapshot).toEqual({ enabled: false, gradingEnabled: false, criteria: [] });
+  });
+
+  it("rejects mismatched parent learner evidence before calling the model", async () => {
+    mocks.attemptFindFirst.mockResolvedValue({ userId: "other-learner" });
+    await expect(evaluateCodingExerciseAttemptWithAi({ ...evaluationInput("test_child"), coreAttemptId: "parent" }))
+      .rejects.toMatchObject({ code: "CODING_EXERCISE_EXECUTION_NOT_FOUND" });
+    expect(mocks.generateAiAgentText).not.toHaveBeenCalled();
+    expect(mocks.evaluationCreate).not.toHaveBeenCalled();
+  });
+
+  it("grades rubric-only work without inventing a deterministic score", async () => {
+    const reference = await mocks.referenceFindUnique();
+    Object.assign(reference.privateConfig.aiFeedback, { testWeightPercent: 0, aiWeightPercent: 100 });
+    mocks.getLatestTests.mockResolvedValue({ resultSummary: { earnedWeight: 0, totalWeight: 0, tests: [] }, testEvaluationId: null });
+    await expect(evaluateCodingExerciseAttemptWithAi(evaluationInput("test_child"))).resolves.toMatchObject({
+      feedback: { deterministicScore: null, aiScore: 100, combinedScore: 100 }, gradingResult: { rawScore: 100, rawMaxScore: 100 }
+    });
+    expect(mocks.evaluationCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ deterministicScore: null }) }));
+  });
+
+  it("refuses weighted automatic grading without a test score before invoking the model", async () => {
+    mocks.getLatestTests.mockResolvedValue({ resultSummary: { earnedWeight: 0, totalWeight: 0 }, testEvaluationId: null });
+    await expect(evaluateCodingExerciseAttemptWithAi(evaluationInput("test_child"))).rejects.toMatchObject({ code: "CODING_EXERCISE_TEST_RESULT_REQUIRED" });
+    expect(mocks.generateAiAgentText).not.toHaveBeenCalled();
+    expect(mocks.evaluationCreate).not.toHaveBeenCalled();
   });
 
   it("uses batch instructions and reviewed examples without sending learner identity to the model", async () => {

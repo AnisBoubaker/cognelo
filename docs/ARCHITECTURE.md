@@ -140,6 +140,8 @@ The first core-backed definition is `test`. A Test is a compound summative activ
 
 Teacher Test regrading reruns all submitted manifest children through the composite execution boundary, using an optional plugin `regrade` handler for immutable evidence and rubric composition. Its authenticated POST streams measured progress to the shared dialog; whole-class regrading uses the same per-attempt batch. Child results are audited independently, while the parent total changes only after a complete batch. AI/manual grading retains a separate aggregate-only operation. See [Test regrading](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-automatic-regrading).
 
+Composite submission and regrading return an optional opaque `pluginAttemptRef` independently of the grade; core persists it even for submitted-ungraded work. The owning plugin validates and resolves legacy submission evidence without core interpreting private state or rewriting historical answers.
+
 Course authoring remains live while attempts are unsubmitted. Core coordinates parent-Test locks, confirmation/messages, public audit, soft removal, and final submission revisions; plugins own private authoring revisions and pure response-reconciliation/student-state projection hooks. Summative result APIs enforce core release visibility, and a composite handler may return a null grading result for submitted work awaiting grading. See [Live activity authoring](LIVE_ACTIVITY_AUTHORING.md).
 
 To add a new plugin-backed activity type:

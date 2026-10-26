@@ -146,10 +146,10 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
       {gradingBreakdown ? (
         <section className="inline-panel form stack stack-tight">
           <div className="grading-breakdown-grid">
-            <label className="field">
+            {gradingBreakdown.automaticMax > 0 ? <label className="field">
               <span>{t("courseDetail.feedbackReviewAutomaticTestsGrade", { max: formatGradeNumber(gradingBreakdown.automaticMax) })}</span>
               <input readOnly value={formatOptionalGrade(gradingBreakdown.automaticGrade)} />
-            </label>
+            </label> : null}
             <label className="field">
               <span>{t("courseDetail.feedbackReviewRubricGrade", { max: formatGradeNumber(gradingBreakdown.rubricMax) })}</span>
               <input readOnly value={formatOptionalGrade(gradingBreakdown.rubricGrade)} />
@@ -205,7 +205,7 @@ export function getCodingExerciseGradingBreakdown(feedback: Record<string, unkno
   const gradingEnabled = feedback.gradingEnabled === true;
   const automaticMax = gradingEnabled ? finiteNumber(feedback.testWeightPercent) : 100;
   const rubricMax = gradingEnabled ? finiteNumber(feedback.aiWeightPercent) : 0;
-  if (deterministicScore === null || automaticMax === null || rubricMax === null) return null;
+  if (automaticMax === null || rubricMax === null || (deterministicScore === null && automaticMax > 0)) return null;
 
   const criteria = recordArray(feedback.criteria);
   const totalCriterionWeight = criteria.reduce((total, criterion) => total + (finiteNumber(criterion.weightPercent) ?? 0), 0);
@@ -215,7 +215,7 @@ export function getCodingExerciseGradingBreakdown(feedback: Record<string, unkno
         0
       ) / totalCriterionWeight)
     : finiteNumber(feedback.aiScore);
-  const automaticGrade = clampPercent(deterministicScore) * automaticMax / 100;
+  const automaticGrade = clampPercent(deterministicScore ?? 0) * automaticMax / 100;
   const rubricGrade = rubricMax === 0 ? 0 : rubricScore === null ? null : clampPercent(rubricScore) * rubricMax / 100;
   const totalGrade = rubricGrade === null ? null : automaticGrade + rubricGrade;
 

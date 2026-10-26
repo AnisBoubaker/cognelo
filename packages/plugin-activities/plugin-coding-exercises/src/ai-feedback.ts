@@ -75,9 +75,9 @@ export async function createCodingExerciseTeacherFeedbackDraft(input: {
     ? clampPercent(earnedWeight / totalWeight * 100)
     : null;
   const rubricScore = feedbackConfig.criteria.length ? 0 : null;
-  const combinedScore = feedbackConfig.gradingEnabled && deterministicScore !== null && rubricScore !== null
+  const combinedScore = feedbackConfig.gradingEnabled && (deterministicScore !== null || feedbackConfig.testWeightPercent === 0) && rubricScore !== null
     ? clampPercent(
-        deterministicScore * feedbackConfig.testWeightPercent / 100
+        (deterministicScore ?? 0) * feedbackConfig.testWeightPercent / 100
         + rubricScore * feedbackConfig.aiWeightPercent / 100
       )
     : deterministicScore;
@@ -160,11 +160,11 @@ export function reviseCodingExerciseAiFeedback(currentFeedback: Record<string, u
   const testWeightPercent = finiteNumber(currentFeedback.testWeightPercent);
   const aiWeightPercent = finiteNumber(currentFeedback.aiWeightPercent);
   const combinedScore = currentFeedback.gradingEnabled === true
-    && deterministicScore !== null
+    && (deterministicScore !== null || testWeightPercent === 0)
     && aiScore !== null
     && testWeightPercent !== null
     && aiWeightPercent !== null
-    ? clampPercent(deterministicScore * testWeightPercent / 100 + aiScore * aiWeightPercent / 100)
+    ? clampPercent((deterministicScore ?? 0) * testWeightPercent / 100 + aiScore * aiWeightPercent / 100)
     : finiteNumber(currentFeedback.combinedScore);
   return {
     ...currentFeedback,
@@ -226,12 +226,15 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
       select: { subject: { select: { teachingLanguage: true } } }
     })
   ]);
-  const teacherTriggered = input.triggerKind === "teacher_single" || input.triggerKind === "teacher_selection" || input.triggerKind === "teacher_batch";
+  const teacherTriggered = input.triggerKind !== "formative_submission";
   if (!reference && (teacherTriggered || !execution?.aiFeedbackConfigSnapshot)) {
     throw new AppError(409, "CODING_EXERCISE_PRIVATE_CONFIG_REQUIRED", "Save the coding exercise rubric and private configuration before requesting AI feedback.");
   }
   if (!execution) {
     throw new AppError(404, "CODING_EXERCISE_EXECUTION_NOT_FOUND", "The coding exercise submission was not found.");
+  }
+  if (input.coreAttemptId && (!attempt?.userId || execution.userId !== attempt.userId)) {
+    throw new AppError(409, "CODING_EXERCISE_EXECUTION_NOT_FOUND", "The coding submission does not belong to this learner's attempt.");
   }
   if (isCodingExerciseOperationalFailure(execution)) {
     throw new AppError(
@@ -260,10 +263,13 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
   const resultSummary = toRecord(latestTests.resultSummary);
   const earnedWeight = finiteNumber(resultSummary.earnedWeight);
   const totalWeight = finiteNumber(resultSummary.totalWeight);
-  if (earnedWeight === null || totalWeight === null || totalWeight <= 0) {
+  if (earnedWeight === null || totalWeight === null || totalWeight < 0 || earnedWeight < 0 || earnedWeight > totalWeight) {
     throw new AppError(409, "CODING_EXERCISE_RESULT_INVALID", "The submission does not contain a valid deterministic test result.");
   }
-  const deterministicScore = clampPercent((earnedWeight / totalWeight) * 100);
+  if (totalWeight === 0 && feedbackConfig.gradingEnabled && feedbackConfig.testWeightPercent > 0) {
+    throw new AppError(409, "CODING_EXERCISE_TEST_RESULT_REQUIRED", "This question has no automatic test score. Set the rubric weight to 100% and tests to 0%, or add tests and rerun automatic grading before AI grading.");
+  }
+  const deterministicScore = totalWeight > 0 ? clampPercent((earnedWeight / totalWeight) * 100) : null;
   const previous = await prisma.pluginCodingExerciseAiEvaluation.findFirst({
     where: { activityId: input.activityId, executionId: execution.id },
     orderBy: { version: "desc" },
@@ -352,7 +358,7 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
       0
     ));
     const combinedScore = feedbackConfig.gradingEnabled
-      ? clampPercent(deterministicScore * feedbackConfig.testWeightPercent / 100 + aiScore * feedbackConfig.aiWeightPercent / 100)
+      ? clampPercent((deterministicScore ?? 0) * feedbackConfig.testWeightPercent / 100 + aiScore * feedbackConfig.aiWeightPercent / 100)
       : deterministicScore;
     const sanitizedFeedback = {
       kind: "ai_assessment_feedback",
@@ -405,7 +411,7 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
       feedbackVersion: completed.version,
       feedbackHash,
       feedback: sanitizedFeedback,
-      gradingResult: feedbackConfig.gradingEnabled
+      gradingResult: feedbackConfig.gradingEnabled && combinedScore !== null
         ? {
             rawScore: combinedScore,
             rawMaxScore: 100,

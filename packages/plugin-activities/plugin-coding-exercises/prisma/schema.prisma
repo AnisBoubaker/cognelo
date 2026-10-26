@@ -145,7 +145,7 @@ model PluginCodingExerciseAiEvaluation {
   parsedResponse     Json?
   sanitizedFeedback  Json?
   criterionScores    Json?
-  deterministicScore Float
+  deterministicScore Float?
   aiScore            Float?
   combinedScore      Float?
   testWeightPercent  Int

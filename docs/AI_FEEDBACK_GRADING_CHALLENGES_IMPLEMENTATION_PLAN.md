@@ -183,7 +183,7 @@ MCQ answer-key grading remains deterministic and authoritative. AI feedback may 
 
 ### Regrading
 
-- Formative/Test-child retries retain the attempt's immutable rubric/configuration snapshot. A teacher-started Programming Exercise evaluation uses the current rubric/reference solution/prompt and latest saved test result, without running tests, and snapshots those inputs in a new model-evaluation version.
+- Formative retries retain the attempt's immutable rubric/configuration snapshot. A teacher-started Programming Exercise evaluation, including a compound Test child, uses the current rubric/reference solution/prompt and latest saved test result, without running tests, and snapshots those inputs in a new model-evaluation version.
 - Programming Exercise **Rerun automatic grading** is a separate test-only action: rerun current enabled tests, append a test-evaluation record, and recompute the grade using current component weights and the latest existing rubric score. A missing rubric score defers final grading; no model call occurs. **Assess with AI** recomputes the rubric component and feedback without running tests. Its confirmation states that it updates grades for AI-grading activities; feedback-only types such as MCQ explicitly state that their deterministic grade will not change. If both tests and rubric changed, teachers run these actions in that order.
 - A completed explicit regrade creates a new result version and a `regraded` core grade event.
 - Previous model outputs, parsed results, feedback, scores, and grade snapshots remain available for audit and research.
@@ -243,6 +243,7 @@ Core Tests are always summative, so their AI feedback never runs automatically o
 - Test submission stores deterministic child results and any child states needed for AI evaluation.
 - A teacher starts AI evaluation for the parent Test/selected attempts from the gradebook.
 - Each participating child plugin evaluates its own item and returns its component result.
+- Programming Test questions use the teacher's current rubric and verified original execution, including legacy children whose execution reference exists only in saved state. Rubric-only grading requires zero deterministic weight and retains an absent test score as null; see the [plugin compatibility reference](../packages/plugin-activities/plugin-coding-exercises/docs/REFERENCE.md#test-ai-grading-compatibility).
 - Required AI-graded children must finish before the parent Test grade is recomputed.
 - Child feedback remains hidden until the parent Test gradebook item is released.
 - A grade challenge belongs to the released parent grade while identifying the child feedback version being contested.

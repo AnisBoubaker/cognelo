@@ -197,4 +197,16 @@ describe("coding exercise teacher feedback review", () => {
       combinedScore: 60
     });
   });
+
+  it("shows and recalculates a rubric-only total without displaying a fabricated test grade", () => {
+    const feedback = { gradingEnabled: true, deterministicScore: null, testWeightPercent: 0, aiWeightPercent: 100,
+      criteria: [{ id: "quality", weightPercent: 100, scorePercent: 75 }] };
+    expect(recalculateCodingExerciseFeedback(feedback)).toMatchObject({ deterministicScore: null, aiScore: 75, combinedScore: 75 });
+    const html = renderToStaticMarkup(React.createElement(CodingExerciseAiFeedbackReview, {
+      feedback, submission: { sourceCode: "print(1)", language: "python", resultSummary: {} }, onFeedbackChange: () => undefined, t
+    }));
+    expect(html).not.toContain("Automatic tests grade");
+    expect(html).toContain("Rubric grade (out of 100)");
+    expect(html).toContain('readOnly="" value="75"');
+  });
 });

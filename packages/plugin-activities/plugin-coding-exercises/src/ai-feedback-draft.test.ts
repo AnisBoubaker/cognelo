@@ -88,4 +88,15 @@ describe("coding exercise teacher feedback drafts", () => {
       criteria: [{ id: "quality", scorePercent: 0 }]
     });
   });
+
+  it("creates a usable rubric-only manual draft without a test score", async () => {
+    pluginPrismaMocks.executionFindFirst.mockResolvedValue({ resultSummary: { earnedWeight: 0, totalWeight: 0 }, aiFeedbackConfigSnapshot: null });
+    pluginPrismaMocks.referenceFindUnique.mockResolvedValue({ privateConfig: { aiFeedback: {
+      enabled: false, gradingEnabled: true, testWeightPercent: 0, aiWeightPercent: 100,
+      criteria: [{ id: "quality", title: "Quality", description: "Evaluate quality.", weightPercent: 100 }]
+    } } });
+    const draft = await createCodingExerciseTeacherFeedbackDraft({ activityId: "activity-1", executionId: "execution-1" });
+    expect(draft).toMatchObject({ aiScore: 0, combinedScore: 0, testWeightPercent: 0, aiWeightPercent: 100 });
+    expect(draft).not.toHaveProperty("deterministicScore");
+  });
 });

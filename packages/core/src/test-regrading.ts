@@ -91,6 +91,7 @@ export async function regradeTestAttempt(
           await lockTestAuthoring(tx, parent.activityId);
           await assertUnchanged(tx);
           const updated = await tx.testItemAttempt.update({ where: { id: item.id, updatedAt: item.updatedAt, lifecycle: item.lifecycle }, data: {
+            ...(result.pluginAttemptRef !== undefined ? { pluginAttemptRef: result.pluginAttemptRef } : {}),
             ...(grade ? { lifecycle: "graded", gradedAt: new Date(), rawScore: grade.rawScore, rawMaxScore: grade.rawMaxScore,
               normalizedScore: grade.rawScore / grade.rawMaxScore * points, normalizedMaxScore: points } : {}),
             result: { ...saved, state: result.state, gradingConfigSnapshot: item.activity.config,
@@ -99,9 +100,9 @@ export async function regradeTestAttempt(
           } });
           await tx.courseAuditEvent.create({ data: { courseId, actorUserId: user.id,
             eventType: "test_item_regraded", targetType: "TestItemAttempt", targetId: item.id,
-            previousValue: { lifecycle: item.lifecycle, result: item.result, feedback: item.feedback,
+            previousValue: { lifecycle: item.lifecycle, pluginAttemptRef: item.pluginAttemptRef, result: item.result, feedback: item.feedback,
               rawScore: item.rawScore, rawMaxScore: item.rawMaxScore, normalizedScore: item.normalizedScore } as Prisma.InputJsonValue,
-            nextValue: { lifecycle: updated.lifecycle, result: updated.result, feedback: updated.feedback,
+            nextValue: { lifecycle: updated.lifecycle, pluginAttemptRef: updated.pluginAttemptRef, result: updated.result, feedback: updated.feedback,
               rawScore: updated.rawScore, rawMaxScore: updated.rawMaxScore, normalizedScore: updated.normalizedScore } as Prisma.InputJsonValue,
             metadata: { parentAttemptId, reason: reason ?? null, outcome: grade ? "graded" : "pending" }
           } });

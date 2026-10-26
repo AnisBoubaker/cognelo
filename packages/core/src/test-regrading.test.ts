@@ -82,6 +82,14 @@ describe("Test automatic regrading", () => {
     expect(mocks.submit).toHaveBeenCalledTimes(4);
   });
 
+  it("persists and audits plugin submission evidence even while rubric grading is pending", async () => {
+    mocks.submit.mockResolvedValueOnce({ state: { executionId: "execution" }, pluginAttemptRef: "execution", gradingResult: null });
+    await regradeTestAttempt(user, "course", "parent");
+    expect(mocks.db.testItemAttempt.update.mock.calls[0][0].data).toMatchObject({ pluginAttemptRef: "execution" });
+    expect(mocks.db.courseAuditEvent.create.mock.calls[0][0].data.nextValue).toMatchObject({ pluginAttemptRef: "execution" });
+    expect(mocks.db.testItemAttempt.update.mock.calls[1][0].data).not.toHaveProperty("pluginAttemptRef");
+  });
+
   it("continues after a runner failure, retains successful child results, and leaves the parent grade unchanged", async () => {
     mocks.submit.mockRejectedValueOnce(new AppError(503, "RUNNER_UNAVAILABLE", "Runner unavailable"));
     const result = await regradeTestAttempt(user, "course", "parent");

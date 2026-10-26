@@ -285,6 +285,8 @@ export type CompositeExecutionSubmissionHandler = (input: {
   payload: unknown;
 }) => Promise<{
   state: Record<string, unknown>;
+  /** Immutable plugin submission evidence, independent of whether a grade is available. */
+  pluginAttemptRef?: string | null;
   /** Null preserves submitted work awaiting teacher/rubric grading. */
   gradingResult: PluginGradingResult | null;
 }>;

@@ -90,6 +90,12 @@ describe("coding exercise feedback revision", () => {
     })).toThrow("original rubric criteria");
   });
 
+  it("recalculates rubric-only grades without inventing a test score", () => {
+    expect(reviseCodingExerciseAiFeedback({ ...current, deterministicScore: null, testWeightPercent: 0, aiWeightPercent: 100 }, {
+      ...current, criteria: [{ ...current.criteria[0], scorePercent: 75 }]
+    })).toMatchObject({ deterministicScore: null, aiScore: 75, combinedScore: 75 });
+  });
+
   it("accepts only reviewed feedback with rubric explanations and narrative comments as a batch template", () => {
     expect(isCodingExerciseAiGradingTemplateComplete(current)).toBe(true);
     expect(isCodingExerciseAiGradingTemplateComplete({ ...current, summary: "", strengths: [], improvements: [] })).toBe(false);

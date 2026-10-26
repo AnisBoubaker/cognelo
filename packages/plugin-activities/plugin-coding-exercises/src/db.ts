@@ -237,6 +237,9 @@ export const codingExercisesDatabaseModule = {
   "previousValue" JSONB NOT NULL, "nextValue" JSONB NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 )`,
       `CREATE INDEX IF NOT EXISTS "PluginCodingExerciseAuthoringRevision_activityId_createdAt_idx" ON "PluginCodingExerciseAuthoringRevision" ("activityId", "createdAt")`
+    ] },
+    { id: "202610260010_nullable_ai_test_score", statements: [
+      `ALTER TABLE "PluginCodingExerciseAiEvaluation" ALTER COLUMN "deterministicScore" DROP NOT NULL`
     ] }
   ],
   notes: [

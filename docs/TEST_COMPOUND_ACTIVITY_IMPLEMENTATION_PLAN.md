@@ -286,6 +286,8 @@ The extension points are deliberately split by responsibility:
 - the web application registers an embedded student renderer by activity type key;
 - core stores generic item state, scores, feedback, plugin references, and fingerprints without importing plugin-specific schemas.
 
+Composite submission/regrading results may include `pluginAttemptRef` independently of `gradingResult`. Plugins with private submission evidence must return it even when grading is pending; core persists it on initial submission and regrading, auditing changes during regrading. Legacy-state interpretation belongs to the owning plugin, not core.
+
 Adding a future activity plugin to Tests therefore requires capability declaration and server/web adapters, not a new Test table, Test route family, or plugin-key branch in core orchestration.
 
 ## Attempt Lifecycle

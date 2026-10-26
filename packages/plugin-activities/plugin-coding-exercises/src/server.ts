@@ -39,6 +39,7 @@ import { getCodingExerciseGradeCompletions } from "./grade-completion";
 import { createCodingExerciseBankActivityVariation } from "./variation";
 import { listCodingExerciseProgrammingLanguages } from "./judge0";
 import { prisma } from "./db-client";
+import { resolveCodingTestSubmission } from "./submission-reference";
 
 export { listCodingExerciseProgrammingLanguages } from "./judge0";
 
@@ -103,8 +104,11 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     getCompletions: getCodingExerciseGradeCompletions
   },
   aiFeedback: {
-    evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity, triggerKind, batchGuidance }) => {
-      if (!pluginAttemptRef) {
+    evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity, triggerKind, batchGuidance, testItemAttempt }) => {
+      const executionId = testItemAttempt
+        ? await resolveCodingTestSubmission({ courseId, activityId, parentAttemptId: coreAttemptId, itemAttemptId: testItemAttempt.id })
+        : pluginAttemptRef;
+      if (!executionId) {
         throw new AppError(409, "CODING_EXERCISE_SUBMISSION_REQUIRED", "This attempt does not reference a coding exercise submission.");
       }
       return evaluateCodingExerciseAttemptWithAi({
@@ -113,7 +117,7 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         groupId,
         activityId,
         coreAttemptId,
-        executionId: pluginAttemptRef,
+        executionId,
         activity,
         assessmentMode: "summative",
         triggerKind,
@@ -186,7 +190,7 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         executionId: execution.id, activity: input.activity,
         feedback: (input.feedback.aiFeedback ?? {}) as Record<string, unknown>
       });
-      return { state, gradingResult: "deferred" in grading ? null : {
+      return { state, pluginAttemptRef: execution.id, gradingResult: "deferred" in grading ? null : {
         ...grading,
         feedback: Object.keys(grading.feedback ?? {}).length ? { aiFeedback: grading.feedback } : {}
       } };
@@ -217,6 +221,7 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
       }
       return {
         state: { sourceCode: input.sourceCode, executionId: execution.id },
+        pluginAttemptRef: execution.id,
         gradingResult: totalWeight === 0 ? null : {
           rawScore: earnedWeight,
           rawMaxScore: totalWeight,
