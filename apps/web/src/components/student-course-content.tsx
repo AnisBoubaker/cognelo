@@ -52,6 +52,7 @@ export function StudentCourseContent({
   selectedFolderId,
   folderHref,
   activityHref,
+  onActivityOpen,
   submittedActivityIds = new Set<string>(),
   studentGrades = null,
   storageScope = "learner"
@@ -74,6 +75,7 @@ export function StudentCourseContent({
   selectedFolderId?: string | null;
   folderHref: (folderId: string) => string;
   activityHref: (activityId: string) => string;
+  onActivityOpen?: () => void;
   submittedActivityIds?: ReadonlySet<string>;
   studentGrades?: StudentReleasedGrades | null;
   storageScope?: "learner" | "preview";
@@ -232,7 +234,7 @@ export function StudentCourseContent({
               >
                 {title}
               </a>
-            ) : href && isOpenable ? <Link href={href}>{title}</Link> : title}
+            ) : href && isOpenable ? <Link href={href} onClick={onActivityOpen}>{title}</Link> : title}
           </strong>
           <ContentResourceInline resource={contentResource} definition={contentDefinition} />
           {contentPresentation?.description ? <p className="content-resource-description">{contentPresentation.description}</p> : null}
@@ -266,7 +268,7 @@ export function StudentCourseContent({
                   <AppIcon name={(material ? materialIsDownloadable : contentResourceIsFile) ? "download" : "open"} />
                 </a>
               ) : (
-                <Link aria-label={t("courseDetail.openContentItem", { title })} className="button secondary icon-button" href={href} title={t("common.open")}>
+                <Link aria-label={t("courseDetail.openContentItem", { title })} className="button secondary icon-button" href={href} onClick={onActivityOpen} title={t("common.open")}>
                   <AppIcon name="open" />
                 </Link>
               )

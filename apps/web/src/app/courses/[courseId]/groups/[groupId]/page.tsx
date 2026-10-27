@@ -49,6 +49,7 @@ import { ContentTypeIcon as MaterialTypeIcon, resolveContentResourcePresentation
 import { useI18n } from "@/lib/i18n";
 import { assignmentRequiresSafeExamBrowser } from "@/lib/safe-exam-browser";
 import { useCourseContentFolders } from "@/lib/use-course-content-folders";
+import { useStudentCourseLocation } from "@/lib/use-student-course-location";
 
 type ContentDropPlacement = "after" | "before" | "inside";
 type ContentDropTarget = { id: string; type: "root" } | { id: string; placement: ContentDropPlacement; type: "content" };
@@ -131,6 +132,10 @@ export default function CourseGroupPage() {
     )
   );
   const canReleaseGrades = Boolean(course?.permissions?.canReleaseGrades);
+  const studentLocation = useStudentCourseLocation({ courseId, groupId,
+    requestedTab: searchParams.get("tab"), requestedFolderId: searchParams.get("folder"),
+    active: Boolean(course && group && !canManage && !canGradeCurrentGroup), ready: contentLoaded });
+  const studentTabHref = (tab: string) => `/courses/${courseId}/groups/${groupId}?tab=${tab}${studentLocation.folderId ? `&folder=${encodeURIComponent(studentLocation.folderId)}` : ""}`;
   const canManageRoster = Boolean(
     canManage || course?.permissions?.sectionRoles.some((assignment) => assignment.groupId === groupId && assignment.role === "teacher")
   );
@@ -285,16 +290,18 @@ export default function CourseGroupPage() {
               </div>
             }
             ariaLabel={t("groupPage.workspaceTabs")}
-            initialTab={["grades", "my-teams"].includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "content"}
+            initialTab={studentLocation.tab}
             tabs={[
               {
                 id: "content",
+                href: studentTabHref("content"),
                 label: t("courseDetail.contentTab"),
                 render: () => (
                   <section className="section stack">
                     <StudentCourseContent
                       activityDefinitions={activityDefinitions}
                       activityHref={(activityId) => `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}`}
+                      onActivityOpen={studentLocation.rememberPosition}
                       activityTypes={activityTypes}
                       assignments={assignedActivities}
                       contentItems={contentItems}
@@ -309,7 +316,7 @@ export default function CourseGroupPage() {
                       groupId={groupId}
                       groupMaterials={materials}
                       locale={locale}
-                      selectedFolderId={searchParams.get("folder")}
+                      selectedFolderId={studentLocation.folderId}
                       studentGrades={studentGrades}
                       submittedActivityIds={submittedActivityIds}
                       t={t}
@@ -319,11 +326,13 @@ export default function CourseGroupPage() {
               },
               {
                 id: "my-teams",
+                href: studentTabHref("my-teams"),
                 label: t("studentGroupings.myTeams"),
                 render: () => <MyTeamsPanel courseId={courseId} groupId={groupId} />
               },
               {
                 id: "grades",
+                href: studentTabHref("grades"),
                 label: t("groupPage.gradesTab"),
                 render: () => (
                   <section className="section stack">

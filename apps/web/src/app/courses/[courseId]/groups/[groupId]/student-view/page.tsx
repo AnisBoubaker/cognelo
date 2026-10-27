@@ -15,6 +15,7 @@ import {
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { clearStudentPreviewSession } from "@/lib/student-preview-state-host";
+import { useStudentCourseLocation } from "@/lib/use-student-course-location";
 
 export default function StudentViewPage() {
   const { courseId, groupId } = useParams<{ courseId: string; groupId: string }>();
@@ -28,9 +29,13 @@ export default function StudentViewPage() {
   const [error, setError] = useState("");
   const [sessionId, setSessionId] = useState(() => searchParams.get("previewSession") || crypto.randomUUID());
   const loadError = t("studentView.loadError");
+  const location = useStudentCourseLocation({ courseId, groupId, scope: "preview",
+    requestedFolderId: searchParams.get("folder"), active: Boolean(workspace?.isAvailable), ready: Boolean(workspace) });
 
   useEffect(() => {
-    window.history.replaceState({}, "", studentViewUrl(courseId, groupId, sessionId));
+    const query = new URLSearchParams(window.location.search);
+    query.set("previewSession", sessionId);
+    window.history.replaceState(null, "", `/courses/${courseId}/groups/${groupId}/student-view?${query}`);
   }, [courseId, groupId, sessionId]);
 
   useEffect(() => {
@@ -81,6 +86,7 @@ export default function StudentViewPage() {
                 <StudentCourseContent
                   activityDefinitions={activityDefinitions}
                   activityHref={(activityId) => `/courses/${courseId}/groups/${groupId}/student-view/activities/${activityId}?previewSession=${encodeURIComponent(sessionId)}`}
+                  onActivityOpen={location.rememberPosition}
                   activityTypes={activityTypes}
                   assignments={workspace.group.activities ?? []}
                   contentItems={workspace.contentItems}
@@ -93,7 +99,7 @@ export default function StudentViewPage() {
                   groupId={groupId}
                   groupMaterials={workspace.group.materials ?? []}
                   locale={locale}
-                  selectedFolderId={searchParams.get("folder")}
+                  selectedFolderId={location.folderId}
                   storageScope="preview"
                   t={t}
                 />

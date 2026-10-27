@@ -4,6 +4,8 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- [Student course navigation](COURSE_CONTENT_TREE_IMPLEMENTATION_PLAN.md#phase-7-unified-teacher-content-tree---complete) remembers workspace/folder tabs and return scroll position locally, alongside the shared folder-expansion preference. Scope by user/course/section/view, honor explicit URLs and four-hour expiry, and restore after content renders. Never persist this view state in the database or mix it with answers.
+
 - [Action buttons](ACTION_BUTTONS.md) use one compact outlined CSS recipe and the shared Tabler `ActionIcon` registry (`AppIcon` in web pages). Keep ordinary actions consistent across host and plugins, including save bars and dialogs. Choose icons explicitly by action, retain labels, and preserve danger, disabled, focus, navigation, and disclosure semantics.
 
 - [Editor undo](EDITOR_UNDO.md): restore saved code as a baseline, never as a full-document undoable edit. Keep undo/redo only in mounted-session memory, isolated by Test attempt/view, question, and file; dispose it on departure/account/attempt changes. Reload/reopen starts from the saved answer with empty history. Loading cannot autosave blank/starter text; normal edits and undo/redo must keep using ordered answer autosaves.
