@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   generateAiAgentText: vi.fn(),
   getCourseAssessmentFeedbackAiAgentConnection: vi.fn(),
+  getCourseAssessmentFeedbackPolicy: vi.fn(),
   hashAiFeedbackValue: vi.fn(),
   recordAiFeedbackResearchEvent: vi.fn(),
   courseFindUnique: vi.fn(),
   attemptFindFirst: vi.fn(),
+  childFindFirst: vi.fn(),
   referenceFindUnique: vi.fn(),
   referenceUpdate: vi.fn(),
   executionFindFirst: vi.fn(),
@@ -22,6 +24,7 @@ vi.mock("@cognelo/core", async () => {
     ...actual,
     generateAiAgentText: mocks.generateAiAgentText,
     getCourseAssessmentFeedbackAiAgentConnection: mocks.getCourseAssessmentFeedbackAiAgentConnection,
+    getCourseAssessmentFeedbackPolicy: mocks.getCourseAssessmentFeedbackPolicy,
     hashAiFeedbackValue: mocks.hashAiFeedbackValue,
     recordAiFeedbackResearchEvent: mocks.recordAiFeedbackResearchEvent
   };
@@ -30,7 +33,8 @@ vi.mock("@cognelo/core", async () => {
 vi.mock("@cognelo/db", () => ({
   prisma: {
     course: { findUnique: mocks.courseFindUnique },
-    activityAttempt: { findFirst: mocks.attemptFindFirst }
+    activityAttempt: { findFirst: mocks.attemptFindFirst },
+    testItemAttempt: { findFirst: mocks.childFindFirst }
   }
 }));
 
@@ -80,7 +84,8 @@ function evaluationInput(triggerKind: "teacher_single" | "formative_submission" 
 
 describe("coding exercise generated feedback language", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    mocks.getCourseAssessmentFeedbackPolicy.mockResolvedValue({ automaticFeedbackEnabled: true, enabled: true });
     mocks.getCourseAssessmentFeedbackAiAgentConnection.mockResolvedValue({
       id: "connection-1",
       provider: "openai_compatible",
@@ -144,6 +149,120 @@ describe("coding exercise generated feedback language", () => {
         })
       })
     }));
+  });
+
+  it.each([
+    ["en", "No answer provided", ""],
+    ["fr", "Aucune réponse fournie", " \n\t"],
+    ["zh", "未提供答案", "\r\n"],
+    ["ar", "لم تُقدَّم إجابة", "  "]
+  ])("grades empty %s responses without resolving or calling a model", async (language, message, sourceCode) => {
+    mocks.courseFindUnique.mockResolvedValue({ subject: { teachingLanguage: language } });
+    const execution = await mocks.executionFindFirst();
+    execution.sourceCode = sourceCode;
+    // No saved test result or working provider is needed to identify a blank response.
+    execution.resultSummary = {};
+    mocks.getCourseAssessmentFeedbackAiAgentConnection.mockRejectedValue(new Error("No model configured"));
+    const result = await evaluateCodingExerciseAttemptWithAi(evaluationInput());
+    expect(result).toMatchObject({
+      feedback: { summary: message, strengths: [message], improvements: [message], aiScore: 0,
+        criteria: [{ id: "correctness", scorePercent: 0, feedback: message }] },
+      gradingResult: { rawScore: 0, rawMaxScore: 100 }
+    });
+    expect(mocks.getCourseAssessmentFeedbackAiAgentConnection).not.toHaveBeenCalled();
+    expect(mocks.generateAiAgentText).not.toHaveBeenCalled();
+    expect(mocks.getLatestTests).not.toHaveBeenCalled();
+    expect(mocks.evaluationCreate).not.toHaveBeenCalled();
+    expect(mocks.recordAiFeedbackResearchEvent).toHaveBeenCalledWith(expect.objectContaining({
+      feedbackRef: result.feedbackRef, feedbackHash: result.feedbackHash, aiContribution: 0,
+      metadata: expect.objectContaining({ rule: "empty-response-v1", feedback: result.feedback })
+    }));
+  });
+
+  it.each([{}, { sourceCode: " \n" }])("grades a persisted unanswered Test question without execution evidence: %j", async (state) => {
+    mocks.childFindFirst.mockResolvedValue({ pluginAttemptRef: null, result: { state }, parentAttempt: { userId: "student-1" } });
+    const result = await evaluateCodingExerciseAttemptWithAi({ ...evaluationInput("test_child"),
+      coreAttemptId: "parent", testItemAttemptId: "child", executionId: null });
+    expect(result.gradingResult?.rawScore).toBe(0);
+    expect(result.feedback.summary).toBe("Aucune réponse fournie");
+    expect(mocks.executionFindFirst).not.toHaveBeenCalled();
+    expect(mocks.generateAiAgentText).not.toHaveBeenCalled();
+  });
+
+  it("preserves course and activity feedback gates for empty responses", async () => {
+    const execution = await mocks.executionFindFirst();
+    execution.sourceCode = "";
+    mocks.getCourseAssessmentFeedbackPolicy.mockResolvedValue({ automaticFeedbackEnabled: false });
+    await expect(evaluateCodingExerciseAttemptWithAi(evaluationInput())).rejects.toMatchObject({ code: "AI_FEEDBACK_DISABLED" });
+    const reference = await mocks.referenceFindUnique();
+    reference.privateConfig.aiFeedback.enabled = false;
+    await expect(evaluateCodingExerciseAttemptWithAi(evaluationInput())).rejects.toMatchObject({ code: "ACTIVITY_AI_FEEDBACK_DISABLED" });
+    expect(mocks.generateAiAgentText).not.toHaveBeenCalled();
+    expect(mocks.recordAiFeedbackResearchEvent).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing or nonempty Test evidence instead of inventing an empty answer", async () => {
+    const input = { ...evaluationInput("test_child"), coreAttemptId: "parent", testItemAttemptId: "child", executionId: null };
+    mocks.childFindFirst.mockResolvedValue(null);
+    await expect(evaluateCodingExerciseAttemptWithAi(input)).rejects.toMatchObject({ code: "CODING_EXERCISE_SUBMISSION_REQUIRED" });
+    mocks.childFindFirst.mockResolvedValue({ pluginAttemptRef: null, result: { state: { sourceCode: "print(1)" } }, parentAttempt: { userId: "student-1" } });
+    await expect(evaluateCodingExerciseAttemptWithAi(input)).rejects.toMatchObject({ code: "CODING_EXERCISE_SUBMISSION_REQUIRED" });
+    expect(mocks.recordAiFeedbackResearchEvent).not.toHaveBeenCalled();
+    expect(mocks.generateAiAgentText).not.toHaveBeenCalled();
+  });
+
+  it("grades a finalized standalone blank but rejects retained nonempty work without execution evidence", async () => {
+    const attempt = { userId: "student-1", participantId: "participant", gradebookItemId: "item", groupActivityId: "assignment",
+      activityId: "activity-1", lifecycle: "submitted", metadata: { timedOut: true, savedResponse: { sourceCode: "  " } } };
+    mocks.attemptFindFirst.mockResolvedValue(attempt);
+    const input = { ...evaluationInput(), coreAttemptId: "attempt", executionId: null };
+    await expect(evaluateCodingExerciseAttemptWithAi(input)).resolves.toMatchObject({ gradingResult: { rawScore: 0 } });
+    attempt.metadata.savedResponse.sourceCode = "print(1)";
+    await expect(evaluateCodingExerciseAttemptWithAi(input)).rejects.toMatchObject({ code: "CODING_EXERCISE_SUBMISSION_REQUIRED" });
+    expect(mocks.generateAiAgentText).not.toHaveBeenCalled();
+  });
+
+  it("enforces zero scores and fixed comments when the model identifies prototype-only work", async () => {
+    mocks.courseFindUnique.mockResolvedValue({ subject: { teachingLanguage: "en" } });
+    const reference = await mocks.referenceFindUnique();
+    reference.privateConfig.aiFeedback.criteria = [
+      { id: "correctness", title: "Correctness", description: "Correct result", weightPercent: 70 },
+      { id: "clarity", title: "Clarity", description: "Clear implementation", weightPercent: 30 }
+    ];
+    const execution = await mocks.executionFindFirst();
+    execution.sourceCode = "def minimum(a, b):\n    pass";
+    execution.resultSummary = { earnedWeight: 0, totalWeight: 1 };
+    mocks.generateAiAgentText.mockResolvedValue(JSON.stringify({ noAnswerProvided: true,
+      summary: "Good structure", strengths: ["Nice name"], improvements: ["Implement the solution"],
+      criteria: [{ criterionId: "correctness", scorePercent: 10, feedback: "An attempt" },
+        { criterionId: "clarity", scorePercent: 80, feedback: "Clear name" }] }));
+    const input = evaluationInput("test_child");
+    input.activity.config = { ...input.activity.config, starterCode: "def minimum(a, b):\n    pass" } as typeof input.activity.config;
+    const result = await evaluateCodingExerciseAttemptWithAi(input);
+    expect(result.feedback).toMatchObject({ summary: "No answer provided", strengths: ["No answer provided"],
+      improvements: ["No answer provided"], aiScore: 0, combinedScore: 0,
+      criteria: [{ id: "correctness", scorePercent: 0, feedback: "No answer provided" },
+        { id: "clarity", scorePercent: 0, feedback: "No answer provided" }] });
+    expect(mocks.generateAiAgentText).toHaveBeenCalledTimes(1);
+    const request = mocks.generateAiAgentText.mock.calls[0][1];
+    expect(JSON.parse(request.userPrompt).activity.starterCode).toBe(execution.sourceCode);
+    expect(request.systemPrompt).toContain("short but genuine solution attempt");
+    expect(request.systemPrompt).toContain("noAnswerProvided=true");
+    expect(mocks.evaluationUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      rawResponse: expect.stringContaining("Good structure"), aiScore: 0,
+      sanitizedFeedback: expect.objectContaining({ summary: "No answer provided" })
+    }) }));
+  });
+
+  it("keeps normal rubric assessment for genuine short or unsuccessful answers", async () => {
+    mocks.generateAiAgentText.mockResolvedValue(JSON.stringify({ noAnswerProvided: false,
+      summary: "Incomplete solution", strengths: ["Compares values"], improvements: ["Handle equality"],
+      criteria: [{ criterionId: "correctness", scorePercent: 30, feedback: "Some logic is present" }] }));
+    mocks.getLatestTests.mockResolvedValue({ resultSummary: { earnedWeight: 0, totalWeight: 1 }, testEvaluationId: null });
+    await expect(evaluateCodingExerciseAttemptWithAi(evaluationInput())).resolves.toMatchObject({
+      feedback: { summary: "Incomplete solution", aiScore: 30, combinedScore: 12 }, gradingResult: { rawScore: 12 }
+    });
+    expect(mocks.generateAiAgentText).toHaveBeenCalledTimes(1);
   });
 
   it("uses the current rubric and latest saved tests for a teacher-triggered evaluation", async () => {

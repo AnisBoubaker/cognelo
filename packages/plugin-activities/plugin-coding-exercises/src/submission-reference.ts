@@ -10,6 +10,8 @@ export async function resolveCodingTestSubmission(input: {
   itemAttemptId: string;
   /** Manual review can work from a recovered answer without running code. */
   allowMissingExecution?: boolean;
+  /** AI grading may score a verified blank response without running code. */
+  allowEmptyResponse?: boolean;
 }) {
   const child = await corePrisma.testItemAttempt.findFirst({
     where: {
@@ -29,6 +31,7 @@ export async function resolveCodingTestSubmission(input: {
   const executionId = child.pluginAttemptRef || savedId;
   if (!executionId) {
     if (input.allowMissingExecution) return null;
+    if (input.allowEmptyResponse && (state.sourceCode == null || (typeof state.sourceCode === "string" && !state.sourceCode.trim()))) return null;
     throw missingSubmission();
   }
   if (savedId && savedId !== executionId) throw mismatchedSubmission();
@@ -40,6 +43,19 @@ export async function resolveCodingTestSubmission(input: {
     throw mismatchedSubmission();
   }
   return execution.id;
+}
+
+/** Read a timed standalone response retained by core after submission finalization. */
+export async function resolveCodingSavedStandaloneResponse(input: { courseId: string; activityId: string; coreAttemptId: string }) {
+  const attempt = await corePrisma.activityAttempt.findFirst({
+    where: { id: input.coreAttemptId, courseId: input.courseId, activityId: input.activityId,
+      lifecycle: { in: ["submitted", "graded"] }, pluginAttemptRef: null },
+    select: { metadata: true }
+  });
+  const metadata = record(attempt?.metadata);
+  const source = record(metadata.savedResponse).sourceCode;
+  if (!attempt || metadata.timedOut !== true || (source != null && typeof source !== "string")) throw missingSubmission();
+  return typeof source === "string" ? source : "";
 }
 
 function record(value: unknown): Record<string, unknown> {

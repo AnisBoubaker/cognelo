@@ -29,7 +29,9 @@ const aiFeedbackMocks = vi.hoisted(() => ({
 }));
 const regradeMocks = vi.hoisted(() => ({ findExecution: vi.fn(), regrade: vi.fn() }));
 const resolveTestSubmission = vi.hoisted(() => vi.fn());
-vi.mock("./submission-reference", () => ({ resolveCodingTestSubmission: resolveTestSubmission }));
+const resolveSavedStandaloneResponse = vi.hoisted(() => vi.fn());
+vi.mock("./submission-reference", () => ({ resolveCodingTestSubmission: resolveTestSubmission,
+  resolveCodingSavedStandaloneResponse: resolveSavedStandaloneResponse }));
 
 vi.mock("./hidden-tests", () => hiddenTestMocks);
 vi.mock("./executions", () => executionMocks);
@@ -189,15 +191,27 @@ describe("coding exercises server plugin lifecycle hooks", () => {
     });
   });
 
-  it("uses verified legacy Test evidence for AI grading instead of trusting caller state", async () => {
-    resolveTestSubmission.mockResolvedValue("verified-execution");
+  it("passes the persisted Test identity to the evaluator instead of trusting caller response state", async () => {
     await codingExercisesServerPlugin.aiFeedback!.evaluateAttempt({
       user: testUser(), courseId: "course-1", groupId: "group-1", activityId: "activity-1", coreAttemptId: "parent",
       pluginAttemptRef: null, activity: testActivity("coding-exercise"), triggerKind: "test_child",
       testItemAttempt: { id: "child", parentAttemptId: "parent", pluginAttemptRef: null, state: { executionId: "untrusted" } }
     });
-    expect(resolveTestSubmission).toHaveBeenCalledWith({ courseId: "course-1", activityId: "activity-1", parentAttemptId: "parent", itemAttemptId: "child" });
-    expect(aiFeedbackMocks.evaluateCodingExerciseAttemptWithAi).toHaveBeenCalledWith(expect.objectContaining({ executionId: "verified-execution", triggerKind: "test_child" }));
+    expect(aiFeedbackMocks.evaluateCodingExerciseAttemptWithAi).toHaveBeenCalledWith(expect.objectContaining({
+      coreAttemptId: "parent", testItemAttemptId: "child", executionId: null, triggerKind: "test_child"
+    }));
+    expect(aiFeedbackMocks.evaluateCodingExerciseAttemptWithAi.mock.calls.at(-1)?.[0]).not.toHaveProperty("state");
+  });
+
+  it("allows teacher review of a finalized empty standalone response without a runner record", async () => {
+    resolveSavedStandaloneResponse.mockResolvedValue("");
+    await codingExercisesServerPlugin.aiFeedback!.teacherReview!.getSubmission({
+      user: testUser(), courseId: "course-1", groupId: "group-1", activityId: "activity-1", coreAttemptId: "attempt",
+      pluginAttemptRef: null, activity: testActivity("coding-exercise")
+    });
+    expect(aiFeedbackMocks.getCodingExerciseAiFeedbackTeacherSubmission).toHaveBeenCalledWith(expect.objectContaining({
+      activityId: "activity-1", executionId: null, savedSourceCode: ""
+    }));
   });
 
   it("uses only stateless preview execution handlers in Student view", async () => {

@@ -39,7 +39,7 @@ import { getCodingExerciseGradeCompletions } from "./grade-completion";
 import { createCodingExerciseBankActivityVariation } from "./variation";
 import { listCodingExerciseProgrammingLanguages } from "./judge0";
 import { prisma } from "./db-client";
-import { resolveCodingTestSubmission } from "./submission-reference";
+import { resolveCodingSavedStandaloneResponse, resolveCodingTestSubmission } from "./submission-reference";
 
 export { listCodingExerciseProgrammingLanguages } from "./judge0";
 
@@ -105,19 +105,14 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
   },
   aiFeedback: {
     evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity, triggerKind, batchGuidance, testItemAttempt }) => {
-      const executionId = testItemAttempt
-        ? await resolveCodingTestSubmission({ courseId, activityId, parentAttemptId: coreAttemptId, itemAttemptId: testItemAttempt.id })
-        : pluginAttemptRef;
-      if (!executionId) {
-        throw new AppError(409, "CODING_EXERCISE_SUBMISSION_REQUIRED", "This attempt does not reference a coding exercise submission.");
-      }
       return evaluateCodingExerciseAttemptWithAi({
         user,
         courseId,
         groupId,
         activityId,
         coreAttemptId,
-        executionId,
+        executionId: pluginAttemptRef ?? null,
+        testItemAttemptId: testItemAttempt?.id,
         activity,
         assessmentMode: "summative",
         triggerKind,
@@ -129,9 +124,12 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         return createCodingExerciseTeacherFeedbackDraft({ activityId: context.activityId, executionId: await teacherReviewExecution(context) });
       },
       getSubmission: async (context) => {
+        const executionId = await teacherReviewExecution(context);
+        const savedSourceCode = context.testItemAttempt
+          ? typeof context.testItemAttempt.state.sourceCode === "string" ? context.testItemAttempt.state.sourceCode : ""
+          : !executionId ? await resolveCodingSavedStandaloneResponse(context) : undefined;
         return getCodingExerciseAiFeedbackTeacherSubmission({ activityId: context.activityId,
-          executionId: await teacherReviewExecution(context), activity: context.activity,
-          ...(context.testItemAttempt ? { savedSourceCode: typeof context.testItemAttempt.state.sourceCode === "string" ? context.testItemAttempt.state.sourceCode : "" } : {}) });
+          executionId, activity: context.activity, savedSourceCode });
       },
       reviseFeedback: ({ currentFeedback, feedback, pluginAttemptRef }) => {
         const revisedFeedback = reviseCodingExerciseAiFeedback(currentFeedback, feedback);
@@ -293,7 +291,10 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
 async function teacherReviewExecution(context: PluginAiFeedbackTeacherReviewContext) {
   if (context.testItemAttempt) return resolveCodingTestSubmission({ courseId: context.courseId, activityId: context.activityId,
     parentAttemptId: context.coreAttemptId, itemAttemptId: context.testItemAttempt.id, allowMissingExecution: true });
-  if (!context.pluginAttemptRef) throw new AppError(409, "CODING_EXERCISE_SUBMISSION_REQUIRED", "This attempt does not reference a coding exercise submission.");
+  if (!context.pluginAttemptRef) {
+    await resolveCodingSavedStandaloneResponse(context);
+    return null;
+  }
   return context.pluginAttemptRef;
 }
 

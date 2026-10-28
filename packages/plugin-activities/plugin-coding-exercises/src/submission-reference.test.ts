@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ child: vi.fn(), execution: vi.fn() }));
-vi.mock("@cognelo/db", () => ({ prisma: { testItemAttempt: { findFirst: mocks.child } } }));
+const mocks = vi.hoisted(() => ({ child: vi.fn(), execution: vi.fn(), attempt: vi.fn() }));
+vi.mock("@cognelo/db", () => ({ prisma: { testItemAttempt: { findFirst: mocks.child }, activityAttempt: { findFirst: mocks.attempt } } }));
 vi.mock("./db-client", () => ({ prisma: { pluginCodingExerciseExecution: { findFirst: mocks.execution } } }));
-import { resolveCodingTestSubmission } from "./submission-reference";
+import { resolveCodingSavedStandaloneResponse, resolveCodingTestSubmission } from "./submission-reference";
 
 const input = { courseId: "course", activityId: "question", parentAttemptId: "parent", itemAttemptId: "child" };
 const child = (pluginAttemptRef: string | null = null, state: Record<string, unknown> = { executionId: "execution", sourceCode: "print(1)" }) => ({
@@ -48,6 +48,32 @@ describe("submitted Test coding evidence", () => {
     mocks.child.mockResolvedValue(child());
     mocks.execution.mockResolvedValue(null);
     await expect(resolveCodingTestSubmission({ ...input, allowMissingExecution: true })).rejects.toMatchObject({ code: "CODING_EXERCISE_EXECUTION_NOT_FOUND" });
+  });
+
+  it.each([{}, { sourceCode: "" }, { sourceCode: " \n\t" }])("permits deterministic grading of a persisted empty Test response: %j", async (state) => {
+    mocks.child.mockResolvedValue(child(null, state));
+    await expect(resolveCodingTestSubmission({ ...input, allowEmptyResponse: true })).resolves.toBeNull();
+    expect(mocks.execution).not.toHaveBeenCalled();
+  });
+
+  it.each([{ sourceCode: "print(1)" }, { sourceCode: 123 }])("does not treat an unexecuted or malformed answer as empty: %j", async (state) => {
+    mocks.child.mockResolvedValue(child(null, state));
+    await expect(resolveCodingTestSubmission({ ...input, allowEmptyResponse: true })).rejects.toMatchObject({ code: "CODING_EXERCISE_SUBMISSION_REQUIRED" });
+  });
+
+  it("loads only scoped finalized standalone saved responses", async () => {
+    const context = { courseId: "course", activityId: "question", coreAttemptId: "attempt" };
+    mocks.attempt.mockResolvedValue({ metadata: { timedOut: true } });
+    await expect(resolveCodingSavedStandaloneResponse(context)).resolves.toBe("");
+    expect(mocks.attempt).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      id: "attempt", courseId: "course", activityId: "question", lifecycle: { in: ["submitted", "graded"] }, pluginAttemptRef: null
+    } }));
+    mocks.attempt.mockResolvedValue({ metadata: { timedOut: true, savedResponse: { sourceCode: "print(1)" } } });
+    await expect(resolveCodingSavedStandaloneResponse(context)).resolves.toBe("print(1)");
+    mocks.attempt.mockResolvedValue({ metadata: {} });
+    await expect(resolveCodingSavedStandaloneResponse(context)).rejects.toMatchObject({ code: "CODING_EXERCISE_SUBMISSION_REQUIRED" });
+    mocks.attempt.mockResolvedValue(null);
+    await expect(resolveCodingSavedStandaloneResponse(context)).rejects.toMatchObject({ code: "CODING_EXERCISE_SUBMISSION_REQUIRED" });
   });
 
   it("rejects conflicting references instead of selecting a different submission", async () => {
