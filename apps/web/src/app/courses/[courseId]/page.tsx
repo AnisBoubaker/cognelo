@@ -1736,6 +1736,17 @@ export default function CourseDetailPage() {
                                         </Link>
                                       )
                                     ) : null}
+                                    {canManage && item.kind === "activity" && activity ? (
+                                      <Link
+                                        className="content-context-menu-item"
+                                        href={`/courses/${courseId}/activities/${activity.id}`}
+                                        role="menuitem"
+                                        onClick={() => setContentContextMenu(null)}
+                                      >
+                                        <MaterialActionIcon name="edit" />
+                                        <span>{t("courseDetail.editActivityTitle")}</span>
+                                      </Link>
+                                    ) : null}
                                     {item.kind === "activity" && activity ? (
                                       previewGroup ? (
                                         <Link
