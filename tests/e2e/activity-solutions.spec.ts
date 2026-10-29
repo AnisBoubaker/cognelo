@@ -4,6 +4,8 @@ import { createAuthenticatedApi } from "./fixtures/auth";
 import { assignCourseTest, responseJson } from "./fixtures/activity-suite";
 import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
 
+// Focus refreshes may coalesce with an in-flight request; allow the documented 20-second poll to settle.
+
 test("formative solution is opt-in, explicit, and revocable without losing the answer", { tag: "@regression" }, async ({ bankCourse: data, teacherApi, teacherPage, studentPage }) => {
   test.setTimeout(120_000);
   const studentApi = await createAuthenticatedApi("student");
@@ -32,7 +34,7 @@ test("formative solution is opt-in, explicit, and revocable without losing the a
     expect(await responseJson(await studentApi.get(`${assigned}/solution`))).toEqual({ available: true });
     await studentPage.evaluate(() => window.dispatchEvent(new Event("focus")));
     const tab = studentPage.getByRole("tab", { name: "Solution", exact: true });
-    await expect(tab).toBeVisible();
+    await expect(tab).toBeVisible({ timeout: 30_000 });
     let reveals = 0;
     studentPage.on("request", (request) => { if (request.url().endsWith("/solution") && request.method() === "POST") reveals++; });
     await tab.click();
@@ -62,7 +64,7 @@ test("formative solution is opt-in, explicit, and revocable without losing the a
     await responseJson(await teacherApi.post(settingsPath, { data: { ...enabled.general, releaseSolution: false, groupAssignments: enabled.groups, confirmActiveStudents: true } }));
     expect((await studentApi.post(`${assigned}/solution`)).status()).toBe(403);
     await studentPage.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect(tab).toBeHidden();
+    await expect(tab).toBeHidden({ timeout: 30_000 });
     await expect(panel).toBeHidden();
   } finally { await studentApi.dispose(); }
 });
@@ -90,19 +92,19 @@ test("summative solutions require both releases and repeatable grades stay priva
     expect(await responseJson(await studentApi.get(`${assigned}/solution`))).toEqual({ available: true });
     await studentPage.evaluate(() => window.dispatchEvent(new Event("focus")));
     const tab = studentPage.getByRole("tab", { name: "Solution", exact: true });
-    await expect(tab).toBeVisible();
+    await expect(tab).toBeVisible({ timeout: 30_000 });
     await tab.click();
     await studentPage.getByRole("button", { name: "Show solution", exact: true }).click();
     await expect(studentPage.getByRole("tabpanel").getByRole("checkbox", { checked: true })).toHaveCount(1);
     await responseJson(await teacherApi.patch(release, { data: { released: false } }));
-    await studentPage.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect(tab).toBeHidden();
     expect((await studentApi.post(`${assigned}/solution`)).status()).toBe(403);
+    await studentPage.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(tab).toBeHidden({ timeout: 30_000 });
     await responseJson(await teacherApi.post(settingsPath, { data: { ...update, releaseSolution: false } }));
     await responseJson(await teacherApi.patch(release, { data: { released: true } }));
     expect((await studentApi.post(`${assigned}/solution`)).status()).toBe(403);
     await studentPage.reload();
-    await expect(tab).toBeHidden();
+    await expect(tab).toBeHidden({ timeout: 30_000 });
   } finally { await studentApi.dispose(); }
 });
 

@@ -861,14 +861,14 @@ test.describe.serial("authoring and completing every activity type", () => {
     await testReview.getByRole("button", { name: `Activity 1: ${mcqTitle}`, exact: true }).click();
     await testReview.getByLabel("Final grade (out of 1)", { exact: true }).fill("0.6");
     await testReview.getByRole("button", { name: "Save all", exact: true }).click();
-    await expect(testReview.getByText("0.6 / 1", { exact: true })).toBeVisible();
+    await expect(testReview.getByText("0.60 / 1", { exact: true })).toBeVisible();
     await testReview.getByRole("button", { name: "Close", exact: true }).click();
     await expect(testReview).toBeHidden();
 
     await testRow.getByRole("button", { name: /^Actions for / }).click();
     await teacherPage.getByRole("menuitem", { name: "Review and grade", exact: true }).click();
     const reopenedTestReview = teacherPage.getByRole("dialog").filter({ has: teacherPage.getByRole("heading", { name: "Review and grade", exact: true }) });
-    await expect(reopenedTestReview.getByRole("heading", { name: mcqTitle }).locator("xpath=ancestor::article[1]")).toContainText("0.6 / 1");
+    await expect(reopenedTestReview.getByRole("heading", { name: mcqTitle }).locator("xpath=ancestor::article[1]")).toContainText("0.60 / 1");
     await reopenedTestReview.getByRole("button", { name: "Close" }).click();
   });
 

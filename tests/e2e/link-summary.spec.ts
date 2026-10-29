@@ -87,7 +87,7 @@ test("generates an editable private link summary with a persisted word limit", a
     await page.setViewportSize({ width: 390, height: 844 });
     await maxWords.scrollIntoViewIfNeeded();
     await settings.screenshot({ path: testInfo.outputPath("internal-summary-mobile.png") });
-    await settings.getByRole("button", { name: "Cancel", exact: true }).click();
+    await settings.getByRole("button", { name: "Close", exact: true }).click();
 
     await page.getByRole("button", { name: `Actions for ${title}`, exact: true }).click();
     await page.getByRole("menuitem", { name: "Duplicate", exact: true }).click();

@@ -373,11 +373,14 @@ test('Web Design files and questions with identical file ids have separate undo 
     await undo(page, 'Editor: styles.css');
     await expectSource(page, s.items[0].id, css);
     await waitForSaves(page);
-    const saved = await prisma.testItemAttempt.findUniqueOrThrow({ where: { parentAttemptId_testItemId: { parentAttemptId: s.attemptId, testItemId: s.items[0].id } } });
-    const state = (saved.result as { state: { files: Array<{ path: string; starterCode: string }> } }).state;
-    expect(state.files.find(file => file.path === 'index.html')?.starterCode).toBe(htmlA + 'x');
-    expect(state.files.find(file => file.path === 'styles.css')?.starterCode).toBe(css);
-    expect(Object.keys(state)).toEqual(['files']);
+    const savedState = async () => {
+      const saved = await prisma.testItemAttempt.findUniqueOrThrow({ where: { parentAttemptId_testItemId: { parentAttemptId: s.attemptId, testItemId: s.items[0].id } } });
+      return (saved.result as { state: { files: Array<{ path: string; starterCode: string }> } }).state;
+    };
+    // The final undo can enqueue its autosave after the navigation button was observed enabled.
+    await expect.poll(async () => Object.fromEntries((await savedState()).files.map(file => [file.path, file.starterCode])))
+      .toEqual({ 'index.html': htmlA + 'x', 'styles.css': css });
+    expect(Object.keys(await savedState())).toEqual(['files']);
   } finally { await s.close(); }
 });
 
