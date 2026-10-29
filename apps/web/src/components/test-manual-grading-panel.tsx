@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { MarkdownRenderer, useDialogs, useNotifications } from "@cognelo/activity-ui";
 import type { CourseGradebookRow, CourseTestAttemptReview } from "@/lib/api";
@@ -8,10 +10,10 @@ import { AppIcon } from "./app-icon";
 import { TestItemReviewEditor } from "./test-item-review-editor";
 
 type Item = CourseTestAttemptReview["items"][number];
-export function TestManualGradingPanel({ courseId, row, attemptCount, selectedAttempt, selectedIndex, loading, readOnly,
+export function TestManualGradingPanel({ embedded = false, courseId, row, attemptCount, selectedAttempt, selectedIndex, loading, readOnly,
   isSavingOverride, isSavingRegrade, onClose, onSelectAttemptIndex, onOverrideGrade, onRegradeAttempt, onReviewed,
   onDirtyChange, renderItemReview, feedbackRendererFor, calculateGradePercent, t }: {
-  courseId: string; row: CourseGradebookRow; attempts: CourseTestAttemptReview[]; attemptCount: number;
+  embedded?: boolean; courseId: string; row: CourseGradebookRow; attempts: CourseTestAttemptReview[]; attemptCount: number;
   selectedAttempt: CourseTestAttemptReview | null; selectedIndex: number; loading: boolean; readOnly: boolean;
   isSavingOverride: boolean; isSavingRegrade: boolean; onClose: () => void; onSelectAttemptIndex: (index: number) => void;
   onOverrideGrade: (input: { score: number; maxScore: number; reason: string | null; feedbackText?: string | null }) => Promise<void>;
@@ -53,11 +55,10 @@ export function TestManualGradingPanel({ courseId, row, attemptCount, selectedAt
     await onOverrideGrade({ score, maxScore: row.maxScore, reason: reason.trim() || null, feedbackText: reason.trim() || null });
   }
   return (
-    <section className="dialog-panel answer-overlay test-review-overlay stack" role="dialog" aria-modal="true" aria-label={t("courseDetail.reviewAndGrade")}>
-      <div className="section-heading">
+    <section className="dialog-panel answer-overlay test-review-overlay stack" role={embedded ? undefined : "dialog"} aria-modal={embedded ? undefined : true} aria-label={embedded ? undefined : t("courseDetail.reviewAndGrade")}>
+      <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={embedded ? undefined : onClose}>
         <div><p className="eyebrow">{row.participantName}</p><h2>{t("courseDetail.reviewAndGrade")}</h2><p className="muted">{row.activityTitle}</p></div>
-        <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" />{t("common.close")}</button>
-      </div>
+      </DialogHeader>
       {loading ? <p className="muted">{t("common.loading")}</p> : null}
       {!loading && attemptCount > 1 ? <div className="row">
         <button className="button secondary" disabled={selectedIndex === 0} type="button" onClick={() => onSelectAttemptIndex(selectedIndex - 1)}><AppIcon name="back" />{t("courseDetail.previousSubmission")}</button>

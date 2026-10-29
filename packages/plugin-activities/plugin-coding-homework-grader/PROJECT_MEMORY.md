@@ -32,3 +32,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Keep ZIP directory/expansion limits, upload/storage budgets, staff-only internal analysis, and atomic finalization together. Expiry finalizes saved answers only; no new archive is accepted after the deadline. See [upload boundaries](docs/REFERENCE.md#upload-and-finalization-boundaries).
 
 - Use the shared Markdown renderer for prompts and feedback: raw styles/forms/attributes stay inert and math stays untrusted and bounded. See [the shared rendering contract](../../../docs/plugin-authoring/03-core-services.md#what-markdownrenderer-gives-you).
+
+- Use the shared [dialog headers](../../../docs/DIALOGS.md) for persistent icon-only dismissal. Manual review embedded in the host omits duplicate dialog roles/close controls; keep guarded callbacks and busy states.

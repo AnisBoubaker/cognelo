@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogCloseButton, DialogHeader, getDialogCloseLabel } from "@cognelo/activity-ui";
+
 import { ActionIcon, ConfirmationDialog, useBodyScrollLock, useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 
 import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -1442,11 +1444,11 @@ export function CodingExerciseActivityView({
                 role="dialog"
                 aria-labelledby={`coding-generation-replace-${replacementDialog}`}
               >
-                <div className="stack" style={{ gap: 8 }}>
+                <DialogHeader closeLabel={getDialogCloseLabel(locale)} onClose={() => setReplacementDialog(null)}>
                   <p className="eyebrow">{getReplacementDialogEyebrow()}</p>
-                  <h2 id={`coding-generation-replace-${replacementDialog}`}>{getReplacementDialogTitle()}</h2>
+                  <h2 id={`coding-generation-replace-${replacementDialog}`}>{getReplacementDialogTitle()}</h2></DialogHeader>
                   <p className="muted">{getReplacementDialogMessage()}</p>
-                </div>
+
                 <div className="dialog-actions">
                   <button className="secondary" type="button" onClick={() => setReplacementDialog(null)}>
                     <ActionIcon name="close" />
@@ -1471,11 +1473,11 @@ export function CodingExerciseActivityView({
                 className="dialog-panel"
                 role="dialog"
               >
-                <div className="stack" style={{ gap: 8 }}>
+                <DialogHeader closeLabel={getDialogCloseLabel(locale)} onClose={() => setTestGenerationDialogOpen(false)}>
                   <p className="eyebrow">{t("generateTests")}</p>
-                  <h2 id="coding-generation-tests-title">{t("generateTestsDialogTitle")}</h2>
+                  <h2 id="coding-generation-tests-title">{t("generateTestsDialogTitle")}</h2></DialogHeader>
                   <p className="muted" id="coding-generation-tests-description">{t("generateTestsDialogMessage")}</p>
-                </div>
+
                 <div className="field">
                   <label htmlFor="coding-generation-test-mode">{t("testGenerationMode")}</label>
                   <select
@@ -2166,14 +2168,14 @@ export function CodingExerciseActivityView({
                 role={isWorkspaceFullScreen ? "dialog" : undefined}
               >
                 <div className="coding-exercise-workspace-toolbar">
-                  <button
+                  {isWorkspaceFullScreen ? <DialogCloseButton label={t("exitFullScreen")} onClose={() => setIsWorkspaceFullScreen(false)} /> : <button
                     className="secondary"
                     type="button"
                     onClick={() => setIsWorkspaceFullScreen((current) => !current)}
                   >
-                    <ActionIcon name={isWorkspaceFullScreen ? "collapse" : "expand"} />
-                    {isWorkspaceFullScreen ? t("exitFullScreen") : t("fullScreen")}
-                  </button>
+                    <ActionIcon name="expand" />
+                    {t("fullScreen")}
+                  </button>}
                 </div>
 
                 <div
@@ -2365,7 +2367,7 @@ export function CodingExerciseActivityView({
                 aria-labelledby="coding-submission-confirmation-title"
               >
                 <div className="stack" style={{ gap: 10 }}>
-                  <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                  <DialogHeader closeLabel={getDialogCloseLabel(locale)} onClose={acknowledgeSubmission}>
                     <h2 id="coding-submission-confirmation-title" style={{ margin: 0 }}>
                       {t("submissionCompleteTitle")}
                     </h2>
@@ -2373,7 +2375,7 @@ export function CodingExerciseActivityView({
                       passed={submissionConfirmation.execution.status === "completed"}
                       locale={pluginLocale}
                     /> : null}
-                  </div>
+                  </DialogHeader>
                   <p className="muted">{t("submissionRecordedMessage")}</p>
                   {submissionConfirmation.aiFeedback?.feedback ? (
                     <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 16 }}>

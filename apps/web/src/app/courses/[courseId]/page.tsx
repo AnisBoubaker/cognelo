@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { useApplicationTime, isZonedMidnight } from "@cognelo/activity-ui";
 
 
@@ -2118,10 +2120,9 @@ export default function CourseDetailPage() {
             {duplicatingCourseActivity ? (
               <div className="dialog-backdrop" role="presentation">
                 <section aria-labelledby="duplicate-course-activity-title" aria-modal="true" className="dialog-panel" role="dialog">
-                  <div className="section-heading">
+                  <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setDuplicatingCourseActivity(null)}>
                     <div><p className="eyebrow">{t("courseDetail.duplicateActivityEyebrow")}</p><h2 id="duplicate-course-activity-title">{t(duplicatingCourseActivity.kind === "content" ? "courseDetail.duplicateContentTitle" : "courseDetail.duplicateActivityTitle")}</h2></div>
-                    <button className="secondary icon-button" type="button" onClick={() => setDuplicatingCourseActivity(null)} title={t("common.close")}><CloseIcon /></button>
-                  </div>
+                  </DialogHeader>
                   <form className="form" onSubmit={duplicateContentActivity}>
                     <div className="field"><label htmlFor="duplicate-course-activity-name">{t("courseDetail.duplicateContentTitleLabel")}</label><input id="duplicate-course-activity-name" autoFocus minLength={2} maxLength={180} required value={duplicateCourseActivityTitle} onChange={(event) => setDuplicateCourseActivityTitle(event.target.value)} /></div>
                     <p className="muted">{t("courseDetail.duplicateActivityLocationHelp")}</p>
@@ -2133,10 +2134,9 @@ export default function CourseDetailPage() {
             {bankSyncDialog && !bankSyncConfirmation ? (
               <div className="dialog-backdrop" role="presentation">
                 <section aria-labelledby="bank-sync-title" aria-modal="true" className="dialog-panel" role="dialog">
-                  <div className="section-heading">
+                  <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setBankSyncDialog(null)} closeDisabled={bankSyncLoading}>
                     <div><p className="eyebrow">{t("courseDetail.bankSyncEyebrow")}</p><h2 id="bank-sync-title">{bankSyncDialog.title}</h2></div>
-                    <button className="secondary icon-button" disabled={bankSyncLoading} type="button" onClick={() => setBankSyncDialog(null)} title={t("common.close")}><CloseIcon /></button>
-                  </div>
+                  </DialogHeader>
                   <div className="form">
                     <p><strong>{t(`courseDetail.bankSyncStatus.${bankSyncDialog.sync.status}`)}</strong></p>
                     <p className="muted">{t("courseDetail.bankSyncVersions", { original: bankSyncDialog.sync.originalVersion.versionNumber, latest: bankSyncDialog.sync.latestVersion.versionNumber })}</p>
@@ -2155,10 +2155,9 @@ export default function CourseDetailPage() {
             {bankSyncDialog && bankSyncConfirmation ? (
               <div className="dialog-backdrop" role="presentation">
                 <section aria-labelledby="bank-sync-confirm-title" aria-modal="true" className="dialog-panel" role="alertdialog">
-                  <div className="section-heading">
+                  <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setBankSyncConfirmation(null)} closeDisabled={bankSyncLoading}>
                     <div><p className="eyebrow">{t("courseDetail.bankSyncConfirmEyebrow")}</p><h2 id="bank-sync-confirm-title">{t(`courseDetail.bankSyncConfirmTitle.${bankSyncConfirmation}`)}</h2></div>
-                    <button className="secondary icon-button" disabled={bankSyncLoading} type="button" onClick={() => setBankSyncConfirmation(null)} title={t("common.close")}><CloseIcon /></button>
-                  </div>
+                  </DialogHeader>
                   <div className="form">
                     <p>{t(`courseDetail.bankSyncConfirmDescription.${bankSyncConfirmation}`, {
                       original: bankSyncDialog.sync.originalVersion.versionNumber,
@@ -2191,15 +2190,12 @@ export default function CourseDetailPage() {
                   className="dialog-panel"
                   role="dialog"
                 >
-                  <div className="section-heading">
+                  <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={closeContentSettings}>
                     <div>
                       <p className="eyebrow">{t("courseDetail.contentSettingsEyebrow")}</p>
                       <h2 id="course-content-settings-title">{contentItemTitle(settingsContentItem)}</h2>
                     </div>
-                    <button className="secondary icon-button" onClick={closeContentSettings} title={t("common.cancel")} type="button">
-                      <CloseIcon />
-                    </button>
-                  </div>
+                  </DialogHeader>
 
                   {settingsContentResource && settingsContentType && SettingsContentTypeRenderer ? (
                     SettingsContentTypeRenderer({
@@ -2495,10 +2491,6 @@ function isContentDescendant(contentItems: CourseContentItem[], possibleChildId:
   }
 
   return false;
-}
-
-function CloseIcon() {
-  return <AppIcon name="close" />;
 }
 
 function FolderContentIcon({ collapsed }: { collapsed: boolean }) {

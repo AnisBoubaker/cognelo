@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogCloseButton } from "./dialog-header";
+
 import { ActionIcon } from "./action-icon";
 
 import DOMPurify from "dompurify";
@@ -910,16 +912,16 @@ export function RichTextEditor({
             {copy.markdown}
           </button>
         </div>
-        <button
-          aria-label={isFullScreen ? copy.exitFullScreen : copy.fullScreen}
+        {isFullScreen ? <DialogCloseButton label={copy.exitFullScreen} onClose={() => setIsFullScreen(false)} /> : <button
+          aria-label={copy.fullScreen}
           className="rich-text-editor-fullscreen-toggle"
-          title={isFullScreen ? copy.exitFullScreen : copy.fullScreen}
+          title={copy.fullScreen}
           type="button"
           onClick={() => setIsFullScreen((current) => !current)}
         >
-          <ActionIcon name={isFullScreen ? "collapse" : "expand"} />
-          <span>{isFullScreen ? copy.exitFullScreen : copy.fullScreen}</span>
-        </button>
+          <ActionIcon name="expand" />
+          <span>{copy.fullScreen}</span>
+        </button>}
       </div>
 
       <div className="rich-text-editor-visual-panel" hidden={mode !== "visual"} role="tabpanel">

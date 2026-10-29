@@ -64,3 +64,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Production workers need a private cgroup namespace when multiple stacks share a host. Keep per-process fallback disabled on cgroup-capable hosts, and preserve separate compilation ceilings: small source programs can produce Go/Rust binaries larger than the student output limit. See [Judge0 integration](docs/REFERENCE.md#judge0-integration).
 
 - Manual Test and finalized timed standalone review may use a validated core response without an execution. Nonempty AI evaluation still requires execution evidence; verified blank responses use the deterministic no-answer rule. Use the same teacher-review handlers and rubric calculations as standalone work; never execute code while loading or saving manual feedback. See [Test review](docs/REFERENCE.md#teacher-review-inside-tests).
+
+- Use the shared [dialog headers](../../../docs/DIALOGS.md) for persistent icon-only dismissal. Manual review embedded in the host omits duplicate dialog roles/close controls; keep guarded callbacks and busy states.

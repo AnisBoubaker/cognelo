@@ -146,3 +146,7 @@ Ordinary, formative, preview, and Test submissions discard unknown question/choi
 ## Deadline finalization
 
 The shared assigned dispatcher checks the effective deadline after the request body arrives. At expiry, this plugin’s `expiredAttemptInput` supplies only its saved server response; incoming answer/code/file changes are ignored. Missing saved work follows the ordinary ungraded timeout fallback. This also applies to a request opened before the deadline whose body finishes later. See [security boundaries](../../../../docs/SECURITY_BOUNDARIES.md).
+
+## Dialog presentation
+
+Authoring, confirmation, submission, and review dialogs reuse the [shared persistent header and close cross](../../../../docs/DIALOGS.md). The host review toolbar keeps navigation, messages, and dismissal on one row; embedded review panels leave the modal boundary and close action to that host. Existing draft guards, busy states, and non-dismissible progress remain in force.

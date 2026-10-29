@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader, getDialogCloseLabel } from "@cognelo/activity-ui";
+
 import { ActionIcon, useApplicationTime } from "@cognelo/activity-ui";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -812,11 +814,11 @@ export function ParsonsActivityView({
             {showReplaceGenerationDialog ? (
               <div className="dialog-backdrop" role="presentation">
                 <div aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="parsons-ai-replace-title">
-                  <div className="stack" style={{ gap: 8 }}>
+                  <DialogHeader closeLabel={getDialogCloseLabel(locale)} onClose={() => setShowReplaceGenerationDialog(false)}>
                     <p className="eyebrow">{t("parsons.generate")}</p>
-                    <h2 id="parsons-ai-replace-title">{t("parsons.replaceGeneratedTitle")}</h2>
+                    <h2 id="parsons-ai-replace-title">{t("parsons.replaceGeneratedTitle")}</h2></DialogHeader>
                     <p className="muted">{t("parsons.replaceGeneratedMessage")}</p>
-                  </div>
+
                   <div className="dialog-actions">
                     <button className="secondary" type="button" onClick={() => setShowReplaceGenerationDialog(false)}>
                       <ActionIcon name="close" />
@@ -1170,11 +1172,11 @@ export function ParsonsActivityView({
       {showSubmitConfirmDialog ? (
         <div className="dialog-backdrop" role="presentation">
           <div aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="parsons-submit-confirm-title">
-            <div className="stack" style={{ gap: 8 }}>
+            <DialogHeader closeLabel={getDialogCloseLabel(locale)} onClose={() => setShowSubmitConfirmDialog(false)} closeDisabled={submitting}>
               <p className="eyebrow">{t("parsons.submit")}</p>
-              <h2 id="parsons-submit-confirm-title">{t("parsons.submitConfirmTitle")}</h2>
+              <h2 id="parsons-submit-confirm-title">{t("parsons.submitConfirmTitle")}</h2></DialogHeader>
               <p className="muted">{t("parsons.submitConfirmMessage")}</p>
-            </div>
+
             <div className="dialog-actions">
               <button className="secondary" type="button" disabled={submitting} onClick={() => setShowSubmitConfirmDialog(false)}>
                 <ActionIcon name="edit" />

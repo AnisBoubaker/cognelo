@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { ActionIcon, useApplicationTime } from "@cognelo/activity-ui";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
@@ -16,6 +18,7 @@ type CodingHomeworkManualGradingRow = {
 };
 
 export type CodingHomeworkManualGradingPanelProps = {
+  embedded?: boolean;
   row: CodingHomeworkManualGradingRow;
   attempts: CodingHomeworkGradebookAttemptRecord[];
   attemptCount: number;
@@ -38,6 +41,7 @@ export type CodingHomeworkManualGradingPanelProps = {
 };
 
 export function CodingHomeworkManualGradingPanel({
+  embedded = false,
   row,
   attemptCount,
   selectedAttempt,
@@ -89,18 +93,14 @@ export function CodingHomeworkManualGradingPanel({
   }
 
   return (
-    <section className="dialog-panel answer-overlay" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
-      <div className="section-heading">
+    <section className="dialog-panel answer-overlay" role={embedded ? undefined : "dialog"} aria-modal={embedded ? undefined : true} onMouseDown={(event) => event.stopPropagation()}>
+      <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={embedded ? undefined : onClose}>
         <div>
           <p className="eyebrow">{row.participantName}</p>
           <h2>{t("courseDetail.studentAnswerTitle")}</h2>
           <p className="muted">{row.participantEmail}</p>
         </div>
-        <button className="button secondary" type="button" onClick={onClose}>
-          <ActionIcon name="close" />
-          {t("common.close")}
-        </button>
-      </div>
+      </DialogHeader>
 
       <label className="checkbox-row">
         <input checked={includeAttempts} type="checkbox" onChange={(event) => onIncludeAttemptsChange(event.target.checked)} />

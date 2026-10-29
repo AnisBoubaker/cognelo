@@ -1,8 +1,9 @@
 "use client";
 
 import { ActionIcon, type ActionIconName } from "./action-icon";
+import { DialogHeader, useDialogCloseLabel } from "./dialog-header";
 
-import { type ReactNode, useEffect, useId, useRef } from "react";
+import React, { type ReactNode, useEffect, useId, useRef } from "react";
 
 export type ConfirmationDialogProps = {
   open: boolean;
@@ -34,11 +35,13 @@ export function ConfirmationDialog({
   onConfirm
 }: ConfirmationDialogProps) {
   const titleId = useId();
+  const closeLabel = useDialogCloseLabel();
   const dialogRef = useRef<HTMLElement | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const isConfirmingRef = useRef(isConfirming);
   const onCancelRef = useRef(onCancel);
+  const dismissOnly = confirmIcon === "close" && !cancelLabel;
 
   isConfirmingRef.current = isConfirming;
   onCancelRef.current = onCancel;
@@ -78,12 +81,13 @@ export function ConfirmationDialog({
       }}
     >
       <section ref={dialogRef} aria-labelledby={titleId} aria-modal="true" className="dialog-panel stack" role="dialog">
-        <div className="stack" style={{ gap: 8 }}>
+        <DialogHeader closeLabel={closeLabel} onClose={dismissOnly ? onConfirm : onCancel}
+          closeDisabled={isConfirming} closeButtonRef={dismissOnly ? confirmButtonRef : undefined}>
           {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
           <h2 id={titleId}>{title}</h2>
-          <div className="muted">{message}</div>
-        </div>
-        <div className="dialog-actions">
+        </DialogHeader>
+        <div className="muted">{message}</div>
+        {!dismissOnly ? <div className="dialog-actions">
           {cancelLabel ? (
             <button className="secondary" disabled={isConfirming} type="button" onClick={onCancel}>
               <ActionIcon name="close" />
@@ -100,7 +104,7 @@ export function ConfirmationDialog({
             <ActionIcon name={confirmIcon ?? (confirmVariant === "danger" ? "alert" : "check")} />
             {confirmLabel}
           </button>
-        </div>
+        </div> : null}
       </section>
     </div>
   );

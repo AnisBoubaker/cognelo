@@ -28,6 +28,8 @@ Tabs, sidebar navigation, accordion rows, menu items, editor keys, and floating 
 
 Choose icons explicitly from action semantics, never by inspecting translated labels. A toggle such as Add/Cancel changes its icon together with its label. Preserve visible labels; icon-only controls require a localized accessible label or title. Icons are decorative (`aria-hidden`, non-focusable) and normally 18px with an 8px gap. Shared save bars, confirmations, rich-text toolbars, and plugin controls reuse this registry. Generic confirmation uses a check or danger alert, and informational-dialog dismissal uses Close.
 
+Dialog dismissal is intentionally icon-only: use the shared persistent [dialog header](DIALOGS.md) with a close cross, localized accessible name, and tooltip. Informational alerts use that cross instead of a second labelled Close button. Review navigation and messaging keep visible labels where space allows and use named icons on narrow screens. Decision actions such as Cancel and Save retain their labels.
+
 ## Verification
 
 `tests/e2e/action-buttons.spec.ts` checks matching computed appearance and semantic icons across core/admin/plugin actions, disabled and keyboard-focus behavior, actual save/cancel flows, and login legibility. `workspace-layout.spec.ts` covers desktop/mobile page layout, while rich-text and activity regressions exercise toolbar, dialog, and learner controls.

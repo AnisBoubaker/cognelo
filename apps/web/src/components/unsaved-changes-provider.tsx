@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { AppIcon } from "@/components/app-icon";
 
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -155,10 +157,10 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
         <div className="dialog-backdrop" role="presentation">
           <section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="unsaved-dialog-title">
             <div className="stack">
-              <div>
+              <DialogHeader closeLabel={t("common.close")} onClose={() => setPendingHref(null)} closeDisabled={saving}>
                 <p className="eyebrow">{t("unsavedChanges.eyebrow")}</p>
                 <h2 id="unsaved-dialog-title">{t("unsavedChanges.title")}</h2>
-              </div>
+              </DialogHeader>
               <p className="muted">{t("unsavedChanges.message")}</p>
               <div className="dialog-actions">
                 <button className="secondary" type="button" disabled={saving} onClick={() => setPendingHref(null)}>

@@ -60,3 +60,5 @@ Teachers can [export submitted answers as PDF or ZIP](../../../docs/ANSWER_EXPOR
 Timed finalization uses only server-saved work after expiry; see [deadline enforcement](docs/REFERENCE.md#deadline-finalization).
 
 Submitted answers are constrained to authored questions and choices before grading or persistence. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
+
+Dialogs follow the shared [persistent header and icon-only close pattern](../../../docs/DIALOGS.md), preserving cancellation guards and blocking progress.

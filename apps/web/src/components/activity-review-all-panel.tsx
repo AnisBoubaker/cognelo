@@ -1,6 +1,7 @@
 "use client";
 
-import { AppIcon } from "@/components/app-icon";
+import { DialogHeader } from "@cognelo/activity-ui";
+
 
 import { CodeRenderer } from "@cognelo/activity-ui";
 import { parsonsAttemptStateSchema, parseParsonsConfig } from "@cognelo/plugin-parsons";
@@ -44,10 +45,10 @@ export function ActivityReviewAllPanel({ activityTypeKey, activityTitle, config,
       className={embedded ? "stack" : "dialog-panel answer-overlay test-review-overlay"}
       {...(embedded ? {} : { role: "dialog", "aria-modal": true })}
     >
-      <div className="section-heading">
-        <div><p className="eyebrow">{activityTitle}</p><h2>{t("courseDetail.reviewAll")}</h2></div>
-        {!embedded && onClose ? <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button> : null}
-      </div>
+      {embedded ? <div className="section-heading"><div><p className="eyebrow">{activityTitle}</p><h2>{t("courseDetail.reviewAll")}</h2></div></div>
+        : <DialogHeader closeLabel={t("common.close")} onClose={onClose}>
+          <p className="eyebrow">{activityTitle}</p><h2>{t("courseDetail.reviewAll")}</h2>
+        </DialogHeader>}
       {loading ? <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p> : null}
       {error ? <p className="error">{error}</p> : null}
       {!loading && !error ? (

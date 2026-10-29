@@ -14,6 +14,7 @@ This is the routing page for repository-maintained documentation. Read the small
 - [Detailed platform decisions](reference/PLATFORM_DECISIONS.md): expanded decisions and implementation constraints formerly kept in project memory. Read only relevant sections.
 - [Application timezone and server time](APPLICATION_TIME.md): admin default, optional owner-managed course zones, scheduling conversion, server-clock enforcement, and regression checks.
 - [Action buttons and icons](ACTION_BUTTONS.md): shared appearance, semantic icons, interaction states, and regression coverage.
+- [Dialog headers and dismissal](DIALOGS.md): persistent close controls, compact review actions, app-wide coverage, and dismissal semantics.
 - [Code editor undo and saved answers](EDITOR_UNDO.md): in-memory history isolation, saved-answer baselines, model disposal, and autosave regression checks.
 - [Email delivery and test recipients](EMAIL_DELIVERY.md): outbound mail boundary and private local capture for synthetic recipients.
 - [Text material editor and display](../packages/plugin-content-types/plugin-text/docs/REFERENCE.md): full Markdown authoring, display modes, and material image access.

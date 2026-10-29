@@ -213,3 +213,7 @@ Run, submit, Test, and preview requests reconstruct files from trusted activity 
 The shared assigned dispatcher checks the effective deadline after the request body arrives. At expiry, this plugin’s `expiredAttemptInput` supplies only its saved server response; incoming answer/code/file changes are ignored. Missing saved work follows the ordinary ungraded timeout fallback. This also applies to a request opened before the deadline whose body finishes later. See [security boundaries](../../../../docs/SECURITY_BOUNDARIES.md).
 
 The production runner image starts Node directly, omits global npm and unused Firefox/WebKit engines, and removes unused bad GStreamer plugins. Keep Chromium/package versions aligned and repeat actual grading plus cropped-screenshot checks when rebuilding; package audit alone does not cover OS/browser dependencies.
+
+## Dialog presentation
+
+Authoring, confirmation, submission, and review dialogs reuse the [shared persistent header and close cross](../../../../docs/DIALOGS.md). The host review toolbar keeps navigation, messages, and dismissal on one row; embedded review panels leave the modal boundary and close action to that host. Existing draft guards, busy states, and non-dismissible progress remain in force.

@@ -44,6 +44,8 @@ describe("ProgressDialog", () => {
     }));
 
     expect(html).toContain('aria-busy="false"');
-    expect(html).toContain(">Close</button>");
+    expect(html).toContain('aria-label="Close"');
+    expect(html).not.toContain(">Close</button>");
+    expect(html.indexOf('aria-label="Close"')).toBeLessThan(html.indexOf("<progress"));
   });
 });

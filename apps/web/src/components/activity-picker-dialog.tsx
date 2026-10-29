@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { activityDefinitionBelongsToCategory, activityDefinitionCreatesCategory, listActivityCategories, type ActivityCategoryId } from "@cognelo/activity-sdk/categories";
 import { type ActivityBank, type ActivityDefinition, type ActivityType, type BankActivity } from "@/lib/api";
@@ -112,15 +114,12 @@ export function ActivityPickerDialog({
   return (
     <div className="dialog-backdrop" role="presentation">
       <section aria-labelledby={titleId} aria-modal="true" className="dialog-panel activity-picker-dialog" role="dialog">
-        <div className="section-heading">
+        <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={onClose} closeDisabled={disabled}>
           <div>
             <p className="eyebrow">{eyebrow ?? t("courseDetail.chooseActivityEyebrow")}</p>
             <h2 id={titleId}>{title ?? t("courseDetail.chooseActivityTitle")}</h2>
           </div>
-          <button className="secondary icon-button" disabled={disabled} onClick={onClose} title={t("common.cancel")} type="button">
-            <CloseIcon />
-          </button>
-        </div>
+        </DialogHeader>
         <div className="activity-picker-layout">
           <div className="activity-category-tabs" role="tablist" aria-label={t("activityBankDetail.categoryTabsLabel")}>
             <button
@@ -230,8 +229,4 @@ function localizedDefinition(
 
 function iconFor(definitions: ActivityDefinition[], key: string): NonNullable<ActivityDefinition["icon"]> {
   return findDefinition(definitions, key)?.icon ?? "placeholder";
-}
-
-function CloseIcon() {
-  return <AppIcon name="close" />;
 }

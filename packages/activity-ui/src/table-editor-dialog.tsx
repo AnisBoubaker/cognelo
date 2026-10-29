@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "./dialog-header";
+
 import { ActionIcon } from "./action-icon";
 
 import { type FormEvent, useEffect, useState } from "react";
@@ -62,14 +64,13 @@ export function TableEditorDialog({ copy, onCancel, onConfirm }: TableEditorDial
         onMouseDown={(event) => event.stopPropagation()}
         onSubmit={submit}
       >
-        <div className="section-heading table-editor-heading">
+        <DialogHeader className="section-heading table-editor-heading" closeLabel={copy.close} onClose={onCancel}>
           <div>
             <p className="eyebrow">{copy.eyebrow}</p>
             <h2 id="table-editor-title">{copy.title}</h2>
             <p className="muted">{copy.help}</p>
           </div>
-          <button aria-label={copy.close} className="secondary icon-button" type="button" onClick={onCancel}><ActionIcon name="close" /></button>
-        </div>
+        </DialogHeader>
 
         <div className="table-editor-size-fields">
           <label className="field">

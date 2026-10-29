@@ -1,4 +1,6 @@
 "use client";
+
+import { DialogHeader } from "@cognelo/activity-ui";
 import { useApplicationTime } from "@cognelo/activity-ui";
 
 import { FormEvent, useState } from "react";
@@ -50,15 +52,12 @@ export function GradebookExportDialog({ target, onClose }: { target: GradebookEx
       if (event.target === event.currentTarget) onClose();
     }}>
       <section aria-labelledby="gradebook-export-title" aria-modal="true" className="dialog-panel" role="dialog">
-        <div className="section-heading">
+        <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={onClose}>
           <div>
             <p className="eyebrow">{t("courseDetail.exportGradesEyebrow")}</p>
             <h2 id="gradebook-export-title">{t("courseDetail.exportGradesTitle")}</h2>
           </div>
-          <button className="secondary icon-button" type="button" onClick={onClose} title={t("common.close")}>
-            <AppIcon name="close" />
-          </button>
-        </div>
+        </DialogHeader>
         <form className="form" onSubmit={submit}>
           <div className="field">
             <label htmlFor="gradebook-export-format">{t("courseDetail.exportFormat")}</label>

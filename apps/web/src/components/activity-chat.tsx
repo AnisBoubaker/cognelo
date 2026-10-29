@@ -1,6 +1,6 @@
 "use client";
 
-import { useApplicationTime, useBodyScrollLock } from "@cognelo/activity-ui";
+import { DialogHeader, useApplicationTime, useBodyScrollLock } from "@cognelo/activity-ui";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { TeacherMessageSoundToggle, TeacherMessageUnreadBadge } from "@/components/teacher-message-alerts";
@@ -25,12 +25,10 @@ export function ActivityChatDialog({ children, onClose, wide = false }: { childr
   return createPortal(
     <dialog ref={dialog} aria-labelledby={titleId} className={`dialog-panel activity-chat-dialog${wide ? " activity-chat-dialog--wide" : ""}`}
       onCancel={(event) => { event.preventDefault(); onClose(); }}>
-      <div className="activity-chat-heading">
+      <DialogHeader className="activity-chat-heading" closeLabel={t("common.close")} onClose={onClose}
+        actions={<><TeacherMessageUnreadBadge /><TeacherMessageSoundToggle /></>}>
         <h2 id={titleId} ref={heading} tabIndex={-1} data-chat-title><AppIcon name="messages" /> {t("activityMessenger.title")}</h2>
-        <div className="activity-chat-heading-actions"><TeacherMessageUnreadBadge /><TeacherMessageSoundToggle />
-        <button className="secondary icon-button" type="button" aria-label={t("common.close")} onClick={onClose}><AppIcon name="close" /></button>
-        </div>
-      </div>
+      </DialogHeader>
       {children}
     </dialog>, document.body
   );

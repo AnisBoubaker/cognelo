@@ -1,6 +1,6 @@
 "use client";
 
-import { ActionIcon } from "./action-icon";
+import { DialogHeader } from "./dialog-header";
 
 import { useSharedDialogOpen } from "./dialog-provider";
 import { useBodyScrollLock } from "./body-scroll-lock";
@@ -104,11 +104,11 @@ export function ProgressDialog({
         role="dialog"
         tabIndex={-1}
       >
-        <div className="stack" style={{ gap: 8 }}>
+        <DialogHeader closeLabel={closeLabel ?? title} onClose={canClose ? onClose : undefined} closeButtonRef={closeButtonRef}>
           {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
           <h2 id={titleId}>{title}</h2>
-          {message ? <div className="muted" id={messageId}>{message}</div> : null}
-        </div>
+        </DialogHeader>
+        {message ? <div className="muted" id={messageId}>{message}</div> : null}
         <div aria-live="polite" className="progress-dialog-body" role="status">
           <progress
             aria-label={progressLabel}
@@ -121,14 +121,6 @@ export function ProgressDialog({
           </div>
           {error ? <div className="error">{error}</div> : null}
         </div>
-        {canClose ? (
-          <div className="dialog-actions">
-            <button ref={closeButtonRef} className="secondary" type="button" onClick={onClose}>
-              <ActionIcon name="close" />
-              {closeLabel}
-            </button>
-          </div>
-        ) : null}
       </section>
     </div>
   );

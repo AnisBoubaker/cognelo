@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { useApplicationTime } from "@cognelo/activity-ui";
 
 
@@ -1094,17 +1096,13 @@ export default function GradebookActivityResultsPage() {
         {aiGradingBatchDialog ? (
           <div className="dialog-backdrop" role="presentation">
             <section aria-labelledby="ai-grading-batch-title" aria-modal="true" className="dialog-panel stack" role="dialog">
-              <div className="section-heading">
+              <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setAiGradingBatchDialog(null)} closeDisabled={aiGradingBatchDialog.submitting}>
                 <div>
                   <p className="eyebrow">{t("courseDetail.gradebookEyebrow")}</p>
                   <h2 id="ai-grading-batch-title">{t("courseDetail.aiBatchTitle")}</h2>
                   <p className="muted">{t("courseDetail.aiBatchImpact")}</p>
                 </div>
-                <button className="button secondary" disabled={aiGradingBatchDialog.submitting} type="button" onClick={() => setAiGradingBatchDialog(null)}>
-                  <AppIcon name="close" />
-                  {t("common.close")}
-                </button>
-              </div>
+              </DialogHeader>
               {aiGradingBatchDialog.loading ? <p className="muted">{t("common.loading")}</p> : !aiGradingBatchDialog.ready ? (
                 <p className="error-text" role="alert">{aiGradingBatchDialog.error}</p>
               ) : (
@@ -1292,7 +1290,8 @@ function AiFeedbackReviewPanel({ courseId, state, onClose, onFeedbackChange, onG
   return (
     <>
     <section className="dialog-panel answer-overlay test-review-overlay stack" role="dialog" aria-modal="true">
-      <div className="section-heading">
+      <DialogHeader closeLabel={t("common.close")} onClose={onClose}
+        actions={<button className="secondary" type="button" onClick={() => setShowMessages(true)}><AppIcon name="messages" />{t("activityMessenger.title")}</button>}>
         <div>
           <p className="eyebrow">{row?.groupTitle}</p>
           <h2>{t("courseDetail.reviewAndGrade")}</h2>
@@ -1300,11 +1299,7 @@ function AiFeedbackReviewPanel({ courseId, state, onClose, onFeedbackChange, onG
             {row?.participantName} · {state.selectedIndex + 1} / {state.rows.length}
           </p>
         </div>
-        <div className="row wrap">
-          <button className="secondary" type="button" onClick={() => setShowMessages(true)}><AppIcon name="messages" />{t("activityMessenger.title")}</button>
-        <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button>
-        </div>
-      </div>
+      </DialogHeader>
       {state.rows.length > 1 ? (
         <div className="row wrap">
           <button className="button secondary" disabled={state.loading || state.selectedIndex === 0} type="button" onClick={() => onSelectIndex(state.selectedIndex - 1)}>

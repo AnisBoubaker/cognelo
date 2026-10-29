@@ -62,3 +62,5 @@ Interface actions use the shared [button style and semantic icons](../../../docs
 Teachers can [export submitted answers as PDF or ZIP](../../../docs/ANSWER_EXPORTS.md), including selectable prompts and grading content. See [export details](docs/REFERENCE.md#answer-exports).
 
 Prompt and feedback rendering follows the [shared Markdown security contract](../../../docs/plugin-authoring/03-core-services.md#what-markdownrenderer-gives-you); raw attributed HTML is shown literally.
+
+Dialogs follow the shared [persistent header and icon-only close pattern](../../../docs/DIALOGS.md), preserving cancellation guards and blocking progress.

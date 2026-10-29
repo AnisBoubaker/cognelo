@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { ActionIcon, useApplicationTime } from "@cognelo/activity-ui";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
@@ -25,6 +27,7 @@ export type McqManualGradingAttempt = {
 };
 
 export type McqManualGradingPanelProps = {
+  embedded?: boolean;
   row: McqManualGradingRow;
   activityConfig?: Record<string, unknown>;
   attempts: McqManualGradingAttempt[];
@@ -47,6 +50,7 @@ export type McqManualGradingPanelProps = {
 };
 
 export function McqManualGradingPanel({
+  embedded = false,
   row,
   activityConfig,
   selectedAttempt,
@@ -106,18 +110,14 @@ export function McqManualGradingPanel({
   }
 
   return (
-    <section className="dialog-panel answer-overlay" role="dialog" aria-modal="true">
-      <div className="section-heading">
+    <section className="dialog-panel answer-overlay" role={embedded ? undefined : "dialog"} aria-modal={embedded ? undefined : true}>
+      <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={embedded ? undefined : onClose}>
         <div>
           <p className="eyebrow">{row.participantName}</p>
           <h2>{t("courseDetail.studentAnswerTitle")}</h2>
           <p className="muted">{row.participantEmail}</p>
         </div>
-        <button className="button secondary" type="button" onClick={onClose}>
-          <ActionIcon name="close" />
-          {t("common.close")}
-        </button>
-      </div>
+      </DialogHeader>
 
       {error ? <p className="error">{error}</p> : null}
       {loading ? <p className="muted">{t("common.loading")}</p> : null}

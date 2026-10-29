@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { toZonedDateTimeInput, fromZonedDateTimeInput, useApplicationTime } from "@cognelo/activity-ui";
 
 import { getActivityDefinition } from "@cognelo/activity-sdk";
@@ -73,15 +75,12 @@ export function ActivitySettingsModal(props: ActivitySettingsDialogProps & { tit
   return (
     <div className="dialog-backdrop" role="presentation">
       <section aria-labelledby={titleId} aria-modal="true" className="dialog-panel activity-settings-dialog" role="dialog">
-        <div className="section-heading">
+        <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={props.onClose}>
           <div>
             <p className="eyebrow">{t("courseDetail.contentSettingsEyebrow")}</p>
             <h2 id={titleId}>{props.title ?? props.activity.title}</h2>
           </div>
-          <button className="secondary icon-button" onClick={props.onClose} title={t("common.cancel")} type="button">
-            <AppIcon name="close" />
-          </button>
-        </div>
+        </DialogHeader>
         <ActivitySettingsDialog {...props} />
       </section>
     </div>

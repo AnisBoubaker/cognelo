@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { AppIcon } from "@/components/app-icon";
 
 import "@xyflow/react/dist/style.css";
@@ -951,12 +953,12 @@ export function SubjectKnowledgeGraph({
       {showReplaceDialog ? (
         <div className="dialog-backdrop" role="presentation">
           <div aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="knowledge-graph-ai-replace-title">
-            <div className="stack" style={{ gap: 8 }}>
+            <DialogHeader closeLabel={t("common.close")} onClose={() => setShowReplaceDialog(false)}>
               <p className="eyebrow">{t("knowledgeGraph.aiGenerate")}</p>
-              <h2 id="knowledge-graph-ai-replace-title">{t("knowledgeGraph.aiReplaceTitle")}</h2>
+              <h2 id="knowledge-graph-ai-replace-title">{t("knowledgeGraph.aiReplaceTitle")}</h2></DialogHeader>
               <p className="muted">{t("knowledgeGraph.aiReplaceMessage")}</p>
               {newGraphHasActivityLinks ? <p className="knowledge-generation-warning">{t("knowledgeGraph.aiActivityLinksWarning")}</p> : null}
-            </div>
+
             <div className="dialog-actions">
               <button className="secondary" type="button" onClick={() => setShowReplaceDialog(false)}>
                 <AppIcon name="close" />
@@ -974,12 +976,12 @@ export function SubjectKnowledgeGraph({
       {generationSummary ? (
         <div className="dialog-backdrop" role="presentation">
           <div aria-modal="true" className="dialog-panel knowledge-generation-summary-dialog" role="dialog" aria-labelledby="knowledge-graph-ai-summary-title">
-            <div className="stack" style={{ gap: 8 }}>
+            <DialogHeader closeLabel={t("common.close")} onClose={() => setGenerationSummary(null)}>
               <p className="eyebrow">{t("knowledgeGraph.aiIterate")}</p>
-              <h2 id="knowledge-graph-ai-summary-title">{t("knowledgeGraph.aiChangesTitle")}</h2>
+              <h2 id="knowledge-graph-ai-summary-title">{t("knowledgeGraph.aiChangesTitle")}</h2></DialogHeader>
               <p className="muted">{t("knowledgeGraph.aiChangesMessage")}</p>
               {generationSummary.hasCurrentActivityLinks ? <p className="knowledge-generation-warning">{t("knowledgeGraph.aiActivityLinksWarning")}</p> : null}
-            </div>
+
             {generationSummary.addedConcepts.length ? <GenerationChangeList title={t("knowledgeGraph.aiAddedConcepts")} items={generationSummary.addedConcepts.map((item) => item.title)} /> : null}
             {generationSummary.deletedConcepts.length ? <GenerationChangeList title={t("knowledgeGraph.aiDeletedConcepts")} items={generationSummary.deletedConcepts.map((item) => item.title)} /> : null}
             {generationSummary.addedSkills.length ? <GenerationChangeList title={t("knowledgeGraph.aiAddedSkills")} items={generationSummary.addedSkills.map((item) => t("knowledgeGraph.aiSkillChange", { skill: item.title, concept: item.conceptTitle ?? "" }))} /> : null}

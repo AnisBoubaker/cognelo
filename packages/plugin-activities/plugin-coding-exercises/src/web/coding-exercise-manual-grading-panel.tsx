@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { ActionIcon, useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 
 import { CodingExerciseAiFeedbackReview } from "./coding-exercise-ai-feedback-review";
@@ -20,6 +22,7 @@ type CodingExerciseReviewRow = {
 };
 
 export type CodingExerciseManualGradingPanelProps = {
+  embedded?: boolean;
   row: CodingExerciseReviewRow;
   attempts: CodingExerciseReviewAttempt[];
   attemptCount: number;
@@ -33,6 +36,7 @@ export type CodingExerciseManualGradingPanelProps = {
 };
 
 export function CodingExerciseManualGradingPanel({
+  embedded = false,
   row,
   attemptCount,
   selectedAttempt,
@@ -46,15 +50,14 @@ export function CodingExerciseManualGradingPanel({
   const { timeZone } = useApplicationTime();
   const feedback = selectedAttempt?.aiFeedback?.feedback ?? null;
   return (
-    <section className="dialog-panel answer-overlay test-review-overlay stack" role="dialog" aria-modal="true">
-      <div className="section-heading">
+    <section className="dialog-panel answer-overlay test-review-overlay stack" role={embedded ? undefined : "dialog"} aria-modal={embedded ? undefined : true}>
+      <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={embedded ? undefined : onClose}>
         <div>
           <p className="eyebrow">{row.groupTitle}</p>
           <h2>{t("courseDetail.inspectAttempts")}</h2>
           <p className="muted">{row.participantName} · {row.participantEmail}</p>
         </div>
-        <button className="button secondary" type="button" onClick={onClose}><ActionIcon name="close" /> {t("common.close")}</button>
-      </div>
+      </DialogHeader>
 
       {attemptCount > 1 ? (
         <div className="row">

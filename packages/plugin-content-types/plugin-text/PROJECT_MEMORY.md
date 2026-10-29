@@ -12,3 +12,5 @@
 - Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.
 
 - Keep rendering behind the shared raw-HTML allowlist and sanitizer. Authored styles/forms/attributes must never become live page markup; use the editor’s Markdown image and formatting features instead.
+
+- Modal text readers keep the localized close cross in a sticky header; full-screen editing exits through the top cross without remounting or losing draft content. See [dialog headers](../../../docs/DIALOGS.md).

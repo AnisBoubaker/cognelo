@@ -39,3 +39,7 @@ Duplication copies Markdown and display preferences, excluding `embeddingIndex`.
 ## Shared action controls
 
 Teacher, learner, and settings actions follow the platform [button and icon contract](../../../../docs/ACTION_BUTTONS.md). Use explicit semantic `ActionIcon` names with localized labels; dimensions and interaction colors are shared CSS, while tabs, disclosure rows, and specialized editor controls retain their own layout.
+
+## Dialog presentation
+
+The host modal reader uses a sticky heading with an icon-only close cross and localized accessible name. Its body remains scrollable within the existing 80vw panel. The shared full-screen editor uses a top cross to exit without losing its mounted draft. See [dialog headers](../../../../docs/DIALOGS.md).

@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { AppIcon } from "@/components/app-icon";
 
 import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
@@ -676,10 +678,10 @@ function GroupActivityContent() {
         {isSafeExamBrowserGateOpen ? (
           <div className="dialog-backdrop" role="presentation">
             <section aria-labelledby="safe-exam-browser-dialog-title" aria-modal="true" className="dialog-panel stack" role="dialog">
-              <div>
+              <DialogHeader closeLabel={t("common.close")} onClose={() => router.push(`/courses/${courseId}/groups/${groupId}`)}>
                 <p className="eyebrow">{t("groupPage.safeExamBrowserEyebrow")}</p>
                 <h2 id="safe-exam-browser-dialog-title">{t("groupPage.safeExamBrowserTitle")}</h2>
-              </div>
+              </DialogHeader>
               <p>{t("groupPage.safeExamBrowserMessage")}</p>
               <p className="muted">{t("groupPage.safeExamBrowserFallback")}</p>
               {safeExamBrowserError ? <p className="error" role="alert">{safeExamBrowserError}</p> : null}

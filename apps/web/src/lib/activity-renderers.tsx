@@ -111,6 +111,7 @@ type BankActivityRendererContext = {
 };
 
 type ManualGradingRendererContext = {
+  embedded?: boolean;
   courseId: string;
   row: CourseGradebookRow;
   activityConfig?: Record<string, unknown>;

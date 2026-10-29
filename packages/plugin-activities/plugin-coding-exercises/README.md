@@ -120,3 +120,5 @@ Timed finalization uses only server-saved work after expiry; see [deadline enfor
 Judge0 execution is queued and polled through core, keeping the API container unprivileged. See [Judge0 integration](docs/REFERENCE.md#judge0-integration) and the platform deployment runbooks.
 
 Production uses cgroup memory accounting and separate compiler ceilings; validate required languages after image or limit changes. See [Judge0 integration](docs/REFERENCE.md#judge0-integration).
+
+Dialogs follow the shared [persistent header and icon-only close pattern](../../../docs/DIALOGS.md), preserving cancellation guards and blocking progress.

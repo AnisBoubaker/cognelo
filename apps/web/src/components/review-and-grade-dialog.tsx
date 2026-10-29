@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogCloseButton, DialogHeader } from "@cognelo/activity-ui";
+
 import { ActivityChatDialog } from "@/components/activity-chat";
 import { StaffActivityChat } from "@/components/activity-broadcast-dialog";
 import { AppIcon } from "@/components/app-icon";
@@ -456,20 +458,20 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
         progressSummary={regradeProgress ? t("courseDetail.batchActionProgress", {
           completed: regradeProgress.completed, total: regradeProgress.total
         }) : undefined} />
-      <div className="review-chat-workspace">
+      <div className="review-chat-workspace" role="dialog" aria-modal="true" aria-label={t("courseDetail.reviewAndGrade")}>
         <div className="review-chat-toolbar">
-          {classRows && classIndex >= 0 && onSelectRow ? <nav className="row wrap" aria-label={t("courseDetail.testReviewStudents")}>
-            <button className="button secondary" type="button" disabled={classIndex === 0} onClick={() => { void selectClassRow(classIndex - 1); }}><AppIcon name="back" />{t("courseDetail.feedbackReviewPrevious")}</button>
+          {classRows && classIndex >= 0 && onSelectRow ? <nav className="review-student-navigation" aria-label={t("courseDetail.testReviewStudents")}>
+            <button className="button secondary" type="button" aria-label={t("courseDetail.feedbackReviewPrevious")} title={t("courseDetail.feedbackReviewPrevious")} disabled={classIndex === 0} onClick={() => { void selectClassRow(classIndex - 1); }}><AppIcon name="back" /><span className="review-toolbar-label">{t("courseDetail.feedbackReviewPrevious")}</span></button>
             <span>{classIndex + 1} / {classRows.length}</span>
-            <button className="button secondary" type="button" disabled={classIndex === classRows.length - 1} onClick={() => { void selectClassRow(classIndex + 1); }}><AppIcon name="next" />{t("courseDetail.feedbackReviewNext")}</button>
+            <button className="button secondary" type="button" aria-label={t("courseDetail.feedbackReviewNext")} title={t("courseDetail.feedbackReviewNext")} disabled={classIndex === classRows.length - 1} onClick={() => { void selectClassRow(classIndex + 1); }}><AppIcon name="next" /><span className="review-toolbar-label">{t("courseDetail.feedbackReviewNext")}</span></button>
           </nav> : null}
-          <button type="button" className="secondary" onClick={() => setShowMessages(true)}><AppIcon name="messages" />{t("activityMessenger.title")}</button>
+          <button type="button" className="secondary" aria-label={t("activityMessenger.title")} title={t("activityMessenger.title")} onClick={() => setShowMessages(true)}><AppIcon name="messages" /><span className="review-toolbar-label">{t("activityMessenger.title")}</span></button>
+          <DialogCloseButton label={t("common.close")} onClose={close} />
         </div>
       {useFeedbackReview ? feedbackReview ? (
           <AiFeedbackReviewPanel
           row={row}
           state={feedbackReview}
-          onClose={close}
           onFeedbackChange={(draft) => setFeedbackReview((current) => {
             if (!current) return current;
             const calculatedGrade = current.review && current.gradeFollowsCalculated && !current.gradeTouched
@@ -488,8 +490,9 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
           onSave={saveFeedbackReview}
           t={t}
         />
-        ) : <LoadingReviewDialog onClose={onClose} t={t} />
+        ) : <LoadingReviewDialog t={t} />
       : manualRenderer ? manualReview ? manualRenderer({
+        embedded: true,
         courseId,
         row,
         activityConfig: manualReview.activityConfig,
@@ -514,13 +517,12 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
         onTestReviewSaved: refreshTestReview,
         onDirtyChange: setManualDirty,
         t
-      }) : <LoadingReviewDialog onClose={onClose} t={t} />
+      }) : <LoadingReviewDialog t={t} />
       : (
-        <section className="dialog-panel answer-overlay stack" role="dialog" aria-modal="true">
-          <div className="section-heading">
+        <section className="dialog-panel answer-overlay stack">
+          <DialogHeader className="section-heading" closeLabel={t("common.close")}>
             <h2>{t("courseDetail.reviewAndGrade")}</h2>
-            <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button>
-          </div>
+          </DialogHeader>
           <p className="error-text">{t("courseDetail.feedbackReviewUnavailable")}</p>
         </section>
       )}
@@ -532,25 +534,22 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
   );
 }
 
-function LoadingReviewDialog({ onClose, t }: {
-  onClose: () => void;
+function LoadingReviewDialog({ t }: {
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   return (
-    <section className="dialog-panel answer-overlay stack" role="dialog" aria-modal="true">
-      <div className="section-heading">
+    <section className="dialog-panel answer-overlay stack">
+      <DialogHeader className="section-heading" closeLabel={t("common.close")}>
         <h2>{t("courseDetail.reviewAndGrade")}</h2>
-        <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button>
-      </div>
+      </DialogHeader>
       <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p>
     </section>
   );
 }
 
-function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeChange, onSelectAttemptIndex, onSave, t }: {
+function AiFeedbackReviewPanel({ row, state, onFeedbackChange, onGradeChange, onSelectAttemptIndex, onSave, t }: {
   row: CourseGradebookRow;
   state: FeedbackReviewState;
-  onClose: () => void;
   onFeedbackChange: (feedback: Record<string, unknown>) => void;
   onGradeChange: (grade: string) => void;
   onSelectAttemptIndex: (index: number) => void;
@@ -561,15 +560,14 @@ function AiFeedbackReviewPanel({ row, state, onClose, onFeedbackChange, onGradeC
   const teacherRevision = state.review && typeof state.review.feedback.teacherRevision === "number" ? state.review.feedback.teacherRevision : 0;
   const readOnly = row.assessmentMode === "formative" || state.selectedAttemptIndex > 0;
   return (
-    <section className="dialog-panel answer-overlay test-review-overlay stack" role="dialog" aria-modal="true">
-      <div className="section-heading">
+    <section className="dialog-panel answer-overlay test-review-overlay stack">
+      <DialogHeader className="section-heading" closeLabel={t("common.close")}>
         <div>
           <p className="eyebrow">{row.groupTitle}</p>
           <h2>{t("courseDetail.reviewAndGrade")}</h2>
           <p className="muted">{row.participantName}</p>
         </div>
-        <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button>
-      </div>
+      </DialogHeader>
       {state.attemptReferences.length > 1 ? (
         <div className="row">
           <button

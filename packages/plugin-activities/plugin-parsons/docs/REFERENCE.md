@@ -194,3 +194,7 @@ The shared assigned dispatcher checks the effective deadline after the request b
 ## Shared Markdown safety
 
 Prompts and feedback use the shared renderer’s fixed attribute-free HTML allowlist and bounded, untrusted math. Raw attributed HTML is displayed literally; retain ordinary Markdown links, images, tables, and formatting. See [the shared rendering contract](../../../../docs/plugin-authoring/03-core-services.md#what-markdownrenderer-gives-you).
+
+## Dialog presentation
+
+Authoring, confirmation, submission, and review dialogs reuse the [shared persistent header and close cross](../../../../docs/DIALOGS.md). The host review toolbar keeps navigation, messages, and dismissal on one row; embedded review panels leave the modal boundary and close action to that host. Existing draft guards, busy states, and non-dismissible progress remain in force.

@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { ConfirmationDialog, ContextMenu } from "@cognelo/activity-ui";
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -130,7 +132,7 @@ export default function ActivityBanksPage() {
 
         {editorBank !== undefined ? (
           <div className="dialog-backdrop" role="presentation"><section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="bank-editor-title">
-            <div className="section-heading"><div><p className="eyebrow">{t("activityBanks.eyebrow")}</p><h2 id="bank-editor-title">{editorBank ? t("activityBanks.editTitle") : t("activityBanks.addTitle")}</h2></div><button className="secondary icon-button" type="button" onClick={() => setEditorBank(undefined)} title={t("common.close")}><CloseIcon /></button></div>
+            <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setEditorBank(undefined)}><div><p className="eyebrow">{t("activityBanks.eyebrow")}</p><h2 id="bank-editor-title">{editorBank ? t("activityBanks.editTitle") : t("activityBanks.addTitle")}</h2></div></DialogHeader>
             <form className="form" onSubmit={saveActivityBank}>
               <div className={`field ${editorBank?.activities?.length ? "field-readonly" : ""}`}><label htmlFor="bank-subject">{t("activityBanks.subjectLabel")}</label><select id="bank-subject" value={draft.subjectId} disabled={Boolean(editorBank?.activities?.length)} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value })} required>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select>{editorBank?.activities?.length ? <p className="muted">{t("activityBanks.subjectLockedHelp")}</p> : null}</div>
               <div className="field"><label htmlFor="bank-title">{t("activityBanks.titleLabel")}</label><input id="bank-title" minLength={2} maxLength={160} required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div>
@@ -142,7 +144,7 @@ export default function ActivityBanksPage() {
 
         {deleteState?.step === "options" ? (
           <div className="dialog-backdrop" role="presentation"><section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="bank-delete-options-title">
-            <div><p className="eyebrow">{t("activityBanks.deleteEyebrow")}</p><h2 id="bank-delete-options-title">{t("activityBanks.deleteTitle")}</h2></div>
+            <DialogHeader closeLabel={t("common.close")} onClose={() => setDeleteState(null)}><p className="eyebrow">{t("activityBanks.deleteEyebrow")}</p><h2 id="bank-delete-options-title">{t("activityBanks.deleteTitle")}</h2></DialogHeader>
             <p>{t("activityBanks.deletePopulatedMessage", { title: deleteState.bank.title, count: deleteState.bank.activities?.length ?? 0 })}</p>
             <form className="form" onSubmit={submitDeleteOptions}>
               <label className="checkbox-row"><input type="radio" name="delete-mode" checked={deleteState.mode === "move"} onChange={() => setDeleteState({ ...deleteState, mode: "move" })} /><span>{t("activityBanks.moveActivities")}</span></label>
@@ -162,4 +164,3 @@ export default function ActivityBanksPage() {
 function MoreIcon() { return <AppIcon name="more" size={20} />; }
 function EditIcon() { return <AppIcon name="edit" />; }
 function RemoveIcon() { return <AppIcon name="remove" />; }
-function CloseIcon() { return <AppIcon name="close" />; }

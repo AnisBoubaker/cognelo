@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader, getDialogCloseLabel } from "@cognelo/activity-ui";
+
 import { ActionIcon, isActivityContentClosedError } from "@cognelo/activity-ui";
 
 import { useApplicationTime } from "@cognelo/activity-ui";
@@ -779,11 +781,11 @@ export function McqActivityView({
         {showReplaceGenerationDialog ? (
           <div className="dialog-backdrop" role="presentation">
             <div aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="mcq-ai-replace-title">
-              <div className="stack" style={{ gap: 8 }}>
+              <DialogHeader closeLabel={getDialogCloseLabel(locale)} onClose={() => setShowReplaceGenerationDialog(false)}>
                 <p className="eyebrow">{copy.generate}</p>
-                <h2 id="mcq-ai-replace-title">{copy.replaceGeneratedTitle}</h2>
+                <h2 id="mcq-ai-replace-title">{copy.replaceGeneratedTitle}</h2></DialogHeader>
                 <p className="muted">{copy.replaceGeneratedMessage}</p>
-              </div>
+
               <div className="dialog-actions">
                 <button className="secondary" type="button" onClick={() => setShowReplaceGenerationDialog(false)}>
                   <ActionIcon name="close" />
@@ -1023,12 +1025,12 @@ export function McqActivityView({
       {showSubmitConfirmDialog ? (
         <div className="dialog-backdrop" role="presentation">
           <div aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="mcq-submit-confirm-title">
-            <div className="stack" style={{ gap: 8 }}>
+            <DialogHeader closeLabel={getDialogCloseLabel(locale)} onClose={() => setShowSubmitConfirmDialog(false)} closeDisabled={submitting}>
               <p className="eyebrow">{copy.submitAnswers}</p>
-              <h2 id="mcq-submit-confirm-title">{copy.submitConfirmTitle}</h2>
+              <h2 id="mcq-submit-confirm-title">{copy.submitConfirmTitle}</h2></DialogHeader>
               <p className="muted">{copy.submitConfirmMessage}</p>
               <p className="muted">{formatSubmissionAvailability(copy, submissionAvailability)}</p>
-            </div>
+
             <div className="dialog-actions">
               <button className="secondary" type="button" disabled={submitting} onClick={() => setShowSubmitConfirmDialog(false)}>
                 <ActionIcon name="edit" />

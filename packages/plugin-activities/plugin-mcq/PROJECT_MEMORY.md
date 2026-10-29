@@ -47,3 +47,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Filter ordinary, formative, preview, and Test submissions through `constrainMcqAnswers`: retain known identifiers, deduplicate choices, and preserve multiple selected choices so invalid single-choice input cannot become correct. Shared/direct math rendering stays untrusted and bounded.
 
 - For Test teacher review, read submitted choices from the host-authorized child state, not parent attempt metadata. Reuse standalone feedback validation; score overrides remain a separate host operation.
+
+- Use the shared [dialog headers](../../../docs/DIALOGS.md) for persistent icon-only dismissal. Manual review embedded in the host omits duplicate dialog roles/close controls; keep guarded callbacks and busy states.

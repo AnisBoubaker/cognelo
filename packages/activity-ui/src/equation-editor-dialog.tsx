@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "./dialog-header";
+
 import { ActionIcon } from "./action-icon";
 
 import { useEffect, useRef, useState } from "react";
@@ -196,14 +198,13 @@ export function EquationEditorDialog({
         role="dialog"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="section-heading equation-editor-heading">
+        <DialogHeader className="section-heading equation-editor-heading" closeLabel={copy.close} onClose={onCancel}>
           <div>
             <p className="eyebrow">{copy.eyebrow}</p>
             <h2 id="equation-editor-title">{mode === "edit" ? copy.editTitle : copy.addTitle}</h2>
             <p className="muted">{copy.help}</p>
           </div>
-          <button aria-label={copy.close} className="secondary icon-button" type="button" onClick={onCancel}><ActionIcon name="close" /></button>
-        </div>
+        </DialogHeader>
 
         <div aria-label={copy.styleLabel} className="equation-editor-style" role="group">
           <button aria-pressed={!displayMode} className={!displayMode ? "is-active" : ""} type="button" onClick={() => setDisplayMode(false)}>

@@ -10,6 +10,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
   const labels: DialogLabels = {
     cancel: t("common.cancel"),
     confirm: t("dialogs.confirm"),
+    close: t("common.close"),
     confirmTitle: t("dialogs.confirmTitle"),
     promptTitle: t("dialogs.promptTitle")
   };

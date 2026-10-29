@@ -1,6 +1,6 @@
 "use client";
 
-import { AppIcon } from "@/components/app-icon";
+import { DialogHeader } from "@cognelo/activity-ui";
 
 import type { ReactNode } from "react";
 import {
@@ -32,20 +32,19 @@ export function TestReviewAllPanel({
 }) {
   const referenceItems = submissions[0]?.review.items ?? [];
   const report = buildTestReportSummary(submissions, participantCount);
+  const heading = <div>
+    <p className="eyebrow">{t("courseDetail.testOverview")}</p>
+    <h2>{t("courseDetail.reviewAll")}</h2>
+    <p className="muted">{activityTitle} · {t("courseDetail.latestCompletedTestAttempts", { count: submissions.length })}</p>
+  </div>;
 
   return (
     <section
       className={embedded ? "stack" : "dialog-panel answer-overlay test-review-overlay"}
       {...(embedded ? {} : { role: "dialog", "aria-modal": true })}
     >
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">{t("courseDetail.testOverview")}</p>
-          <h2>{t("courseDetail.reviewAll")}</h2>
-          <p className="muted">{activityTitle} · {t("courseDetail.latestCompletedTestAttempts", { count: submissions.length })}</p>
-        </div>
-        {!embedded && onClose ? <button className="button secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.close")}</button> : null}
-      </div>
+      {embedded ? <div className="section-heading">{heading}</div>
+        : <DialogHeader closeLabel={t("common.close")} onClose={onClose}>{heading}</DialogHeader>}
 
       {loading ? <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p> : null}
       {error ? <p className="error">{error}</p> : null}

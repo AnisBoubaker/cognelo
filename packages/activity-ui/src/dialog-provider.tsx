@@ -13,8 +13,10 @@ import {
   useState
 } from "react";
 import { ConfirmationDialog } from "./confirmation-dialog";
+import { DialogCloseLabelProvider } from "./dialog-header";
 
 export type DialogLabels = {
+  close?: string;
   cancel: string;
   confirm: string;
   confirmTitle: string;
@@ -129,6 +131,7 @@ export function DialogProvider({ children, labels }: { children: ReactNode; labe
   const promptInvalid = Boolean(promptOptions?.required && !promptValue.trim());
 
   return (
+    <DialogCloseLabelProvider label={labels.close ?? "Close"}>
     <DialogContext.Provider value={context}>
       <DialogOpenContext.Provider value={Boolean(active)}>{children}</DialogOpenContext.Provider>
       <ConfirmationDialog
@@ -168,6 +171,7 @@ export function DialogProvider({ children, labels }: { children: ReactNode; labe
         onConfirm={() => finish(active?.kind === "prompt" ? promptValue : true)}
       />
     </DialogContext.Provider>
+    </DialogCloseLabelProvider>
   );
 }
 

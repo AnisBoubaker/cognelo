@@ -155,7 +155,7 @@ test.describe.serial("participant import and group lifecycle", () => {
     await expect(progress).toContainText("Importing 1 of 2 students...");
     releaseFirstRequest();
     await expect(dialog.getByRole("status")).toContainText("Import complete: 1 added, 1 already in the group, 0 failed.");
-    await dialog.locator(".dialog-actions").getByRole("button", { name: "Close", exact: true }).click();
+    await dialog.getByRole("button", { name: "Close", exact: true }).click();
     await expect(group.getByText(firstEmail, { exact: true })).toBeVisible();
   });
 

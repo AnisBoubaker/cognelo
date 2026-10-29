@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "./dialog-header";
+
 import { ActionIcon } from "./action-icon";
 
 /* eslint-disable @next/next/no-img-element -- Preview sources are local object URLs or authenticated media routes that Next Image cannot optimize reliably. */
@@ -142,14 +144,13 @@ export function ImageEditorDialog({
         onMouseDown={(event) => event.stopPropagation()}
         onSubmit={submit}
       >
-        <div className="section-heading image-editor-heading">
+        <DialogHeader className="section-heading image-editor-heading" closeLabel={copy.close} onClose={onCancel} closeDisabled={busy}>
           <div>
             <p className="eyebrow">{copy.eyebrow}</p>
             <h2 id="image-editor-title">{mode === "add" ? copy.addTitle : copy.editTitle}</h2>
             <p className="muted">{copy.help}</p>
           </div>
-          <button aria-label={copy.close} className="secondary icon-button" disabled={busy} type="button" onClick={onCancel}><ActionIcon name="close" /></button>
-        </div>
+        </DialogHeader>
 
         <div className="image-editor-layout">
           <div className="stack stack-tight">

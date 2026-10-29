@@ -6,6 +6,7 @@ export * from "./code-language";
 export * from "./code-renderer";
 export * from "./confirmation-dialog";
 export * from "./dialog-provider";
+export * from "./dialog-header";
 export * from "./context-menu";
 export * from "./edit-action-bar";
 export * from "./markdown-renderer";

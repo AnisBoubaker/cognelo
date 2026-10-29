@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { AppIcon } from "@/components/app-icon";
 
 import { isActivityContentClosedError } from "@cognelo/activity-ui";
@@ -421,9 +423,9 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
       {showPublishToBank ? (
         <div className="dialog-backdrop" role="presentation">
           <section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="publish-test-to-bank-title">
-            <div className="section-heading">
+            <DialogHeader closeLabel={t("common.close")} onClose={() => setShowPublishToBank(false)} closeDisabled={busy}>
               <div><p className="eyebrow">Reusable Test</p><h2 id="publish-test-to-bank-title">Add this Test to an activity bank</h2></div>
-            </div>
+            </DialogHeader>
             <p className="muted">The Test and every contained activity will be copied into the bank and published as one reusable version.</p>
             <div className="field">
               <label htmlFor="publish-test-bank">Activity bank</label>

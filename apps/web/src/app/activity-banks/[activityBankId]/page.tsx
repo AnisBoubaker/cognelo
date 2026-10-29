@@ -1,5 +1,7 @@
 "use client";
 
+import { DialogHeader } from "@cognelo/activity-ui";
+
 import { useApplicationTime } from "@cognelo/activity-ui";
 
 
@@ -946,16 +948,13 @@ export default function ActivityBankDetailPage() {
         {showConceptFilter ? (
           <div className="dialog-backdrop" role="presentation">
             <section aria-modal="true" className="dialog-panel activity-bank-filter-dialog" role="dialog" aria-labelledby="activity-bank-filter-title">
-              <div className="section-heading">
+              <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setShowConceptFilter(false)}>
                 <div>
                   <p className="eyebrow">{t("activityBankDetail.filters")}</p>
                   <h2 id="activity-bank-filter-title">{t("activityBankDetail.filterByConcepts")}</h2>
                   <p className="muted">{t("activityBankDetail.filterByConceptsHelp")}</p>
                 </div>
-                <button className="secondary icon-button" type="button" onClick={() => setShowConceptFilter(false)} title={t("common.close")}>
-                  <CloseIcon />
-                </button>
-              </div>
+              </DialogHeader>
               {subjectConcepts.length ? (
                 <div className="activity-bank-concept-filter-list">
                   {subjectConcepts.map((concept) => (
@@ -990,10 +989,9 @@ export default function ActivityBankDetailPage() {
         {duplicatingActivity ? (
           <div className="dialog-backdrop" role="presentation">
             <section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="duplicate-bank-activity-title">
-              <div className="section-heading">
+              <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setDuplicatingActivity(null)}>
                 <div><p className="eyebrow">{t("activityBankDetail.duplicateActivityEyebrow")}</p><h2 id="duplicate-bank-activity-title">{t("activityBankDetail.duplicateActivityTitle")}</h2></div>
-                <button className="secondary icon-button" type="button" onClick={() => setDuplicatingActivity(null)} title={t("common.close")}><CloseIcon /></button>
-              </div>
+              </DialogHeader>
               <form className="form" onSubmit={duplicateActivity}>
                 <div className="field"><label htmlFor="duplicate-bank-activity-name">{t("activityBankDetail.duplicateActivityTitleLabel")}</label><input id="duplicate-bank-activity-name" minLength={2} maxLength={160} required autoFocus value={duplicateTitle} onChange={(event) => setDuplicateTitle(event.target.value)} /></div>
                 <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDuplicatingActivity(null)}><AppIcon name="close" /> {t("common.cancel")}</button><button disabled={Boolean(duplicatingActivityId) || duplicateTitle.trim().length < 2} type="submit"><AppIcon name="duplicate" /> {duplicatingActivityId ? t("common.saving") : t("activityBankDetail.duplicateActivity")}</button></div>
@@ -1005,13 +1003,12 @@ export default function ActivityBankDetailPage() {
         {variationActivity && !variationJob && !creatingVariation ? (
           <div className="dialog-backdrop" role="presentation">
             <section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="variation-bank-activity-title">
-              <div className="section-heading">
+              <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={closeVariationDialog}>
                 <div>
                   <p className="eyebrow">{t("activityBankDetail.variationEyebrow")}</p>
                   <h2 id="variation-bank-activity-title">{t("activityBankDetail.variationTitle")}</h2>
                 </div>
-                <button className="secondary icon-button" type="button" onClick={closeVariationDialog} title={t("common.close")}><CloseIcon /></button>
-              </div>
+              </DialogHeader>
               <form className="form" onSubmit={createVariation}>
                 <p>{t("activityBankDetail.variationMessage", { title: variationActivity.title })}</p>
                 <div className="field">
@@ -1076,10 +1073,9 @@ export default function ActivityBankDetailPage() {
         {movingActivity && bank ? (
           <div className="dialog-backdrop" role="presentation">
             <section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="move-bank-activity-title">
-              <div className="section-heading">
+              <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setMovingActivity(null)}>
                 <div><p className="eyebrow">{t("activityBankDetail.moveActivityEyebrow")}</p><h2 id="move-bank-activity-title">{t("activityBankDetail.moveActivityTitle")}</h2></div>
-                <button className="secondary icon-button" type="button" onClick={() => setMovingActivity(null)} title={t("common.close")}><CloseIcon /></button>
-              </div>
+              </DialogHeader>
               <p>{t("activityBankDetail.moveActivityMessage", { title: movingActivity.title })}</p>
               <form className="form" onSubmit={moveActivity}>
                 <div className="field">
@@ -1099,10 +1095,9 @@ export default function ActivityBankDetailPage() {
         {comparingActivity ? (
           <div className="dialog-backdrop" role="presentation">
             <section aria-modal="true" className="dialog-panel activity-version-diff-dialog" role="dialog" aria-labelledby="version-comparison-title">
-              <div className="section-heading">
+              <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setComparingActivity(null)}>
                 <div><p className="eyebrow">{t("bankActivityPage.versionHistory")}</p><h2 id="version-comparison-title">{comparingActivity.title}</h2></div>
-                <button className="secondary icon-button" type="button" onClick={() => setComparingActivity(null)} title={t("common.close")}><CloseIcon /></button>
-              </div>
+              </DialogHeader>
               <div className="grid compact-form-grid version-comparison-controls">
                 <div className="field"><label htmlFor="version-diff-from">{t("bankActivityPage.versionDiffFrom")}</label><select id="version-diff-from" value={fromVersionId} onChange={(event) => { setFromVersionId(event.target.value); setVersionDiff(null); }}>
                   {comparingActivity.versions?.map((version) => <option key={version.id} value={version.id}>{versionOptionLabel(version.versionNumber, version.createdAt, locale, timeZone)}</option>)}
@@ -1122,15 +1117,12 @@ export default function ActivityBankDetailPage() {
         {showActivityPicker ? (
           <div className="dialog-backdrop" role="presentation">
             <section aria-modal="true" className="dialog-panel activity-picker-dialog" role="dialog" aria-labelledby="activity-picker-title">
-              <div className="section-heading">
+              <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setShowActivityPicker(false)}>
                 <div>
                   <p className="eyebrow">{t("activityBankDetail.chooseActivityEyebrow")}</p>
                   <h2 id="activity-picker-title">{t("activityBankDetail.chooseActivityTitle")}</h2>
                 </div>
-                <button className="secondary icon-button" type="button" onClick={() => setShowActivityPicker(false)} title={t("common.cancel")}>
-                  <CloseIcon />
-                </button>
-              </div>
+              </DialogHeader>
               <div className="activity-picker-layout">
                 <div className="activity-category-tabs" role="tablist" aria-label={t("activityBankDetail.categoryTabsLabel")}>
                   {visibleActivityCategories.map((category) => (
@@ -1383,8 +1375,4 @@ function MoveIcon() {
 
 function CompareIcon() {
   return <AppIcon name="compare" />;
-}
-
-function CloseIcon() {
-  return <AppIcon name="close" />;
 }
