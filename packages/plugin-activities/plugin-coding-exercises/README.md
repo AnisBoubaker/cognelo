@@ -124,3 +124,5 @@ Production uses cgroup memory accounting and separate compiler ceilings; validat
 Dialogs follow the shared [persistent header and icon-only close pattern](../../../docs/DIALOGS.md), preserving cancellation guards and blocking progress.
 
 Inside Tests, manual review retains drafts across questions and uses one [Save all action](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Question score edits update the calculated Test total; changing student/submission or closing still warns about unsaved changes.
+
+Test AI batches can use up to three graded Test submissions as examples, matched to the corresponding question with complete feedback. There is no Test-wide instruction editor: each question keeps its own instructions, now included in the model system prompt as the authoritative grading policy. See [guided Test grading](docs/REFERENCE.md#test-ai-grading-compatibility).

@@ -91,7 +91,7 @@ The model is always resolved server-side. Provider keys, raw credentials, privat
 - Teacher revisions may update learner-visible narrative feedback before or after release, including while a challenge is open. A plugin may also expose editable rubric percentages and return a validated grading result; Programming Exercises then recompute the AI and combined scores with the immutable deterministic result and configured weights, and core records the change through its audited regrade path. Core preserves the immutable original evaluation artifact and challenge hash, records previous/next feedback and research telemetry, and links post-challenge teacher revisions to the challenge ID.
 - Student-safe summative AI feedback is exposed only after the associated `GradebookItem` is released.
 
-Teacher-triggered batch grading processes attempts sequentially and independently, so one provider or parsing failure does not erase successful results for other attempts. For direct AI-grading plugins, the shared preparation dialog preloads current activity instructions and lists already graded attempts whose plugin-owned rubric and comment content is complete. Teachers may select up to three consistency examples. Selected examples are excluded from reassessment; every target request revalidates them as complete graded attempts for the same activity and passes only the plugin-sanitized submission/feedback pair, never learner identity. Edited instructions apply to the current run, while a default-on checkbox optionally persists them once before processing. The completion notice reports the failure count and most common actionable reason rather than expanding every learner name. A durable maximum batch size plus cancellation and timeout UX remain Phase 6 hardening.
+Teacher-triggered batch grading processes attempts sequentially and independently, so one provider or parsing failure does not erase successful results for other attempts. Tests now use the same example-selection dialog without an instructions editor or persistence checkbox: every child keeps its own current grading policy. Up to three graded Test submissions can supply matching question examples; the UI reports complete-question coverage, and only supported questions with complete grading feedback are used. Selected parent attempts are excluded from targets. For direct AI-grading plugins, the shared preparation dialog preloads current activity instructions and lists already graded attempts whose plugin-owned rubric and comment content is complete. Teachers may select up to three consistency examples. Selected examples are excluded from reassessment; every target request revalidates them as complete graded attempts for the same activity and passes only the plugin-sanitized submission/feedback pair, never learner identity. Edited instructions apply to the current run, while a default-on checkbox optionally persists them once before processing. The completion notice reports the failure count and most common actionable reason rather than expanding every learner name. A durable maximum batch size plus cancellation and timeout UX remain Phase 6 hardening.
 
 ## Responsibility Boundary
 
@@ -135,7 +135,7 @@ The SDK now exposes capabilities distinct from existing deterministic automatic 
 - `aiFeedback.teacherReview.createFeedbackDraft` for a valid empty plugin-owned teacher feedback shape
 - `aiFeedback.teacherReview.reviseFeedback` for whitelisting and validating editable feedback fields and optionally returning a plugin grading result when rubric scores are teacher-editable
 - `aiFeedback.batchGrading.getInstructions`, `updateInstructions`, and `isTemplateComplete` for the shared guided-batch dialog and server-side template revalidation
-- optional `batchGuidance` on `aiFeedback.evaluateAttempt`, containing the run instructions and at most three sanitized reviewed examples
+- optional `batchGuidance` on `aiFeedback.evaluateAttempt`, containing at most three sanitized reviewed examples and optional run instructions; omitted instructions preserve the owning question’s policy
 
 Server plugins need an evaluation handler that receives an immutable attempt/submission context plus the resolved course model and returns a validated result resembling:
 
@@ -165,6 +165,9 @@ type PluginAiFeedbackResult = {
 The browser must receive only the sanitized result. Raw provider responses, grading prompts, hidden rubrics, reference solutions, hidden tests, and teacher-only rationale remain plugin-private.
 
 ## Grading Semantics
+
+Programming and MCQ feedback place teacher assessment instructions directly in the model system prompt through `assessmentInstructionPrompt`, as well as retaining them in the private request snapshot. They govern grading judgments, permitted features, tolerance and feedback style ahead of rubric descriptions, task examples, reference solutions, tests and reviewed examples. The prompt explicitly prohibits inferring restrictions from omissions in examples and requests a consistency check of every score/comment. Protocol, criterion identities, weights, privacy and no-answer handling remain fixed. This strengthens instruction priority; it is not a deterministic semantic verifier of arbitrary model feedback.
+
 
 ### Programming Exercise Example
 
@@ -243,6 +246,8 @@ Core Tests are always summative, so their AI feedback never runs automatically o
 - Test submission stores deterministic child results and any child states needed for AI evaluation.
 - A teacher starts AI evaluation for the parent Test/selected attempts from the gradebook.
 - Each participating child plugin evaluates its own item and returns its component result.
+- Test template preparation and execution use `prepareTestAiGradingTemplates` / `resolveTestAiGradingGuidance`. Each request rechecks course/section access, same-Test ownership, graded lifecycle, and plugin-owned completeness. Examples match stable item/activity/type identities and frozen description/configuration, never shuffled display positions. Questions without a compatible complete example use their ordinary policy; a selected Test with no usable matching question is rejected before any target evaluation.
+- Test-wide instruction updates and run overrides are rejected. Question templates omit `batchGuidance.instructions`; the child evaluator reads its own current instructions. Template parent IDs and the sanitized per-question examples remain in private evaluation snapshots only.
 - Manual [Test review](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading) reuses the same plugin feedback form and `teacherReview` handlers as a standalone activity, with an optional authorized child context. Revision metadata is shared; child audit and parent grade updates are transactional, and manual review makes no model or runner call.
 - Programming Test questions use the teacher's current rubric and verified original execution, including legacy children whose execution reference exists only in saved state. Rubric-only grading requires zero deterministic weight and retains an absent test score as null; see the [plugin compatibility reference](../packages/plugin-activities/plugin-coding-exercises/docs/REFERENCE.md#test-ai-grading-compatibility).
 - Required AI-graded children must finish before the parent Test grade is recomputed.

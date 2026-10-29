@@ -4,18 +4,20 @@ import { encryptCredential } from "@cognelo/core";
 import type { APIRequestContext } from "@playwright/test";
 import { test, expect } from "./fixtures/bank-course";
 import { assignCourseTest, responseJson } from "./fixtures/activity-suite";
-import { createAuthenticatedApi, createAuthenticatedApiWithCredentials, confirmSharedDialog } from "./fixtures/auth";
+import { createAuthenticatedApi, createAuthenticatedApiWithCredentials } from "./fixtures/auth";
 import type { CourseTestRuntime } from "../../apps/web/src/lib/api";
 
-test("whole-class Test AI grading handles legacy links, newly added rubrics, and rubric-only questions", { tag: "@regression" }, async ({ bankCourse: data, teacherApi, teacherPage: page }) => {
+test("Test AI grading uses matching question templates and authoritative question instructions", { tag: "@regression" }, async ({ bankCourse: data, teacherApi, teacherPage: page }) => {
   test.setTimeout(180_000);
   // Only the remote model is replaced. Submission, plugin dispatch, persistence, and grading are real.
-  const requests: Array<{ submission: { sourceCode: string }; rubric: { criteria: Array<{ id: string }> } }> = [];
+  const requests: Array<{ systemPrompt: string; submission: { sourceCode: string }; rubric: { instructions: string; criteria: Array<{ id: string }> };
+    gradingTemplates?: Array<{ submission: { sourceCode: string }; feedback: Record<string, unknown> }> }> = [];
   const provider = createServer(async (request, response) => {
     try {
       let body = "";
       for await (const chunk of request) body += chunk;
-      const payload = JSON.parse(JSON.parse(body).input) as typeof requests[number];
+      const envelope = JSON.parse(body);
+      const payload = { ...JSON.parse(envelope.input), systemPrompt: envelope.instructions } as typeof requests[number];
       requests.push(payload);
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ output_text: JSON.stringify({
@@ -66,7 +68,7 @@ test("whole-class Test AI grading handles legacy links, newly added rubrics, and
       const parentAttemptId = runtime.attempt!.id;
       ids.push(parentAttemptId);
       for (const child of children) await responseJson(await learner.put(`${assigned}/test/items/${child.id}`, { data: {
-        parentAttemptId, sessionId, state: { sourceCode: `print(1) # learner ${index}` }
+        parentAttemptId, sessionId, state: { sourceCode: `print(1) # learner ${index}, question ${children.indexOf(child)}` }
       } }));
       await responseJson(await learner.post(`${assigned}/test/submit`, { data: { parentAttemptId, sessionId } }));
     }
@@ -80,10 +82,13 @@ test("whole-class Test AI grading handles legacy links, newly added rubrics, and
     const executionEvidence = () => prisma.$queryRaw`SELECT e.* FROM "PluginCodingExerciseExecution" e JOIN "TestItemAttempt" c ON e.id=c.result->'state'->>'executionId' WHERE c."parentAttemptId" IN (${ids[0]}, ${ids[1]}) ORDER BY e.id`;
     const originalExecutions = await executionEvidence();
     // Add the rubric only AFTER both learners submitted, matching the regression.
+    const instructionsFor = (child: typeof children[number]) => child.tests.length
+      ? "Tests and rubric: user-facing input prompts are allowed even when sample output omits them."
+      : "Rubric only: credit a clear solution and give concise feedback.";
     for (const child of children) await responseJson(await teacherApi.put(child.privatePath, { data: {
       tests: child.tests, referenceSolution: "print(1)", privateConfig: {
         templateSource: "{{ STUDENT_CODE }}", aiFeedback: {
-          enabled: true, gradingEnabled: true, instructions: "Apply the newly added criterion.",
+          enabled: true, gradingEnabled: true, instructions: instructionsFor(child),
           testWeightPercent: child.tests.length ? 50 : 0, aiWeightPercent: child.tests.length ? 50 : 100,
           criteria: [{ id: "new-quality", title: "Quality", description: "Evaluate the submitted solution.", weightPercent: 100 }]
         }
@@ -92,9 +97,61 @@ test("whole-class Test AI grading handles legacy links, newly added rubrics, and
     expect((await student.post(`/api/courses/${data.courseId}/gradebook/attempts/${ids[0]}/ai-feedback`, { data: {} })).status()).toBe(403);
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}`);
     await page.getByRole("button", { name: "AI-assess all submissions", exact: true }).click();
-    await confirmSharedDialog(page);
+    const emptySetup = page.getByRole("dialog", { name: "Prepare batch AI grading", exact: true });
+    await expect(emptySetup.getByRole("textbox")).toHaveCount(0);
+    await expect(emptySetup.getByRole("checkbox")).toHaveCount(0);
+    await expect(emptySetup.getByText("Graded examples become available once their grading feedback is complete.", { exact: true })).toBeVisible();
+    await emptySetup.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect(requests).toHaveLength(0);
+    await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/gradebook/attempts/${ids[0]}/ai-feedback`, { data: {} }));
+    expect(requests).toHaveLength(2);
+    expect((await teacherApi.patch(`/api/courses/${data.courseId}/gradebook/activities/${activityId}/ai-grading-batch`, {
+      data: { attemptId: ids[1], instructions: "No Test-wide policy" }
+    })).status()).toBe(400);
+    expect((await teacherApi.post(`/api/courses/${data.courseId}/gradebook/attempts/${ids[1]}/ai-feedback`, {
+      data: { triggerKind: "teacher_batch", instructions: "Do not replace question policy", templateAttemptIds: [ids[0]] }
+    })).status()).toBe(400);
+    expect((await teacherApi.post(`/api/courses/${data.courseId}/gradebook/attempts/${ids[0]}/ai-feedback`, {
+      data: { triggerKind: "teacher_batch", templateAttemptIds: [ids[0]] }
+    })).status()).toBe(400);
+    expect(requests).toHaveLength(2);
+    const batchRequests: Array<{ id: string; body: Record<string, unknown> }> = [];
+    const instructionWrites: string[] = [];
+    page.on("request", request => {
+      if (request.method() === "POST" && request.url().endsWith("/ai-feedback")) {
+        batchRequests.push({ id: new URL(request.url()).pathname.split("/").at(-2)!, body: request.postDataJSON() });
+      }
+      if (request.method() === "PATCH" && request.url().endsWith("/ai-grading-batch")) instructionWrites.push(request.url());
+    });
+    await page.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}`);
+    await page.getByRole("button", { name: "AI-assess all submissions", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Prepare batch AI grading", exact: true });
+    await expect(dialog.getByRole("textbox", { name: "AI instructions", exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole("checkbox", { name: "Update AI instructions in the activity settings", exact: true })).toHaveCount(0);
+    await expect(dialog.getByText("Each question uses its own saved AI grading instructions.", { exact: true })).toBeVisible();
+    await expect(dialog.getByRole("checkbox")).toHaveCount(1);
+    await expect(dialog.getByText("Complete question feedback: 2", { exact: true })).toBeVisible();
+    await dialog.getByRole("checkbox").check();
+    await dialog.getByRole("button", { name: "Start AI grading", exact: true }).click();
     await expect.poll(() => requests.length, { timeout: 60_000 }).toBe(4);
     await expect(page.getByRole("dialog", { name: "Assessing submissions" })).toBeHidden({ timeout: 30_000 });
+    expect(batchRequests).toEqual([{ id: ids[1], body: { triggerKind: "teacher_batch", templateAttemptIds: [ids[0]] } }]);
+    expect(instructionWrites).toHaveLength(0);
+    for (const [index, child] of children.entries()) {
+      const calls = requests.filter(request => request.submission.sourceCode.endsWith(`question ${index}`));
+      expect(calls).toHaveLength(2);
+      for (const call of calls) {
+        expect(call.rubric.instructions).toBe(instructionsFor(child));
+        expect(call.systemPrompt).toContain(instructionsFor(child));
+        expect(call.systemPrompt).toContain("highest priority");
+      }
+      const target = calls.find(call => call.submission.sourceCode.includes("learner 1"))!;
+      expect(target.gradingTemplates).toHaveLength(1);
+      expect(target.gradingTemplates![0].submission.sourceCode).toBe(`print(1) # learner 0, question ${index}`);
+      expect(JSON.stringify(target.gradingTemplates)).not.toContain(ids[0]);
+      expect(JSON.stringify(target.gradingTemplates)).not.toContain("@cognelo.local");
+      expect(JSON.stringify(target.gradingTemplates)).not.toContain(account.email);
+    }
     const grades = await prisma.grade.findMany({ where: { selectedAttemptId: { in: ids } } });
     expect(grades).toHaveLength(2);
     for (const grade of grades) expect(grade.normalizedScore / grade.normalizedMaxScore).toBeCloseTo(0.85);

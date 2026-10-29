@@ -82,9 +82,9 @@ export default function GradebookActivityResultsPage() {
     loading: boolean;
     ready: boolean;
     submitting: boolean;
-    instructions: string;
+    instructions: string | null;
     updateInstructions: boolean;
-    templates: Array<{ attemptId: string; participantName: string; attemptNumber: number }>;
+    templates: Array<{ attemptId: string; participantName: string; attemptNumber: number; questionCount?: number }>;
     selectedTemplateAttemptIds: string[];
     error: string;
   } | null>(null);
@@ -513,8 +513,8 @@ export default function GradebookActivityResultsPage() {
       loading: true,
       ready: false,
       submitting: false,
-      instructions: "",
-      updateInstructions: canManageCourse,
+      instructions: activityTypeKey === "test" ? null : "",
+      updateInstructions: activityTypeKey !== "test" && canManageCourse,
       templates: [],
       selectedTemplateAttemptIds: [],
       error: ""
@@ -541,7 +541,7 @@ export default function GradebookActivityResultsPage() {
         ready: true,
         submitting: false,
         instructions: setup.instructions,
-        updateInstructions: canManageCourse,
+        updateInstructions: setup.instructions !== null && canManageCourse,
         templates: setup.templates,
         selectedTemplateAttemptIds: [],
         error: ""
@@ -557,8 +557,8 @@ export default function GradebookActivityResultsPage() {
 
   async function startGuidedAiGradingBatch() {
     if (!aiGradingBatchDialog) return;
-    const instructions = aiGradingBatchDialog.instructions.trim();
-    if (!instructions) {
+    const instructions = aiGradingBatchDialog.instructions?.trim();
+    if (aiGradingBatchDialog.instructions !== null && !instructions) {
       setAiGradingBatchDialog({ ...aiGradingBatchDialog, error: t("courseDetail.aiBatchInstructionsRequired") });
       return;
     }
@@ -569,7 +569,7 @@ export default function GradebookActivityResultsPage() {
     }
     setAiGradingBatchDialog({ ...aiGradingBatchDialog, submitting: true, error: "" });
     try {
-      if (aiGradingBatchDialog.updateInstructions) {
+      if (instructions && aiGradingBatchDialog.updateInstructions) {
         await api.updateActivityAiGradingInstructions(courseId, activityId, eligible[0].attempt.id, instructions);
       }
       const templateAttemptIds = aiGradingBatchDialog.selectedTemplateAttemptIds;
@@ -584,7 +584,7 @@ export default function GradebookActivityResultsPage() {
     }
   }
 
-  async function generateAiFeedbackForAllRows(guidance?: { instructions: string; templateAttemptIds: string[] }) {
+  async function generateAiFeedbackForAllRows(guidance?: { instructions?: string; templateAttemptIds: string[] }) {
     const eligible = aiFeedbackBatchTargets(guidance?.templateAttemptIds);
     if (!eligible.length) {
       notifications.error(t("courseDetail.aiFeedbackUnavailable"));
@@ -1110,10 +1110,11 @@ export default function GradebookActivityResultsPage() {
                   event.preventDefault();
                   void startGuidedAiGradingBatch();
                 }}>
+                  {aiGradingBatchDialog.instructions === null ? <p className="muted">{t("courseDetail.aiBatchTestInstructionsHelp")}</p> : null}
                   {aiGradingBatchDialog.templates.length ? (
                     <fieldset className="field">
                       <legend>{t("courseDetail.aiBatchTemplatesLabel")}</legend>
-                      <p className="muted">{t("courseDetail.aiBatchTemplatesHelp")}</p>
+                      <p className="muted">{t(aiGradingBatchDialog.instructions === null ? "courseDetail.aiBatchTestTemplatesHelp" : "courseDetail.aiBatchTemplatesHelp")}</p>
                       {aiGradingBatchDialog.templates.map((template) => {
                         const selected = aiGradingBatchDialog.selectedTemplateAttemptIds.includes(template.attemptId);
                         const selectionFull = aiGradingBatchDialog.selectedTemplateAttemptIds.length >= 3;
@@ -1130,14 +1131,16 @@ export default function GradebookActivityResultsPage() {
                                   : current.selectedTemplateAttemptIds.filter((id) => id !== template.attemptId)
                               } : current)}
                             />
-                            <span>{t("courseDetail.aiBatchTemplateAttempt", { name: template.participantName, number: template.attemptNumber })}</span>
+                            <span>{t("courseDetail.aiBatchTemplateAttempt", { name: template.participantName, number: template.attemptNumber })}
+                              {template.questionCount !== undefined ? <small className="muted" style={{ display: "block" }}>{t("courseDetail.aiBatchTestTemplateQuestions", { count: template.questionCount })}</small> : null}
+                            </span>
                           </label>
                         );
                       })}
                       <span className="muted">{t("courseDetail.aiBatchTemplatesSelected", { count: aiGradingBatchDialog.selectedTemplateAttemptIds.length })}</span>
                     </fieldset>
-                  ) : null}
-                  <div className="field">
+                  ) : <p className="muted">{t("courseDetail.aiBatchNoTemplates")}</p>}
+                  {aiGradingBatchDialog.instructions !== null ? <><div className="field">
                     <label htmlFor="ai-grading-batch-instructions">{t("courseDetail.aiBatchInstructionsLabel")}</label>
                     <textarea
                       id="ai-grading-batch-instructions"
@@ -1157,7 +1160,7 @@ export default function GradebookActivityResultsPage() {
                       onChange={(event) => setAiGradingBatchDialog((current) => current ? { ...current, updateInstructions: event.target.checked } : current)}
                     />
                     <span>{t("courseDetail.aiBatchUpdateInstructions")}</span>
-                  </label> : null}
+                  </label> : null}</> : null}
                   {aiGradingBatchDialog.error ? <p className="error-text" role="alert">{aiGradingBatchDialog.error}</p> : null}
                   <div className="dialog-actions">
                     <button className="button secondary" disabled={aiGradingBatchDialog.submitting} type="button" onClick={() => setAiGradingBatchDialog(null)}>

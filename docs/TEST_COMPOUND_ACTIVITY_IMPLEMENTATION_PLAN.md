@@ -377,6 +377,14 @@ Overall comments live in the Test attempt metadata (`testReviewFeedbackText`) an
 
 Regression coverage is in `test-manual-feedback.spec.ts` (including cross-question draft retention and warnings when changing students), the API-only `test-review-save-all.spec.ts`, the broader activity workflow, and core/plugin/draft-state unit tests. No schema migration is required.
 
+### Guided AI grading examples
+
+Whole-class AI grading offers up to three graded Test submissions as examples, without Test-level instructions. Each question retains its own saved instructions, promoted to the model system prompt as the authoritative assessment policy. The selected Tests are excluded from batch targets. The dialog shows how many questions have complete feedback available for use as examples.
+
+Core revalidates every selected parent and uses only compatible, complete question feedback through the owning plugin's batch/teacher-review contracts. Matching uses stable question/activity/type identities and frozen prompt/configuration, so shuffled order cannot cross-wire answers and changed questions cannot borrow incompatible examples. Partial coverage is allowed and visible; questions without a matching example are assessed normally. Invalid, foreign, ungraded, duplicate, self-selected, or entirely unusable examples fail before target evaluation. No learner identity is passed as model metadata. Test-wide instruction writes or run overrides are rejected; child guidance contains only examples.
+
+Coverage: `test-coding-ai-grading.spec.ts` verifies real API/UI selection, excluded examples, matching source and policy per question, absence of global instruction controls/writes, legacy evidence, rubric-only grading, and unchanged submissions with a local model stand-in. `guided-ai-grading.spec.ts` retains standalone instruction editing and the three-example cap. Core tests cover scope, order, completeness, and content compatibility.
+
 ### Teacher automatic regrading
 
 **Rerun automatic grading** reevaluates every child in the selected submitted/graded attempt's frozen manifest against current child authoring, then recalculates the weighted Test total. It does not add questions created after submission or change the attempt's original points, answers, start, submission time, or grade-release state. The learner owns execution evidence; the requesting teacher owns the grading audit. **Rerun automatic grading for all** applies the identical batch to each selected student submission in the report's section scope.

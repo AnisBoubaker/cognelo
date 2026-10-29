@@ -9,7 +9,8 @@ import {
   assertCanManageCourse,
   getActivityAttemptRegradeContext,
   getActivityAttemptRegradeContexts,
-  getTeacherAttemptAiFeedbackReview
+  getTeacherAttemptAiFeedbackReview,
+  prepareTestAiGradingTemplates
 } from "@cognelo/core";
 import { z } from "zod";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
@@ -38,6 +39,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     const contexts = await getActivityAttemptRegradeContexts(user, courseId, attemptIds);
     contexts.forEach((context) => assertActivityMatches(context.activityId, activityId));
     const first = contexts[0];
+    if (first.activityTypeKey === "test") {
+      return json(await prepareTestAiGradingTemplates(user, courseId, activityId, attemptIds));
+    }
     const batchGrading = resolvePluginAiGradingBatchHandler(first.activityTypeKey);
     const teacherReview = resolvePluginAiFeedbackTeacherReviewHandler(first.activityTypeKey);
     if (!batchGrading || !teacherReview) {
@@ -72,6 +76,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const body = updateSchema.parse(await readJson(request));
     const context = await getActivityAttemptRegradeContext(user, courseId, body.attemptId);
     assertActivityMatches(context.activityId, activityId);
+    if (context.activityTypeKey === "test") {
+      throw new AppError(400, "TEST_AI_INSTRUCTIONS_QUESTION_SPECIFIC", "Edit AI grading instructions on each Test question, not on the Test.");
+    }
     const batchGrading = resolvePluginAiGradingBatchHandler(context.activityTypeKey);
     if (!batchGrading) {
       throw new AppError(409, "PLUGIN_AI_BATCH_GRADING_UNAVAILABLE", "This activity type does not provide batch AI grading settings.");

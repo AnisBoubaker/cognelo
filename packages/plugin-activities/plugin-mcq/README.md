@@ -64,3 +64,5 @@ Submitted answers are constrained to authored questions and choices before gradi
 Dialogs follow the shared [persistent header and icon-only close pattern](../../../docs/DIALOGS.md), preserving cancellation guards and blocking progress.
 
 Inside Tests, manual review retains drafts across questions and uses one [Save all action](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Question score edits update the calculated Test total; changing student/submission or closing still warns about unsaved changes.
+
+Assessment feedback now places the question’s saved teacher instructions in the model system prompt, ahead of question/example assumptions. Deterministic MCQ grades remain unchanged.

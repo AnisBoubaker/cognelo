@@ -154,3 +154,7 @@ Authoring, confirmation, submission, and review dialogs reuse the [shared persis
 ## Saving Test reviews
 
 Question review participates in the host’s [single Save all transaction](../../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Drafts survive navigation between questions; switching students/submissions or leaving still warns. Scores and comments are saved with the recalculated total and audit, without re-executing the answer.
+
+## Teacher feedback instruction priority
+
+Prompt version `mcq-feedback-v2` includes saved assessment instructions directly in the system message through `assessmentInstructionPrompt`, in addition to the private request snapshot. Teacher tone/tolerance/permissions take priority over assumptions inferred from question or example text; question content remains data. MCQ feedback still cannot propose or change deterministic grades. Test templates apply only to plugins with the explicit batch-grading capability; MCQ keeps its own feedback instructions.

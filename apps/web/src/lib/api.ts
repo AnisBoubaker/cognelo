@@ -1426,11 +1426,12 @@ export type TeacherAiFeedbackReview = {
 
 export type AiGradingBatchSetup = {
   available: boolean;
-  instructions: string;
+  instructions: string | null;
   templates: Array<{
     attemptId: string;
     participantName: string;
     attemptNumber: number;
+    questionCount?: number;
   }>;
 };
 

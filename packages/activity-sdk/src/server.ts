@@ -212,7 +212,8 @@ export type PluginAiGradingTemplate = {
 };
 
 export type PluginAiGradingBatchGuidance = {
-  instructions: string;
+  /** Omit for compound Tests: each question retains its own saved instructions. */
+  instructions?: string;
   templates: readonly PluginAiGradingTemplate[];
 };
 

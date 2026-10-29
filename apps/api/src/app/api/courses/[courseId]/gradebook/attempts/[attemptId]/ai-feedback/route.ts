@@ -6,7 +6,7 @@ import {
   type PluginAiFeedbackTeacherReviewContext,
   type PluginAiGradingBatchGuidance
 } from "@cognelo/activity-sdk/server";
-import { AppError, getActivityAttemptRegradeContext, getTeacherAttemptAiFeedbackReview, getTestAttemptReview, recordActivityAttemptAiFeedback, recordActivityAttemptGradingResult, recordAiFeedbackResearchEvent, recordTestItemAiFeedback, recalculateTestAttemptGrade, reviseTeacherAttemptAiFeedback } from "@cognelo/core";
+import { AppError, getActivityAttemptRegradeContext, getTeacherAttemptAiFeedbackReview, recordActivityAttemptAiFeedback, recordActivityAttemptGradingResult, recordAiFeedbackResearchEvent, recordTestItemAiFeedback, recalculateTestAttemptGrade, resolveTestAiGradingGuidance, reviseTeacherAttemptAiFeedback } from "@cognelo/core";
 import type { Prisma } from "@cognelo/db";
 import { z } from "zod";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
@@ -149,6 +149,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     const body = generateSchema.parse(await readJson(request).catch(() => ({})));
     const triggerKind = body.triggerKind ?? "teacher_single";
     const context = await getActivityAttemptRegradeContext(user, courseId, attemptId);
+    if (context.activityTypeKey === "test" && body.instructions !== undefined) {
+      throw new AppError(400, "TEST_AI_INSTRUCTIONS_QUESTION_SPECIFIC", "A Test uses each question's saved AI grading instructions.");
+    }
     await recordAiFeedbackResearchEvent({
       eventType: "teacher_evaluation_started",
       courseId,
@@ -163,7 +166,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       outcome: "started"
     });
     if (context.activityTypeKey === "test") {
-      const review = await getTestAttemptReview(user, courseId, attemptId);
+      const { review, guidance } = await resolveTestAiGradingGuidance(user, courseId, attemptId, body.templateAttemptIds ?? []);
       const evaluations = [];
       for (const item of review.items) {
         const evaluateChild = resolvePluginAiFeedbackHandler(item.activityTypeKey);
@@ -178,6 +181,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             pluginAttemptRef: item.itemAttempt.pluginAttemptRef,
             activity: item.activity,
             triggerKind: "test_child",
+            batchGuidance: guidance.get(item.testItemId),
             testItemAttempt: {
               id: item.itemAttempt.id,
               parentAttemptId: context.attemptId,
@@ -225,7 +229,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!evaluateAttempt) {
       throw new AppError(409, "PLUGIN_AI_FEEDBACK_UNAVAILABLE", "This activity type does not support AI assessment feedback.");
     }
-    const batchGuidance = triggerKind === "teacher_batch" && body.instructions !== undefined
+    const batchGuidance = triggerKind === "teacher_batch" && (body.instructions !== undefined || body.templateAttemptIds?.length)
       ? await resolveBatchGuidance({
           user,
           courseId,
@@ -306,7 +310,7 @@ async function resolveBatchGuidance(input: {
   targetAttemptId: string;
   targetActivityId: string;
   activityTypeKey: string;
-  instructions: string;
+  instructions?: string;
   templateAttemptIds: string[];
 }): Promise<PluginAiGradingBatchGuidance> {
   const batchGrading = resolvePluginAiGradingBatchHandler(input.activityTypeKey);

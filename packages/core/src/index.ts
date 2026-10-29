@@ -34,6 +34,8 @@ export * from "./student-team-choice";
 export * from "./tests";
 export * from "./test-execution";
 export * from "./test-item-review";
+export * from "./test-ai-grading";
+export * from "./assessment-instructions";
 export * from "./test-regrading";
 export * from "./test-timeout-recovery";
 export * from "./users";
