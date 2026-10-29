@@ -135,6 +135,7 @@ type ManualGradingRendererContext = {
   onDeleteSubmission: () => Promise<void>;
   onTestReviewSaved?: () => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
+  onSavingChange?: (saving: boolean) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
@@ -1417,6 +1418,7 @@ export const manualGradingRenderers: Record<string, (context: ManualGradingRende
   ),
   "test-manual-grading": (context) => (
     <TestManualGradingPanel
+      key={`${context.row.participantId}:${context.selectedAttempt?.id ?? "loading"}`}
       {...context}
       attempts={context.attempts as CourseTestAttemptReview[]}
       selectedAttempt={context.selectedAttempt as CourseTestAttemptReview | null}

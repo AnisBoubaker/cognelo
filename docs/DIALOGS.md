@@ -8,7 +8,7 @@ The header stays at the top of the dialog's scroll area. Ordinary dialogs use a 
 
 The review workspace has one accessible dialog containing both its action bar and scrolling panel. Previous student, student position, Next student, Activity messages, and the close cross share one compact row above the content. The bar can use the available width instead of stacking Activity messages below navigation. At narrow widths, the action labels yield to icons; localized accessible names and tooltips remain.
 
-Plugin manual-review panels accept optional `embedded` presentation. Inside the host workspace, they omit a second dialog role and duplicate close control. Standalone panels keep their own sticky header and close cross. The host continues to own unsaved-feedback confirmation and student navigation. Embedded Class overview content remains ordinary page content, without a sticky dialog heading.
+Plugin manual-review panels accept optional `embedded` presentation. Inside the host workspace, they omit a second dialog role and duplicate close control. Standalone panels keep their own sticky header and close cross. The host continues to own unsaved-feedback confirmation and student navigation. Test review has one Save all action; drafts persist between questions, while changing students/submissions or closing still requires the existing unsaved-change confirmation. Navigation and dismissal are disabled during the save. Embedded Class overview content remains ordinary page content, without a sticky dialog heading.
 
 ## Dismissal semantics
 

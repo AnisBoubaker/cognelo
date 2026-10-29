@@ -1,4 +1,4 @@
-import type { AnswerExportRequest, AnswerExportStudent } from "@cognelo/contracts";
+import type { AnswerExportRequest, AnswerExportStudent, TestAttemptReviewInput } from "@cognelo/contracts";
 import type {
   ActivityMessageDeletionInput,
   ActivityMessageTestItemInput,
@@ -1436,6 +1436,11 @@ export type AiGradingBatchSetup = {
 
 export type CourseTestAttemptReview = {
   id: string;
+  feedbackText: string;
+  updatedAt: string;
+  readOnly: boolean;
+  gradeUpdatedAt: string | null;
+  grade: { score: number; maxScore: number; source: string; updatedAt: string } | null;
   attemptNumber: number;
   lifecycle: string;
   submittedAt: string | null;
@@ -1449,6 +1454,8 @@ export type CourseTestAttemptReview = {
     activity: Activity;
     itemAttempt: {
       id: string;
+      updatedAt: string;
+      manuallyGraded: boolean;
       pluginAttemptRef?: string | null;
       lifecycle: string;
       rawScore: number | null;
@@ -2101,6 +2108,10 @@ export const api = {
     ),
   testAttemptReview: (courseId: string, attemptId: string) =>
     request<{ review: CourseTestAttemptReview }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/test-review`),
+  saveTestAttemptReview: (courseId: string, attemptId: string, input: TestAttemptReviewInput) =>
+    request<{ review: CourseTestAttemptReview; items: TestItemTeacherReview[] }>(`/courses/${courseId}/gradebook/attempts/${attemptId}/test-review`, {
+      method: "PATCH", body: JSON.stringify(input)
+    }),
   reopenActivitySubmission: (courseId: string, attemptId: string) =>
     request<{ result: { attempt: GradebookMutationAttempt } }>(
       `/courses/${courseId}/gradebook/attempts/${attemptId}/reopen`, { method: "POST" }

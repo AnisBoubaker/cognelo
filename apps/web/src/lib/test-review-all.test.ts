@@ -108,6 +108,8 @@ function response(participantId: string, participantName: string, answers: Recor
       activity: {} as CourseTestAttemptReview["items"][number]["activity"],
       itemAttempt: {
         id: `item-attempt-${participantId}`,
+        updatedAt: "2026-08-07T12:01:00.000Z",
+        manuallyGraded: false,
         lifecycle: "graded",
         rawScore: null,
         rawMaxScore: null,
@@ -136,6 +138,11 @@ function testSubmission(
     isLate,
     review: {
       id: `attempt-${participantId}`,
+      updatedAt: "2026-08-07T12:01:00.000Z",
+      readOnly: false,
+      feedbackText: "",
+      gradeUpdatedAt: null,
+      grade: null,
       attemptNumber: 1,
       lifecycle: normalizedScore === null ? "submitted" : "graded",
       submittedAt: "2026-08-07T12:00:00.000Z",

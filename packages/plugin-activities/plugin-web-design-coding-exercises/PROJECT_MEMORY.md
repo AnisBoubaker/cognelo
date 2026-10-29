@@ -46,3 +46,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Test review uses the host comment/grade form around the retained-file inspector. Manual review must not execute submitted HTML/JavaScript or call the runner; see [Test teacher review](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading).
 
 - Host review and shared editor/progress dialogs follow the [dialog header contract](../../../docs/DIALOGS.md); preserve learner files and non-dismissible running operations.
+
+- Test review uses the host’s [atomic Save all workflow](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Keep question drafts when switching questions, retain warnings across students/submissions, and let the host recompute the total once. New rubric edits may explicitly clear an older item override; never execute answers during review.

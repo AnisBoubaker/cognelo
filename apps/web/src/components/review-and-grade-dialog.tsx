@@ -83,6 +83,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
   const [savingAction, setSavingAction] = useState<"delete" | "override" | "regrade" | null>(null);
   const [showMessages, setShowMessages] = useState(false);
   const [manualDirty, setManualDirty] = useState(false);
+  const [manualSaving, setManualSaving] = useState(false);
   const [regradeProgress, setRegradeProgress] = useState<TestRegradeProgress | null>(null);
   const loadReviewRef = useRef<() => void>(() => undefined);
   const loadedReviewIdentityRef = useRef<string | null>(null);
@@ -432,6 +433,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
     ? feedbackReview?.attemptReferences[feedbackReview.selectedAttemptIndex]?.coreAttemptId
     : row.attempts.find((attempt) => attempt.id === selectedAttempt?.id || attempt.pluginAttemptRef === selectedAttempt?.id)?.id;
   const close = async () => {
+    if (manualSaving || savingAction || feedbackReview?.saving) return;
     if (!(manualDirty || (feedbackReview && hasUnsavedFeedbackReview(feedbackReview))) || await dialogs.confirm({
       message: t("courseDetail.feedbackReviewDiscardConfirm"),
       confirmVariant: "danger"
@@ -439,6 +441,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
   };
   const classIndex = classRows?.findIndex(candidate => candidate.gradebookItemId === row.gradebookItemId && candidate.participantId === row.participantId) ?? -1;
   async function selectClassRow(index: number) {
+    if (manualSaving || savingAction || feedbackReview?.saving) return;
     const next = classRows?.[index];
     if (!next || !onSelectRow) return;
     if ((manualDirty || (feedbackReview && hasUnsavedFeedbackReview(feedbackReview))) && !await dialogs.confirm({
@@ -461,12 +464,12 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
       <div className="review-chat-workspace" role="dialog" aria-modal="true" aria-label={t("courseDetail.reviewAndGrade")}>
         <div className="review-chat-toolbar">
           {classRows && classIndex >= 0 && onSelectRow ? <nav className="review-student-navigation" aria-label={t("courseDetail.testReviewStudents")}>
-            <button className="button secondary" type="button" aria-label={t("courseDetail.feedbackReviewPrevious")} title={t("courseDetail.feedbackReviewPrevious")} disabled={classIndex === 0} onClick={() => { void selectClassRow(classIndex - 1); }}><AppIcon name="back" /><span className="review-toolbar-label">{t("courseDetail.feedbackReviewPrevious")}</span></button>
+            <button className="button secondary" type="button" aria-label={t("courseDetail.feedbackReviewPrevious")} title={t("courseDetail.feedbackReviewPrevious")} disabled={manualSaving || Boolean(savingAction) || Boolean(feedbackReview?.saving) || classIndex === 0} onClick={() => { void selectClassRow(classIndex - 1); }}><AppIcon name="back" /><span className="review-toolbar-label">{t("courseDetail.feedbackReviewPrevious")}</span></button>
             <span>{classIndex + 1} / {classRows.length}</span>
-            <button className="button secondary" type="button" aria-label={t("courseDetail.feedbackReviewNext")} title={t("courseDetail.feedbackReviewNext")} disabled={classIndex === classRows.length - 1} onClick={() => { void selectClassRow(classIndex + 1); }}><AppIcon name="next" /><span className="review-toolbar-label">{t("courseDetail.feedbackReviewNext")}</span></button>
+            <button className="button secondary" type="button" aria-label={t("courseDetail.feedbackReviewNext")} title={t("courseDetail.feedbackReviewNext")} disabled={manualSaving || Boolean(savingAction) || Boolean(feedbackReview?.saving) || classIndex === classRows.length - 1} onClick={() => { void selectClassRow(classIndex + 1); }}><AppIcon name="next" /><span className="review-toolbar-label">{t("courseDetail.feedbackReviewNext")}</span></button>
           </nav> : null}
           <button type="button" className="secondary" aria-label={t("activityMessenger.title")} title={t("activityMessenger.title")} onClick={() => setShowMessages(true)}><AppIcon name="messages" /><span className="review-toolbar-label">{t("activityMessenger.title")}</span></button>
-          <DialogCloseButton label={t("common.close")} onClose={close} />
+          <DialogCloseButton label={t("common.close")} onClose={close} disabled={manualSaving || Boolean(savingAction) || Boolean(feedbackReview?.saving)} />
         </div>
       {useFeedbackReview ? feedbackReview ? (
           <AiFeedbackReviewPanel
@@ -516,6 +519,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
         onDeleteSubmission: () => deleteSelectedSubmission(selectedAttempt),
         onTestReviewSaved: refreshTestReview,
         onDirtyChange: setManualDirty,
+        onSavingChange: setManualSaving,
         t
       }) : <LoadingReviewDialog t={t} />
       : (

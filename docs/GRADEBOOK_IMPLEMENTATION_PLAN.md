@@ -607,3 +607,8 @@ Frontend tests where practical:
 ### Export security invariants
 
 Both legacy course CSV and activity-result CSV use the shared cell escaper. Student-controlled text beginning with a spreadsheet formula marker, including leading whitespace/control characters, is literal text; numeric score cells remain numeric. PDF/ZIP preparation and rendering follow the aggregate budgets in [answer exports](ANSWER_EXPORTS.md).
+
+
+### Unified Test review saving
+
+Test review uses one [Save all boundary](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading) for question rubric scores, feedback, item grades, the overall comment, and an explicit total override. Draft totals follow question edits without requiring intermediate saves. Existing saved overrides no longer silently freeze a new rubric edit; deliberate current-draft overrides remain explicit. The atomic save rechecks all versions and preserves audit, partial-grade, historical/read-only, grade-selection, and release behavior.

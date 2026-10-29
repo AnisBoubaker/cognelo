@@ -217,3 +217,7 @@ The production runner image starts Node directly, omits global npm and unused Fi
 ## Dialog presentation
 
 Authoring, confirmation, submission, and review dialogs reuse the [shared persistent header and close cross](../../../../docs/DIALOGS.md). The host review toolbar keeps navigation, messages, and dismissal on one row; embedded review panels leave the modal boundary and close action to that host. Existing draft guards, busy states, and non-dismissible progress remain in force.
+
+## Saving Test reviews
+
+Question review participates in the host’s [single Save all transaction](../../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Drafts survive navigation between questions; switching students/submissions or leaving still warns. Scores and comments are saved with the recalculated total and audit, without re-executing the answer.

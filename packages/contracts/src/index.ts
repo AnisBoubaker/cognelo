@@ -13,6 +13,7 @@ function partialWithoutDefaults<T extends z.ZodRawShape>(schema: z.ZodObject<T>)
 }
 
 export type { TestRegradeProgress, TestRegradeItemResult } from "./test-regrading";
+export { TestItemReviewInputSchema, TestAttemptReviewInputSchema, type TestItemReviewInput, type TestAttemptReviewInput } from "./test-review";
 
 export const RoleKeySchema = z.enum(["admin", "course_manager", "teacher", "student"]);
 export type RoleKey = z.infer<typeof RoleKeySchema>;

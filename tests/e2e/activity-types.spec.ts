@@ -856,14 +856,11 @@ test.describe.serial("authoring and completing every activity type", () => {
     await testReview.getByRole("button", { name: `Activity 2: ${parsonsTitle}`, exact: true }).click();
     await expect(testReview.getByRole("heading", { name: parsonsTitle })).toBeVisible();
     await testReview.getByRole("textbox", { name: "Comments", exact: true }).fill("Reviewed arrangement.");
-    await testReview.getByRole("button", { name: "Save review", exact: true }).click();
-    await expect(testReview.getByRole("button", { name: "Save review", exact: true })).toBeDisabled();
+    await testReview.getByRole("button", { name: "Save all", exact: true }).click();
+    await expect(testReview.getByRole("button", { name: "Save all", exact: true })).toBeDisabled();
     await testReview.getByRole("button", { name: `Activity 1: ${mcqTitle}`, exact: true }).click();
     await testReview.getByLabel("Final grade (out of 1)", { exact: true }).fill("0.6");
-    const mcqItem = testReview
-      .getByRole("heading", { name: mcqTitle })
-      .locator("xpath=ancestor::article[1]");
-    await mcqItem.getByRole("button", { name: "Save review", exact: true }).click();
+    await testReview.getByRole("button", { name: "Save all", exact: true }).click();
     await expect(testReview.getByText("0.6 / 1", { exact: true })).toBeVisible();
     await testReview.getByRole("button", { name: "Close", exact: true }).click();
     await expect(testReview).toBeHidden();

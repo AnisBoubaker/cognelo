@@ -58,3 +58,5 @@ Timed finalization uses only server-saved work after expiry; see [deadline enfor
 Prompt and feedback rendering follows the [shared Markdown security contract](../../../docs/plugin-authoring/03-core-services.md#what-markdownrenderer-gives-you); raw attributed HTML is shown literally.
 
 Dialogs follow the shared [persistent header and icon-only close pattern](../../../docs/DIALOGS.md), preserving cancellation guards and blocking progress.
+
+Inside Tests, manual review retains drafts across questions and uses one [Save all action](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Question score edits update the calculated Test total; changing student/submission or closing still warns about unsaved changes.

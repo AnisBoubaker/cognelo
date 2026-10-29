@@ -42,3 +42,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Test review uses the host comment/grade form around the existing arrangement inspector. Reviewing and saving comments must not evaluate or modify the submitted arrangement; see [Test teacher review](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading).
 
 - Use the shared [dialog headers](../../../docs/DIALOGS.md) for persistent icon-only dismissal. Manual review embedded in the host omits duplicate dialog roles/close controls; keep guarded callbacks and busy states.
+
+- Test review uses the host’s [atomic Save all workflow](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Keep question drafts when switching questions, retain warnings across students/submissions, and let the host recompute the total once. New rubric edits may explicitly clear an older item override; never execute answers during review.

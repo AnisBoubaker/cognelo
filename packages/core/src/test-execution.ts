@@ -489,6 +489,8 @@ export async function getTestAttemptReview(user: CurrentUser, courseId: string, 
     lifecycle: parentAttempt.lifecycle,
     submittedAt: parentAttempt.submittedAt?.toISOString() ?? null,
     gradedAt: parentAttempt.gradedAt?.toISOString() ?? null,
+    feedbackText: typeof asRecord(parentAttempt.metadata).testReviewFeedbackText === "string"
+      ? String(asRecord(parentAttempt.metadata).testReviewFeedbackText) : null,
     items: manifestItems(parentAttempt.metadata).flatMap((manifestItem) => {
       const itemAttempt = attemptByItemId.get(manifestItem.testItemId);
       if (!itemAttempt) return [];
@@ -720,6 +722,8 @@ function testAttemptGradingInput(parentAttempt: Awaited<ReturnType<typeof loadTe
     normalizedResult: {
       studentFeedback: {
         kind: "test",
+        ...(typeof asRecord(parentAttempt.metadata).testReviewFeedbackText === "string"
+          ? { feedbackText: asRecord(parentAttempt.metadata).testReviewFeedbackText } : {}),
         details: { items }
       }
     } as Prisma.InputJsonValue,

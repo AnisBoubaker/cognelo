@@ -122,3 +122,5 @@ Judge0 execution is queued and polled through core, keeping the API container un
 Production uses cgroup memory accounting and separate compiler ceilings; validate required languages after image or limit changes. See [Judge0 integration](docs/REFERENCE.md#judge0-integration).
 
 Dialogs follow the shared [persistent header and icon-only close pattern](../../../docs/DIALOGS.md), preserving cancellation guards and blocking progress.
+
+Inside Tests, manual review retains drafts across questions and uses one [Save all action](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Question score edits update the calculated Test total; changing student/submission or closing still warns about unsaved changes.

@@ -1,5 +1,5 @@
 import { resolvePluginAiFeedbackTeacherReviewHandler, type PluginAiFeedbackTeacherReviewContext } from "@cognelo/activity-sdk/server";
-import type { CurrentUser } from "@cognelo/contracts";
+import type { CurrentUser, TestItemReviewInput, TestAttemptReviewInput } from "@cognelo/contracts";
 import { prisma, type Prisma } from "@cognelo/db";
 import { buildTeacherFeedbackRevision, hashAiFeedbackValue } from "./ai-feedback";
 import { AppError, notFound } from "./errors";
@@ -49,14 +49,8 @@ export async function getTestItemTeacherReview(user: CurrentUser, courseId: stri
   return (await loadReview(user, courseId, parentAttemptId, testItemId)).review;
 }
 
-export async function saveTestItemTeacherReview(user: CurrentUser, courseId: string, parentAttemptId: string, testItemId: string, input: {
-  expectedUpdatedAt: string;
-  expectedFeedbackHash: string | null;
-  feedback?: unknown;
-  feedbackText?: string;
-  score?: number;
-  reason?: string | null;
-}) {
+async function saveTestItemReview(user: CurrentUser, courseId: string, parentAttemptId: string, testItemId: string,
+  input: TestItemReviewInput, transaction?: Prisma.TransactionClient) {
   const { parent, item, handler, context, hasFeedback, review } = await loadReview(user, courseId, parentAttemptId, testItemId);
   if (review.readOnly) throw new AppError(409, "TEST_REVIEW_READ_ONLY", "Only the latest submitted Test attempt can be edited.");
   if (review.updatedAt !== input.expectedUpdatedAt || review.feedbackHash !== input.expectedFeedbackHash) throw reviewConflict();
@@ -73,15 +67,18 @@ export async function saveTestItemTeacherReview(user: CurrentUser, courseId: str
     feedbackRef: hasFeedback ? String(currentFeedback.feedbackRef) : `teacher-feedback:${item.itemAttempt.id}`,
     feedbackVersion: hasFeedback ? Number(currentFeedback.feedbackVersion) : 1
   }) : null;
-  // A teacher's explicit item override survives later rubric/narrative edits.
+  if (input.useRubricScore && (input.score !== undefined || !revision?.gradingResult)) {
+    throw new AppError(400, "TEST_RUBRIC_GRADE_UNAVAILABLE", "Change a rubric score before returning this question to its calculated grade.");
+  }
+  // A new rubric-score edit can explicitly replace an older item override.
   const grading = input.score !== undefined ? { rawScore: input.score, rawMaxScore: item.pointsPossible }
-    : review.manuallyGraded ? null : revision?.gradingResult ?? null;
+    : review.manuallyGraded && !input.useRubricScore ? null : revision?.gradingResult ?? null;
   if (grading && (!Number.isFinite(grading.rawScore) || !Number.isFinite(grading.rawMaxScore) || grading.rawMaxScore <= 0
     || grading.rawScore < 0 || grading.rawScore > grading.rawMaxScore)) {
     throw new AppError(400, "TEST_ITEM_GRADING_RESULT_INVALID", "The activity returned an invalid score.");
   }
 
-  const result = await prisma.$transaction(async tx => {
+  const write = async (tx: Prisma.TransactionClient) => {
     await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id = ${parent.id} FOR UPDATE`;
     const claim = await tx.testSubmissionClaim.findUnique({ where: { parentAttemptId } });
     if (claim?.status === "processing" && claim.updatedAt.getTime() > now.getTime() - 30 * 60_000) {
@@ -93,7 +90,7 @@ export async function saveTestItemTeacherReview(user: CurrentUser, courseId: str
     if ((await latestSubmittedAttempt(parent, tx))?.id !== parent.id) throw reviewConflict();
     const current = await tx.testItemAttempt.findUnique({ where: { id: item.itemAttempt.id } });
     if (!current || current.updatedAt.toISOString() !== input.expectedUpdatedAt) throw reviewConflict();
-    const previousGrade = grading ? await tx.grade.findUnique({ where: {
+    const previousGrade = grading && !transaction ? await tx.grade.findUnique({ where: {
       gradebookItemId_participantId: { gradebookItemId: parent.gradebookItemId, participantId: parent.participantId }
     } }) : null;
     const nextFeedback = {
@@ -102,6 +99,7 @@ export async function saveTestItemTeacherReview(user: CurrentUser, courseId: str
     };
     const nextResult = { ...record(current.result),
       ...(revised ? { aiFeedbackRef: revised.nextFeedback.feedbackRef, aiFeedbackVersion: revised.nextFeedback.feedbackVersion } : {}),
+      ...(input.useRubricScore ? { manualGrading: null } : {}),
       ...(input.score !== undefined ? { manualGrading: { score: input.score, pointsPossible: item.pointsPossible,
         graderUserId: user.id, reason: input.reason ?? null, gradedAt: now.toISOString() } } : {})
     };
@@ -131,6 +129,8 @@ export async function saveTestItemTeacherReview(user: CurrentUser, courseId: str
           ...(challenge ? { gradeChallengeId: challenge.id } : {}) }
       } });
     }
+    // The batch owns the single aggregate update after every question is saved.
+    if (transaction) return null;
     if (!grading) return { grade: await refreshTestAttemptFeedback(user, courseId, parent.id, tx) };
     try {
       const result = await recalculateTestAttemptGrade(user, courseId, parent.id, input.reason ?? "Teacher Test review", tx);
@@ -150,11 +150,123 @@ export async function saveTestItemTeacherReview(user: CurrentUser, courseId: str
       if (error instanceof AppError && error.code === "TEST_ITEMS_NOT_GRADED") return null;
       throw error;
     }
-  }, { isolationLevel: "Serializable" }).catch(error => {
+  };
+  const result = await (transaction ? write(transaction) : prisma.$transaction(write, { isolationLevel: "Serializable" })).catch(error => {
     if (["P2025", "P2034"].includes(String(record(error).code))) throw reviewConflict();
     throw error;
   });
-  return { review: await getTestItemTeacherReview(user, courseId, parentAttemptId, testItemId), grade: result?.grade ?? null };
+  return { grade: result?.grade ?? null, gradingChanged: Boolean(grading) };
+}
+
+export async function saveTestItemTeacherReview(user: CurrentUser, courseId: string, parentAttemptId: string, testItemId: string,
+  input: TestItemReviewInput) {
+  const result = await saveTestItemReview(user, courseId, parentAttemptId, testItemId, input);
+  return { review: await getTestItemTeacherReview(user, courseId, parentAttemptId, testItemId), grade: result.grade };
+}
+
+/** The saved grade version accompanies the attempt, so polling cannot silently replace a draft's baseline. */
+export async function getTestAttemptTeacherReview(user: CurrentUser, courseId: string, parentAttemptId: string) {
+  const review = await getTestAttemptReview(user, courseId, parentAttemptId);
+  const grade = await prisma.grade.findUnique({ where: { gradebookItemId_participantId: {
+    gradebookItemId: review.gradebookItemId, participantId: review.participantId
+  } } });
+  return { ...review, readOnly: (await latestSubmittedAttempt(review))?.id !== review.id,
+    feedbackText: review.feedbackText ?? String(record(record(grade?.normalizedResult).studentFeedback).feedbackText ?? ""),
+    grade: grade?.isActive ? { score: grade.normalizedScore, maxScore: grade.normalizedMaxScore,
+      source: grade.source, updatedAt: grade.updatedAt.toISOString() } : null,
+    gradeUpdatedAt: grade?.updatedAt.toISOString() ?? null };
+}
+
+/** Save the whole review atomically, without executing answers or contacting AI. */
+export async function saveTestAttemptTeacherReview(user: CurrentUser, courseId: string, parentAttemptId: string,
+  input: TestAttemptReviewInput) {
+  const parent = await getTestAttemptReview(user, courseId, parentAttemptId);
+  if (parent.updatedAt !== input.expectedUpdatedAt) throw reviewConflict();
+  if ((await latestSubmittedAttempt(parent))?.id !== parent.id) {
+    throw new AppError(409, "TEST_REVIEW_READ_ONLY", "Only the latest submitted Test attempt can be edited.");
+  }
+  const itemIds = input.items.map(item => item.testItemId);
+  if (itemIds.length > 100 || new Set(itemIds).size !== itemIds.length || (!itemIds.length && !input.total && input.feedbackText === undefined)) {
+    throw new AppError(400, "TEST_REVIEW_ITEMS_INVALID", "Supply distinct questions or a Test total change.");
+  }
+  if (itemIds.some(id => !parent.items.some(item => item.testItemId === id))) throw notFound("Test item attempt");
+  if (input.total?.mode === "override" && (!Number.isFinite(input.total.score) || input.total.score < 0)) {
+    throw new AppError(400, "TEST_ITEM_SCORE_OUT_OF_RANGE", "The Test total must be a nonnegative score.");
+  }
+
+  await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id = ${parent.id} FOR UPDATE`;
+    const current = await tx.activityAttempt.findUnique({ where: { id: parent.id } });
+    if (!current || current.updatedAt.toISOString() !== input.expectedUpdatedAt || !["submitted", "graded"].includes(current.lifecycle)) throw reviewConflict();
+    if ((await latestSubmittedAttempt(parent, tx))?.id !== parent.id) throw reviewConflict();
+    const claim = await tx.testSubmissionClaim.findUnique({ where: { parentAttemptId } });
+    if (claim?.status === "processing" && claim.updatedAt.getTime() > Date.now() - 30 * 60_000) {
+      throw new AppError(409, "TEST_SUBMISSION_IN_PROGRESS", "This Test is being graded. Wait before saving the review.");
+    }
+    const previousGrade = await tx.grade.findUnique({ where: { gradebookItemId_participantId: {
+      gradebookItemId: parent.gradebookItemId, participantId: parent.participantId
+    } } });
+    if ((previousGrade?.updatedAt.toISOString() ?? null) !== input.expectedGradeUpdatedAt) throw reviewConflict();
+
+    let gradingChanged = false;
+    for (const item of input.items) {
+      const saved = await saveTestItemReview(user, courseId, parentAttemptId, item.testItemId,
+        { ...item, reason: input.reason ?? item.reason }, tx);
+      gradingChanged ||= saved.gradingChanged;
+    }
+    if (gradingChanged || input.total?.mode === "calculated") {
+      try {
+        await recalculateTestAttemptGrade(user, courseId, parent.id, input.reason ?? "Teacher Test review", tx);
+      } catch (error) {
+        // Partial reviews can be saved without inventing grades for unanswered grading work.
+        if (!(error instanceof AppError && error.code === "TEST_ITEMS_NOT_GRADED")) throw error;
+        if (previousGrade?.isActive && previousGrade.source === "override" && input.total?.mode !== "override") {
+          throw new AppError(409, "TEST_ITEMS_NOT_GRADED", "Grade every question before replacing the manual Test total with its calculated score.");
+        }
+      }
+    } else {
+      await refreshTestAttemptFeedback(user, courseId, parent.id, tx);
+    }
+    if (input.total?.mode === "override") {
+      const previousFeedback = record(record(previousGrade?.normalizedResult).studentFeedback);
+      await overrideGradebookGrade(user, courseId, {
+        gradebookItemId: parent.gradebookItemId, participantId: parent.participantId,
+        score: input.total.score, reason: input.reason ?? "Teacher Test total override",
+        ...(typeof previousFeedback.feedbackText === "string" ? { feedbackText: previousFeedback.feedbackText } : {})
+      }, tx);
+    }
+    const priorComment = parent.feedbackText ?? record(record(previousGrade?.normalizedResult).studentFeedback).feedbackText;
+    const nextComment = input.feedbackText ?? (typeof priorComment === "string" ? priorComment : undefined);
+    if (nextComment !== undefined && (input.feedbackText !== undefined || parent.feedbackText === null)) {
+      await saveTestReviewComment(tx, user, courseId, parent, nextComment, typeof priorComment === "string" ? priorComment : "");
+    }
+  }, { isolationLevel: "Serializable", timeout: 30_000 }).catch(error => {
+    if (["P2025", "P2034"].includes(String(record(error).code))) throw reviewConflict();
+    throw error;
+  });
+  return {
+    review: await getTestAttemptTeacherReview(user, courseId, parentAttemptId),
+    items: await Promise.all(input.items.map(item => getTestItemTeacherReview(user, courseId, parentAttemptId, item.testItemId)))
+  };
+}
+
+async function saveTestReviewComment(tx: Prisma.TransactionClient, user: CurrentUser, courseId: string,
+  parent: Awaited<ReturnType<typeof getTestAttemptReview>>, feedbackText: string, previousText: string) {
+  const current = await tx.activityAttempt.findUnique({ where: { id: parent.id } });
+  if (!current) throw reviewConflict();
+  await tx.activityAttempt.update({ where: { id: parent.id, updatedAt: current.updatedAt },
+    data: { metadata: { ...record(current.metadata), testReviewFeedbackText: feedbackText } as Prisma.InputJsonValue } });
+  const grade = await tx.grade.findUnique({ where: { gradebookItemId_participantId: {
+    gradebookItemId: parent.gradebookItemId, participantId: parent.participantId
+  } } });
+  if (grade?.isActive && (grade.selectedAttemptId === parent.id || grade.source === "override")) {
+    const normalized = record(grade.normalizedResult);
+    await tx.grade.update({ where: { id: grade.id, updatedAt: grade.updatedAt }, data: {
+      normalizedResult: { ...normalized, studentFeedback: { ...record(normalized.studentFeedback), feedbackText } } as Prisma.InputJsonValue
+    } });
+  }
+  await tx.courseAuditEvent.create({ data: { courseId, actorUserId: user.id, eventType: "test_review_comment_updated",
+    targetType: "ActivityAttempt", targetId: parent.id, previousValue: { feedbackText: previousText }, nextValue: { feedbackText } } });
 }
 
 function reviewConflict() {
