@@ -1,6 +1,6 @@
 # Browser user flows
 
-`student-course-return.spec.ts` verifies browser-local restoration after activity navigation/reload for both accordion and folder-tab layouts, in learner and teacher Student view. It covers title/Open actions, workspace tabs, nested expansion, scroll position, malformed preferences, and blocked localStorage. No runner or model is required.
+`student-course-return.spec.ts` verifies browser-local restoration after activity navigation/reload for both accordion and folder-tab layouts, in learner and teacher Student view. It covers title/Open actions, workspace tabs, nested expansion, scroll position, malformed preferences, and blocked localStorage. The tab-restoration check waits for Grades to become selected before forcing a document navigation, so it does not abort the client-side tab transition it intends to preserve. No runner or model is required.
 
 `activity-menu-preview.spec.ts` checks direct activity-menu Preview links from Course and Group perspectives, actual section assignments, disabled unassigned actions, new-tab/opener isolation, and temporary answers without academic records.
 

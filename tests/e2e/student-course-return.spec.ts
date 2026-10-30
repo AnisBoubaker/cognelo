@@ -50,6 +50,8 @@ for (const layout of ["accordion", "folder_tabs"] as const) {
       await expect(activityLink).toBeVisible();
       if (!preview) {
         await page.getByRole("tab", { name: "Grades", exact: true }).click();
+        // Let the client-side tab transition complete before forcing a new document navigation.
+        await expect(page.getByRole("tab", { name: "Grades", exact: true })).toHaveAttribute("aria-selected", "true");
         await page.goto(`${groupPath}/activities/assigned/${data.activityId}`);
         await page.getByRole("link", { name: "Back to course", exact: true }).click();
         await expect(page.getByRole("tab", { name: "Grades", exact: true })).toHaveAttribute("aria-selected", "true");
