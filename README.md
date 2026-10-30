@@ -88,7 +88,7 @@ See [Browser user flows](tests/e2e/README.md) for service prerequisites and envi
 
 Public deployment guides use reserved example domains and generic instance identifiers. Keep the real infrastructure inventory in private operator notes outside Git.
 
-Production changes must follow the backup, production-clone migration rehearsal, approval, smoke-test, and rollback gates in those runbooks.
+Production changes must follow the backup, isolated production-clone rehearsal, authorization, and rollback gates in those runbooks. Functional/browser tests and synthetic data stay in local/preprod environments; production validation is read-only unless the user explicitly requests production browser testing for a specific scope.
 
 ## Documentation Rule
 

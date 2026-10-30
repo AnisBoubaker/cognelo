@@ -12,6 +12,8 @@ This guide deploys a production Cognelo instance across two Ubuntu VPSs. It uses
 
 The examples use `instance1.example.com` and the instance key `instance1`. Every example hostname, address, account, database, path, and port is a placeholder and must be replaced with values assigned to the target installation.
 
+Functional and browser testing in this guide belongs in local or isolated preprod environments. Never add test accounts, synthetic submissions, grades, or other test data to production. Successful preprod verification is sufficient for an authorized deployment; production validation is read-only health, version, logs, or integrity checks. Only an explicit user request for production browser testing overrides this standing rule for the requested scope. See the [production validation boundary](DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md#production-validation-boundary).
+
 Authentication throttling uses persistent, expiring account/source buckets. The default ignores forwarded IP headers. To enable distinct sources behind the exclusive Apache proxy, configure `AUTH_TRUST_PROXY=true` in the private application environment and overwrite the header in that virtual host:
 
 ```apache
@@ -54,7 +56,7 @@ Apache is the reference reverse proxy for this runbook. It provides the required
 
 PostgreSQL should run on the application VPS for this topology. Docker remains appropriate for untrusted-code sandboxes because their dependency and isolation requirements are materially different from the web application. The reference deployment binds both sandbox APIs only to the sandbox VPS's WireGuard address. Their ports are never published on its public interface, and WireGuard accepts the application VPS as the only peer.
 
-For one class of approximately 40 students, start with 4 vCPU, 8 GB RAM, and at least 75 GB NVMe on each VPS. The supplied sandbox configuration has two Judge0 workers and one Playwright runner limited to 2 vCPU/2 GB. This is intended for ordinary classroom use with intermittent submissions, not an assurance that 40 simultaneous browser or code executions will complete without queueing. Load-test the real activities before a synchronized assessment; the sandbox VPS is the first host to scale when queue latency or browser failures become unacceptable.
+For one class of approximately 40 students, start with 4 vCPU, 8 GB RAM, and at least 75 GB NVMe on each VPS. The supplied sandbox configuration has two Judge0 workers and one Playwright runner limited to 2 vCPU/2 GB. This is intended for ordinary classroom use with intermittent submissions, not an assurance that 40 simultaneous browser or code executions will complete without queueing. Load-test representative activities in isolated preprod before a synchronized assessment; the sandbox VPS is the first host to scale when queue latency or browser failures become unacceptable.
 
 Sections 3–13 produce a working Cognelo instance without code execution. Section 14 completes the deployment with Judge0 and the Playwright runner. Keep the dependent plugins disabled until Section 14's smoke tests pass.
 
@@ -698,7 +700,7 @@ sudo nano /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
 sudo grep -n 'REPLACE_' /srv/cognelo-sandboxes/instance1/runtime/judge0.conf
 ```
 
-The final `grep` must print nothing. In Cognelo, open **Settings → Runners → Judge0** and save base URL `http://10.80.0.2:2358`, authentication header `X-Auth-Token`, the same `AUTHN_TOKEN`, and disabled per-process/thread fallback so the production worker uses cgroup accounting. Save the Web Design runner at `http://10.80.0.2:3456` with its dedicated `Authorization: Bearer <credential>` authentication from section 14.5. Use each card's capability test before activating the dependent plugin. Cognelo encrypts the Judge0 token in PostgreSQL with the instance credential key; it is not stored in the application `.env` or returned to the browser.
+The final `grep` must print nothing. In Cognelo, open **Settings → Runners → Judge0** and save base URL `http://10.80.0.2:2358`, authentication header `X-Auth-Token`, the same `AUTHN_TOKEN`, and disabled per-process/thread fallback so the production worker uses cgroup accounting. Save the Web Design runner at `http://10.80.0.2:3456` with its dedicated `Authorization: Bearer <credential>` authentication from section 14.5. Validate each card's capability test in isolated preprod before activating the dependent plugin; production validation stays read-only. Cognelo encrypts the Judge0 token in PostgreSQL with the instance credential key; it is not stored in the application `.env` or returned to the browser.
 
 The supplied Judge0 configuration disables synchronous execution (`ENABLE_WAIT_RESULT=false`): Cognelo submits with `wait=false` and polls the result from the privileged worker. Student execution defaults remain 5 CPU seconds, 10 wall seconds, 128,000 KiB memory, and a 1 MiB file ceiling. Judge0 uses the separate maximums during compilation: 15 CPU seconds, 30 wall seconds, 256,000 KiB memory, and 16 MiB files. These allow ordinary Go/Rust binaries and TypeScript compilation without raising default student output limits. Workers use a private cgroup namespace so independent instances cannot collide on submission-derived box IDs. It permits the explicit per-process/thread fallback for supported development environments, and disables submission networking, callbacks, command-line arguments, compiler options, batch requests, and additional files. Review these limits when Cognelo's execution contract changes. Judge0's complete option reference is its [versioned configuration file](https://github.com/judge0/judge0/blob/v1.13.1/judge0.conf).
 
@@ -995,9 +997,11 @@ A dedicated application-host SSH service may provide encrypted transport to the 
 
 Use a dedicated sandbox account and key restricted to the application source address and exact runner destinations. Its SSH configuration must allow only local TCP forwarding (`AllowTcpForwarding local` and explicit `PermitOpen` entries), forbid remote and Unix-socket forwarding (`PermitListen none`, `AllowStreamLocalForwarding no`), and disable shell/subsystem sessions (`MaxSessions 0`), PTYs, passwords, agent forwarding, and X11. See the [OpenSSH forwarding controls](https://man.openbsd.org/sshd_config#AllowTcpForwarding) and [key restrictions](https://man.openbsd.org/sshd.8#AUTHORIZED_KEYS_FILE_FORMAT).
 
-Run the tunnel under an unprivileged service account with strict host-key checking, `ExitOnForwardFailure`, keepalives, and restart recovery. The API should order itself after and want that service without requiring it; an execution outage must not stop unrelated application features. Verify authenticated execution through the forwarded listeners, rejected unauthorized destinations/shell sessions, and absence of public runner listeners. Retain actual keys, units, and network inventory in private operator records.
+Run the tunnel under an unprivileged service account with strict host-key checking, `ExitOnForwardFailure`, keepalives, and restart recovery. The API should order itself after and want that service without requiring it; an execution outage must not stop unrelated application features. Validate authenticated execution through the forwarded listeners in isolated preprod; production checks verify tunnel/service health, access restrictions, and absence of public runner listeners without synthetic execution workloads. Retain actual keys, units, and network inventory in private operator records.
 
-### 14.7 Run end-to-end sandbox smoke tests
+### 14.7 Run end-to-end sandbox smoke tests in isolated preprod
+
+Run the execution requests in this section only against an isolated preprod sandbox. Stack startup and read-only health commands also apply to an authorized production deployment, but production must not receive synthetic execution/browser workloads unless the user explicitly requests production browser testing for that scope.
 
 On the sandbox host, start Judge0's data services first, inspect them, and then start the complete stack:
 
@@ -1373,7 +1377,7 @@ Never build over the active deployment and never deploy a mutable branch head su
 8. Run `npm run db:migrate:all` from the new tagged deployment.
 9. Atomically move `current` to the new deployment.
 10. Restart API and web.
-11. Verify local health, public health, login, file download, and one representative activity.
+11. Verify loopback/public health, the deployed tag/version, service state, and logs without production test data. Login, upload/download, and representative activity workflows must already have passed in isolated preprod.
 12. Retain at least one previous tagged deployment until the deployment is accepted.
 
 When the tag changes execution services or `infra/production`, follow the coordinated procedure in [the upgrade runbook](DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md#3-update-the-sandbox-only-when-the-private-upgrade-checklist-requires-it). Switching from synchronous Judge0 to the hardened queued stack requires an application maintenance window; do not put old synchronous clients against the new API. For a compatible Web Design-only update:
@@ -1382,8 +1386,8 @@ When the tag changes execution services or `infra/production`, follow the coordi
 2. build `cognelo/web-design-runner:<new-tag>` from that worktree;
 3. review and copy any intentional Compose or Judge0 configuration changes into `runtime/` without overwriting secrets;
 4. change only `WEB_DESIGN_RUNNER_IMAGE` in the sandbox `runtime/.env`;
-5. run `docker compose config --quiet`, recreate the runner, and repeat both sandbox smoke tests;
-6. deploy the application tag only after the matching runner passes.
+5. run `docker compose config --quiet`, recreate the runner, and check read-only health; both functional sandbox smoke tests must already have passed on the matching image in isolated preprod;
+6. deploy the application tag only after the matching runner passes those gates.
 
 Example runner update for a future `cognelo-0.6.0` tag on the sandbox host:
 
@@ -1402,7 +1406,7 @@ sudo docker compose --env-file .env -f sandbox.compose.yml \
 curl --fail -H "Authorization: Bearer ${WEB_DESIGN_RUNNER_TOKEN}" http://10.80.0.2:3456/health
 ```
 
-Judge0, PostgreSQL, Redis, and Playwright base-image upgrades are separate dependency upgrades, not routine restarts. Change a pinned version in a reviewed Cognelo tag, read its upstream migration notes, back up any retained Judge0 data, pull/build it, run the smoke tests, and then roll it into production. Never use an unattended `docker compose pull` against mutable tags.
+Judge0, PostgreSQL, Redis, and Playwright base-image upgrades are separate dependency upgrades, not routine restarts. Change a pinned version in a reviewed Cognelo tag, read its upstream migration notes, back up any retained Judge0 data, pull/build it, run the functional smoke tests in isolated preprod, and then roll it into production with read-only health checks. Never use an unattended `docker compose pull` against mutable tags.
 
 Example update to a future `cognelo-0.6.0` tag:
 
@@ -1555,26 +1559,28 @@ Common failure causes:
 
 ## 20. Deployment acceptance checklist
 
+Complete functional items below in isolated preprod before deployment. On production, perform authorized setup and read-only infrastructure, version, health, log, and backup checks only; do not create test accounts or submissions.
+
 - [ ] DNS resolves only to intended addresses.
 - [ ] UFW exposes only approved public ports.
 - [ ] PostgreSQL, direct Node web/API listeners, Judge0, and the Playwright runner are not publicly reachable; only Apache exposes Cognelo over HTTPS.
 - [ ] Core and plugin migrations complete without errors.
 - [ ] `/api/health` succeeds locally and through HTTPS.
-- [ ] The administrator can sign in and change their password.
-- [ ] The administrator can save the chosen email route and deliver a test to an external address; received headers show expected SPF, DKIM, and DMARC results.
-- [ ] A newly created test account receives its first-login code at an external address, cannot access normal routes before verification, and can access its role landing page after entering the code.
+- [ ] In preprod, the administrator can sign in and change their password.
+- [ ] In preprod, the administrator can save the chosen email route and deliver a test to an external address; received headers show expected SPF, DKIM, and DMARC results.
+- [ ] In preprod, a newly created test account receives its first-login code at an external address, cannot access normal routes before verification, and can access its role landing page after entering the code.
 - [ ] Required plugins are activated and enabled; unused plugins remain disabled.
-- [ ] An uploaded file survives a service restart and deployment switch.
-- [ ] A representative student submission reaches the gradebook.
+- [ ] In preprod, an uploaded file survives a service restart and deployment switch.
+- [ ] In preprod, a representative student submission reaches the gradebook.
 - [ ] Sandbox containers remain on the internal Docker network with no outbound access; host socket proxies bind only to the selected WireGuard address, or to the explicitly accepted firewall-only public address restricted to the application host.
 - [ ] In the reference topology, both WireGuard interfaces return automatically
   after reboot, show a recent handshake, and expose no sandbox API on the
   public interface. In the firewall-only exception, both socket units return,
   the application host can reach them, and non-allowlisted sources time out.
 - [ ] Judge0 authentication rejects a missing/incorrect token and accepts the configured token.
-- [ ] The Judge0 Python execution smoke test returns `Accepted` and `5`.
-- [ ] The Judge0 C system-library smoke test returns `Accepted` and `2.000`.
-- [ ] The Playwright runner smoke test reports `completed`, `1 / 1`.
-- [ ] One real coding exercise and one real web-design exercise reach the gradebook.
+- [ ] In preprod, the Judge0 Python execution smoke test returns `Accepted` and `5`.
+- [ ] In preprod, the Judge0 C system-library smoke test returns `Accepted` and `2.000`.
+- [ ] In preprod, the Playwright runner smoke test reports `completed`, `1 / 1`.
+- [ ] In preprod, one real coding exercise and one real web-design exercise reach the gradebook.
 - [ ] Database and storage backups complete and exist off-host.
 - [ ] Logs contain no secrets or recurring startup errors.

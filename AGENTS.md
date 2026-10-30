@@ -44,6 +44,12 @@ Before handing off, explicitly review every affected root or plugin README, proj
 
 Before starting a new task, evaluate whether this is a totally new feature or one thats is unrelated to the one that preceded it. If so, consider the last feature or task complete and validated and do an automatic commit.
 
+## Production testing — standing rule
+
+Never run browser/E2E tests on production or create test accounts, synthetic submissions, grades, or other test data there. Run functional tests and upgrade rehearsals locally or in isolated preprod. A successful preprod rehearsal is sufficient for an authorized deployment; post-deployment production checks are read-only health, version, logs, or integrity checks. Normal authorized upgrade operations and backups remain permitted.
+
+This rule persists across sessions and releases. Only the user's explicit request to run browser tests on production overrides it, and only for that requested scope. General requests to test, release, rehearse, or deploy do not authorize production testing.
+
 ## Deployment privacy
 
 Keep actual deployment hostnames, IPs, account/database names, inventories, and environment-specific incident or rehearsal evidence out of tracked files, commit messages, and public release notes. Use reserved example domains and generic instance identifiers in public runbooks. Keep operator inventory outside the checkout; the local untracked .git/info/cognelo-operations pointer may identify its location for authorized operations.

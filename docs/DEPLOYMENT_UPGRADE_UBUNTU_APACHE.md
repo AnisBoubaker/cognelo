@@ -22,16 +22,21 @@ Never build over `current`, deploy a branch such as `main`, run `npm run db:seed
 
 ## Mandatory pre-production release gate
 
-Do not create a tag or production release until the exact current commit has passed a pre-production upgrade rehearsal and the designated approver has explicitly accepted it. The release process is:
+Do not create a tag or production release until the exact release candidate has passed an isolated pre-production upgrade rehearsal and the user has authorized release/deployment. Authorization may explicitly be conditional on a successful rehearsal; once that condition is met, a separate approval or production functional test is not required. The release process is:
 
 1. the designated approver supplies a fresh, protected dump of the currently deployed production database;
 2. restore that dump into an isolated pre-production database;
 3. deploy the exact current commit to pre-production and run its complete `npm run db:migrate:all` path, including core and plugin migrations, without errors;
-4. pass automated tests, production builds, service health checks, and migration-log review;
-5. receive manual visual and workflow testing by the designated approver; and
-6. only after explicit approval, create the immutable tag and GitHub Release from that unchanged commit.
+4. pass the required automated/functional checks in local or isolated preprod, production builds, service health checks, and migration-log review; and
+5. under the user's release authorization, create the immutable tag and GitHub Release from that unchanged candidate.
 
-Never reuse a database that was migrated by an earlier candidate: restore the supplied production dump before every rehearsal. A successful CI run, an empty migration set, or automated smoke tests do not replace manual approval. Record the source production version, candidate commit, migration log, test date, and approver in the release record. The release tag must resolve to the approved commit. If the commit changes after approval, repeat the complete rehearsal with a fresh restore and obtain approval again.
+Never reuse a database that was migrated by an earlier candidate: restore the supplied production dump before every rehearsal. Record the source production version, candidate commit, migration log, test evidence, and user authorization in the private release record. The release tag must resolve to the validated commit. If candidate code changes, repeat the relevant tests and complete rehearsal with a fresh restore. Do not infer permission to deploy from test success alone; honor any authorization already provided by the user.
+
+## Production validation boundary
+
+Never run browser/E2E tests on production or create test accounts, synthetic submissions, grades, or other test data there. Perform functional workflows, grading/runner checks, and upgrade rehearsals locally or in isolated preprod. A successful preprod rehearsal is sufficient for an authorized deployment.
+
+After deployment, use only read-only service health, deployed-version, log, and integrity checks. Normal authorized upgrades, migrations, configuration changes, and backups remain permitted. This rule persists across sessions and releases. Only an explicit user request to run browser tests on production overrides it for the requested scope; a general request to test, release, rehearse, or deploy does not.
 
 Check the current release and service health:
 
@@ -57,7 +62,7 @@ The release author must separately prepare a private operator checklist covering
 - backups, downtime, storage, and schema compatibility;
 - environment, host, service, runner, and sandbox changes;
 - plugin actions and post-upgrade jobs;
-- smoke tests, rollback, and private validation evidence.
+- preprod functional checks, read-only production validation, rollback, and private evidence.
 
 Public release notes do not replace that checklist. If required migration instructions or the private checklist are missing, stop and have the release author complete the appropriate record. Do not infer operational requirements during a production upgrade.
 
@@ -286,7 +291,7 @@ sudo docker compose --env-file .env -f sandbox.compose.yml \
   ps -a judge0-language-config judge0-workers
 ```
 
-The configuration is idempotent. Compose waits for its successful exit before recreating the workers. `judge0-language-config` must show `Exited (0)` and its logs must show every active C/C++ runtime with `-pthread -lm -ldl -lrt`. Complete the Python and C Judge0 smoke tests from the initial deployment runbook after this change.
+The configuration is idempotent. Compose waits for its successful exit before recreating the workers. `judge0-language-config` must show `Exited (0)` and its logs must show every active C/C++ runtime with `-pthread -lm -ldl -lrt`. Complete the Python and C Judge0 smoke tests from the initial deployment runbook in isolated preprod before deploying this change; production checks remain read-only.
 
 ### First upgrade to queued, hardened Judge0
 
@@ -295,7 +300,7 @@ This change requires a coordinated maintenance window: the old Cognelo client us
 1. Build `cognelo/judge0-hardened:<new-tag>` with `infra/production/judge0-hardened.Dockerfile` and the approved `JUDGE0_BASE_IMAGE=judge0/judge0:1.13.1`, as shown in [initial deployment](DEPLOYMENT_UBUNTU_APACHE.md#144-build-the-pinned-execution-images). Build the matching Web Design image too.
 2. Stop `judge0-server`, `judge0-workers`, and `judge0-redis`. Upstream startup logs may have contained the four Judge0 service credentials. Keep any required evidence in restricted incident storage; rotate `AUTHN_TOKEN`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, and `SECRET_KEY_BASE`. Update the existing PostgreSQL role interactively using `docker compose --env-file .env -f sandbox.compose.yml exec judge0-db psql -U judge0 -d postgres` and `\password judge0`, then store the matching password in protected `judge0.conf`. Do not remove database volumes or merely change the config without updating the existing role.
 3. Copy the new Compose template and language SQL. Preserve instance-specific settings/secrets, set `ENABLE_WAIT_RESULT=false` in `judge0.conf`, and set runtime `JUDGE0_IMAGE=cognelo/judge0-hardened:<new-tag>` plus the new `WEB_DESIGN_RUNNER_IMAGE`. Pull only `judge0-db`, `judge0-redis`, and `judge0-language-config` (PostgreSQL 16.15 / Redis 7.2.16). Both Judge0 services must use the locally built wrapper; only workers remain privileged, and the API drops all capabilities with `no-new-privileges`. Retain the worker’s private cgroup namespace and the template’s separate compilation ceilings; ordinary execution defaults stay bounded.
-4. Validate with `docker compose config --quiet`, recreate the private databases and execution services with the preserved volumes, and require `judge0-language-config` to exit successfully. Repeat the queued Python/C smoke tests in the initial runbook. Verify `/api/environment` is mode `0600`, current logs contain none of the rotated values, and the old authentication token returns 401.
+4. Validate with `docker compose config --quiet`, recreate the private databases and execution services with the preserved volumes, and require `judge0-language-config` to exit successfully. The queued Python/C smoke tests in the initial runbook must already have passed in isolated preprod. Verify `/api/environment` is mode `0600`, current logs contain none of the rotated values, and the old authentication token returns 401 on a read-only endpoint.
 5. Run `npm run db:migrate:all` and activate the matching Cognelo release during the same window. Update the encrypted Judge0 token through **Settings → Runners** using restricted administrator access before restoring learner traffic; disable per-process/thread fallback on this cgroup-capable host, and run both runner capability tests plus a representative program in every required language. The GitHub plugin migration `202610250020_github_url_credentials` strips legacy URL userinfo and invalidates its derived index; Core migration `202610250030_legacy_material_urls` performs the same cleanup for course, section, and retained subject material URLs and clears unsupported URL schemes. Rotate any real credential that had been embedded in these URLs.
 6. Keep rollback artifacts for the application, wrapper image, configuration, and database together. An older synchronous client is incompatible with the queued-only stack; rehearse rollback as a coordinated pair. Credentials already exposed in old logs must stay rotated.
 
@@ -421,18 +426,11 @@ curl --fail --head https://instance1.example.com/
 sudo systemctl status instance1-api instance1-web --no-pager
 ```
 
-## 6. Smoke-test the release
+## 6. Verify the deployed release without test data
 
-Complete a short production smoke test:
+Functional acceptance belongs in the isolated preprod rehearsal: sign-in, existing content/uploads, plugin registration, representative submissions/grades, and any relevant Judge0/Web Design execution. Do not repeat those workflows against production or add disposable production records.
 
-1. Sign in as an administrator through the public HTTPS URL.
-2. Open an existing subject, activity bank, course, and section.
-3. Confirm existing uploaded files can still be downloaded.
-4. Confirm Settings → Plugins shows the expected activation state.
-5. Submit one designated test activity and confirm its result reaches the gradebook.
-6. If enabled, run one small Judge0 coding exercise and the documented C system-library smoke test.
-7. If enabled, run one small Playwright web-design exercise.
-8. Check recent logs for recurring errors.
+On production, confirm the active immutable tag/version, public and loopback health, expected service state, and recent startup logs. Read-only integrity comparisons may verify that the upgrade preserved existing records. Never treat deployment authorization as permission to run browser tests or create synthetic data; see the [standing boundary](#production-validation-boundary).
 
 ```bash
 sudo journalctl -u instance1-api --since '30 minutes ago' --no-pager
@@ -516,7 +514,7 @@ sudo systemctl start instance1-web
 curl --fail https://instance1.example.com/api/health
 ```
 
-Repeat the smoke test after rollback.
+Repeat read-only health, version, and log checks after rollback. Do not create production test data.
 
 ## 8. Clean up later
 
@@ -537,7 +535,7 @@ Never remove `/srv/cognelo/instance1/shared`, its `.env`, or its `storage` direc
 
 - [ ] The supplied current-production dump was freshly restored into isolated pre-production.
 - [ ] The exact current commit passed all core and plugin migrations and automated checks against that clone.
-- [ ] The candidate passed manual pre-production testing and the designated approver explicitly approved release.
+- [ ] The candidate passed required local/preprod checks, and user release/deployment authorization is recorded, including any satisfied conditional authorization.
 - [ ] The immutable tag resolves to the approved, unchanged commit.
 - [ ] Current tag and health are confirmed.
 - [ ] New immutable tag is fetched and verified.
@@ -553,7 +551,7 @@ Never remove `/srv/cognelo/instance1/shared`, its `.env`, or its `storage` direc
 - [ ] Migrations complete successfully.
 - [ ] `current` points to the new tag.
 - [ ] API health passes before web starts.
-- [ ] Public health and smoke tests pass.
+- [ ] Public health, deployed version, and read-only production checks pass; functional checks stayed in local/preprod and no production test data was created.
 - [ ] Old worktree and database dump remain available through the acceptance period.
 
 ### Instance timezone migration

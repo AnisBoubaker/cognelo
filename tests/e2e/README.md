@@ -63,6 +63,8 @@ Browser interactions use accessible roles, labels, and visible text. Direct stru
 
 ## Run locally
 
+Never point this suite at production or create test accounts, submissions, grades, or other synthetic data there. Use local or isolated preprod services and storage. A general request to run E2E, prepare a release, or deploy does not authorize production testing; only an explicit user request for browser tests on production can override this standing rule for the requested scope. See the [production validation boundary](../../docs/DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md#production-validation-boundary).
+
 Start from a migrated and seeded development database, then run:
 
 ```bash
