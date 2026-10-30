@@ -68,4 +68,21 @@ describe("student group grades route", () => {
     });
     expect(mocks.getReport).toHaveBeenCalledTimes(1);
   });
+
+  it("loads child reports for the released Test attempt and never for closed content", async () => {
+    const row = { gradebookItemId: "test-grade", activityId: "test-activity", activityTypeKey: "test", gradeKind: "final",
+      selectedAttemptId: null, challengeAttemptId: "selected-parent", feedback: { kind: "test", details: { items: [
+        { testItemId: "child-1", activityId: "program-1", activityTypeKey: "coding-exercise" },
+        { testItemId: "child-2", activityId: "choices-1", activityTypeKey: "mcq" }
+      ] } } };
+    mocks.getGrades.mockResolvedValue({ rows: [structuredClone(row), { ...structuredClone(row), contentClosed: true, feedback: null }] });
+    const response = await GET(new Request("http://test.local"), params);
+    const body = await response.json();
+    expect(body.grades.rows[0].feedback.details.items[0].gradingReport.kind).toBe("coding-exercise");
+    expect(mocks.getReport).toHaveBeenCalledTimes(1);
+    expect(mocks.getReport).toHaveBeenCalledWith(expect.objectContaining({
+      activityId: "program-1", gradebookItemId: "test-grade", selectedAttemptId: "selected-parent", testItemId: "child-1"
+    }));
+    expect(body.grades.rows[1].feedback).toBeNull();
+  });
 });

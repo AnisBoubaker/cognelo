@@ -174,6 +174,8 @@ export type PluginStudentGradeReportHandler = (input: {
   activityId: string;
   gradebookItemId: string;
   selectedAttemptId?: string | null;
+  /** A child of the released parent Test; providers must recheck ownership and membership. */
+  testItemId?: string;
 }) => Promise<Record<string, unknown> | null>;
 
 export type PluginGradeCompletion = {

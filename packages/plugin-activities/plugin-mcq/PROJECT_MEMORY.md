@@ -53,3 +53,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Test review uses the host’s [atomic Save all workflow](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Keep question drafts when switching questions, retain warnings across students/submissions, and let the host recompute the total once. New rubric edits may explicitly clear an older item override; never execute answers during review.
 
 - Use core `assessmentInstructionPrompt` to promote saved MCQ feedback instructions into the system message. Question content and examples remain evidence. Keep the feedback-only response contract and deterministic grade unchanged.
+
+- The shared [learner grading details](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md) display Test-child comments and plugin-declared student feedback under the parent release/content-access policy. Keep private result/configuration/analytics out of the public feedback envelope.

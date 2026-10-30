@@ -124,6 +124,7 @@ test.describe("student programming grading report", () => {
       await loginWithCredentialsThroughUi(page, { email: studentEmail, password: "Password123!" });
       await page.goto(`/courses/${courseId}/groups/${groupId}?tab=grades`);
       const row = page.locator(".table-row-student-grades").filter({ hasText: "C exercise: Median of three integers" });
+      await row.getByText("Grading details", { exact: true }).click();
       await expect(row.getByRole("heading", { name: "Grading report" })).toBeVisible();
       await expect(row.getByRole("heading", { name: "Grade recap" })).toBeVisible();
       await expect(row.getByText("Automatic tests", { exact: true })).toBeVisible();

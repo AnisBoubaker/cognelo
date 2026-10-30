@@ -519,6 +519,7 @@ First plugin integration target:
 ### Phase 7: Student Grade Visibility - Completed
 
 - Completed: add student grade view for released grades in the section/group workspace.
+- Completed: the learner Grades tab lists released activities with expandable **Grading details** and a link to the activity/submission history. The same shared feedback view is used on the assigned page. Compound Tests list every exercise from the selected submitted manifest (latest submitted attempt for a total override), with exercise points, teacher comments, rubric criteria, strengths/improvements, question explanations, and plugin-projected deterministic feedback. Programming children reuse their plugin's source/test/rubric report. Existing released Tests gain the details on read, without regrading or migration; unreleased grades and closed-content details remain hidden.
 - Completed: show released graded scores in the student assigned-activity list and on the assigned activity page itself.
 - Completed: hide every unreleased summative grade and its feedback, including repeatable items (`unlimited`, `until_due`, or `max_attempts > 1`). The learner Grades feed selects only released items; no provisional-result bypass remains. [Solution release](ACTIVITY_SOLUTIONS.md) is independent and default-off.
 - Completed: treat release as publication of the final grade selected by the configured grade strategy and prevent further attempts after release.

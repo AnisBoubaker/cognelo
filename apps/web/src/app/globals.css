@@ -3379,6 +3379,49 @@ button:hover > .disclosure-indicator {
   padding-top: 18px;
 }
 
+.student-grade-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.test-grade-breakdown summary > strong {
+  margin-inline-start: 1rem;
+  white-space: nowrap;
+}
+
+.student-grade-details-content {
+  padding-top: 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.student-grade-details-content > .button {
+  align-self: flex-start;
+}
+
+.table-row-student-grades .table-main strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.student-grade-details .coding-exercise-attempt-accordion > summary {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.student-grade-details .coding-exercise-attempt-accordion > summary time {
+  flex-basis: 100%;
+}
+
+.student-grade-details .coding-exercise-attempt-accordion .metadata-badge {
+  white-space: normal;
+}
+
+@media (max-width: 640px) {
+  .table-row-student-grades { grid-template-columns: minmax(0, 1fr); }
+}
+
 .coding-exercise-grade-recap {
   display: grid;
   gap: 12px;

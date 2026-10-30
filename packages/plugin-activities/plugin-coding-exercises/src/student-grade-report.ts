@@ -10,6 +10,7 @@ export async function getCodingExerciseStudentGradeReport(input: {
   activityId: string;
   gradebookItemId: string;
   selectedAttemptId?: string | null;
+  testItemId?: string;
 }) {
   const participant = await corePrisma.courseGroupParticipant.findFirst({
     where: {
@@ -27,18 +28,22 @@ export async function getCodingExerciseStudentGradeReport(input: {
       id: input.gradebookItemId,
       courseId: input.courseId,
       groupId: input.groupId,
-      activityId: input.activityId,
+      ...(input.testItemId ? { activity: { activityType: { key: "test" } } } : { activityId: input.activityId }),
       gradesReleased: true,
-      grades: { some: { participantId: participant.id } }
+      grades: { some: { participantId: participant.id, isActive: true } }
     },
     select: { id: true }
   });
   if (!gradebookItem) return null;
 
+  if (input.testItemId && !input.selectedAttemptId) return null;
+
   const coreAttempts = await corePrisma.activityAttempt.findMany({
     where: {
       gradebookItemId: gradebookItem.id,
       participantId: participant.id,
+      assessmentMode: "summative",
+      ...(input.testItemId ? { id: input.selectedAttemptId! } : {}),
       lifecycle: { in: ["submitted", "graded"] }
     },
     orderBy: [{ attemptNumber: "asc" }],
@@ -46,10 +51,22 @@ export async function getCodingExerciseStudentGradeReport(input: {
       id: true,
       attemptNumber: true,
       pluginAttemptRef: true,
-      submittedAt: true
+      submittedAt: true,
+      testItemAttempts: input.testItemId ? {
+        where: { testItemId: input.testItemId, activityId: input.activityId, lifecycle: { in: ["submitted", "graded"] } },
+        select: { pluginAttemptRef: true, result: true }
+      } : false
     }
   });
-  const executionIds = coreAttempts.flatMap((attempt) => attempt.pluginAttemptRef ? [attempt.pluginAttemptRef] : []);
+  const reportAttempts = coreAttempts.flatMap((attempt) => {
+    if (!input.testItemId) return [{ ...attempt, savedSource: null as string | null }];
+    const child = attempt.testItemAttempts[0];
+    if (!child) return [];
+    const state = recordValue(recordValue(child.result).state);
+    return [{ ...attempt, pluginAttemptRef: child.pluginAttemptRef ?? stringValue(state.executionId),
+      savedSource: typeof state.sourceCode === "string" ? state.sourceCode : null }];
+  });
+  const executionIds = reportAttempts.flatMap((attempt) => attempt.pluginAttemptRef ? [attempt.pluginAttemptRef] : []);
   const executions = executionIds.length
     ? await prisma.pluginCodingExerciseExecution.findMany({
         where: {
@@ -69,9 +86,16 @@ export async function getCodingExerciseStudentGradeReport(input: {
     : [];
   const executionById = new Map(executions.map((execution) => [execution.id, execution]));
 
-  const attempts = await Promise.all(coreAttempts.flatMap((attempt) => {
+  const attempts = await Promise.all(reportAttempts.flatMap((attempt) => {
     const execution = attempt.pluginAttemptRef ? executionById.get(attempt.pluginAttemptRef) : null;
-    if (!execution) return [];
+    if (!execution) {
+      // Recovered/manual submissions may have saved code without runner evidence.
+      if (attempt.savedSource === null || !attempt.submittedAt) return [];
+      return [Promise.resolve({ attemptId: attempt.id, attemptNumber: attempt.attemptNumber,
+        executionId: "", isSelected: true, submittedAt: attempt.submittedAt.toISOString(),
+        language: "text", sourceCode: attempt.savedSource, testScore: null, testMaxScore: null, tests: [] })];
+    }
+    if (attempt.savedSource !== null && attempt.savedSource !== execution.sourceCode) return [];
     return [getLatestCodingExerciseTestResult({
       activityId: input.activityId,
       executionId: execution.id,

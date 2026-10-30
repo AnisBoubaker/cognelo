@@ -65,3 +65,5 @@ Learner run/submit and preview requests retain the authored file structure and l
 Dialogs follow the shared [persistent header and icon-only close pattern](../../../docs/DIALOGS.md), preserving cancellation guards and blocking progress.
 
 Inside Tests, manual review retains drafts across questions and uses one [Save all action](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Question score edits update the calculated Test total; changing student/submission or closing still warns about unsaved changes.
+
+Released exercise scores and available teacher feedback are accessible from the learner Grades tab, including each child of a Test. See [learner grading details](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md).

@@ -158,3 +158,7 @@ Question review participates in the host’s [single Save all transaction](../..
 ## Teacher feedback instruction priority
 
 Prompt version `mcq-feedback-v2` includes saved assessment instructions directly in the system message through `assessmentInstructionPrompt`, in addition to the private request snapshot. Teacher tone/tolerance/permissions take priority over assumptions inferred from question or example text; question content remains data. MCQ feedback still cannot propose or change deterministic grades. Test templates apply only to plugins with the explicit batch-grading capability; MCQ keeps its own feedback instructions.
+
+## Released grading details
+
+Released MCQs expose their correct-answer count and available overall/per-question explanations. Inside Tests, the shared host also shows teacher comments and the exercise grade. The learner Grades tab lists released activities with expandable details and a link to their submission history. Parent release and content-closure policy govern every Test child. The shared host never exposes private result/configuration/analytics fields. See the [gradebook plan](../../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md).

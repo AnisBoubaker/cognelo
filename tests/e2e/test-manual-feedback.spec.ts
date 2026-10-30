@@ -4,7 +4,7 @@ import { assignCourseTest, responseJson } from "./fixtures/activity-suite";
 import { createAuthenticatedApi, createAuthenticatedApiWithCredentials } from "./fixtures/auth";
 import type { CourseTestRuntime, TestItemTeacherReview } from "../../apps/web/src/lib/api";
 
-test("Test review saves all drafts, recalculates totals, and warns before leaving the student", { tag: "@regression" }, async ({ bankCourse: data, teacherApi, teacherPage: page }) => {
+test("Test review saves all drafts, recalculates totals, and warns before leaving the student", { tag: "@regression" }, async ({ bankCourse: data, teacherApi, teacherPage: page, studentPage }) => {
   test.setTimeout(150_000);
   const student = await createAuthenticatedApi("student");
   const admin = await createAuthenticatedApi("admin");
@@ -190,6 +190,26 @@ test("Test review saves all drafts, recalculates totals, and warns before leavin
     const releasePath = `/api/courses/${data.courseId}/gradebook/items/${before.gradebookItemId}/release`;
     await responseJson(await teacherApi.patch(releasePath, { data: { released: true } }));
     expect(await (await student.get(gradesPath)).text()).toContain("First reviewed answer.");
+    await studentPage.goto(`/courses/${data.courseId}/groups/${data.groupId}?tab=grades`);
+    const gradeRow = studentPage.locator(".table-row-student-grades").filter({ hasText: created.activity.title });
+    await gradeRow.getByText("Grading details", { exact: true }).click();
+    await expect(gradeRow.getByText("Overall teacher judgment.", { exact: true })).toBeVisible();
+    await gradeRow.locator("summary").filter({ hasText: "1. Program 1" }).click();
+    await expect(gradeRow.getByText(finalSummary, { exact: true })).toBeVisible();
+    await expect(gradeRow.getByText("Clear expression.", { exact: true })).toBeVisible();
+    await expect(gradeRow.getByText("Consider edge cases.", { exact: true })).toBeVisible();
+    await expect(gradeRow.getByText("Partial rubric credit.", { exact: true })).toBeVisible();
+    await gradeRow.locator("summary").filter({ hasText: "2. Program 2" }).click();
+    await expect(gradeRow.getByText("Recovered answer reviewed.", { exact: true })).toBeVisible();
+    await expect(gradeRow.getByText("Clear reasoning.", { exact: true })).toBeVisible();
+    await expect(gradeRow.locator("pre").filter({ hasText: "print(2)" })).toBeVisible();
+    await studentPage.setViewportSize({ width: 390, height: 844 });
+    expect(await studentPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const attemptLabel = gradeRow.locator(".coding-exercise-attempt-accordion > summary > span").filter({ hasText: /^Attempt 1$/ }).first();
+    await expect(attemptLabel).toBeVisible();
+    expect((await attemptLabel.boundingBox())!.height).toBeLessThan(50);
+    await studentPage.screenshot({ path: "tmp/student-test-programming-grades.png", fullPage: true });
+
     await responseJson(await teacherApi.patch(releasePath, { data: { released: false } }));
 
     await submit("second");

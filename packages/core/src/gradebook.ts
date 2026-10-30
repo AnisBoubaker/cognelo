@@ -1,3 +1,4 @@
+import { studentTestFeedback } from "./student-test-feedback";
 import { escapeCsvCell } from "./csv";
 import { getActivityPlugin } from "@cognelo/activity-sdk";
 import { resolveAttemptContinuationHandler } from "@cognelo/activity-sdk/server";
@@ -1773,7 +1774,8 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
       },
       attempts: {
         where: { participantId: participant.id, assessmentMode: "summative" },
-        orderBy: [{ attemptNumber: "asc" }]
+        orderBy: [{ attemptNumber: "asc" }],
+        include: { testItemAttempts: true }
       },
       events: {
         where: {
@@ -1834,7 +1836,10 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
         latePenaltyApplied: effectiveGrade?.latePenaltyApplied ?? false,
         latePenaltyPercent: effectiveGrade?.latePenaltyPercent ?? null,
         contentClosed,
-        feedback: contentClosed ? null : sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult),
+        feedback: contentClosed ? null : sanitizeStudentGradeFeedback(item.activity.activityType.key === "test"
+          ? studentTestFeedback(effectiveGrade?.normalizedResult,
+              submittedAttempts.find((attempt) => attempt.id === effectiveGrade?.selectedAttemptId) ?? latestSubmittedAttempt)
+          : effectiveGrade?.normalizedResult),
         selectedAttemptId: effectiveGrade?.selectedAttemptId ?? null,
         challengeAttemptId,
         gradeChallengeTarget: !contentClosed && gradeChallengeTarget

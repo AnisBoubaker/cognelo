@@ -17,6 +17,21 @@ export async function GET(_request: Request, { params }: Params) {
       const getReport = row.gradeKind === "final" && !row.contentClosed
         ? resolvePluginStudentGradeReportHandler(row.activityTypeKey)
         : null;
+      const feedback = row.feedback;
+      if (row.gradeKind === "final" && !row.contentClosed && row.activityTypeKey === "test" && Array.isArray(feedback?.details?.items)) {
+        feedback.details.items = await Promise.all(feedback.details.items.map(async (value) => {
+          if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+          const item = value as Record<string, unknown>;
+          if (typeof item.activityTypeKey !== "string" || typeof item.activityId !== "string" || typeof item.testItemId !== "string") return item;
+          const childReport = resolvePluginStudentGradeReportHandler(item.activityTypeKey);
+          return { ...item, gradingReport: childReport ? await childReport({
+            user, courseId, groupId, activityId: item.activityId,
+            gradebookItemId: row.gradebookItemId,
+            selectedAttemptId: row.selectedAttemptId ?? row.challengeAttemptId,
+            testItemId: item.testItemId
+          }) : null };
+        }));
+      }
       return {
         ...row,
         gradingReport: getReport

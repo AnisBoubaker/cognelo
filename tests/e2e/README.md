@@ -185,3 +185,5 @@ Judge0 uses queued submissions and authenticated result polling. Run a real comp
 Solution-release/revocation assertions allow 30 seconds for the documented 20-second policy refresh: a synthetic focus event can arrive while another refresh is still in flight. Direct solution API denials are still checked immediately; the longer UI assertion is not an authorization grace period.
 
 The Web Design undo-isolation check polls the persisted file values after the final undo. An enabled navigation button alone can be observed before the React update queues that autosave; it is not a database-commit signal.
+
+Learner grading-details coverage extends `test-review-generic.spec.ts` with released MCQ/Parsons exercise accordions, comments, deterministic breakdowns, hide/release boundaries, and desktop/mobile containment. `test-manual-feedback.spec.ts` checks every programming child’s rubric/narrative and recovered code under an overridden Test total. `student-programming-report.spec.ts` opens the standalone report through the same Grades disclosure.

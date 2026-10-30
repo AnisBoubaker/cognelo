@@ -433,6 +433,8 @@ The Test opens as one assigned activity. The shell provides:
 - read-only submitted state;
 - released overall grade and permitted item feedback.
 
+Released Tests also appear in the learner Grades tab with an expandable report for every exercise, including zero scores and exercises without a score when the teacher overrides the total. Details use the final submitted manifest and the selected attempt, or the latest submitted attempt for an overall override. Core projects only plugin-declared student feedback from the child result plus reviewed comments/assessment feedback; raw state, configuration, analytics and grading metadata are excluded. Programming Exercise reports independently authorize the released parent and exact child before returning saved code and safe test outcomes. Recovered code without execution evidence remains reviewable without running it. The assigned page reuses the same report. This read-time projection supports previously released Tests without altering grades or historical evidence. Parent release and activity-content closure still govern all child details.
+
 The current numbered exercise button uses `aria-current="step"` and an explicit dark fill with white text. Its selected appearance is independent of ordinary primary/secondary action styling and follows numbered, Previous/Next, and review-return navigation in both learner and teacher Student view.
 
 When a new attempt is blocked by grade release, the due date, or the attempt limit, the student Test shell remains visible with a disabled start action and a localized explanation. The assigned-activity tab shell must not hide the Test renderer merely because attempt availability is false.

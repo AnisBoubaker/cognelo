@@ -97,4 +97,31 @@ describe("coding exercise student grade report", () => {
     expect(mocks.attemptFindMany).not.toHaveBeenCalled();
     expect(mocks.executionFindMany).not.toHaveBeenCalled();
   });
+  it("resolves only the selected learner-owned Test child and validates legacy execution source", async () => {
+    const input = { user: student, courseId: "course-1", groupId: "group-1", activityId: "program-1",
+      gradebookItemId: "test-grade", selectedAttemptId: "parent-1", testItemId: "child-1" };
+    const submittedAt = new Date("2026-10-01T12:00:00Z");
+    mocks.attemptFindMany.mockResolvedValue([{ id: "parent-1", attemptNumber: 2, submittedAt, pluginAttemptRef: "parent-1",
+      testItemAttempts: [{ pluginAttemptRef: null, result: { state: { executionId: "execution-1", sourceCode: "print(1)" } } }] }]);
+    mocks.executionFindMany.mockResolvedValue([{ id: "execution-1", sourceCode: "print(1)", languageKey: "python", resultSummary: {}, updatedAt: submittedAt }]);
+    mocks.latestTests.mockResolvedValue({ resultSummary: { earnedWeight: 1, totalWeight: 1,
+      tests: [{ id: "test", passed: true, weight: 1, stdin: "secret-input", expectedOutput: "secret-output" }] } });
+    const report = await getCodingExerciseStudentGradeReport(input);
+    expect(report?.attempts).toEqual([expect.objectContaining({ attemptId: "parent-1", sourceCode: "print(1)", testScore: 1 })]);
+    expect(JSON.stringify(report)).not.toContain("secret-");
+    expect(mocks.gradebookItemFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      id: "test-grade", gradesReleased: true, activity: { activityType: { key: "test" } }, grades: { some: { participantId: "participant-1", isActive: true } }
+    }) }));
+    expect(mocks.attemptFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "parent-1", participantId: "participant-1", assessmentMode: "summative", gradebookItemId: "gradebook-item-1" }),
+      select: expect.objectContaining({ testItemAttempts: expect.objectContaining({ where: { testItemId: "child-1", activityId: "program-1", lifecycle: { in: ["submitted", "graded"] } } }) })
+    }));
+    mocks.executionFindMany.mockResolvedValue([{ id: "execution-1", sourceCode: "different source", updatedAt: submittedAt }]);
+    expect((await getCodingExerciseStudentGradeReport(input))?.attempts).toEqual([]);
+    mocks.attemptFindMany.mockResolvedValue([{ id: "parent-1", testItemAttempts: [] }]);
+    expect((await getCodingExerciseStudentGradeReport(input))?.attempts).toEqual([]);
+    mocks.gradebookItemFindFirst.mockResolvedValue(null);
+    expect(await getCodingExerciseStudentGradeReport(input)).toBeNull();
+  });
+
 });

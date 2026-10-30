@@ -221,3 +221,7 @@ Authoring, confirmation, submission, and review dialogs reuse the [shared persis
 ## Saving Test reviews
 
 Question review participates in the host’s [single Save all transaction](../../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Drafts survive navigation between questions; switching students/submissions or leaving still warns. Scores and comments are saved with the recalculated total and audit, without re-executing the answer.
+
+## Released grading details
+
+Released Web Design exercises expose their final grade and available teacher comments. Inside Tests, the shared host gives each exercise its own disclosure; the activity link opens the retained submission workspace. The learner Grades tab lists released activities with expandable details and a link to their submission history. Parent release and content-closure policy govern every Test child. The shared host never exposes private result/configuration/analytics fields. See the [gradebook plan](../../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md).

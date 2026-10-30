@@ -17,7 +17,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { CSSProperties, FocusEvent, FormEvent, PointerEvent, useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ActivityTypeIcon, AppIcon, FolderContentIcon as SharedFolderContentIcon } from "@/components/app-icon";
-import { TestGradeBreakdown } from "@/components/test-grade-breakdown";
+import { StudentGradeFeedbackView as StudentFeedback } from "@/components/student-grade-feedback";
 import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { CourseGradeChallengesPanel } from "@/components/course-grade-challenges-panel";
@@ -42,7 +42,6 @@ import {
   GradebookStatus,
   GroupParticipant,
   GroupParticipantCandidate,
-  StudentGradeFeedback,
   StudentReleasedGrades
 } from "@/lib/api";
 import { ContentTypeIcon as MaterialTypeIcon, resolveContentResourcePresentation } from "@/lib/content-type-renderers";
@@ -363,23 +362,29 @@ export default function CourseGroupPage() {
                               {row.latePenaltyApplied && row.latePenaltyPercent !== null ? (
                                 <span className="table-meta-note muted">-{row.latePenaltyPercent}%</span>
                               ) : null}
-                              {codingExerciseReport ? null : <StudentFeedback feedback={row.feedback} maxScore={row.maxScore} t={t} />}
                             </div>
                             <span className={`participant-status is-${row.status.replace("_", "-")}`}>
                               {t(`courseDetail.gradebookStatus.${row.status}`)}
                               {row.latePenaltyApplied && row.latePenaltyPercent !== null ? ` -${row.latePenaltyPercent}%` : ""}
                             </span>
-                            {codingExerciseReport && row.score !== null ? (
-                              <div className="student-grade-report-cell">
-                                <CodingExerciseStudentGradeReport
-                                  feedback={row.feedback}
-                                  locale={locale}
-                                  maxScore={row.maxScore}
-                                  report={codingExerciseReport}
-                                  score={row.score}
-                                />
-                              </div>
-                            ) : null}
+                            <div className="student-grade-report-cell">
+                              {row.contentClosed ? <p className="muted">{t("groupPage.gradeDetailsClosed")}</p> : (
+                                <details className="student-grade-details">
+                                  <summary>{t("groupPage.gradingDetails")}</summary>
+                                  <div className="stack student-grade-details-content">
+                                    {codingExerciseReport && row.score !== null ? (
+                                      <CodingExerciseStudentGradeReport feedback={row.feedback} locale={locale}
+                                        maxScore={row.maxScore} report={codingExerciseReport} score={row.score} />
+                                    ) : row.feedback ? (
+                                      <StudentFeedback feedback={row.feedback} maxScore={row.maxScore} t={t} />
+                                    ) : <p className="muted">{t("groupPage.noGradingDetails")}</p>}
+                                    <Link className="button secondary" href={`/courses/${courseId}/groups/${groupId}/activities/assigned/${row.activityId}`}>
+                                      <AppIcon name="review" />{t("groupPage.openGradedActivity")}
+                                    </Link>
+                                  </div>
+                                </details>
+                              )}
+                            </div>
                           </div>;
                         })}
                       </div>
@@ -2174,99 +2179,6 @@ function formatAvailabilityValue(value: string, timeZone: string = "UTC") {
     hour12: false,
     hourCycle: "h23"
   }).format(date);
-}
-
-function StudentFeedback({
-  feedback,
-  maxScore,
-  t
-}: {
-  feedback: StudentGradeFeedback | null;
-  maxScore: number;
-  t: (key: string, params?: Record<string, string | number>) => string;
-}) {
-  if (!feedback) {
-    return null;
-  }
-  const parsonsDetails = getParsonsFeedbackDetails(feedback);
-
-  return (
-    <div className="stack stack-tight">
-      {feedback.feedbackText ? (
-        <div className="stack stack-tight">
-          <strong>{t("groupPage.feedbackTitle")}</strong>
-          <p className="muted">{feedback.feedbackText}</p>
-        </div>
-      ) : null}
-      {parsonsDetails.messages.length ? (
-        <div className="stack stack-tight">
-          <strong>{t("groupPage.feedbackTitle")}</strong>
-          {parsonsDetails.messages.map((message) => (
-            <p className="muted" key={message.type}>
-              {message.type === "order"
-                ? t("parsons.orderFeedback", { count: message.count })
-                : t("parsons.indentFeedback", { count: message.count })}
-            </p>
-          ))}
-        </div>
-      ) : null}
-      {parsonsDetails.grading.length ? (
-        <div className="stack stack-tight">
-          <strong>{t("groupPage.gradingBreakdownTitle")}</strong>
-          {scaleFeedbackGrading(parsonsDetails.grading, maxScore).map((component) => (
-            <p className="muted" key={component.type}>
-              {t(component.type === "order" ? "groupPage.parsonsOrderScore" : "groupPage.parsonsIndentationScore", {
-                score: formatGradeNumber(component.awarded),
-                max: formatGradeNumber(component.possible)
-              })}
-            </p>
-          ))}
-        </div>
-      ) : null}
-      <TestGradeBreakdown feedback={feedback} heading={t("groupPage.gradingBreakdownTitle")} />
-    </div>
-  );
-}
-
-type ParsonsFeedbackMessage = { type: "order" | "indentation"; count: number };
-type ParsonsFeedbackGrading = { type: "order" | "indentation"; awardedRaw: number; possibleRaw: number };
-
-function getParsonsFeedbackDetails(feedback: StudentGradeFeedback) {
-  const details = feedback.kind === "parsons" && feedback.details && typeof feedback.details === "object" ? feedback.details : {};
-  const messages = Array.isArray(details.messages)
-    ? details.messages
-        .map((message) => {
-          const item = message && typeof message === "object" ? (message as Record<string, unknown>) : null;
-          const type = item?.type;
-          const count = typeof item?.count === "number" ? item.count : null;
-          return (type === "order" || type === "indentation") && count !== null ? { type, count } : null;
-        })
-        .filter((message): message is ParsonsFeedbackMessage => message !== null)
-    : [];
-  const grading = Array.isArray(details.grading)
-    ? details.grading
-        .map((component) => {
-          const item = component && typeof component === "object" ? (component as Record<string, unknown>) : null;
-          const type = item?.type;
-          const awardedRaw = typeof item?.awardedRaw === "number" ? item.awardedRaw : null;
-          const possibleRaw = typeof item?.possibleRaw === "number" ? item.possibleRaw : null;
-          return (type === "order" || type === "indentation") && awardedRaw !== null && possibleRaw !== null
-            ? { type, awardedRaw, possibleRaw }
-            : null;
-        })
-        .filter((component): component is ParsonsFeedbackGrading => component !== null)
-    : [];
-  return { messages, grading };
-}
-
-function scaleFeedbackGrading(grading: ParsonsFeedbackGrading[], maxScore: number) {
-  const rawTotal = grading.reduce((sum, component) => sum + component.possibleRaw, 0);
-  const scale = rawTotal > 0 ? maxScore / rawTotal : 1;
-  return grading.map((component) => ({
-    type: component.type,
-    awarded: component.awardedRaw * scale,
-    possible: component.possibleRaw * scale
-  }));
 }
 
 function formatGradebookScore(score: number | null, maxScore: number) {

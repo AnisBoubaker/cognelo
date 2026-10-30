@@ -3,7 +3,7 @@ import { expect, test, ORIGINAL_SOURCE } from "./fixtures/bank-course";
 import { assignCourseTest, responseJson } from "./fixtures/activity-suite";
 import { createAuthenticatedApi } from "./fixtures/auth";
 
-test("one Save all persists MCQ feedback and generic question grades together", async ({ bankCourse: data, teacherApi, teacherPage: page }) => {
+test("one Save all persists MCQ feedback and generic question grades together", async ({ bankCourse: data, teacherApi, teacherPage: page, studentPage }) => {
   const student = await createAuthenticatedApi("student");
   try {
     const base = `/api/courses/${data.courseId}`;
@@ -58,5 +58,36 @@ test("one Save all persists MCQ feedback and generic question grades together", 
     await expect(dialog.getByLabel("Final grade (out of 30)", { exact: true })).toHaveValue("15");
     await expect(save).toBeDisabled();
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
+
+    const gradesPath = `${base}/groups/${data.groupId}/grades`;
+    expect(JSON.stringify(await responseJson(await student.get(gradesPath)))).not.toContain("Reviewed choices.");
+    await responseJson(await teacherApi.patch(`${base}/gradebook/items/${initial.gradebookItemId}/release`, { data: { released: true } }));
+    const standalone = `${base}/groups/${data.groupId}/activities/assigned/${data.activityId}`;
+    await responseJson(await student.post(`${standalone}/mcq/submission`, { data: { answers: { "question-1": ["question-1-choice-1"] } } }));
+    const standaloneItem = await prisma.gradebookItem.findFirstOrThrow({ where: { activityId: data.activityId, groupId: data.groupId } });
+    await responseJson(await teacherApi.patch(`${base}/gradebook/items/${standaloneItem.id}/release`, { data: { released: true } }));
+    await studentPage.goto(`/courses/${data.courseId}/groups/${data.groupId}?tab=grades`);
+    const standaloneRow = studentPage.locator(".table-row-student-grades").filter({ hasText: data.title });
+    await standaloneRow.getByText("Grading details", { exact: true }).click();
+    await expect(standaloneRow.getByText("Correct answers: 1 / 1", { exact: true })).toBeVisible();
+
+    const gradeRow = studentPage.locator(".table-row-student-grades").filter({ hasText: created.activity.title });
+    await gradeRow.getByText("Grading details", { exact: true }).click();
+    await gradeRow.locator("summary").filter({ hasText: "1. Choices" }).click();
+    await expect(gradeRow.getByText("Reviewed choices.", { exact: true })).toBeVisible();
+    await expect(gradeRow.getByText("Correct answers: 1 / 1", { exact: true })).toBeVisible();
+    await gradeRow.locator("summary").filter({ hasText: "2. Arrangement" }).click();
+    await expect(gradeRow.getByText("Reviewed arrangement.", { exact: true })).toBeVisible();
+    await expect(gradeRow.getByText(/^Order: /)).toBeVisible();
+    await expect(gradeRow.getByRole("link", { name: "Open activity and submissions" })).toBeVisible();
+    await studentPage.setViewportSize({ width: 390, height: 844 });
+    expect(await studentPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await studentPage.screenshot({ path: "tmp/student-test-grades-mobile.png", fullPage: true });
+    await studentPage.setViewportSize({ width: 1280, height: 900 });
+    await studentPage.screenshot({ path: "tmp/student-test-grades-desktop.png", fullPage: true });
+    await responseJson(await teacherApi.patch(`${base}/gradebook/items/${initial.gradebookItemId}/release`, { data: { released: false } }));
+    await responseJson(await teacherApi.patch(`${base}/gradebook/items/${standaloneItem.id}/release`, { data: { released: false } }));
+    await studentPage.reload();
+    await expect(studentPage.getByText("No grades are available yet.", { exact: true })).toBeVisible();
   } finally { await student.dispose(); }
 });
