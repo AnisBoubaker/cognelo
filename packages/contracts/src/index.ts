@@ -764,6 +764,16 @@ export const LiveActivityChangeSchema = z.object({
   confirmActiveStudents: z.boolean().optional(),
   studentMessage: z.string().trim().max(4000).optional()
 });
+export const ReplaceTestAiGradingInstructionsSchema = z.object({
+  instructions: z.string().trim().min(1).max(8000),
+  expectedRevision: z.string().min(1),
+  ...LiveActivityChangeSchema.shape
+}).strict();
+export type TestAiGradingInstructions = {
+  revision: string;
+  items: Array<{ testItemId: string; activityId: string; title: string; instructions: string }>;
+};
+
 export const ActivityUpdateSchema = partialWithoutDefaults(ActivityInputSchema).extend(LiveActivityChangeSchema.shape);
 export type ActivityUpdate = z.infer<typeof ActivityUpdateSchema>;
 

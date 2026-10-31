@@ -2,6 +2,16 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const zhMessages = {
+  testAiInstructions: {
+    "action": "替换 AI 评分说明",
+    "label": "AI 评分说明",
+    "help": "相同的说明将应用于以下 {count} 个支持 AI 评分的活动。",
+    "warning": "这将替换这些活动当前的 AI 评分说明。评分量规、权重和 AI 启用设置保持不变，已有成绩也不会改变。",
+    "replace": "替换说明",
+    "none": "此测试中没有可编辑 AI 评分说明的活动。",
+    "updated": "已更新 {count} 个活动的评分说明。",
+    "error": "无法替换 AI 评分说明。"
+},
   aiGrading: {
     "stoppedTitle": "AI 评分已停止",
     "completed": "已完成评分（{count}）",

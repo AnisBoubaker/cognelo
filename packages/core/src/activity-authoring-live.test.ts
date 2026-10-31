@@ -62,4 +62,14 @@ describe("live activity authoring", () => {
     expect(data.nextValue.fingerprint).not.toBe(data.previousValue.fingerprint);
     expect(JSON.stringify(data)).not.toContain("secret");
   });
+  it.each([true, false])("preserves partial submission records only for instruction-only authoring (%s)", async preservePartialSubmissions => {
+    mocks.tx.testItemAttempt.findMany.mockResolvedValue([{ id: "child", result: { state: { sourceCode: "submitted" } },
+      rawScore: 1, rawMaxScore: 2, feedback: {}, submittedAt: new Date(), gradedAt: new Date() }]);
+    await withActivityAuthoringChange(user, "course", "question", {}, vi.fn(), { preservePartialSubmissions });
+    if (preservePartialSubmissions) expect(mocks.tx.testItemAttempt.update).not.toHaveBeenCalled();
+    else expect(mocks.tx.testItemAttempt.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "child" },
+      data: expect.objectContaining({ lifecycle: "started", rawScore: null }) }));
+    expect(mocks.tx.courseAuditEvent.create).toHaveBeenCalledTimes(1);
+  });
+
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { TestAiGradingInstructionsAction } from "./test-ai-grading-instructions";
 import { DialogHeader } from "@cognelo/activity-ui";
 
 import { AppIcon } from "@/components/app-icon";
@@ -337,6 +338,8 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
           <p className="muted">Each item is a regular activity owned by this Test.</p>
           <p className="muted">Published activities can be composed here while Test execution support is developed separately.</p>
         </div>
+        {canManage ? <div className="row wrap"><TestAiGradingInstructionsAction scope="course" ownerId={courseId}
+          activityId={activity.id} disabled={busy || hasUnsavedSettings} onApplied={refresh} /></div> : null}
         {test.items.length ? test.items.map((item, index) => (
           <article className="card card-compact" key={item.id}>
             <div className="stack">

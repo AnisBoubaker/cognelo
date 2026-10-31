@@ -2,6 +2,16 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const frMessages = {
+  testAiInstructions: {
+    "action": "Remplacer les consignes de notation IA",
+    "label": "Consignes de notation IA",
+    "help": "Les mêmes consignes seront appliquées à ces {count} activités prenant en charge la notation par IA.",
+    "warning": "Cette action remplace leurs consignes de notation IA actuelles. Les grilles, pondérations et paramètres d’activation de l’IA sont conservés. Les notes existantes restent inchangées.",
+    "replace": "Remplacer les consignes",
+    "none": "Ce Test ne contient aucune activité dont les consignes de notation IA sont modifiables.",
+    "updated": "Consignes mises à jour pour {count} activités.",
+    "error": "Impossible de remplacer les consignes de notation IA."
+},
   aiGrading: {
     "stoppedTitle": "Évaluation par IA arrêtée",
     "completed": "Copies évaluées ({count})",

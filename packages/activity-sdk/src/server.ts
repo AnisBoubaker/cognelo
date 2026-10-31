@@ -270,6 +270,23 @@ export type PluginAiFeedbackTeacherReviewHandler = {
   };
 };
 
+export type PluginAiGradingInstructionsContext = {
+  scope: "course" | "bank";
+  activityId: string;
+  actorUserId: string;
+  transaction: {
+    query: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
+    execute: (query: TemplateStringsArray, ...values: unknown[]) => Promise<number>;
+  };
+};
+
+/** Authoring access to a plugin's existing instruction field, independent of submissions. */
+export type PluginAiGradingInstructionsHandler = {
+  activityTypeKeys: readonly string[];
+  getInstructions: (input: PluginAiGradingInstructionsContext) => Promise<string>;
+  replaceInstructions: (input: PluginAiGradingInstructionsContext & { instructions: string }) => Promise<void>;
+};
+
 export type PluginAiGradingBatchHandler = {
   getInstructions: (
     input: PluginAiFeedbackTeacherReviewContext
@@ -363,6 +380,7 @@ export type ServerActivityPlugin = {
     activityTypeKeys: readonly string[];
     getCompletions: PluginGradeCompletionHandler;
   };
+  aiGradingInstructions?: PluginAiGradingInstructionsHandler;
   aiFeedback?: {
     evaluateAttempt: PluginAiFeedbackHandler;
     publishEvaluation?: (input: {
@@ -575,6 +593,10 @@ export function resolvePluginAiFeedbackTeacherReviewHandler(activityTypeKey: str
   return currentServerPlugins().find((plugin) =>
     plugin.aiFeedback?.teacherReview && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.aiFeedback?.teacherReview ?? null;
+}
+
+export function resolvePluginAiGradingInstructionsHandler(activityTypeKey: string) {
+  return currentServerPlugins().find(plugin => plugin.aiGradingInstructions?.activityTypeKeys.includes(activityTypeKey))?.aiGradingInstructions ?? null;
 }
 
 export function resolvePluginAiGradingBatchHandler(activityTypeKey: string) {

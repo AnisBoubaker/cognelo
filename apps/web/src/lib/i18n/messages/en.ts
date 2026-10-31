@@ -2,6 +2,16 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const enMessages = {
+  testAiInstructions: {
+    "action": "Replace AI grading instructions",
+    "label": "AI grading instructions",
+    "help": "The same instructions will be applied to these {count} activities that support AI grading.",
+    "warning": "This replaces their current AI grading instructions. Rubrics, weights and AI enablement settings are preserved. Existing grades are unchanged.",
+    "replace": "Replace instructions",
+    "none": "This Test has no activities with editable AI grading instructions.",
+    "updated": "Updated instructions for {count} activities.",
+    "error": "Unable to replace AI grading instructions."
+},
   aiGrading: {
     "stoppedTitle": "AI grading stopped",
     "completed": "Completed grading ({count})",

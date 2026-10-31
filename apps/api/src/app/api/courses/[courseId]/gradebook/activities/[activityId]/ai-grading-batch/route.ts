@@ -77,7 +77,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const context = await getActivityAttemptRegradeContext(user, courseId, body.attemptId);
     assertActivityMatches(context.activityId, activityId);
     if (context.activityTypeKey === "test") {
-      throw new AppError(400, "TEST_AI_INSTRUCTIONS_QUESTION_SPECIFIC", "Edit AI grading instructions on each Test question, not on the Test.");
+      throw new AppError(400, "TEST_AI_INSTRUCTIONS_QUESTION_SPECIFIC", "Use the Test editor to replace child AI grading instructions. A Test has no separate grading policy.");
     }
     const batchGrading = resolvePluginAiGradingBatchHandler(context.activityTypeKey);
     if (!batchGrading) {

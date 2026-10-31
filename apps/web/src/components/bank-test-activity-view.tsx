@@ -1,5 +1,6 @@
 "use client";
 
+import { TestAiGradingInstructionsAction } from "./test-ai-grading-instructions";
 import { AppIcon } from "@/components/app-icon";
 
 import Link from "next/link";
@@ -226,6 +227,8 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
           <h2>Test activities</h2>
           <p className="muted">Each activity is an independent copy owned by this reusable Test.</p>
         </div>
+        {bank.canManage ? <div className="row wrap"><TestAiGradingInstructionsAction scope="bank" ownerId={bank.id}
+          activityId={activity.id} disabled={busy || hasUnsavedSettings} onApplied={refresh} /></div> : null}
         {test.items.length ? test.items.map((item, index) => (
           <article className="card card-compact" key={item.id}>
             <div className="stack">

@@ -193,3 +193,7 @@ For guided Test assessment, `batchGuidance.instructions` is optional: the host s
 ## Deferred AI grading publication
 
 Cancellable teacher grading requires `aiFeedback.publishEvaluation` and support for `deferPublication: true` on evaluation. Persist private artifacts as `staged`, excluded from normal history/report fallback queries. Publish only the exact feedback/activity/attempt identity through the host's neutral transaction executor. The core run commits publication together with grades and feedback; discarded or failed stages remain private audit evidence. See [AI grading runs](../AI_GRADING_RUNS.md).
+
+## Bulk authoring of AI grading instructions
+
+A type with `grading.supportsAiFeedbackGrading` may expose `ServerActivityPlugin.aiGradingInstructions` with an explicit activity-type allowlist, `getInstructions`, and `replaceInstructions`. These handlers operate on a course or bank activity without needing a student submission and receive only the actor and a neutral SQL transaction. Core resolves eligible current Test children, checks manager permissions and a loaded revision, and invokes all replacements atomically. The plugin must merge only its existing instruction field, preserve every other private setting, and retain private audit where applicable. See [Test bulk instructions](../TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#bulk-ai-grading-instructions).

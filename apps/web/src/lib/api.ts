@@ -1,3 +1,4 @@
+import type { TestAiGradingInstructions } from "@cognelo/contracts";
 import type { AiGradingRunSummary } from "@cognelo/contracts";
 import type { AnswerExportRequest, AnswerExportStudent, TestAttemptReviewInput } from "@cognelo/contracts";
 import type {
@@ -1812,6 +1813,12 @@ export const api = {
   }),
   bankTest: (activityBankId: string, bankActivityId: string) =>
     request<{ test: BankTest }>(`/activity-banks/${activityBankId}/activities/${bankActivityId}/test`),
+  testAiGradingInstructions: (scope: "course" | "bank", ownerId: string, activityId: string, signal?: AbortSignal) =>
+    request<TestAiGradingInstructions>(`${scope === "course" ? `/courses/${ownerId}` : `/activity-banks/${ownerId}`}/activities/${activityId}/test/ai-grading-instructions`, { signal }),
+  replaceTestAiGradingInstructions: (scope: "course" | "bank", ownerId: string, activityId: string, input: { instructions: string; expectedRevision: string }) =>
+    requestAuthoring<{ updatedCount: number }>(`${scope === "course" ? `/courses/${ownerId}` : `/activity-banks/${ownerId}`}/activities/${activityId}/test/ai-grading-instructions`, {
+      method: "PUT", body: JSON.stringify(input)
+    }),
   updateBankTest: (activityBankId: string, bankActivityId: string, input: {
     title?: string;
     description?: string;

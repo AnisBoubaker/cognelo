@@ -1,3 +1,4 @@
+import { codingExerciseGradingInstructions } from "./grading-instructions";
 import { exportCodingSubmission } from "./submission-export";
 import type { PluginAiFeedbackTeacherReviewContext, ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import {
@@ -103,6 +104,7 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     activityTypeKeys: ["coding-exercise"],
     getCompletions: getCodingExerciseGradeCompletions
   },
+  aiGradingInstructions: codingExerciseGradingInstructions,
   aiFeedback: {
     publishEvaluation: async ({ activityId, coreAttemptId, feedbackRef, transaction }) => {
       const changed = await transaction.execute`UPDATE "PluginCodingExerciseAiEvaluation" SET status = 'completed'

@@ -15,7 +15,7 @@ export async function lockTestAuthoring(tx: ActivityAuthoringTransaction, activi
 export async function withActivityAuthoringChange<T>(
   user: CurrentUser, courseId: string, activityId: string, input: unknown,
   mutate: (tx: Prisma.TransactionClient) => Promise<T>,
-  options: { eventType?: string; privateChange?: { before: unknown; after: unknown } } = {}
+  options: { eventType?: string; privateChange?: { before: unknown; after: unknown }; preservePartialSubmissions?: boolean } = {}
 ): Promise<T> {
   await assertCanManageCourse(user, courseId);
   const confirmation = LiveActivityChangeSchema.parse(input ?? {});
@@ -34,7 +34,7 @@ export async function withActivityAuthoringChange<T>(
     const result = await mutate(tx);
     // A previously interrupted submission may have graded some children. They
     // must be graded against the correction on retry, retaining the old evidence.
-    const partials = await tx.testItemAttempt.findMany({ where: {
+    const partials = options.preservePartialSubmissions ? [] : await tx.testItemAttempt.findMany({ where: {
       parentAttempt: { activityId: parentId, lifecycle: "started" }, lifecycle: { in: ["submitted", "graded"] }
     } });
     for (const item of partials) {

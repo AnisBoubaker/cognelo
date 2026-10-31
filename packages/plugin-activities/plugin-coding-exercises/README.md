@@ -125,6 +125,6 @@ Dialogs follow the shared [persistent header and icon-only close pattern](../../
 
 Inside Tests, manual review retains drafts across questions and uses one [Save all action](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading). Question score edits update the calculated Test total; changing student/submission or closing still warns about unsaved changes.
 
-Test AI batches can use up to three graded Test submissions as examples, matched to the corresponding question with complete feedback. There is no Test-wide instruction editor: each question keeps its own instructions, now included in the model system prompt as the authoritative grading policy. See [guided Test grading](docs/REFERENCE.md#test-ai-grading-compatibility).
+Test AI batches can use up to three graded Test submissions as examples, matched to the corresponding question with complete feedback. Each question keeps its own instructions, included in the model system prompt as the authoritative grading policy. The main Test editor can replace this field across all eligible children at once; it does not introduce a separate parent policy. See [guided Test grading](docs/REFERENCE.md#test-ai-grading-compatibility).
 
 Teacher AI assessment supports [atomic cancellable grading runs](../../../docs/AI_GRADING_RUNS.md): completed copies stay private until saved, and interrupted runs offer named Keep/Discard results.
