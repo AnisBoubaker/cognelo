@@ -162,3 +162,7 @@ Prompt version `mcq-feedback-v2` includes saved assessment instructions directly
 ## Released grading details
 
 Released MCQs expose their correct-answer count and available overall/per-question explanations. Inside Tests, the shared host also shows teacher comments and the exercise grade. The learner Grades tab lists released activities with expandable details and a link to their submission history. Parent release and content-closure policy govern every Test child. The shared host never exposes private result/configuration/analytics fields. See the [gradebook plan](../../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md).
+
+## Cancellable teacher AI grading
+
+The host's [AI grading run](../../../../docs/AI_GRADING_RUNS.md) evaluates copies sequentially, stages every question of a Test, and publishes only complete results after success or an explicit Keep decision. This plugin honors `deferPublication` with private `staged` artifacts; ordinary completed-only queries cannot use them for student reports, teacher feedback fallback, exports or regrading. `publishEvaluation` validates feedback/activity/attempt identity and promotes the artifact through the host transaction together with academic records. Discard retains private evidence without exposing feedback or changing old grades. Existing formative calls do not defer publication.

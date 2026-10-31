@@ -235,6 +235,8 @@ export type PluginAiFeedbackHandler = (input: {
     state: Record<string, unknown>;
   };
   batchGuidance?: PluginAiGradingBatchGuidance;
+  /** Keep private artifacts out of ordinary report/history queries until the host commits. */
+  deferPublication?: boolean;
 }) => Promise<PluginAiFeedbackResult>;
 
 export type PluginAiFeedbackTeacherReviewContext = {
@@ -363,6 +365,12 @@ export type ServerActivityPlugin = {
   };
   aiFeedback?: {
     evaluateAttempt: PluginAiFeedbackHandler;
+    publishEvaluation?: (input: {
+      activityId: string;
+      coreAttemptId: string;
+      feedbackRef: string;
+      transaction: { execute: (query: TemplateStringsArray, ...values: unknown[]) => Promise<number> };
+    }) => Promise<void>;
     teacherReview?: PluginAiFeedbackTeacherReviewHandler;
     batchGrading?: PluginAiGradingBatchHandler;
   };
@@ -555,6 +563,12 @@ export function resolvePluginAiFeedbackHandler(activityTypeKey: string) {
   return currentServerPlugins().find((plugin) =>
     plugin.aiFeedback?.evaluateAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.aiFeedback?.evaluateAttempt ?? null;
+}
+
+export function resolvePluginAiFeedbackPublisher(activityTypeKey: string) {
+  return currentServerPlugins().find((plugin) =>
+    plugin.aiFeedback?.evaluateAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
+  )?.aiFeedback?.publishEvaluation ?? null;
 }
 
 export function resolvePluginAiFeedbackTeacherReviewHandler(activityTypeKey: string) {

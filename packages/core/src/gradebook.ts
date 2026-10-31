@@ -981,10 +981,11 @@ export async function recordActivityAttemptAiFeedback(
     feedbackRef: string;
     feedbackVersion: number;
     feedbackHash: string;
-  }
+  },
+  transaction?: Prisma.TransactionClient
 ) {
   await assertCanViewCourseGradebook(user, courseId);
-  const attempt = await prisma.activityAttempt.findFirst({
+  const attempt = await (transaction ?? prisma).activityAttempt.findFirst({
     where: { id: input.attemptId, courseId },
     select: { id: true, gradebookItemId: true, participantId: true, groupId: true, assessmentMode: true }
   });
@@ -993,7 +994,7 @@ export async function recordActivityAttemptAiFeedback(
   if (attempt.assessmentMode === "formative") {
     throw new AppError(409, "FORMATIVE_ATTEMPT_NOT_GRADEABLE", "Formative attempts cannot receive gradebook feedback.");
   }
-  const current = await prisma.grade.findUnique({
+  const current = await (transaction ?? prisma).grade.findUnique({
     where: {
       gradebookItemId_participantId: {
         gradebookItemId: attempt.gradebookItemId,
@@ -1015,7 +1016,7 @@ export async function recordActivityAttemptAiFeedback(
     feedbackHash: input.feedbackHash,
     challengeAllowed: false
   };
-  return prisma.$transaction(async (tx) => {
+  const save = async (tx: Prisma.TransactionClient) => {
     const grade = await tx.grade.update({
       where: { id: current.id },
       data: {
@@ -1048,7 +1049,8 @@ export async function recordActivityAttemptAiFeedback(
       }
     });
     return grade;
-  });
+  };
+  return transaction ? save(transaction) : prisma.$transaction(save);
 }
 
 export async function getActivityAttemptRegradeContext(

@@ -1,3 +1,5 @@
+export * from "./ai-grading-runs";
+export * from "./ai-grading-preparation";
 export * from "./student-grade-visibility";
 export * from "./activity-authoring-live";
 export * from "./activities";

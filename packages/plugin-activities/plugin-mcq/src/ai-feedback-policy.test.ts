@@ -20,10 +20,11 @@ describe("MCQ teacher instruction priority", () => {
     mocks.update.mockResolvedValue({ id: "evaluation", version: 1 });
     mocks.generate.mockResolvedValue(JSON.stringify({ summary: "Brief feedback", questionFeedback: [{ questionId: "question-1", explanation: "Reviewed answer" }] }));
   });
-  it("promotes the saved feedback instructions without promoting question text or changing deterministic grades", async () => {
+  it.each([false, true])("preserves instruction priority and stages publication when requested (%s)", async (deferPublication) => {
     const instructions = "Use one short sentence and acknowledge the learner's reasoning.";
     const result = await evaluateMcqWithAi({
       user: { id: "teacher", email: "teacher@example.test", name: null, firstName: null, lastName: null, roles: ["teacher"] },
+      deferPublication,
       courseId: "course", groupId: "group", activityId: "activity", coreAttemptId: "attempt", assessmentMode: "summative", triggerKind: "test_child",
       activity: { id: "activity", title: "Question", description: "", lifecycle: "published", activityType: { key: "mcq", name: "MCQ", description: "" },
         config: { source: "## Addition\nStudent-facing question text.\n- [x] Four\n- [ ] Five", aiFeedbackEnabled: true, aiFeedbackInstructions: instructions } },
@@ -36,5 +37,6 @@ describe("MCQ teacher instruction priority", () => {
     expect(input.systemPrompt).not.toContain("Student-facing question text.");
     expect(JSON.parse(input.userPrompt).instructions).toBe(instructions);
     expect(result.gradingResult).toBeUndefined();
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: deferPublication ? "staged" : "completed" }) }));
   });
 });

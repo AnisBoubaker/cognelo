@@ -52,21 +52,27 @@ test.describe("guided batch AI grading", () => {
       instructionUpdates.push(route.request().postDataJSON() as Record<string, unknown>);
       await route.fulfill({ contentType: "application/json", body: JSON.stringify({ updated: true }) });
     });
-    await page.route(`**/api/courses/${courseId}/gradebook/attempts/*/ai-feedback`, async (route) => {
-      if (route.request().method() !== "POST") {
-        await route.continue();
-        return;
+    let run: { id: string; activityId: string; status: string; stopReason: null; completed: number; total: number;
+      students: Array<{ attemptId: string; name: string; status: string; error: null }> } | null = null;
+    let runInput: Record<string, unknown> = {};
+    await page.route(`**/api/courses/${courseId}/gradebook/activities/${activityId}/ai-grading-runs`, async route => {
+      if (route.request().method() === "POST") {
+        runInput = route.request().postDataJSON();
+        const targets = runInput.attemptIds as string[];
+        run = { id: "mock-run", activityId, status: "running", stopReason: null, completed: 0, total: targets.length,
+          students: targets.map(attemptId => ({ attemptId, name: attemptId, status: "pending", error: null })) };
       }
-      const attemptId = new URL(route.request().url()).pathname.split("/").at(-2) ?? "";
-      assessed.push({ attemptId, body: route.request().postDataJSON() as Record<string, unknown> });
-      if (assessed.length === 1) {
-        markFirstAssessmentStarted();
-        await firstAssessmentGate;
-      }
-      await route.fulfill({
-        contentType: "application/json",
-        body: JSON.stringify({ evaluation: { feedbackRef: `mock-${attemptId}`, feedbackVersion: 1 }, result: {} })
-      });
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ run: run?.status === "running" ? run : null }) });
+    });
+    await page.route(`**/api/courses/${courseId}/gradebook/ai-grading-runs/mock-run**`, async route => {
+      if (route.request().method() === "POST") {
+        const attemptId = new URL(route.request().url()).pathname.split("/").at(-1)!;
+        assessed.push({ attemptId, body: { triggerKind: "teacher_batch", instructions: runInput.instructions, templateAttemptIds: runInput.templateAttemptIds } });
+        if (assessed.length === 1) { markFirstAssessmentStarted(); await firstAssessmentGate; }
+        run!.students.find(student => student.attemptId === attemptId)!.status = "completed";
+        run!.completed++;
+      } else if (route.request().method() === "PATCH" && route.request().postDataJSON().action === "finish") run!.status = "completed";
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ run }) });
     });
 
     await page.goto(`/courses/${courseId}/gradebook/activities/${activityId}`);

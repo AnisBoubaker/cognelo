@@ -48,4 +48,18 @@ describe("ProgressDialog", () => {
     expect(html).not.toContain(">Close</button>");
     expect(html.indexOf('aria-label="Close"')).toBeLessThan(html.indexOf("<progress"));
   });
+  it("exposes explicit cancellation without making a running operation dismissible", () => {
+    const html = renderToStaticMarkup(createElement(ProgressDialog, {
+      open: true, title: "Grading", progressLabel: "Progress", cancelLabel: "Cancel grading", onCancel: () => {},
+      closeLabel: "Close", onClose: () => {}
+    }));
+    expect(html).toContain("Cancel grading");
+    expect(html).not.toContain('aria-label="Close"');
+    expect(html).toContain('data-action-icon="close"');
+    const cancelling = renderToStaticMarkup(createElement(ProgressDialog, {
+      open: true, title: "Grading", progressLabel: "Progress", cancelLabel: "Cancelling", onCancel: () => {}, cancelling: true
+    }));
+    expect(cancelling).toContain('disabled=""');
+  });
+
 });

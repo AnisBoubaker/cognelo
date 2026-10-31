@@ -156,6 +156,7 @@ enum SmtpSecurityMode {
 }
 
 model User {
+  aiGradingRuns AiGradingRun[]
   id                                 String                        @id @default(cuid())
   email                              String                        @unique
   name                               String?
@@ -253,6 +254,26 @@ model ExecutionRunner {
   @@index([updatedById])
 }
 
+model AiGradingRun {
+  id          String   @id @default(cuid())
+  courseId    String
+  activityId  String
+  actorUserId String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  activity    Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  actor       User     @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+  activeKey   String?  @unique
+  status      String   @default("running")
+  stopReason  String?
+  entries     Json
+  guidance    Json
+  heartbeatAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([courseId, activityId, actorUserId, createdAt])
+}
+
 model BackgroundJob {
   id             String              @id
   queue          String              @default("default")
@@ -319,6 +340,7 @@ model UserRole {
 }
 
 model Course {
+  aiGradingRuns AiGradingRun[]
   id                        String                     @id @default(cuid())
   subjectId                 String
   title                     String
@@ -914,6 +936,7 @@ model ActivityVersion {
 }
 
 model Activity {
+  aiGradingRuns AiGradingRun[]
   id                        String                     @id @default(cuid())
   courseId                  String
   bankActivityId            String?

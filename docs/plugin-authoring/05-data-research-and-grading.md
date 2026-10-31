@@ -189,3 +189,7 @@ Declare `grading.supportsAnswerExport` and register the matching server `submiss
 
 
 For guided Test assessment, `batchGuidance.instructions` is optional: the host sends matching reviewed question examples and leaves instructions to the owning activity. Use the saved effective question policy when that field is absent. Implement `isTemplateComplete` against sanitized feedback and keep learner identity out of model templates. Assessment instructions should be placed in the system prompt using core’s `assessmentInstructionPrompt` so examples/reference details cannot override the teacher’s policy. See [compound Test examples](../TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#guided-ai-grading-examples).
+
+## Deferred AI grading publication
+
+Cancellable teacher grading requires `aiFeedback.publishEvaluation` and support for `deferPublication: true` on evaluation. Persist private artifacts as `staged`, excluded from normal history/report fallback queries. Publish only the exact feedback/activity/attempt identity through the host's neutral transaction executor. The core run commits publication together with grades and feedback; discarded or failed stages remain private audit evidence. See [AI grading runs](../AI_GRADING_RUNS.md).

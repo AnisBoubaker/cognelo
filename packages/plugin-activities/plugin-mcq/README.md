@@ -68,3 +68,5 @@ Inside Tests, manual review retains drafts across questions and uses one [Save a
 Assessment feedback now places the question’s saved teacher instructions in the model system prompt, ahead of question/example assumptions. Deterministic MCQ grades remain unchanged.
 
 Released exercise scores and available teacher feedback are accessible from the learner Grades tab, including each child of a Test. See [learner grading details](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md).
+
+Teacher AI assessment supports [atomic cancellable grading runs](../../../docs/AI_GRADING_RUNS.md): completed copies stay private until saved, and interrupted runs offer named Keep/Discard results.

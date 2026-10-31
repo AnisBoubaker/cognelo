@@ -1,5 +1,6 @@
 "use client";
 
+import { ActionIcon } from "./action-icon";
 import { DialogHeader } from "./dialog-header";
 
 import { useSharedDialogOpen } from "./dialog-provider";
@@ -21,6 +22,9 @@ export type ProgressDialogProps = {
   error?: ReactNode;
   closeLabel?: string;
   onClose?: () => void;
+  cancelLabel?: string;
+  onCancel?: () => void;
+  cancelling?: boolean;
 };
 
 export function ProgressDialog({
@@ -34,7 +38,10 @@ export function ProgressDialog({
   status = "running",
   error,
   closeLabel,
-  onClose
+  onClose,
+  cancelLabel,
+  onCancel,
+  cancelling = false
 }: ProgressDialogProps) {
   const titleId = useId();
   const sharedDialogOpen = useSharedDialogOpen();
@@ -62,8 +69,9 @@ export function ProgressDialog({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Tab" && statusRef.current === "running") {
-        event.preventDefault();
-        dialogRef.current?.focus();
+        const buttons = Array.from(dialogRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []);
+        if (!buttons.length) { event.preventDefault(); dialogRef.current?.focus(); }
+        else if (event.shiftKey || document.activeElement === buttons.at(-1)) { event.preventDefault(); buttons[0].focus(); }
         return;
       }
       if (event.key !== "Escape") return;
@@ -121,6 +129,9 @@ export function ProgressDialog({
           </div>
           {error ? <div className="error">{error}</div> : null}
         </div>
+        {status === "running" && onCancel && cancelLabel ? <div className="row">
+          <button type="button" onClick={onCancel} disabled={cancelling}><ActionIcon name="close" />{cancelLabel}</button>
+        </div> : null}
       </section>
     </div>
   );

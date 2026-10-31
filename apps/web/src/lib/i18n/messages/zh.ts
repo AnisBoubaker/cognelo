@@ -2,6 +2,21 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const zhMessages = {
+  aiGrading: {
+    "stoppedTitle": "AI 评分已停止",
+    "completed": "已完成评分（{count}）",
+    "notGraded": "未评分（{count}）",
+    "none": "无",
+    "keep": "保留已完成的评分",
+    "discard": "放弃本次评分",
+    "decisionHelp": "已完成的评分已准备好，但尚未替换任何成绩。您可以保留这些评分，或放弃本次操作以保持所有原有成绩和反馈不变。",
+    "stagingHelp": "结果仅在本次评分全部完成，或您选择保留已完成的评分时保存。",
+    "connectionLost": "连接已断开。评分正在停止；恢复连接后将显示处理结果。",
+    "discarded": "本次评分已放弃。原有成绩和反馈保持不变。",
+    "cancelling": "正在取消…",
+    "progress": "{completed} / {total}",
+    "saving": "正在保存已完成的成绩…"
+},
   answerExport: {
     "title": "导出学生答案",
     "single": "将答案导出为 PDF",

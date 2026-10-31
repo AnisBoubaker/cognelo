@@ -370,3 +370,7 @@ The shared assigned dispatcher checks the effective deadline after the request b
 ## Dialog presentation
 
 Authoring, confirmation, submission, and review dialogs reuse the [shared persistent header and close cross](../../../../docs/DIALOGS.md). The host review toolbar keeps navigation, messages, and dismissal on one row; embedded review panels leave the modal boundary and close action to that host. Existing draft guards, busy states, and non-dismissible progress remain in force.
+
+## Cancellable teacher AI grading
+
+The host's [AI grading run](../../../../docs/AI_GRADING_RUNS.md) evaluates copies sequentially, stages every question of a Test, and publishes only complete results after success or an explicit Keep decision. This plugin honors `deferPublication` with private `staged` artifacts; ordinary completed-only queries cannot use them for student reports, teacher feedback fallback, exports or regrading. `publishEvaluation` validates feedback/activity/attempt identity and promotes the artifact through the host transaction together with academic records. Discard retains private evidence without exposing feedback or changing old grades. Existing formative calls do not defer publication.

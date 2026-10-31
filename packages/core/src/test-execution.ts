@@ -545,11 +545,12 @@ export async function recordTestItemAiFeedback(
     feedbackHash: string;
     expectedUpdatedAt?: string;
     gradingResult?: { rawScore: number; rawMaxScore: number; isPass?: boolean | null };
-  }
+  },
+  transaction?: Prisma.TransactionClient
 ) {
   const context = await getActivityAttemptRegradeContext(user, courseId, parentAttemptId);
   if (context.activityTypeKey !== "test") throw new AppError(400, "TEST_ATTEMPT_REQUIRED", "This attempt does not belong to a Test.");
-  const parent = await prisma.activityAttempt.findFirst({
+  const parent = await (transaction ?? prisma).activityAttempt.findFirst({
     where: { id: parentAttemptId, courseId, pluginKey: CORE_TEST_RUNTIME_KEY, lifecycle: { in: ["submitted", "graded"] } },
     include: { testItemAttempts: true }
   });
@@ -569,7 +570,7 @@ export async function recordTestItemAiFeedback(
         normalizedMaxScore: pointsPossible
       }
     : null;
-  return prisma.testItemAttempt.update({
+  return (transaction ?? prisma).testItemAttempt.update({
     where: { id: itemAttempt.id, updatedAt: itemAttempt.updatedAt },
     data: {
       ...(grading ? { ...grading, lifecycle: "graded" as const, gradedAt: new Date() } : {}),

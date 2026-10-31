@@ -43,6 +43,7 @@ Content-type plugin entry points live under `packages/plugin-content-types/`; th
 
 Open these only when changing or reviewing the named area:
 
+- [Atomic AI grading and interruption recovery](AI_GRADING_RUNS.md)
 - [AI feedback, grading, and challenges](AI_FEEDBACK_GRADING_CHALLENGES_IMPLEMENTATION_PLAN.md)
 - [Coding Homework Grader](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md)
 - [Content-type plugins](CONTENT_TYPE_PLUGIN_IMPLEMENTATION_PLAN.md)

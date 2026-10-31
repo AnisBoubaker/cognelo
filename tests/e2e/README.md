@@ -187,3 +187,5 @@ Solution-release/revocation assertions allow 30 seconds for the documented 20-se
 The Web Design undo-isolation check polls the persisted file values after the final undo. An enabled navigation button alone can be observed before the React update queues that autosave; it is not a database-commit signal.
 
 Learner grading-details coverage extends `test-review-generic.spec.ts` with released MCQ/Parsons exercise accordions, comments, deterministic breakdowns, hide/release boundaries, and desktop/mobile containment. `test-manual-feedback.spec.ts` checks every programming child’s rubric/narrative and recovered code under an overridden Test total. `student-programming-report.spec.ts` opens the standalone report through the same Grades disclosure.
+
+`atomic-ai-grading.spec.ts` checks per-Test atomicity, in-flight cancellation, named Keep/Discard lists, provider failure, reload/heartbeat recovery, staged-result privacy, optimistic conflicts and keyboard/mobile behavior against real local APIs with a controlled model endpoint. Guided batch tests use the durable run routes.

@@ -377,6 +377,10 @@ Overall comments live in the Test attempt metadata (`testReviewFeedbackText`) an
 
 Regression coverage is in `test-manual-feedback.spec.ts` (including cross-question draft retention and warnings when changing students), the API-only `test-review-save-all.spec.ts`, the broader activity workflow, and core/plugin/draft-state unit tests. No schema migration is required.
 
+### Atomic AI grading
+
+AI evaluation stages all applicable questions before publishing a student's Test. New grades and feedback are committed with the parent total in one transaction; any failed or cancelled question leaves the whole copy unchanged. Class runs show named completed/not-graded lists and let the teacher keep completed copies or discard all prepared results after cancellation/interruption, including reload recovery. See [AI grading runs](AI_GRADING_RUNS.md) for state, plugin publication, concurrency and migration details.
+
 ### Guided AI grading examples
 
 Whole-class AI grading offers up to three graded Test submissions as examples, without Test-level instructions. Each question retains its own saved instructions, promoted to the model system prompt as the authoritative assessment policy. The selected Tests are excluded from batch targets. The dialog shows how many questions have complete feedback available for use as examples.

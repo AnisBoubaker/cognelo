@@ -91,7 +91,7 @@ The model is always resolved server-side. Provider keys, raw credentials, privat
 - Teacher revisions may update learner-visible narrative feedback before or after release, including while a challenge is open. A plugin may also expose editable rubric percentages and return a validated grading result; Programming Exercises then recompute the AI and combined scores with the immutable deterministic result and configured weights, and core records the change through its audited regrade path. Core preserves the immutable original evaluation artifact and challenge hash, records previous/next feedback and research telemetry, and links post-challenge teacher revisions to the challenge ID.
 - Student-safe summative AI feedback is exposed only after the associated `GradebookItem` is released.
 
-Teacher-triggered batch grading processes attempts sequentially and independently, so one provider or parsing failure does not erase successful results for other attempts. Tests now use the same example-selection dialog without an instructions editor or persistence checkbox: every child keeps its own current grading policy. Up to three graded Test submissions can supply matching question examples; the UI reports complete-question coverage, and only supported questions with complete grading feedback are used. Selected parent attempts are excluded from targets. For direct AI-grading plugins, the shared preparation dialog preloads current activity instructions and lists already graded attempts whose plugin-owned rubric and comment content is complete. Teachers may select up to three consistency examples. Selected examples are excluded from reassessment; every target request revalidates them as complete graded attempts for the same activity and passes only the plugin-sanitized submission/feedback pair, never learner identity. Edited instructions apply to the current run, while a default-on checkbox optionally persists them once before processing. The completion notice reports the failure count and most common actionable reason rather than expanding every learner name. A durable maximum batch size plus cancellation and timeout UX remain Phase 6 hardening.
+Teacher-triggered AI grading uses [durable, cancellable runs](AI_GRADING_RUNS.md). Each submitted Test is prepared completely before any question or total changes; completed results stay staged until successful completion or the teacher's explicit Keep decision. Cancellation and interruptions retain named completed/not-graded lists and a Keep/Discard choice across reloads. Discard preserves previous grades and feedback. Failed copies are never partly published, and stale edits reject the final atomic save. Batches are limited to 500 distinct submissions and run sequentially through direct requests, without a background worker. The existing guided example selection and question-owned Test instructions remain unchanged.
 
 ## Responsibility Boundary
 
@@ -345,11 +345,11 @@ The normalized event should include stable references, timestamps, assessment mo
 
 ### Phase 0 — Confirm The Contract
 
-Status: complete. Grade release is blocked when pending or failed required grading leaves submitted work ungraded or partial; feedback-only pending work remains a separate teacher-controlled action. The web batch is bounded by the attempts currently loaded for the activity and processes them sequentially. Direct AI-grading plugins use the shared guided-batch contract; Programming Exercises implement the initial instruction/template policy. Compound Test orchestration continues to delegate to child-owned configuration rather than pretending the parent has one instruction setting.
+Status: complete. Grade release is blocked when pending or failed required grading leaves submitted work ungraded or partial; feedback-only pending work remains a separate teacher-controlled action. The web batch is bounded by the loaded attempts and a server limit of 500; it prepares them sequentially and publishes through the atomic run decision. Direct AI-grading plugins use the shared guided-batch contract; Programming Exercises implement the initial instruction/template policy. Compound Test orchestration continues to delegate to child-owned configuration rather than pretending the parent has one instruction setting.
 
 - Confirm course settings, trigger semantics, visibility, direct teacher execution, challenge rules, and research fields.
 - Completed: block release when required grading is incomplete, without blocking true non-submissions or feedback-only activities.
-- Confirm bounded batch size and timeout behavior for direct teacher-triggered grading.
+- Completed: bounded batches, explicit cancellation, atomic Test publication and durable interruption recovery; see [AI grading runs](AI_GRADING_RUNS.md).
 
 ### Phase 1 — Shared Platform Foundation
 
@@ -412,7 +412,7 @@ Status: partial. The manager research endpoint is implemented with stable identi
 - define and enforce raw provider-response retention;
 - add operational dashboards for failures, latency, model usage, and pending teacher grading;
 - add activity/section/student challenge-list filters and Compound Test child feedback review/edit rendering;
-- add live-provider cross-plugin browser coverage and cancellation/timeout UX for larger batches;
+- add live-provider cross-plugin browser coverage; cancellation/recovery is implemented in [AI grading runs](AI_GRADING_RUNS.md);
 - update the student-model evidence plan if AI rubric dimensions become learning-evidence signals.
 
 ## Verification Requirements
@@ -445,7 +445,7 @@ Status: partial. The manager research endpoint is implemented with stable identi
 
 - Whether feedback-only summative release should later be blocked while generation is pending/failed. Required grading components already block release when incomplete.
 - A durable maximum batch size beyond the attempts loaded by the current detailed-gradebook view.
-- Request timeout/cancellation behavior for larger direct bulk grading without a background worker.
+- Completed: direct bulk-grading cancellation and interruption recovery without a background worker; see [AI grading runs](AI_GRADING_RUNS.md).
 - Whether Compound Test parent review should edit child feedback inline or open each child's plugin review renderer in a nested surface.
 - Whether a teacher changes only the final normalized grade during challenge resolution or can also replace individual plugin rubric-component scores.
 - Whether a regrade after release is immediately visible or requires a hide/re-release cycle.

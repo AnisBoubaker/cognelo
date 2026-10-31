@@ -613,3 +613,5 @@ Both legacy course CSV and activity-result CSV use the shared cell escaper. Stud
 ### Unified Test review saving
 
 Test review uses one [Save all boundary](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading) for question rubric scores, feedback, item grades, the overall comment, and an explicit total override. Draft totals follow question edits without requiring intermediate saves. Existing saved overrides no longer silently freeze a new rubric edit; deliberate current-draft overrides remain explicit. The atomic save rechecks all versions and preserves audit, partial-grade, historical/read-only, grade-selection, and release behavior.
+
+AI assessment now uses [durable cancellable grading runs](AI_GRADING_RUNS.md). Each Test and the final Keep decision are atomic; cancelled/interrupted batches retain named results and a Keep/Discard decision. Staged grades/feedback remain invisible until publication, even for previously released items.

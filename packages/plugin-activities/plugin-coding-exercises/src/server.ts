@@ -104,13 +104,19 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     getCompletions: getCodingExerciseGradeCompletions
   },
   aiFeedback: {
-    evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity, triggerKind, batchGuidance, testItemAttempt }) => {
+    publishEvaluation: async ({ activityId, coreAttemptId, feedbackRef, transaction }) => {
+      const changed = await transaction.execute`UPDATE "PluginCodingExerciseAiEvaluation" SET status = 'completed'
+        WHERE id = ${feedbackRef} AND "activityId" = ${activityId} AND "coreAttemptId" = ${coreAttemptId} AND status = 'staged'`;
+      if (changed !== 1 && !feedbackRef.startsWith("coding-exercise-empty:")) throw new AppError(409, "AI_GRADING_CONFLICT", "The prepared feedback is no longer available.");
+    },
+    evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, pluginAttemptRef, activity, triggerKind, batchGuidance, testItemAttempt, deferPublication }) => {
       return evaluateCodingExerciseAttemptWithAi({
         user,
         courseId,
         groupId,
         activityId,
         coreAttemptId,
+        deferPublication,
         executionId: pluginAttemptRef ?? null,
         testItemAttemptId: testItemAttempt?.id,
         activity,

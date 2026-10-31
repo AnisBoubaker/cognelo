@@ -2,6 +2,21 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const frMessages = {
+  aiGrading: {
+    "stoppedTitle": "Évaluation par IA arrêtée",
+    "completed": "Copies évaluées ({count})",
+    "notGraded": "Copies non évaluées ({count})",
+    "none": "Aucune",
+    "keep": "Conserver les évaluations terminées",
+    "discard": "Abandonner cette évaluation",
+    "decisionHelp": "Les copies évaluées sont prêtes, mais aucune note n’a été remplacée. Conservez-les ou abandonnez cette évaluation pour préserver toutes les notes et rétroactions précédentes.",
+    "stagingHelp": "Les résultats sont enregistrés à la fin du traitement ou lorsque vous choisissez de conserver les évaluations terminées.",
+    "connectionLost": "Connexion perdue. L’évaluation s’arrête ; le bilan sera affiché au rétablissement de la connexion.",
+    "discarded": "Évaluation abandonnée. Les notes et rétroactions précédentes sont inchangées.",
+    "cancelling": "Annulation…",
+    "progress": "{completed} sur {total}",
+    "saving": "Enregistrement des notes terminées…"
+},
   answerExport: {
     "title": "Exporter les réponses des étudiants",
     "single": "Exporter la réponse en PDF",

@@ -193,6 +193,7 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
   groupId?: string | null;
   activityId: string;
   coreAttemptId?: string | null;
+  deferPublication?: boolean;
   executionId: string | null;
   testItemAttemptId?: string;
   activity: ServerActivityRecord;
@@ -424,7 +425,7 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
     const completed = await prisma.pluginCodingExerciseAiEvaluation.update({
       where: { id: evaluation.id },
       data: {
-        status: "completed",
+        status: input.deferPublication ? "staged" : "completed",
         rawResponse,
         parsedResponse: parsed as Prisma.InputJsonValue,
         sanitizedFeedback: sanitizedFeedback as Prisma.InputJsonValue,
@@ -442,7 +443,7 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
       connection,
       submissionHash,
       eventType: "feedback_completed",
-      outcome: "completed",
+      outcome: input.deferPublication ? "staged" : "completed",
       feedbackHash,
       aiContribution: feedbackConfig.gradingEnabled ? feedbackConfig.aiWeightPercent / 100 : 0,
       metadata: { deterministicScore, aiScore, combinedScore, templateCount: templateAttemptIds.length }
@@ -524,7 +525,7 @@ async function recordEmptyCodingExerciseFeedback({ input, attempt, feedbackConfi
     gradebookItemId: attempt?.gradebookItemId ?? null, participantId: attempt?.participantId ?? null,
     userId: attempt?.userId ?? null, attemptId: input.coreAttemptId ?? null, actorUserId: input.user.id,
     pluginKey: "coding-exercises", feedbackRef, feedbackVersion: 1, feedbackHash,
-    assessmentMode: input.assessmentMode, triggerKind: input.triggerKind, outcome: "completed", aiContribution: 0,
+    assessmentMode: input.assessmentMode, triggerKind: input.triggerKind, outcome: input.deferPublication ? "staged" : "completed", aiContribution: 0,
     metadata: { rule: "empty-response-v1", testItemAttemptId: input.testItemAttemptId ?? null, feedback }
   });
   return {

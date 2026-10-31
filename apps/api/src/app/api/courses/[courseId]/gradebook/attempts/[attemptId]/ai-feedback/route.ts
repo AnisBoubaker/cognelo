@@ -6,8 +6,8 @@ import {
   type PluginAiFeedbackTeacherReviewContext,
   type PluginAiGradingBatchGuidance
 } from "@cognelo/activity-sdk/server";
-import { AppError, getActivityAttemptRegradeContext, getTeacherAttemptAiFeedbackReview, recordActivityAttemptAiFeedback, recordActivityAttemptGradingResult, recordAiFeedbackResearchEvent, recordTestItemAiFeedback, recalculateTestAttemptGrade, resolveTestAiGradingGuidance, reviseTeacherAttemptAiFeedback } from "@cognelo/core";
-import type { Prisma } from "@cognelo/db";
+import { AppError, getActivityAttemptRegradeContext, getTeacherAttemptAiFeedbackReview, recordActivityAttemptAiFeedback, recordActivityAttemptGradingResult, recordAiFeedbackResearchEvent, prepareAiGradingAttempt, commitPreparedAiGrading, reviseTeacherAttemptAiFeedback } from "@cognelo/core";
+import { prisma, type Prisma } from "@cognelo/db";
 import { z } from "zod";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
 import { validateAiGradingTemplateAttemptIds } from "@/lib/ai-grading-batch";
@@ -166,64 +166,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       outcome: "started"
     });
     if (context.activityTypeKey === "test") {
-      const { review, guidance } = await resolveTestAiGradingGuidance(user, courseId, attemptId, body.templateAttemptIds ?? []);
-      const evaluations = [];
-      for (const item of review.items) {
-        const evaluateChild = resolvePluginAiFeedbackHandler(item.activityTypeKey);
-        if (!evaluateChild) continue;
-        try {
-          const evaluation = await evaluateChild({
-            user,
-            courseId: context.courseId,
-            groupId: context.groupId,
-            activityId: item.activityId,
-            coreAttemptId: context.attemptId,
-            pluginAttemptRef: item.itemAttempt.pluginAttemptRef,
-            activity: item.activity,
-            triggerKind: "test_child",
-            batchGuidance: guidance.get(item.testItemId),
-            testItemAttempt: {
-              id: item.itemAttempt.id,
-              parentAttemptId: context.attemptId,
-              pluginAttemptRef: item.itemAttempt.pluginAttemptRef,
-              state: item.itemAttempt.state
-            }
-          });
-          await recordTestItemAiFeedback(user, courseId, attemptId, item.testItemId, {
-            expectedUpdatedAt: item.itemAttempt.updatedAt,
-            feedback: evaluation.feedback,
-            feedbackRef: evaluation.feedbackRef,
-            feedbackVersion: evaluation.feedbackVersion,
-            feedbackHash: evaluation.feedbackHash,
-            gradingResult: evaluation.gradingResult
-          });
-          evaluations.push({ testItemId: item.testItemId, evaluation });
-        } catch (error) {
-          if (error instanceof AppError && ["ACTIVITY_AI_FEEDBACK_DISABLED", "AI_FEEDBACK_DISABLED", "AI_FEEDBACK_MODEL_NOT_CONFIGURED"].includes(error.code)) {
-            continue;
-          }
-          throw error;
-        }
-      }
-      if (!evaluations.length) {
-        throw new AppError(409, "TEST_AI_FEEDBACK_UNAVAILABLE", "No Test activity has effective AI feedback configuration.");
-      }
-      const result = await recalculateTestAttemptGrade(user, courseId, attemptId, "AI feedback evaluation");
-      await recordAiFeedbackResearchEvent({
-        eventType: "parent_grade_recomputed",
-        courseId,
-        groupId: context.groupId,
-        activityId: context.activityId,
-        groupActivityId: context.activity.assignment?.id ?? null,
-        attemptId,
-        actorUserId: user.id,
-        pluginKey: "core-test-runtime",
-        assessmentMode: "summative",
-        triggerKind,
-        outcome: "graded",
-        metadata: { evaluatedChildCount: evaluations.length }
-      });
-      return json({ evaluations, result });
+      const prepared = await prepareAiGradingAttempt(user, courseId, attemptId, body);
+      if (request.signal.aborted) throw new AppError(409, "AI_GRADING_STOPPED", "AI grading was interrupted. No grades were changed.");
+      const result = await prisma.$transaction(tx => commitPreparedAiGrading(user, courseId, prepared, tx), { timeout: 30_000, isolationLevel: "Serializable" });
+      return json({ evaluations: prepared.evaluations, result });
     }
     const evaluateAttempt = resolvePluginAiFeedbackHandler(context.activityTypeKey);
     if (!evaluateAttempt) {

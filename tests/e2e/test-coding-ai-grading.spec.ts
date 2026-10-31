@@ -118,8 +118,8 @@ test("Test AI grading uses matching question templates and authoritative questio
     const batchRequests: Array<{ id: string; body: Record<string, unknown> }> = [];
     const instructionWrites: string[] = [];
     page.on("request", request => {
-      if (request.method() === "POST" && request.url().endsWith("/ai-feedback")) {
-        batchRequests.push({ id: new URL(request.url()).pathname.split("/").at(-2)!, body: request.postDataJSON() });
+      if (request.method() === "POST" && request.url().endsWith("/ai-grading-runs")) {
+        batchRequests.push({ id: activityId, body: request.postDataJSON() });
       }
       if (request.method() === "PATCH" && request.url().endsWith("/ai-grading-batch")) instructionWrites.push(request.url());
     });
@@ -135,7 +135,7 @@ test("Test AI grading uses matching question templates and authoritative questio
     await dialog.getByRole("button", { name: "Start AI grading", exact: true }).click();
     await expect.poll(() => requests.length, { timeout: 60_000 }).toBe(4);
     await expect(page.getByRole("dialog", { name: "Assessing submissions" })).toBeHidden({ timeout: 30_000 });
-    expect(batchRequests).toEqual([{ id: ids[1], body: { triggerKind: "teacher_batch", templateAttemptIds: [ids[0]] } }]);
+    expect(batchRequests).toEqual([{ id: activityId, body: { attemptIds: [ids[1]], templateAttemptIds: [ids[0]] } }]);
     expect(instructionWrites).toHaveLength(0);
     for (const [index, child] of children.entries()) {
       const calls = requests.filter(request => request.submission.sourceCode.endsWith(`question ${index}`));

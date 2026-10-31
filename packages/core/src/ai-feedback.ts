@@ -34,8 +34,8 @@ export type AiFeedbackResearchEventInput = {
   metadata?: JsonInput;
 };
 
-export async function recordAiFeedbackResearchEvent(input: AiFeedbackResearchEventInput) {
-  return prisma.aiFeedbackResearchEvent.create({
+export async function recordAiFeedbackResearchEvent(input: AiFeedbackResearchEventInput, transaction?: Prisma.TransactionClient) {
+  return (transaction ?? prisma).aiFeedbackResearchEvent.create({
     data: {
       ...input,
       metadata: input.metadata ?? {}

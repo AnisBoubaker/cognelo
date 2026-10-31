@@ -29,7 +29,12 @@ export const mcqServerPlugin: ServerActivityPlugin = {
     createVariation: createMcqBankActivityVariation
   },
   aiFeedback: {
-    evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, activity, triggerKind, testItemAttempt }) => {
+    publishEvaluation: async ({ activityId, coreAttemptId, feedbackRef, transaction }) => {
+      const changed = await transaction.execute`UPDATE "PluginMcqAiEvaluation" SET status = 'completed'
+        WHERE id = ${feedbackRef} AND "activityId" = ${activityId} AND "coreAttemptId" = ${coreAttemptId} AND status = 'staged'`;
+      if (changed !== 1) throw new AppError(409, "AI_GRADING_CONFLICT", "The prepared feedback is no longer available.");
+    },
+    evaluateAttempt: async ({ user, courseId, groupId, activityId, coreAttemptId, activity, triggerKind, testItemAttempt, deferPublication }) => {
       const attempt = testItemAttempt ? null : await prisma.activityAttempt.findUnique({ where: { id: coreAttemptId }, select: { metadata: true } });
       if (!attempt && !testItemAttempt) throw new AppError(404, "MCQ_ATTEMPT_NOT_FOUND", "The MCQ attempt was not found.");
       return evaluateMcqWithAi({
@@ -38,6 +43,7 @@ export const mcqServerPlugin: ServerActivityPlugin = {
         groupId,
         activityId,
         coreAttemptId,
+        deferPublication,
         activity,
         answers: testItemAttempt ? submittedAnswersFromMetadata({ submittedAnswers: testItemAttempt.state.answers }) : submittedAnswersFromMetadata(attempt?.metadata),
         assessmentMode: "summative",

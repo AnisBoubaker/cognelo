@@ -1,5 +1,7 @@
 "use client";
 
+import { useAiGradingRun } from "@/lib/use-ai-grading-run";
+import { AiGradingRunDialog } from "@/components/ai-grading-run-dialog";
 import { DialogHeader } from "@cognelo/activity-ui";
 
 import { useApplicationTime } from "@cognelo/activity-ui";
@@ -139,6 +141,8 @@ export default function GradebookActivityResultsPage() {
     setGradebook(gradebookResult.gradebook);
     setInProgressAttempts(inProgressResult.attempts);
   }, [activityId, courseId, groupId]);
+
+  const aiGrading = useAiGradingRun(courseId, activityId, refresh);
 
   useEffect(() => {
     setInProgressAttempts([]);
@@ -478,20 +482,8 @@ export default function GradebookActivityResultsPage() {
       : "courseDetail.aiAssessmentFeedbackConfirm";
     if (!await dialogs.confirm({ message: t(confirmKey, { name: row.participantName }) })) return;
     setSavingGradeKey(`${row.gradebookItemId}:${row.participantId}:ai-feedback`);
-    setProgressOperation({
-      title: t("courseDetail.aiAssessmentRunning"),
-      message: row.participantName
-    });
-    try {
-      await api.generateActivityAttemptAiFeedback(courseId, attempt.id);
-      await refresh();
-      notifications.success(t("courseDetail.aiFeedbackGenerated"));
-    } catch (err) {
-      notifications.error(err instanceof Error ? err.message : t("courseDetail.aiFeedbackError"));
-    } finally {
-      setSavingGradeKey(null);
-      setProgressOperation(null);
-    }
+    try { await aiGrading.start({ attemptIds: [attempt.id] }); }
+    finally { setSavingGradeKey(null); }
   }
 
   function aiFeedbackBatchTargets(excludedAttemptIds: readonly string[] = []) {
@@ -595,50 +587,8 @@ export default function GradebookActivityResultsPage() {
       : "courseDetail.aiAssessmentFeedbackAllConfirm";
     if (!guidance && !await dialogs.confirm({ message: t(confirmKey, { count: eligible.length }) })) return;
     setSavingGradeKey("__all:ai-feedback");
-    setProgressOperation({
-      title: t("courseDetail.aiAssessmentRunning"),
-      completed: 0,
-      total: eligible.length
-    });
-    try {
-      let completed = 0;
-      const failureReasons: string[] = [];
-      for (const [index, { attempt }] of eligible.entries()) {
-        try {
-          await api.generateActivityAttemptAiFeedback(courseId, attempt.id, {
-            triggerKind: "teacher_batch",
-            ...(guidance ? {
-              instructions: guidance.instructions,
-              templateAttemptIds: guidance.templateAttemptIds
-            } : {})
-          });
-          completed += 1;
-        } catch (err) {
-          failureReasons.push(err instanceof Error ? err.message : t("courseDetail.aiFeedbackError"));
-        } finally {
-          setProgressOperation((current) => current ? { ...current, completed: index + 1 } : current);
-        }
-      }
-      await refresh();
-      if (completed) notifications.success(t("courseDetail.aiFeedbackGenerated"));
-      if (failureReasons.length) {
-        const reasonCounts = new Map<string, number>();
-        for (const reason of failureReasons) {
-          reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
-        }
-        const mostCommonReason = [...reasonCounts].sort((left, right) => right[1] - left[1])[0]?.[0]
-          ?? t("courseDetail.aiFeedbackError");
-        notifications.error(t("courseDetail.aiFeedbackBatchFailed", {
-          count: failureReasons.length,
-          reason: mostCommonReason
-        }));
-      }
-    } catch (err) {
-      notifications.error(err instanceof Error ? err.message : t("courseDetail.aiFeedbackError"));
-    } finally {
-      setSavingGradeKey(null);
-      setProgressOperation(null);
-    }
+    try { await aiGrading.start({ attemptIds: eligible.map(({ attempt }) => attempt.id), ...guidance }); }
+    finally { setSavingGradeKey(null); }
   }
 
   async function openFeedbackReview(targetRows: CourseGradebookRow[], selectedIndex = 0) {
@@ -1053,6 +1003,7 @@ export default function GradebookActivityResultsPage() {
           )}
         </section>
 
+        <AiGradingRunDialog grading={aiGrading} />
         <ProgressDialog
           open={Boolean(progressOperation)}
           eyebrow={t("courseDetail.gradebookEyebrow")}

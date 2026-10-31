@@ -131,6 +131,11 @@ describe("coding exercise generated feedback language", () => {
     }));
   });
 
+  it("retains staged evaluation artifacts without making them visible to ordinary history queries", async () => {
+    await evaluateCodingExerciseAttemptWithAi({ ...evaluationInput(), deferPublication: true });
+    expect(mocks.evaluationUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "staged" }) }));
+  });
+
   it("makes the subject teaching language authoritative", async () => {
     await expect(evaluateCodingExerciseAttemptWithAi(evaluationInput())).resolves.toMatchObject({
       feedback: { summary: "Bonne solution." }

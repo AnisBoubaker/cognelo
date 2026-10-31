@@ -2,6 +2,21 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const arMessages = {
+  aiGrading: {
+    "stoppedTitle": "توقف التقييم بالذكاء الاصطناعي",
+    "completed": "اكتمل التقييم ({count})",
+    "notGraded": "لم يتم التقييم ({count})",
+    "none": "لا أحد",
+    "keep": "الاحتفاظ بالتقييمات المكتملة",
+    "discard": "تجاهل هذه العملية",
+    "decisionHelp": "التقييمات المكتملة جاهزة، لكنها لم تستبدل أي درجات. احتفظ بها أو تجاهل العملية للإبقاء على جميع الدرجات والملاحظات السابقة دون تغيير.",
+    "stagingHelp": "تُحفظ النتائج عند اكتمال العملية أو عند اختيار الاحتفاظ بالتقييمات المكتملة.",
+    "connectionLost": "انقطع الاتصال. جارٍ إيقاف التقييم؛ سيظهر ملخص الاسترداد عند عودة الاتصال.",
+    "discarded": "تم تجاهل التقييم. لم تتغير الدرجات والملاحظات السابقة.",
+    "cancelling": "جارٍ الإلغاء…",
+    "progress": "{completed} من {total}",
+    "saving": "جارٍ حفظ الدرجات المكتملة…"
+},
   answerExport: {
     "title": "تصدير إجابات الطلاب",
     "single": "تصدير الإجابة بصيغة PDF",

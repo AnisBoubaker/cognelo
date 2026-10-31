@@ -66,6 +66,7 @@ export async function evaluateMcqWithAi(input: {
   groupId: string;
   activityId: string;
   coreAttemptId?: string | null;
+  deferPublication?: boolean;
   activity: ServerActivityRecord;
   answers: McqAnswerState;
   assessmentMode: "formative" | "summative";
@@ -145,7 +146,7 @@ export async function evaluateMcqWithAi(input: {
     const completed = await mcqPrisma.pluginMcqAiEvaluation.update({
       where: { id: evaluation.id },
       data: {
-        status: "completed",
+        status: input.deferPublication ? "staged" : "completed",
         rawResponse,
         parsedResponse: parsed as Prisma.InputJsonValue,
         sanitizedFeedback: feedback as Prisma.InputJsonValue,
@@ -153,7 +154,7 @@ export async function evaluateMcqWithAi(input: {
         latencyMs: Date.now() - startedAt
       }
     });
-    await recordResearch("feedback_completed", "completed", input, context, completed, connection, submissionHash, feedbackHash);
+    await recordResearch("feedback_completed", input.deferPublication ? "staged" : "completed", input, context, completed, connection, submissionHash, feedbackHash);
     return { feedbackRef: completed.id, feedbackVersion: completed.version, feedbackHash, feedback };
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI feedback generation failed.";

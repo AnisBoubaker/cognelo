@@ -1,3 +1,4 @@
+import type { AiGradingRunSummary } from "@cognelo/contracts";
 import type { AnswerExportRequest, AnswerExportStudent, TestAttemptReviewInput } from "@cognelo/contracts";
 import type {
   ActivityMessageDeletionInput,
@@ -2040,6 +2041,16 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ attemptId, instructions })
     }),
+  pendingAiGradingRun: (courseId: string, activityId: string) =>
+    request<{ run: AiGradingRunSummary | null }>(`/courses/${courseId}/gradebook/activities/${activityId}/ai-grading-runs`),
+  createAiGradingRun: (courseId: string, activityId: string, input: { attemptIds: string[]; instructions?: string; templateAttemptIds?: string[] }) =>
+    request<{ run: AiGradingRunSummary }>(`/courses/${courseId}/gradebook/activities/${activityId}/ai-grading-runs`, { method: "POST", body: JSON.stringify(input) }),
+  aiGradingRun: (courseId: string, runId: string) =>
+    request<{ run: AiGradingRunSummary }>(`/courses/${courseId}/gradebook/ai-grading-runs/${runId}`),
+  actOnAiGradingRun: (courseId: string, runId: string, action: "heartbeat" | "cancel" | "interrupt" | "keep" | "discard" | "finish") =>
+    request<{ run: AiGradingRunSummary }>(`/courses/${courseId}/gradebook/ai-grading-runs/${runId}`, { method: "PATCH", body: JSON.stringify({ action }) }),
+  processAiGradingRunAttempt: (courseId: string, runId: string, attemptId: string, signal?: AbortSignal) =>
+    request<{ run: AiGradingRunSummary }>(`/courses/${courseId}/gradebook/ai-grading-runs/${runId}/attempts/${attemptId}`, { method: "POST", signal }),
   generateActivityAttemptAiFeedback: (courseId: string, attemptId: string, input?: {
     triggerKind?: "teacher_single" | "teacher_selection" | "teacher_batch";
     instructions?: string;

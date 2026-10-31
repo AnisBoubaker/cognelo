@@ -2,6 +2,21 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const enMessages = {
+  aiGrading: {
+    "stoppedTitle": "AI grading stopped",
+    "completed": "Completed grading ({count})",
+    "notGraded": "Not graded ({count})",
+    "none": "None",
+    "keep": "Keep completed grading",
+    "discard": "Discard this run",
+    "decisionHelp": "The completed copies are ready but have not replaced any grades. Keep them, or discard this run to leave all previous grades and feedback unchanged.",
+    "stagingHelp": "Results are saved only when the run finishes or you choose to keep completed grading.",
+    "connectionLost": "Connection lost. Grading is stopping; the recovery summary will appear when the connection returns.",
+    "discarded": "Grading discarded. Previous grades and feedback are unchanged.",
+    "cancelling": "Cancelling…",
+    "progress": "{completed} of {total}",
+    "saving": "Saving completed grades…"
+},
   answerExport: {
     "title": "Export student answers",
     "single": "Export answer as PDF",

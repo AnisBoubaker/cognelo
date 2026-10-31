@@ -55,3 +55,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Use core `assessmentInstructionPrompt` to promote saved MCQ feedback instructions into the system message. Question content and examples remain evidence. Keep the feedback-only response contract and deterministic grade unchanged.
 
 - The shared [learner grading details](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md) display Test-child comments and plugin-declared student feedback under the parent release/content-access policy. Keep private result/configuration/analytics out of the public feedback envelope.
+
+- For [cancellable AI grading](../../../docs/AI_GRADING_RUNS.md), `deferPublication` writes private artifacts as `staged`. Keep ordinary report/history queries restricted to completed artifacts. Publish only through `aiFeedback.publishEvaluation` using the host transaction; cancellation never deletes immutable evidence or changes formative behavior.

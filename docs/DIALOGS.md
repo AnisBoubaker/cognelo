@@ -14,7 +14,7 @@ Plugin manual-review panels accept optional `embedded` presentation. Inside the 
 
 - Keep explicit Cancel, Save, Confirm, Submit, and other decision actions in their existing forms/footers. Moving dismissal does not imply submitting or discarding a draft without its existing guard.
 - Shared confirmations expose a localized Close cross distinct from the explicit Cancel action. Informational alerts whose only action is dismissal use the header cross alone. `DialogProvider` supplies the close label independently of custom confirmation labels.
-- Preserve disabled dismissal while a save/upload/import requires it. Running `ProgressDialog` instances have no close control; their terminal success/error state may expose the cross when dismissal is supported.
+- Preserve disabled dismissal while a save/upload/import requires it. Running `ProgressDialog` instances have no close control; a supported operation may expose an explicit keyboard-accessible Cancel action through `onCancel`, with recovery decisions owned by that operation; their terminal success/error state may expose the cross when dismissal is supported.
 - Unsaved-navigation dialogs close by continuing editing. Submission receipts close through their existing acknowledgement handler. Safe Exam Browser launch dialogs retain their existing cancellation destination.
 - Full-screen rich-text and coding editors use the same cross at the top to exit full screen, keeping their editor state mounted. Their accessible label still describes exiting full screen.
 - Existing Escape behavior, initial focus, focus restoration, shared scroll locks, and native-dialog behavior remain owned by their existing dialog implementations. New headers do not add global event listeners or move DOM nodes.
