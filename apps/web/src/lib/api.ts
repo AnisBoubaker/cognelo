@@ -2398,9 +2398,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input)
     }),
-  generateCodingExerciseRubric: (courseId: string, activityId: string, input: CodingExerciseRubricGenerationInput) =>
+  generateCodingExerciseRubric: (courseId: string, activityId: string, input: CodingExerciseRubricGenerationInput, signal?: AbortSignal) =>
     request<CodingExerciseRubricGenerationResult>(`/courses/${courseId}/activities/${activityId}/coding-exercises/generate-rubric`, {
       method: "POST",
+      signal,
       body: JSON.stringify(input)
     }),
   saveCodingExerciseRubricGuidance: (courseId: string, activityId: string, guidance: string) =>
@@ -2463,11 +2464,12 @@ export const api = {
         body: JSON.stringify(input)
       }
     ),
-  generateBankCodingExerciseRubric: (activityBankId: string, bankActivityId: string, input: CodingExerciseRubricGenerationInput) =>
+  generateBankCodingExerciseRubric: (activityBankId: string, bankActivityId: string, input: CodingExerciseRubricGenerationInput, signal?: AbortSignal) =>
     request<CodingExerciseRubricGenerationResult>(
       `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-exercises/generate-rubric`,
       {
         method: "POST",
+        signal,
         body: JSON.stringify(input)
       }
     ),

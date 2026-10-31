@@ -269,7 +269,7 @@ type CodingExerciseAiGenerationClient = {
     language: string;
     locale: CodingExercisesLocale;
     knowledge: ActivityKnowledgeGenerationRequest;
-  }) => Promise<{ criteria: RubricCriterion[]; attempts: number }>;
+  }, signal?: AbortSignal) => Promise<{ criteria: RubricCriterion[]; attempts: number }>;
   saveRubricGuidance: (guidance: string) => Promise<{ guidance: string }>;
 };
 
@@ -356,6 +356,14 @@ export function CodingExerciseActivityView({
   const [generatingSolution, setGeneratingSolution] = useState(false);
   const [generatingTests, setGeneratingTests] = useState(false);
   const [generatingRubric, setGeneratingRubric] = useState(false);
+  const rubricGenerationRequest = useRef<AbortController | null>(null);
+  const rubricGuidanceSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const rubricGenerationScope = useRef<object>({});
+  useEffect(() => () => {
+    rubricGenerationScope.current = {};
+    rubricGenerationRequest.current?.abort();
+    rubricGenerationRequest.current = null;
+  }, [activity.id]);
   const [rubricGenerationDialogOpen, setRubricGenerationDialogOpen] = useState(false);
   const [rubricGuidanceDraft, setRubricGuidanceDraft] = useState("");
   const rubricGuidanceId = useId();
@@ -464,6 +472,8 @@ export function CodingExerciseActivityView({
     setSubmitExecution(null);
     setSubmissionConfirmation(null);
     if (isNewActivity) {
+      setGeneratingRubric(false);
+      setRubricGenerationDialogOpen(false);
       setHiddenTests([]);
       setReferenceSolution("");
       setPrivateConfig(parseCodingExercisePrivateConfig({}));
@@ -1139,17 +1149,37 @@ export function CodingExerciseActivityView({
     setRubricGenerationDialogOpen(true);
   }
 
-  async function generateRubric() {
-    if (!aiGenerationClient || !config.language) {
-      return;
-    }
+  function cancelRubricGeneration() {
+    rubricGenerationRequest.current?.abort();
+    rubricGenerationRequest.current = null;
+    setGeneratingRubric(false);
+    setRubricGenerationDialogOpen(false);
+  }
 
+  async function generateRubric() {
+    if (!aiGenerationClient || !config.language || rubricGenerationRequest.current) return;
+    const controller = new AbortController();
+    const scope = rubricGenerationScope.current;
+    rubricGenerationRequest.current = controller;
+    const isCurrent = () => rubricGenerationRequest.current === controller && !controller.signal.aborted
+      && rubricGenerationScope.current === scope;
     setGeneratingRubric(true);
     setError("");
     try {
-      const { guidance } = await aiGenerationClient.saveRubricGuidance(rubricGuidanceDraft.trim());
-      setPrivateConfig((current) => ({ ...current, rubricGenerationGuidance: guidance }));
-      setSavedSnapshot((current) => ({ ...current, privateConfig: { ...current.privateConfig, rubricGenerationGuidance: guidance } }));
+      // Confirmed preference writes finish in order, even when generation is cancelled.
+      // They never replace rubric criteria or other unsaved authoring fields.
+      const saveGuidance = rubricGuidanceSaveQueue.current.then(async () => {
+        if (!isCurrent()) return undefined;
+        const { guidance } = await aiGenerationClient.saveRubricGuidance(rubricGuidanceDraft.trim());
+        if (rubricGenerationScope.current === scope) {
+          setPrivateConfig(current => ({ ...current, rubricGenerationGuidance: guidance }));
+          setSavedSnapshot(current => ({ ...current, privateConfig: { ...current.privateConfig, rubricGenerationGuidance: guidance } }));
+        }
+        return guidance;
+      });
+      rubricGuidanceSaveQueue.current = saveGuidance.then(() => undefined, () => undefined);
+      const guidance = await saveGuidance;
+      if (!isCurrent() || guidance === undefined) return;
       setRubricGenerationDialogOpen(false);
       const result = await aiGenerationClient.generateRubric({
         guidance,
@@ -1160,16 +1190,20 @@ export function CodingExerciseActivityView({
         language: config.language,
         locale: pluginLocale,
         knowledge: knowledgeGeneration.request
-      });
-      setPrivateConfig((current) => ({
+      }, controller.signal);
+      if (!isCurrent()) return;
+      setPrivateConfig(current => ({
         ...current,
         aiFeedback: { ...current.aiFeedback, criteria: result.criteria }
       }));
       notifications.success(result.attempts > 1 ? `${t("generatedRubric")} (${result.attempts})` : t("generatedRubric"));
     } catch (err) {
-      notifications.error(err instanceof Error ? err.message : t("generateRubricError"));
+      if (isCurrent()) notifications.error(err instanceof Error ? err.message : t("generateRubricError"));
     } finally {
-      setGeneratingRubric(false);
+      if (rubricGenerationRequest.current === controller) {
+        rubricGenerationRequest.current = null;
+        setGeneratingRubric(false);
+      }
     }
   }
 
@@ -2418,12 +2452,14 @@ export function CodingExerciseActivityView({
           ) : null}
         </div>
       )}
-      <ProgressDialog
+      {typeof document !== "undefined" ? createPortal(<ProgressDialog
         open={Boolean(longRunningTitle)}
         eyebrow={activity.title}
         title={longRunningTitle ?? t("saving")}
         progressLabel={longRunningTitle ?? t("saving")}
-      />
+        cancelLabel={t("cancelTestGeneration")}
+        onCancel={generatingRubric ? cancelRubricGeneration : undefined}
+      />, document.body) : null}
     </section>
   );
 }

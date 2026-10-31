@@ -4,7 +4,7 @@
 
 `activity-menu-preview.spec.ts` checks direct activity-menu Preview links from Course and Group perspectives, actual section assignments, disabled unassigned actions, new-tab/opener isolation, and temporary answers without academic records.
 
-`rubric-generation-guidance.spec.ts` verifies guidance dialogs and real private persistence in course/bank exercises, failed-generation recovery, cancellation/clearing, unchanged grading instructions and rubric drafts, and authorization. Model responses are mocked.
+`rubric-generation-guidance.spec.ts` verifies guidance dialogs and real private persistence in course/bank exercises, visible blocking progress from the Grading tab, keyboard/mobile cancellation, late-response/retry isolation, failed-generation recovery, cancellation/clearing, unchanged grading instructions and rubric drafts, and authorization. Model responses are mocked.
 
 `action-buttons.spec.ts` waits for non-empty computed styles after action-bar hydration before comparing appearance; a detached reading must not be mistaken for a style regression. It checks consistent outlined actions and semantic icons across core/admin/plugin UI, actual saves/cancellation, danger and disabled states, keyboard focus, and login legibility.
 

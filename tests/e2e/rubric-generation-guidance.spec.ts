@@ -33,11 +33,20 @@ for (const scope of ["course", "bank"] as const) {
     } }));
     const requests: Array<{ guidance: string }> = [];
     let generationFails = true;
-    await page.route(`**${path}/coding-exercises/generate-rubric`, (route) => {
+    let generationGate: Promise<void> | null = null;
+    let generatedTitle = "Generated criterion";
+    let markResponseFinished = () => {};
+    await page.route(`**${path}/coding-exercises/generate-rubric`, async (route) => {
       requests.push(route.request().postDataJSON());
-      return generationFails
+      const fails = generationFails;
+      const resultTitle = generatedTitle;
+      const gate = generationGate;
+      const finished = markResponseFinished;
+      if (gate) await gate;
+      await (fails
         ? route.fulfill({ status: 503, json: { error: { code: "GENERATION_UNAVAILABLE", message: "Test generation is unavailable." } } })
-        : route.fulfill({ json: { attempts: 1, criteria: [{ id: "generated", title: "Generated criterion", description: "Evaluate the requested reasoning.", weightPercent: 100 }] } });
+        : route.fulfill({ json: { attempts: 1, criteria: [{ id: "generated", title: resultTitle, description: "Evaluate the requested reasoning.", weightPercent: 100 }] } })).catch(() => {});
+      finished();
     });
     async function openGeneration() {
       await page.getByRole("tab", { name: "Grading", exact: true }).click();
@@ -98,6 +107,54 @@ for (const scope of ["course", "bank"] as const) {
     await expect(guidance).toHaveValue(revisedGuidance);
     expect((await readReference()).privateConfig.aiFeedback).toMatchObject({ instructions: gradingInstructions, criteria: [expect.objectContaining({ title: "Generated criterion" })] });
 
+    // The Grading tab portals its editor out of a hidden Activity panel. Progress must remain visible and blocking.
+    let releaseGeneration = () => {};
+    generationGate = new Promise<void>(resolve => { releaseGeneration = resolve; });
+    const delayedResponseFinished = new Promise<void>(resolve => { markResponseFinished = resolve; });
+    generatedTitle = "Cancelled late criterion";
+    const requestCountBeforeCancel = requests.length;
+    await dialog.getByRole("button", { name: "Replace rubric", exact: true }).click();
+    const progress = page.getByRole("dialog", { name: "Generating rubric...", exact: true });
+    await expect(progress).toBeVisible();
+    await expect(progress.getByRole("progressbar")).toBeVisible();
+    await expect.poll(() => requests.length).toBe(requestCountBeforeCancel + 1);
+    await expect(progress.getByRole("progressbar")).not.toHaveAttribute("value");
+    const cancel = progress.getByRole("button", { name: "Cancel", exact: true });
+    await expect(cancel).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add criterion", exact: true }).click({ trial: true, timeout: 500 })).rejects.toThrow();
+    await cancel.focus();
+    await page.keyboard.press("Tab");
+    await expect(cancel).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(progress).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(cancel).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath("rubric-generation-progress-mobile.png") });
+    try {
+      await cancel.click();
+      await expect(progress).toBeHidden();
+      const criterion = page.getByRole("textbox", { name: "Criterion title", exact: true });
+      await expect(criterion).toHaveValue("Generated criterion");
+      await criterion.fill("Manual edit after cancellation");
+      expect((await readReference()).privateConfig.aiFeedback.criteria[0].title).toBe("Generated criterion");
+      // A retry can finish while the cancelled response is still in flight.
+      generationGate = null;
+      markResponseFinished = () => {};
+      generatedTitle = "Retry criterion";
+      await openGeneration();
+      await expect(guidance).toHaveValue(revisedGuidance);
+      await dialog.getByRole("button", { name: "Replace rubric", exact: true }).click();
+      await expect(criterion).toHaveValue("Retry criterion");
+      releaseGeneration();
+      await delayedResponseFinished;
+      await expect(criterion).toHaveValue("Retry criterion");
+      await expect(page.getByText("Cancelled late criterion", { exact: true })).toHaveCount(0);
+      await page.getByRole("button", { name: "Save coding exercise", exact: true }).click();
+      await expect.poll(async () => (await readReference()).privateConfig.aiFeedback.criteria[0].title).toBe("Retry criterion");
+    } finally { releaseGeneration(); }
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openGeneration();
     generationFails = true;
     await guidance.fill("");
     await dialog.getByRole("button", { name: "Replace rubric", exact: true }).click();
