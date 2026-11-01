@@ -4,6 +4,21 @@
 
 This is the canonical record of the user's choices for the next Coding Homework delivery. It supersedes conflicting proposed behavior in the older [implementation plan](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md), particularly ZIP-only preparation, timing the entire upload/generation workflow, and rejecting every incomplete submission. The [plugin reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md) describes the existing implementation; this document does not claim these changes have shipped.
 
+## Implementation clarifications — November 1, 2026
+
+The user approved these follow-up details before implementation:
+
+- C matching checks function name, argument count/types and return type, ignoring parameter names and equivalent pointer/array notation.
+- Missing files and signature mismatches, like missing functions, may be submitted after explicit incomplete-work acknowledgement.
+- Individual uploads support destination folders and confirmed replacement at an existing path.
+- Use OpenAI `text-embedding-3-small`; default question-generation concurrency is 2, capped at 4 by the server.
+- Material selection is locked while submissions are enabled.
+- Deadline finalization submits saved answers, including blanks.
+- Teacher cancellation preserves the old record, withdraws its associated grade, and permits a fresh submission with a new question set.
+- Material plugins offer their own index generation/refresh service, invoked through core. Plugins never talk directly to sibling plugins.
+
+Remaining reasonable implementation choices are authorized and must be recorded in the [progress record](CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md) and final report. Validated slices are committed incrementally.
+
 ## Scope
 
 - Support **C** for this delivery, with approximately **30 students submitting at a time**.
@@ -25,7 +40,7 @@ The teacher solution remains a private authoring artifact under the existing tea
 
 Record the validation result and incomplete-work acknowledgement against the submitted file set. Replacing/removing files invalidates a prior validation result; final submission must validate the actual collection being frozen. Existing archive safety, authorization, and storage limits remain enforced independently of the incomplete-work acknowledgement.
 
-Exact C signature compatibility rules and the treatment of missing files or incorrect signatures still need specification; see [remaining details](#remaining-details-and-deferred-work).
+The follow-up clarifications above specify C signature matching and acknowledgement for missing files/signature mismatches. Archive safety failures remain blocking.
 
 ## Student file preparation
 
@@ -52,7 +67,7 @@ Students cannot modify the frozen files after confirming and submitting their wo
 
 Students **must not have a Cancel action for their submitted work or its question-generation job**. Leaving the page is not cancellation. This is an explicit exception to the general request for Cancel on long-running UI: the student generation phase is a persistent status/waiting flow. Teacher-operated preparation/generation actions retain the ordinary cancellation rules where applicable.
 
-Teacher cancellation must be coordinated with queued/running work so a late result cannot revive the cancelled workflow. Retain academic/audit evidence rather than silently deleting it. The precise handling of existing completed answers/grades and the subsequent attempt identity is not yet decided.
+Teacher cancellation must be coordinated with queued/running work so a late result cannot revive the cancelled workflow. Retain academic/audit evidence rather than silently deleting it. Cancellation retains the old record, withdraws its associated grade, and permits a new submission with newly generated questions.
 
 ## Safe Exam Browser and timing
 
@@ -65,13 +80,13 @@ Teacher cancellation must be coordinated with queued/running work so a late resu
 - Students can consult **their submitted files read-only** while answering. **Course material remains accessible**, subject to its normal permissions, including during SEB use.
 - Queue-related grace periods, automatic deadline extensions and special treatment of work becoming ready after closing are deferred. The teacher is responsible for suitable availability and duration settings in this phase. Do not invent an exception to the configured window.
 
-The user did not select a new partial-answer timeout/finalization policy. Preserve that as an explicit outstanding detail rather than assuming automatic submission of blank answers or automatic extensions.
+At timeout, finalize the server-saved answers, including blanks. Do not accept new answer content after expiry or invent an availability extension.
 
 ## Queue and load control
 
 - Use a **FIFO dispatch queue** for challenge generation rather than launching every student's AI requests at once.
 - Permit limited parallel processing, with **the teacher choosing how many submissions may be processed at once** within a server-enforced safe maximum.
-- The maximum must be chosen to suit the servers and provider limits. No numeric default or ceiling was approved; sizing and verification are implementation work, not permission to allow 30 parallel jobs.
+- The approved default is 2 concurrent submissions, with a server-enforced maximum of 4. Validate the bound across workers; 30 students must never become 30 parallel generation jobs.
 - With parallelism, FIFO refers to admission/dispatch order; independent jobs need not finish in arrival order.
 - Persist jobs and status across browser departure. Submission retries must not create duplicate work, and teacher cancellation must remain effective against late worker responses.
 - The target class represents roughly **90–150 generated questions** at the expected 3–5 questions per student. Validate queue behavior at that scale locally/preprod.
@@ -110,14 +125,14 @@ Retain the example as an extraction/acceptance fixture; this documentation chang
 ### Models and index compatibility
 
 - **OpenAI** is the chosen provider for the initial implementation.
-- The user requested “use the same model,” but did not identify a concrete embedding model or dimensions. Do not silently turn that phrase into a model ID or assert that the question-generation model is an embedding endpoint.
+- The confirmed embedding model is **`text-embedding-3-small`**. Question generation retains its independently configured OpenAI model.
 - **Changing the question-generation model must not invalidate existing indexes.** The indexes provide vector retrieval context to question generation; they do not depend on which generation model consumes that context.
 - Embedding compatibility remains tied to the actual embedding configuration and source revision. Reuse unchanged compatible embeddings; a genuinely different embedding model/dimension configuration cannot be treated as the same index.
-- The exact embedding model/endpoint and dimension/storage choices remain explicit technical choices before implementation. No model/pricing/provider-capacity claim is made here.
+- Dimension/storage details are implementation choices to record and verify; the embedding-model choice is now confirmed.
 
 ## Remaining details and deferred work
 
-These were not resolved by the user's answers and must not be silently filled in as approved product decisions:
+The numbered list below preserves the earlier open-detail inventory. Items 1, 3–8 are resolved or narrowed by the implementation clarifications above. The user now authorizes reasonable remaining choices, recorded in the progress record rather than requiring another blocking questionnaire:
 
 1. Exact C argument/signature matching: parameter count/types, pointer/array normalization, qualifiers, parameter names and return-type requirements.
 2. Whether missing required files and signature mismatches are blocking or acknowledgement-based; how to generate the configured number of questions when too little analyzable code or too few required functions are present.

@@ -46,6 +46,7 @@ Open these only when changing or reviewing the named area:
 - [Atomic AI grading and interruption recovery](AI_GRADING_RUNS.md)
 - [AI feedback, grading, and challenges](AI_FEEDBACK_GRADING_CHALLENGES_IMPLEMENTATION_PLAN.md)
 - [Coding Homework Grader](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md)
+- [Coding Homework implementation progress](CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md): resumable implementation checklist, assumptions, validation and incremental commits.
 - [Coding Homework approved submission workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md): agreed next-delivery requirements, indexing/freshness policy, and remaining decisions (implementation pending).
 - [Content-type plugins](CONTENT_TYPE_PLUGIN_IMPLEMENTATION_PLAN.md)
 - [Course content tree](COURSE_CONTENT_TREE_IMPLEMENTATION_PLAN.md)
