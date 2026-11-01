@@ -559,3 +559,7 @@ Never remove `/srv/cognelo/instance1/shared`, its `.env`, or its `storage` direc
 ### Instance timezone migration
 
 When upgrading to a release containing `202610210001_application_timezone`, the combined migration command adds the instance setting with a `UTC` default. After startup, an administrator should select the intended timezone under **Settings → Date and time** before users resume scheduling. Existing UTC deadlines and attempts are not shifted. Open browser pages must reload to adopt the new display zone. Keep the host clock synchronized; no OS timezone change is needed. See [application time](APPLICATION_TIME.md).
+
+## Prepared material PDF dependency
+
+Before enabling PDF reference indexing, install `poppler-utils` on the application host (`sudo apt install -y poppler-utils`) and verify `pdftotext -v` under the API service account. The additive core material-index migration and plugin preparation migration are applied by the normal `npm run db:migrate:all` command. No vector database extension or new environment variable is required. See [material services](MATERIAL_EMBEDDING_SERVICES.md).

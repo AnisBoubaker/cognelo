@@ -112,7 +112,7 @@ The guide assumes a supported Ubuntu LTS release and a sudo-capable operator acc
 ```bash
 sudo apt update
 sudo apt full-upgrade -y
-sudo apt install -y apache2 postgresql postgresql-contrib git curl ca-certificates build-essential openssl ufw
+sudo apt install -y apache2 postgresql postgresql-contrib git curl ca-certificates build-essential openssl ufw poppler-utils
 ```
 
 Install Node.js 24 LTS. Next.js 16 requires Node.js 20.9 or newer; Cognelo is currently developed and verified on Node 24. The following uses the NodeSource Ubuntu packages. Download the setup script before running it so it can be inspected:

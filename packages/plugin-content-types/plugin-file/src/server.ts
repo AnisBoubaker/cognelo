@@ -1,4 +1,4 @@
-import { readBoundedFormData, openStoredMaterial } from "@cognelo/core";
+import { readBoundedFormData, openStoredMaterial, contentIndexRevision, extractMaterialPdfText } from "@cognelo/core";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -36,6 +36,10 @@ function readMetadata(metadata: Record<string, unknown> | undefined): FileMetada
 
 export const fileContentServerPlugin: ServerContentTypePlugin = {
   key: "file-content",
+  indexing: {
+    policy: resource => ({ revision: contentIndexRevision({ title: resource.title, ...readMetadata(resource.metadata), embeddingIndex: undefined }) }),
+    prepare: async ({ resource, store, signal }) => store(await getPreparedFileDocuments(resource, signal))
+  },
   routes: [
     {
       path: "upload",
@@ -354,4 +358,14 @@ export function extractSimplePdfText(bytes: Buffer) {
     else current.push(character);
   }
   return values.join("\n").split("\n").map((line) => line.trimEnd()).join("\n").trim();
+}
+
+async function getPreparedFileDocuments(resource: ServerContentResourceRecord, signal?: AbortSignal): Promise<ContentEmbeddingDocumentsResult> {
+  const metadata = readMetadata(resource.metadata);
+  if (!metadata.storedName) return { sourceId: resource.id, documents: [], diagnostics: [] };
+  const file = await openStoredMaterial(path.resolve(process.cwd(), "../../storage/course-content-files"), [resource.courseId], metadata.storedName);
+  const bytes = await (async () => { try { if ((await file.stat()).size > MAX_UPLOAD_BYTES) throw new Error("Material exceeds extraction limit."); return await file.readFile(); } finally { await file.close(); } })();
+  const pdf = metadata.mimeType === "application/pdf" || /\.pdf$/i.test(metadata.originalName ?? "");
+  const text = pdf ? await extractMaterialPdfText(bytes, signal) : extractFileText(bytes, metadata.mimeType ?? "", metadata.originalName ?? resource.title).text;
+  return { sourceId: resource.id, documents: text ? [{ id: `${resource.id}:file`, sourceId: resource.id, title: resource.title, text, kind: "plain_text", path: metadata.originalName }] : [], diagnostics: [] };
 }

@@ -1453,6 +1453,7 @@ export const enMessages = {
       source: "Source",
       location: "Location",
       topLevel: "Top level",
+      githubEmbeddingFreshness: "Embedding freshness (hours)",
       githubUrl: "GitHub repository URL",
       file: "File",
       maxFileSize: "Maximum file size: 25 MB.",

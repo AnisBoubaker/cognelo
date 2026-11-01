@@ -1423,6 +1423,7 @@ export const frMessages = {
       source: "Source",
       location: "Emplacement",
       topLevel: "Niveau supérieur",
+      githubEmbeddingFreshness: "Fraîcheur des index (heures)",
       githubUrl: "URL du dépôt GitHub",
       file: "Fichier",
       maxFileSize: "Taille maximale du fichier : 25 Mo.",

@@ -11,3 +11,7 @@ Interface actions use the shared [button style and semantic icons](../../../docs
 Raw attributed HTML is displayed literally; ordinary Markdown, attribute-free formatting, images, and bounded untrusted math remain supported through the shared renderer. See [student display](docs/REFERENCE.md#student-display).
 
 Modal readers and full-screen editors use the shared [persistent close cross](../../../docs/DIALOGS.md).
+
+## Prepared embedding service
+
+This material provides plugin-owned preparation/refresh through core. See [material embedding services](../../../docs/MATERIAL_EMBEDDING_SERVICES.md) for source extraction, reuse, freshness and limits. The prior deterministic index handlers remain a legacy compatibility path; Coding Homework uses the prepared semantic service.

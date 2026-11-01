@@ -17,3 +17,5 @@
 - Validate multipart title and original filename through the existing shared/plugin schemas before writing bytes. A failed metadata validation must leave neither a staged file nor a changed resource.
 
 - Pending delivery: [Coding Homework](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) requires PDF content extraction through this plugin into reusable compatible reference indexes. Do not treat support for URLs/file metadata or the current basic PDF extractor as acceptance of all PDFs; scanned-PDF/OCR scope remains unspecified.
+
+- Own `indexing.policy` and `indexing.prepare`; core supplies authorized embedding storage and search. Never call a sibling plugin. Prepared semantic indexes remain outside public resource metadata. See [service contract](../../../docs/MATERIAL_EMBEDDING_SERVICES.md).

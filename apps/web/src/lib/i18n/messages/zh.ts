@@ -1422,6 +1422,7 @@ export const zhMessages = {
       source: "来源",
       location: "位置",
       topLevel: "顶层",
+      githubEmbeddingFreshness: "向量索引有效期（小时）",
       githubUrl: "GitHub 仓库地址",
       file: "文件",
       maxFileSize: "文件大小上限：25 MB。",

@@ -14,3 +14,5 @@
 - Keep rendering behind the shared raw-HTML allowlist and sanitizer. Authored styles/forms/attributes must never become live page markup; use the editor’s Markdown image and formatting features instead.
 
 - Modal text readers keep the localized close cross in a sticky header; full-screen editing exits through the top cross without remounting or losing draft content. See [dialog headers](../../../docs/DIALOGS.md).
+
+- Own `indexing.policy` and `indexing.prepare`; core supplies authorized embedding storage and search. Never call a sibling plugin. Prepared semantic indexes remain outside public resource metadata. See [service contract](../../../docs/MATERIAL_EMBEDDING_SERVICES.md).

@@ -1,3 +1,4 @@
+export * from "./material-embeddings";
 export * from "./test-grading-instructions";
 export * from "./ai-grading-runs";
 export * from "./ai-grading-preparation";
@@ -59,3 +60,5 @@ export * from "./credentials";
 export * from "./csv";
 
 export * from "./judge0-jobs";
+export * from "./public-material-fetch";
+export * from "./pdf-text";

@@ -38,3 +38,7 @@ When changing this plugin, update:
 Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.
 
 Repository URLs reject embedded credentials and non-HTTP(S) schemes; HTTP is normalized to HTTPS. Run `npm run db:migrate:all` to strip legacy URL userinfo and invalidate its derived index (`202610250020_github_url_credentials`).
+
+## Prepared embedding service
+
+This material provides plugin-owned preparation/refresh through core. See [material embedding services](../../../docs/MATERIAL_EMBEDDING_SERVICES.md) for source extraction, reuse, freshness and limits. The prior deterministic index handlers remain a legacy compatibility path; Coding Homework uses the prepared semantic service.

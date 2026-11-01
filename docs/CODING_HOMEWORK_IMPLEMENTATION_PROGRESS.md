@@ -57,3 +57,12 @@ The user explicitly authorized reasonable remaining assumptions and requested th
 - Deferred gates: `ActivityDefinition.assessmentFlow`, `PluginRouteDefinition.learnerAccessPhase`, assigned API dispatcher and host SEB/timing callbacks. Homework currently opts in; finish the new student renderer before handoff.
 - New plugin Prisma models: `PluginCodingHomeworkDraft` and `PluginCodingHomeworkTeacherSolution`; submission status adds `cancelled`. Generated homework Prisma sources are tracked in this repository and must stay synchronized.
 - Material index generation/refresh MUST remain a material-plugin service dispatched by core. Shared storage/provider helpers may be used through core; no homework-to-material-plugin import.
+
+## Active integration checkpoint
+
+- `e62b9a9` committed persistent preparation, private teacher solution and deferred assessment foundations; preparation Playwright passed.
+- Material service implementation now includes private shared OpenAI vectors/indexes, plugin-owned text/file/link/GitHub extraction, public DNS-pinned fetching and per-repository freshness settings. Core migration applied locally.
+- Final hand-in, queue limits/heartbeats/recovery, atomic full question publication, deferred answering, deadline jobs, teacher cancellation and initial UI are implemented but integration validation is in progress. Do not report completion yet.
+- Assume bounded exact cosine search over real embeddings in PostgreSQL Float32 storage for the initial class size; no pgvector/server-image replacement. Text PDFs only (Poppler), no OCR. Empty reference selection is explicitly preparable; questions then use the assignment/submitted work.
+- New key files: `workflow-settings.ts`, `hand-in.ts`, `prepared-processing.ts`, `deadline.ts`, `submission-management.ts`, `workflow-routes.ts`, and `src/web/homework-*.tsx`.
+- Pending: local full workflow/SEB/cancellation/deadline/concurrency Playwright tests; update old unit mocks/route lists; full locales; correctness/privacy/documentation review and remaining commits.

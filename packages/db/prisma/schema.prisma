@@ -302,6 +302,7 @@ model BackgroundJob {
 }
 
 model AiAgentConnection {
+  materialIndexes ContentMaterialIndex[]
   id          String          @id @default(cuid())
   ownerId     String?
   provider    AiAgentProvider
@@ -340,6 +341,7 @@ model UserRole {
 }
 
 model Course {
+  materialIndexes ContentMaterialIndex[]
   aiGradingRuns AiGradingRun[]
   id                        String                     @id @default(cuid())
   subjectId                 String
@@ -1228,6 +1230,8 @@ model TestItem {
 }
 
 model CourseContentResource {
+  materialIndexes ContentMaterialIndex[]
+  materialIndexBuild ContentMaterialIndexBuild?
   id             String              @id @default(cuid())
   courseId       String
   groupId        String?
@@ -1676,4 +1680,38 @@ model RateLimitBucket {
   expiresAt DateTime
 
   @@index([expiresAt])
+}
+
+model ContentMaterialVector {
+  id String @id
+  modelKey String
+  dimensions Int
+  values Bytes
+  createdAt DateTime @default(now())
+}
+
+model ContentMaterialIndex {
+  id String @id @default(cuid())
+  courseId String
+  resourceId String?
+  sourceId String
+  connectionId String?
+  modelKey String
+  sourceRevision String
+  contentFingerprint String
+  documents Json
+  checkedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  resource CourseContentResource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  connection AiAgentConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  @@unique([sourceId, modelKey, contentFingerprint])
+  @@index([courseId, sourceId, checkedAt])
+}
+
+model ContentMaterialIndexBuild {
+  resourceId String @id
+  token String
+  expiresAt DateTime
+  resource CourseContentResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
 }

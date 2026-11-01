@@ -22,3 +22,5 @@ This file is for GitHub repo content plugin memory only.
 - [Coding Homework decisions](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#github-freshness) require public-repository contents, not URL-only vectors. Private repositories are out of scope for the first delivery.
 - Own the freshness interval in this plugin: 48-hour default with a per-repository material override. Consumers check it when enabling homework submissions; do not automatically refresh an enabled homework's prepared references.
 - Reuse unchanged compatible embeddings across homework selections. A question-generation model change is not an embedding-index invalidation event. Existing URL metadata/dev-index behavior above is still the runtime baseline.
+
+- Own `indexing.policy` and `indexing.prepare`; core supplies authorized embedding storage and search. Never call a sibling plugin. Prepared semantic indexes remain outside public resource metadata. See [service contract](../../../docs/MATERIAL_EMBEDDING_SERVICES.md).

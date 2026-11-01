@@ -17,3 +17,7 @@ See [reference](docs/REFERENCE.md) for persistence, validation, and integration 
 Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.
 
 The [approved next Coding Homework workflow](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) requires linked teaching-page/lecture content for reusable reference indexes, including the supplied slides example. This remains planned; the existing URL/description embedding projection and private AI-summary feature are not equivalent to that extraction workflow.
+
+## Prepared embedding service
+
+This material provides plugin-owned preparation/refresh through core. See [material embedding services](../../../docs/MATERIAL_EMBEDDING_SERVICES.md) for source extraction, reuse, freshness and limits. The prior deterministic index handlers remain a legacy compatibility path; Coding Homework uses the prepared semantic service.

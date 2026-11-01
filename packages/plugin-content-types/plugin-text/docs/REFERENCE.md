@@ -43,3 +43,7 @@ Teacher, learner, and settings actions follow the platform [button and icon cont
 ## Dialog presentation
 
 The host modal reader uses a sticky heading with an icon-only close cross and localized accessible name. Its body remains scrollable within the existing 80vw panel. The shared full-screen editor uses a top cross to exit without losing its mounted draft. See [dialog headers](../../../../docs/DIALOGS.md).
+
+## Prepared material indexes
+
+The text-owned indexing service fingerprints the saved title/body and prepares reusable semantic embeddings through core. See [material embedding services](../../../../docs/MATERIAL_EMBEDDING_SERVICES.md).

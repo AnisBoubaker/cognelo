@@ -1375,6 +1375,7 @@ export const arMessages = {
       source: "المصدر",
       location: "الموقع",
       topLevel: "المستوى الأعلى",
+      githubEmbeddingFreshness: "مدة صلاحية الفهرس (ساعات)",
       githubUrl: "رابط مستودع GitHub",
       file: "ملف",
       maxFileSize: "الحجم الأقصى للملف: 25 ميغابايت.",

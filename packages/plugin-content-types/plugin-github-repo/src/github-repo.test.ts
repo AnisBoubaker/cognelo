@@ -41,7 +41,7 @@ describe("GitHub repo content plugin", () => {
       })
     ).resolves.toEqual({
       title: "Examples",
-      metadata: { url: "https://github.com/cognelo/examples" }
+      metadata: { url: "https://github.com/cognelo/examples", embeddingFreshnessHours: 48 }
     });
 
     await expect(
@@ -58,7 +58,7 @@ describe("GitHub repo content plugin", () => {
         payload: { url: "https://github.com/cognelo/updated/" }
       })
     ).resolves.toEqual({
-      metadata: { url: "https://github.com/cognelo/updated" }
+      metadata: { url: "https://github.com/cognelo/updated", embeddingFreshnessHours: 48 }
     });
   });
 

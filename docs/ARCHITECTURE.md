@@ -224,3 +224,5 @@ type ContentEmbeddingSource =
 ```
 
 There is no embeddings/index database yet. Future activity generation should ask a generic indexing service for relevant course context; it should not import concrete content type plugins directly.
+
+Material embedding preparation is a plugin-owned service dispatched through core. Core provides private reusable vector/index storage and authorized snapshot search; material plugins own extraction/revision/freshness policy. See [prepared material services](MATERIAL_EMBEDDING_SERVICES.md).

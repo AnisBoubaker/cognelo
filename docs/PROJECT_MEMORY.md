@@ -87,3 +87,5 @@ This file is intentionally short. It records only cross-cutting decisions that a
 - Deployment and release gates: [DEPLOYMENT_UBUNTU_APACHE.md](DEPLOYMENT_UBUNTU_APACHE.md) and [DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md](DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md)
 
 Plugin-specific decisions live in the owning plugin's README, short `PROJECT_MEMORY.md`, and linked detailed references. Do not copy them back into this file unless they establish a platform-wide contract.
+
+- Prepared material embeddings: material plugins own generation/refresh, and consumers call them only through core. Preserve immutable pinned index versions; question-model changes do not invalidate embeddings. See [service contract](MATERIAL_EMBEDDING_SERVICES.md).

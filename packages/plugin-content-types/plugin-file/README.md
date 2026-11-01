@@ -15,3 +15,7 @@ Interface actions use the shared [button style and semantic icons](../../../docs
 Uploads validate titles (180 characters) and original filenames (255 characters) before staging, use bounded multipart reads and remove staged files after persistence failures. Download and extraction share the server-owned storage containment check. Basic PDF extraction scans literal strings in linear time, including malformed files. See [security boundaries](../../../docs/SECURITY_BOUNDARIES.md).
 
 The [approved next Coding Homework workflow](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) requires PDF teaching content to participate in reusable prepared indexes. This is an implementation target; the current basic extractor and development indexes described above are not a declaration that the new workflow is ready.
+
+## Prepared embedding service
+
+This material provides plugin-owned preparation/refresh through core. See [material embedding services](../../../docs/MATERIAL_EMBEDDING_SERVICES.md) for source extraction, reuse, freshness and limits. The prior deterministic index handlers remain a legacy compatibility path; Coding Homework uses the prepared semantic service.

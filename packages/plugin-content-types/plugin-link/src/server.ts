@@ -1,3 +1,4 @@
+import { linkMaterialIndexing } from "./indexing";
 import type { ServerContentTypePlugin } from "@cognelo/content-type-sdk/server";
 import { z } from "zod";
 import { AppError, assertCanManageCourse } from "@cognelo/core";
@@ -13,6 +14,7 @@ const payloadSchema = linkPayloadSchema.extend({
 
 export const linkContentServerPlugin: ServerContentTypePlugin = {
   key: "link-content",
+  indexing: linkMaterialIndexing,
   routes: [{
     path: "summary",
     contentTypeKeys: ["link"],

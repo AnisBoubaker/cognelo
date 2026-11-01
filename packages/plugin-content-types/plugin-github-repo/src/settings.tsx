@@ -5,13 +5,15 @@ export type GithubRepoSettingsFormProps = {
   title: string;
   url: string;
   error?: string;
+  metadata?: Record<string, unknown>;
+  onMetadataChange?: (metadata: Record<string, unknown>) => void;
   onTitleChange: (title: string) => void;
   onUrlChange: (url: string) => void;
   onSubmit: (event: FormEvent) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
-export function GithubRepoSettingsForm({ title, url, error, onTitleChange, onUrlChange, onSubmit, t }: GithubRepoSettingsFormProps) {
+export function GithubRepoSettingsForm({ title, url, error, metadata, onMetadataChange, onTitleChange, onUrlChange, onSubmit, t }: GithubRepoSettingsFormProps) {
   return (
     <form className="form" onSubmit={onSubmit}>
       <div className="field">
@@ -28,6 +30,7 @@ export function GithubRepoSettingsForm({ title, url, error, onTitleChange, onUrl
           placeholder="https://github.com/org/repo"
         />
       </div>
+      <div className="field"><label htmlFor="github-freshness">{t("courseDetail.githubEmbeddingFreshness")}</label><input id="github-freshness" type="number" min={1} max={8760} value={Number(metadata?.embeddingFreshnessHours ?? 48)} onChange={event => onMetadataChange?.({ ...metadata, embeddingFreshnessHours: Number(event.target.value) })} /></div>
       {error ? <p className="error">{error}</p> : null}
       <div className="row">
         <button type="submit"><ActionIcon name="save" /> {t("courseDetail.saveMaterial")}</button>

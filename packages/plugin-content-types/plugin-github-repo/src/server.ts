@@ -1,3 +1,4 @@
+import { githubMaterialIndexing, githubFreshnessHours } from "./indexing";
 import { z } from "zod";
 import type { ContentEmbeddingDocumentsResult, ServerContentResourceRecord, ServerContentTypePlugin } from "@cognelo/content-type-sdk/server";
 import { buildContentVectorIndex, searchContentVectorIndex, type ContentVectorIndex } from "@cognelo/content-type-sdk/vector";
@@ -8,7 +9,8 @@ const EMBEDDING_INDEX_KEY = "embeddingIndex";
 
 const githubRepoPayloadSchema = z.object({
   title: z.string().trim().min(1).max(180).optional(),
-  url: z.string().trim().url().optional()
+  url: z.string().trim().url().optional(),
+  embeddingFreshnessHours: z.number().int().min(1).max(8760).optional()
 });
 
 function parseGithubRepoPayload(payload: unknown) {
@@ -16,7 +18,7 @@ function parseGithubRepoPayload(payload: unknown) {
   const url = input.url ? normalizeGithubRepoUrl(input.url) : null;
   return {
     title: input.title ?? "GitHub repository",
-    url
+    url, embeddingFreshnessHours: input.embeddingFreshnessHours ?? 48
   };
 }
 
@@ -27,6 +29,7 @@ function readUrl(metadata: Record<string, unknown> | undefined) {
 
 export const githubRepoContentServerPlugin: ServerContentTypePlugin = {
   key: "github-repo-content",
+  indexing: githubMaterialIndexing,
   handlers: {
     async duplicate(input) {
       const { embeddingIndex: _embeddingIndex, ...metadata } = input.resource.metadata ?? {};
@@ -36,7 +39,7 @@ export const githubRepoContentServerPlugin: ServerContentTypePlugin = {
       const parsed = parseGithubRepoPayload(input.payload);
       return {
         title: parsed.title,
-        metadata: parsed.url ? { url: parsed.url } : { setupStatus: "draft" }
+        metadata: parsed.url ? { url: parsed.url, embeddingFreshnessHours: parsed.embeddingFreshnessHours } : { setupStatus: "draft", embeddingFreshnessHours: parsed.embeddingFreshnessHours }
       };
     },
     async update(input) {
@@ -47,7 +50,8 @@ export const githubRepoContentServerPlugin: ServerContentTypePlugin = {
         ...(parsed.title !== undefined ? { title: parsed.title } : {}),
         metadata: {
           ...(input.resource.metadata ?? {}),
-          ...(nextUrl ? { url: nextUrl } : {})
+          ...(nextUrl ? { url: nextUrl } : {}),
+          embeddingFreshnessHours: parsed.embeddingFreshnessHours ?? githubFreshnessHours(input.resource.metadata)
         }
       };
     },

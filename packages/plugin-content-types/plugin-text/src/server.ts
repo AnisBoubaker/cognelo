@@ -1,3 +1,4 @@
+import { contentIndexRevision } from "@cognelo/core";
 import { textPayloadSchema } from "./shared";
 import type { ContentEmbeddingDocumentsResult, ServerContentResourceRecord, ServerContentTypePlugin } from "@cognelo/content-type-sdk/server";
 import { buildContentVectorIndex, searchContentVectorIndex, type ContentVectorIndex } from "@cognelo/content-type-sdk/vector";
@@ -11,6 +12,10 @@ const EMBEDDING_INDEX_KEY = "embeddingIndex";
 
 export const textContentServerPlugin: ServerContentTypePlugin = {
   key: "text-content",
+  indexing: {
+    policy: resource => ({ revision: contentIndexRevision({ title: resource.title, body: bodyFrom(resource.metadata) }) }),
+    prepare: async ({ resource, store }) => store(getTextEmbeddingDocuments(resource))
+  },
   handlers: {
     async duplicate(input) {
       const { embeddingIndex: _embeddingIndex, ...metadata } = input.resource.metadata ?? {};

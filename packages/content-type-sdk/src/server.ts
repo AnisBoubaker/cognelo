@@ -167,7 +167,22 @@ export type ContentTypeEmbeddingSearchHandler = (input: {
   preferredKind?: ContentEmbeddingSourceKind;
 }) => Promise<ContentVectorSearchResult>;
 
+export type PreparedContentIndex = {
+  id: string; sourceId: string; modelKey: string; sourceRevision: string; contentFingerprint: string;
+  indexedAt: string; checkedAt: string; documentCount: number; connectionId: string;
+};
+export type ContentIndexPolicy = { revision: string; maxAgeHours?: number | null };
+/** A material plugin owns extraction/index generation; core supplies private storage and embedding facilities. */
+export type ContentIndexingService = {
+  policy: (resource: ServerContentResourceRecord) => ContentIndexPolicy;
+  prepare: (input: {
+    user: CurrentUser; resource: ServerContentResourceRecord; signal?: AbortSignal;
+    store: (documents: ContentEmbeddingDocumentsResult) => Promise<PreparedContentIndex>;
+  }) => Promise<PreparedContentIndex>;
+};
+
 export type ServerContentTypePlugin = {
+  indexing?: ContentIndexingService;
   key: string;
   routes?: readonly ContentTypeRouteDefinition[];
   handlers?: {

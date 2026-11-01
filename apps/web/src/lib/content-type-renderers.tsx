@@ -77,6 +77,8 @@ const contentTypeSettingsRenderers: Record<string, ContentTypeRenderer> = {
   "github-repo-settings": (context) =>
     context.settings ? (
       <GithubRepoSettingsForm
+        metadata={context.settings.metadata}
+        onMetadataChange={context.settings.onMetadataChange}
         title={context.settings.title}
         url={context.settings.url}
         error={context.settings.error}
