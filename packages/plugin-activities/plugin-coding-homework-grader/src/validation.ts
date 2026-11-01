@@ -1,3 +1,4 @@
+import { normalizeCParameter, normalizeCReturnType } from "./c-signatures";
 import type {
   CodingHomeworkFunctionRequirement,
   CodingHomeworkSourceFile,
@@ -111,7 +112,7 @@ export async function validateCodingHomeworkArchive(input: CodingHomeworkArchive
   const parserIssues: CodingHomeworkValidationIssue[] = parseResult.diagnostics
     .filter((diagnostic) => diagnostic.severity === "error")
     .map((diagnostic) => ({
-      code: "parser_error",
+      code: diagnostic.code === "SOURCE_ANALYSIS_LIMIT" || diagnostic.code === "FUNCTION_ANALYSIS_LIMIT" ? "archive_error" : "parser_error",
       message: diagnostic.message,
       path: diagnostic.path,
       severity: diagnostic.severity
@@ -130,10 +131,19 @@ export async function validateCodingHomeworkArchive(input: CodingHomeworkArchive
         path: requirement.filePath,
         severity: "error"
       });
+    } else if (requirement.parameterTypes || requirement.returnType) {
+      const candidates = parseResult.functions.filter(fn => fn.functionName === requirement.name
+        && (!requirement.filePath || normalizeRequirementPath(fn.sourcePath) === normalizeRequirementPath(requirement.filePath)));
+      const matches = candidates.some(fn => fn.signature
+        && (!requirement.returnType || normalizeCReturnType(requirement.returnType) === fn.signature.returnType)
+        && (!requirement.parameterTypes || JSON.stringify(requirement.parameterTypes.map(normalizeCParameter)) === JSON.stringify(fn.signature.parameterTypes)));
+      if (!matches) allIssues.push({ code: "signature_mismatch", functionName: requirement.name,
+        message: `Function signature does not match the required arguments/return type: ${formatFunctionRequirement(requirement)}.`,
+        path: requirement.filePath, severity: "error" });
     }
   }
 
-  const missingRequired = allIssues.filter((issue) => issue.code === "missing_file" || issue.code === "missing_folder" || issue.code === "missing_function");
+  const missingRequired = allIssues.filter((issue) => issue.code === "signature_mismatch" || issue.code === "missing_file" || issue.code === "missing_folder" || issue.code === "missing_function");
   const unexpectedItems = allIssues.filter((issue) => issue.code === "unexpected_file" || issue.code === "unsupported_extension" || issue.code === "forbidden_path");
   const parserDiagnostics = allIssues.filter((issue) => issue.code === "parser_error");
 
@@ -221,4 +231,13 @@ function hasRequiredFunction(
 
 function formatFunctionRequirement(requirement: CodingHomeworkFunctionRequirement) {
   return requirement.filePath ? `${requirement.filePath}:${requirement.name}` : requirement.name;
+}
+
+/** Academic incompleteness can be acknowledged; unsafe uploads and resource exhaustion cannot. */
+export function codingHomeworkSubmissionReadiness(summary: CodingHomeworkPreflightValidationSummary) {
+  const incompleteCodes = new Set(["missing_file", "missing_folder", "missing_function", "signature_mismatch", "parser_error"]);
+  const blocking = summary.issues.filter(issue => issue.severity === "error" && !incompleteCodes.has(issue.code));
+  const incomplete = summary.issues.filter(issue => incompleteCodes.has(issue.code));
+  return { canSubmit: blocking.length === 0 && summary.validFiles.length > 0, requiresAcknowledgement: incomplete.length > 0,
+    incomplete, blocking };
 }

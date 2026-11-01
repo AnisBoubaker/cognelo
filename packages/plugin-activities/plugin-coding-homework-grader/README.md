@@ -19,6 +19,8 @@ author assignment -> snapshot prior content -> validate ZIP -> reserve core atte
 -> generate challenge questions -> collect answers -> submit core attempt -> review grade
 ```
 
+Static C validation also recognizes required argument/return signatures; the parser exposes normalized types and the new readiness classifier separates academic incompleteness from hard safety failures. The upload-preparation UI is still being implemented.
+
 Uploads and finalization enforce [transactional limits and archive safety](docs/REFERENCE.md#upload-and-finalization-boundaries).
 
 Long-running analysis and question generation use the shared background-job service. Final submission requests are idempotent and teachers can reprocess unfinished or failed work. Student submission/preflight and visible background processing, plus teacher uploads, extraction, snapshots, preflight, and saves, use the platform shared blocking progress dialog.

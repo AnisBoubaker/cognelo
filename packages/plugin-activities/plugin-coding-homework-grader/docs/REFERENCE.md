@@ -183,3 +183,7 @@ Prompts and feedback use the shared renderer’s fixed attribute-free HTML allow
 ## Dialog presentation
 
 Authoring, confirmation, submission, and review dialogs reuse the [shared persistent header and close cross](../../../../docs/DIALOGS.md). The host review toolbar keeps navigation, messages, and dismissal on one row; embedded review panels leave the modal boundary and close action to that host. Existing draft guards, busy states, and non-dismissible progress remain in force.
+
+## Static signature validation
+
+The C parser now supplies normalized argument and return types alongside its existing source/AST records. Requirement entries optionally carry `parameterTypes` and `returnType`; older name-only entries remain valid. Signature mismatches are reported distinctly. `codingHomeworkSubmissionReadiness` separates acknowledgement-based academic gaps (missing files/folders/functions, mismatched signatures and syntax diagnostics) from hard archive, extension and resource-limit failures; at least one valid file is required. The new upload workflow will consume this classifier; existing strict preflight `isValid` semantics remain unchanged.

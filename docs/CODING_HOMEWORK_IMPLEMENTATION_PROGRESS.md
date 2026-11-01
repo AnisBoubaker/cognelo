@@ -35,14 +35,16 @@ The user explicitly authorized reasonable remaining assumptions and requested th
 
 ## Assumptions to report
 
-None chosen beyond the confirmed settings yet. Add each substantive implementation choice here when made.
+- Static C validation uses bounded declaration normalization, without compilation/preprocessing. Typedefs retain their spelling; common builtin spelling, parameter names, storage qualifiers and array-to-pointer adjustment are normalized. Syntax failures can be acknowledged as incomplete work, while analysis/storage/ZIP safety limits remain blocking.
 
 ## Current checkpoint
 
 - Baseline: documentation commit `d67e1ea`; working tree was clean before this task.
-- Implementation has started with discovery and this checkpoint. No runtime changes yet.
+- Static validation slice implemented: signature-bearing parser results and requirements, signature mismatch reports, and an acknowledgement/readiness classifier. Legacy strict preflight remains intact until the new preparation workflow uses the classifier.
+- A task-owned macOS `caffeinate -i -s` assertion is active during implementation. The local PID is in `.git/info/cognelo-homework-caffeinate.pid`; stop only that process when the job finishes.
 - Resume by reading this file and the current Git diff; do not redo completed work.
 
 ## Validation and commits
 
-- Documentation checkpoint: pending commit after link review.
+- `93ec082`: recorded implementation checklist and the user’s follow-up clarifications.
+- Static signature slice: 19 focused parser/validation tests passed; plugin typecheck passed. Commit follows this checkpoint.

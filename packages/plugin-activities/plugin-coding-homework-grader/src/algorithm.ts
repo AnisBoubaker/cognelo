@@ -50,6 +50,8 @@ export type CodingHomeworkFunctionRequirement = {
   description?: string;
   filePath?: string;
   name: string;
+  returnType?: string;
+  parameterTypes?: string[];
   required?: boolean;
 };
 
@@ -73,6 +75,7 @@ export type CodingHomeworkValidationIssue = {
     | "missing_file"
     | "missing_folder"
     | "missing_function"
+    | "signature_mismatch"
     | "parser_error"
     | "unsupported_extension"
     | "unexpected_file";
@@ -102,6 +105,7 @@ export type CodingHomeworkParserDiagnostic = {
 };
 
 export type CodingHomeworkParsedFunction = {
+  signature?: { returnType: string; parameterTypes: string[] };
   astText: string;
   endLine?: number;
   functionCode: string;

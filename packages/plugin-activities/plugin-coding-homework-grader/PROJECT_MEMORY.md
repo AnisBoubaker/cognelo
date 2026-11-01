@@ -44,3 +44,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Use the shared Markdown renderer for prompts and feedback: raw styles/forms/attributes stay inert and math stays untrusted and bounded. See [the shared rendering contract](../../../docs/plugin-authoring/03-core-services.md#what-markdownrenderer-gives-you).
 
 - Use the shared [dialog headers](../../../docs/DIALOGS.md) for persistent icon-only dismissal. Manual review embedded in the host omits duplicate dialog roles/close controls; keep guarded callbacks and busy states.
+
+- C signatures are normalized without execution: compare names, argument types/count and return type, ignoring parameter names/storage qualifiers and equivalent array parameters. Preserve pointer depth and pointee qualifiers. Academic gaps use the readiness acknowledgement classifier; parser resource limits and unsafe archives stay blocking.

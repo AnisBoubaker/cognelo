@@ -1,3 +1,4 @@
+import { normalizeCSignature } from "./c-signatures";
 import type {
   CodingHomeworkLanguageKey,
   CodingHomeworkParsedFunction,
@@ -19,7 +20,7 @@ type SignatureRange = {
 };
 
 const C_KEYWORDS = new Set(["do", "else", "for", "if", "return", "sizeof", "switch", "while"]);
-const C_TYPE_DEFINITION_PREFIX = /^(struct|union|enum|typedef)\b/;
+const C_TYPE_DEFINITION_PREFIX = /^typedef\b/;
 const C_MULTI_CHAR_OPERATORS = [
   "<<=",
   ">>=",
@@ -192,6 +193,7 @@ function parseCFile(file: CodingHomeworkSourceFile): CodingHomeworkParseResult {
       const sourceEnd = closeIndex + 1;
       const functionCode = file.content.slice(sourceStart, sourceEnd).trim();
       functions.push({
+        signature: normalizeCSignature(signature.returnType, signature.parameters),
         astText: serializeCFunctionAst(signature, file.content.slice(index + 1, closeIndex)),
         endLine: sourceLine(closeIndex),
         functionCode,
@@ -219,6 +221,7 @@ function parseCFile(file: CodingHomeworkSourceFile): CodingHomeworkParseResult {
 }
 
 function parseCSignature(signature: string): ParsedCSignature | null {
+  if (signature.length > 10_000) return null;
   const normalized = normalizeWhitespace(signature);
   if (!normalized || normalized.includes("=") || C_TYPE_DEFINITION_PREFIX.test(normalized)) {
     return null;

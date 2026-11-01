@@ -17,6 +17,8 @@ const pathRequirementSchema = z.object({
 
 const functionRequirementSchema = z.object({
   name: z.string().trim().min(1).max(160),
+  returnType: z.string().trim().min(1).max(500).optional(),
+  parameterTypes: z.array(z.string().trim().min(1).max(500)).max(100).optional(),
   filePath: z.string().trim().min(1).max(500).optional(),
   description: z.string().trim().max(1000).optional(),
   required: z.boolean().default(true)
