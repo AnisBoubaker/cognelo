@@ -1,6 +1,6 @@
 import { prisma as corePrisma, type Prisma as CorePrisma } from "@cognelo/db";
 import { z } from "zod";
-import { AppError, startActivityAttempt, submitActivityAttempt } from "@cognelo/core";
+import { AppError, startActivityAttempt, submitActivityAttempt, getGroupAssignedActivity, assignmentTimeLimitMinutes, assignmentAttemptExpiresAt } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma } from "./db-client";
 import { toStudentChallengeQuestionRecord } from "./generation";
@@ -72,10 +72,12 @@ export async function saveCodingHomeworkChallengeAnswers(
   input: unknown,
   options: {
     finalize: boolean;
+    expiredAttemptId?: string;
     gradebook?: ChallengeAnswerGradebookOptions;
   }
 ) {
   const parsed = challengeAnswersInputSchema.parse(input ?? {});
+  const activity = await getGroupAssignedActivity(scope.user, scope.courseId, scope.groupId, scope.activityId);
   return corePrisma.$transaction(async (tx) => {
   const candidates = await tx.$queryRaw<SubmissionRow[]>`SELECT * FROM "PluginCodingHomeworkSubmission"
     WHERE "activityId" = ${scope.activityId} AND "groupId" = ${scope.groupId} AND "userId" = ${scope.user.id}
@@ -99,13 +101,19 @@ export async function saveCodingHomeworkChallengeAnswers(
     throw new AppError(400, "CODING_HOMEWORK_CHALLENGES_NOT_READY", "Challenge questions are not ready for this submission.");
   }
 
+  let expired = false;
+  if (normalizeObject(submission.metadata).workflowVersion === 2 && (!submission.coreAttemptId || !normalizeObject(submission.metadata).assessmentStartedAt)) throw new AppError(409, "HOMEWORK_ASSESSMENT_NOT_STARTED", "Click Answer challenge questions to begin.");
   if (submission.coreAttemptId) {
-    const [attempt] = await tx.$queryRaw<Array<{ lifecycle: string }>>`SELECT lifecycle FROM "ActivityAttempt" WHERE id = ${submission.coreAttemptId} FOR UPDATE`;
+    const [attempt] = await tx.$queryRaw<Array<{ lifecycle: string; startedAt: Date }>>`SELECT lifecycle, "startedAt" FROM "ActivityAttempt" WHERE id = ${submission.coreAttemptId} FOR UPDATE`;
     if (!attempt || attempt.lifecycle !== "started") throw new AppError(409, "CODING_HOMEWORK_SUBMISSION_LOCKED", "This attempt is complete and cannot be edited.");
+    const deadline = assignmentAttemptExpiresAt(attempt.startedAt, assignmentTimeLimitMinutes(activity.assignment.metadata), activity.assignment.availableUntil) ?? activity.assignment.availableUntil;
+    expired = Boolean(deadline && Date.now() >= deadline.getTime());
+    if (options.expiredAttemptId && (options.expiredAttemptId !== submission.coreAttemptId || !expired)) throw new AppError(409, "ACTIVITY_TIME_LIMIT_ACTIVE", "The answering deadline changed. Refresh the activity.");
+    if (expired && !options.finalize) throw new AppError(409, "ACTIVITY_TIME_LIMIT_EXPIRED", "The answering deadline has passed.");
   }
   const questionsById = new Map(submission.questions.map((question) => [question.id, question]));
   const incomingAnswers = new Map<string, string>();
-  for (const answer of parsed.answers) {
+  for (const answer of expired ? [] : parsed.answers) {
     if (!questionsById.has(answer.questionId)) {
       throw new AppError(400, "CODING_HOMEWORK_QUESTION_NOT_FOUND", "One answer targets a question that is not part of this submission.");
     }
@@ -117,7 +125,7 @@ export async function saveCodingHomeworkChallengeAnswers(
     nextAnswers.set(questionId, answer);
   }
 
-  if (options.finalize) {
+  if (options.finalize && !expired) {
     const missingQuestion = submission.questions.find((question) => !nextAnswers.get(question.id)?.trim());
     if (missingQuestion) {
       throw new AppError(400, "CODING_HOMEWORK_CHALLENGE_ANSWERS_INCOMPLETE", "Answer every challenge question before submitting.");

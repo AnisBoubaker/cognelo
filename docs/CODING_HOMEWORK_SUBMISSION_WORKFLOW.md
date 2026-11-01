@@ -1,8 +1,8 @@
 # Coding Homework submission workflow
 
-**Decision date: November 1, 2026. Status: approved product requirements; implementation and validation are pending.**
+**Decision date: November 1, 2026. Status: implemented for local acceptance testing; see the progress record for completed checks.**
 
-This is the canonical record of the user's choices for the next Coding Homework delivery. It supersedes conflicting proposed behavior in the older [implementation plan](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md), particularly ZIP-only preparation, timing the entire upload/generation workflow, and rejecting every incomplete submission. The [plugin reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md) describes the existing implementation; this document does not claim these changes have shipped.
+This is the canonical record of the user's choices for the next Coding Homework delivery. It supersedes conflicting proposed behavior in the older [implementation plan](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md), particularly ZIP-only preparation, timing the entire upload/generation workflow, and rejecting every incomplete submission. The [plugin reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md) describes the current implementation. No production deployment is implied.
 
 ## Implementation clarifications — November 1, 2026
 
@@ -90,7 +90,7 @@ At timeout, finalize the server-saved answers, including blanks. Do not accept n
 - With parallelism, FIFO refers to admission/dispatch order; independent jobs need not finish in arrival order.
 - Persist jobs and status across browser departure. Submission retries must not create duplicate work, and teacher cancellation must remain effective against late worker responses.
 - The target class represents roughly **90–150 generated questions** at the expected 3–5 questions per student. Validate queue behavior at that scale locally/preprod.
-- Exact automatic retry/backoff and terminal-error recovery policy was not settled in the answers. Existing retry behavior is a baseline to inspect, not a newly approved guarantee.
+- Implementation choice: three generation attempts with bounded backoff; leases heartbeat every 15 seconds and recover after two minutes of inactivity. Terminal failure retains frozen work; a teacher can cancel and permit resubmission.
 
 ## Material selection, indexing and reuse
 
@@ -112,7 +112,7 @@ The user supplied this lecture/slides link as a required example of linked teach
 
 - [INF155 course 04 slides](https://anisboubaker.github.io/INF155/diapos/cours04/#/)
 
-Retain the example as an extraction/acceptance fixture; this documentation change does not validate its extraction. Supporting a link means obtaining useful teaching content for retrieval, not merely embedding the URL. Public repository support likewise requires repository contents, not a URL-only placeholder. Private GitHub repositories are out of scope for now. Exact branch/path selection, link traversal, and any scanned-PDF/OCR requirements remain implementation details to resolve.
+The supplied deck was verified with the real link extractor during local acceptance (static teaching content, including slide templates). Supporting a link means obtaining useful teaching content for retrieval, not merely embedding the URL. Public repository support likewise requires repository contents, not a URL-only placeholder. Private GitHub repositories are out of scope for now. Exact branch/path selection, link traversal, and any scanned-PDF/OCR requirements remain implementation details to resolve.
 
 ### GitHub freshness
 
@@ -130,24 +130,21 @@ Retain the example as an extraction/acceptance fixture; this documentation chang
 - Embedding compatibility remains tied to the actual embedding configuration and source revision. Reuse unchanged compatible embeddings; a genuinely different embedding model/dimension configuration cannot be treated as the same index.
 - Dimension/storage details are implementation choices to record and verify; the embedding-model choice is now confirmed.
 
-## Remaining details and deferred work
+## Recorded implementation assumptions and deferred work
 
-The numbered list below preserves the earlier open-detail inventory. Items 1, 3–8 are resolved or narrowed by the implementation clarifications above. The user now authorizes reasonable remaining choices, recorded in the progress record rather than requiring another blocking questionnaire:
-
-1. Exact C argument/signature matching: parameter count/types, pointer/array normalization, qualifiers, parameter names and return-type requirements.
-2. Whether missing required files and signature mismatches are blocking or acknowledgement-based; how to generate the configured number of questions when too little analyzable code or too few required functions are present.
-3. Folder/path handling for individual uploads and duplicate-name replacement behavior. ZIP replacement of the entire collection is already decided.
-4. The exact OpenAI embedding model configuration; generation-model changes must not invalidate indexes regardless of that choice.
-5. The teacher parallelism default and server-wide safety ceiling, including coordination across workers and concurrent activities. The engineering choice must be justified by capacity/rate-limit validation.
-6. Whether material selection can be edited while final submissions are enabled or must first be disabled. No regeneration within an enabled workflow is approved.
-7. Teacher cancellation semantics after answers or grades already exist, reuse versus creation of a core attempt, and retry/recovery behavior after terminal generation failures.
-8. Partial-answer handling at time expiry. Queue/grace-period special cases are expressly deferred; no automatic availability extension is approved.
-9. Whether hidden/section-specific materials or earlier activity statements can be selected, and how activity-owned assignment/provided files or the new private teacher solution join the explicit reference set.
-10. Additional extraction details beyond the specified source types: repository branch/subdirectory scope, link crawling depth and scanned-PDF/OCR support. No Word/PowerPoint or private-repository requirement was selected.
+- Static matching uses a bounded C scanner, without preprocessing or compilation. Typedef spelling remains significant; syntax incompleteness can be acknowledged, while parser resource limits block.
+- The teacher can configure 1–20 questions (default 3). Reuse candidate functions for distinct questions if fewer functions exist; if none can be parsed, use submitted source and the assignment text. This is not an automatic correctness score.
+- Individual files are limited to 8 MB; the prepared collection obeys the configured archive-size/file-count ceilings. ZIP replacement and same-path overwrites require confirmation. Empty reference selection must be explicitly prepared and uses assignment/submitted work for generation.
+- Reference selection contains visible, shared course material resources. Hidden/section-only materials and activity prompts that are not material resources are excluded from the chooser. A folder selects its current recursive material descendants. Private teacher solutions are never automatically embedded.
+- Use OpenAI 1536-dimensional vectors in PostgreSQL Float32 storage and bounded exact cosine search, without a new database image/extension. Reuse vectors/indexes across homework. See [material services](MATERIAL_EMBEDDING_SERVICES.md) for compatibility and limits.
+- Public GitHub root repositories use the default branch pinned to a commit; no branch/subdirectory chooser, private credentials, checkout or execution. Extraction is bounded to 200 source/text files, 512 KB each and 4 MB total. Repository freshness allows 1–8760 hours, default 48.
+- Link extraction reads static HTML/plain text and Reveal.js inline/same-origin external Markdown, without executing JavaScript. PDFs must contain extractable text; Poppler is required, and OCR/Word/PowerPoint are deferred.
+- Teacher cancellation preserves the original evidence and grants a new workflow rather than changing frozen files. A replacement after released grading is scoped to that student; whole-class release remains unchanged.
+- Native SEB startup is simulated at the OS boundary in Playwright. Real launch-token/configuration proof, session scoping and no-repeat-launch behavior are tested. A final native-client check remains an operator acceptance step.
 
 ## Implementation status and acceptance
 
-The current baseline already contains ZIP preflight/final uploads, C function-name analysis, a background generation pipeline, saved challenge answers, manual grading, prior-material snapshots and deterministic development vector indexes. It does **not** yet implement the full target above. In particular, file-by-file persistent preparation, solution-derived argument validation and acknowledgement, manual submission enablement with indexing readiness, phase-specific SEB/timing, real repository/content embeddings and the per-repository freshness setting require implementation or integration work.
+The current implementation contains the preparation, private solution, static signature acknowledgement, prepared-reference/manual-opening, durable queue, deferred SEB/timer and cancellation workflow described above. The [progress record](CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md) records incremental commits, actual local tests and any remaining final checks.
 
 The [implementation plan](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md#approved-next-delivery) tracks that work. Before declaring this ready, validate locally or in isolated preprod:
 
@@ -163,4 +160,4 @@ The [implementation plan](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md#approved
 - Correct SEB handoff, no duplicate launch for verified sessions, read-only submitted-code access and continued material access.
 - Timer start on Answer, enforcement of activity availability, preserved answers and staff review/audit access.
 
-No production browser tests or synthetic submissions are authorized by this plan. This documentation commit changes no runtime behavior, schema, models, deployment or configuration.
+No production browser tests, synthetic production submissions or deployment are authorized by this implementation task.

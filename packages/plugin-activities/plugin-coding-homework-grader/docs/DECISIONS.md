@@ -1,10 +1,10 @@
-# Coding Homework Grader Detailed Decisions
+# Coding Homework Grader historical decisions
 
-The decisions below describe the existing implementation baseline and its earlier phases. The [approved next submission workflow](../../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) records the November 1, 2026 product choices and supersedes conflicting future-facing assumptions. Its implementation is pending; do not treat the current ZIP-only, whole-workflow timer, or strict-complete-function behavior as the next-delivery requirements.
+The current version-2 workflow is described in the [reference](REFERENCE.md) and [approved choices](../../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md). The earlier implementation decisions below document the legacy ZIP/analysis pipeline; ZIP-only preparation, upload-start timing, deterministic vectors and strict-complete submission are superseded.
 
 This document preserves detailed Coding Homework Grader decisions. Load only the sections relevant to the task.
 
-## Current Decisions
+## Legacy pipeline decisions
 
 - Assignment PDFs and teacher-provided files are plugin-owned activity attachments, not separate course content resources. The secure `coding-homework-grader/activity-file` route serves them after activity/course/bank authorization; PDFs use inline disposition for teacher/student viewing, while other files download normally.
 - `provided_file` attachment rows belong to bank or course activities and are copied by the bank-to-course hook. Teacher authoring can upload/remove/open them, and assigned students receive sanitized attachment metadata plus authorized open links.

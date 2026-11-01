@@ -9,6 +9,14 @@ describe("coding homework grader plugin manifest", () => {
     expect(codingHomeworkGraderPlugin.activities[0]?.key).toBe("coding-homework-grader");
     expect(codingHomeworkGraderPlugin.activities[0]?.name).toBe("Coding Homework Grader");
     expect(codingHomeworkGraderServerPlugin.routes?.map((route) => route.path)).toEqual([
+      "coding-homework-grader/workflow-settings",
+      "coding-homework-grader/prepare-material",
+      "coding-homework-grader/prepare-references",
+      "coding-homework-grader/workspace",
+      "coding-homework-grader/hand-in",
+      "coding-homework-grader/answering",
+      "coding-homework-grader/submitted-file",
+      "coding-homework-grader/manage-submissions",
       "coding-homework-grader/preparation",
       "coding-homework-grader/prepared-file",
       "coding-homework-grader/teacher-solution",

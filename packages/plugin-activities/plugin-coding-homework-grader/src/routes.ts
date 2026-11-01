@@ -23,7 +23,7 @@ import { enqueueCodingHomeworkSubmissionProcessing } from "./background-processi
 import { runCodingHomeworkPreflight } from "./preflight";
 import { searchCodingHomeworkReferenceContent } from "./reference-search";
 import { isCodingHomeworkSubmissionDeleted } from "./submission-deletion";
-import { getCodingHomeworkStudentAssignment, getLatestCodingHomeworkSubmission, runCodingHomeworkSubmission } from "./submission";
+import { getCodingHomeworkStudentAssignment, getLatestCodingHomeworkSubmission } from "./submission";
 
 function requireCourseId(courseId: string | undefined) {
   if (!courseId) {
@@ -160,6 +160,7 @@ export const codingHomeworkProvidedFilesRoute: PluginRouteDefinition = {
 export const codingHomeworkActivityFileRoute: PluginRouteDefinition = {
   path: "coding-homework-grader/activity-file",
   activityTypeKeys: ["coding-homework-grader"],
+  learnerAccessPhase: "preparation",
   methods: {
     GET: async ({ context, request }) => {
       const attachmentId = new URL(request.url).searchParams.get("attachmentId")?.trim();
@@ -255,6 +256,7 @@ export const codingHomeworkPreflightRoute: PluginRouteDefinition = {
 export const codingHomeworkStudentAssignmentRoute: PluginRouteDefinition = {
   path: "coding-homework-grader/assignment",
   activityTypeKeys: ["coding-homework-grader"],
+  learnerAccessPhase: "preparation",
   methods: {
     GET: async ({ context }) => {
       return getCodingHomeworkStudentAssignment(resolveStudentSubmissionScope(context));
@@ -269,29 +271,8 @@ export const codingHomeworkSubmissionRoute: PluginRouteDefinition = {
     GET: async ({ context }) => {
       return getLatestCodingHomeworkSubmission(resolveStudentSubmissionScope(context));
     },
-    POST: async ({ context, readJson }) => {
-      const scope = resolveStudentSubmissionScope(context);
-      const input = await readJson();
-      const submissionResult = await runCodingHomeworkSubmission(scope, input);
-      if (!submissionResult.summary.isValid) {
-        return submissionResult;
-      }
-      if (
-        submissionResult.idempotent &&
-        submissionResult.questions?.length &&
-        ["challenge_ready", "ready_for_grading", "graded"].includes(submissionResult.submission.status)
-      ) {
-        return submissionResult;
-      }
-      const job = await enqueueCodingHomeworkSubmissionProcessing(scope, {
-        locale: input && typeof input === "object" && !Array.isArray(input) ? normalizeLocale((input as Record<string, unknown>).locale) : "en",
-        mode: "student",
-        submissionId: submissionResult.submission.id
-      });
-      return {
-        ...submissionResult,
-        processingJob: toProcessingJobRecord(job)
-      };
+    POST: async () => {
+      throw new AppError(409, "HOMEWORK_PREPARATION_REQUIRED", "Upload your files in the preparation workspace, then click Submit my work.");
     }
   }
 };
@@ -421,6 +402,7 @@ export const codingHomeworkChallengeAnswersRoute: PluginRouteDefinition = {
     POST: async ({ context, readJson }) => {
       return saveCodingHomeworkChallengeAnswers(resolveStudentSubmissionScope(context), await readJson(), {
         finalize: true,
+        expiredAttemptId: context.expiredTimedAttemptId,
         gradebook: {
           assessmentMode: typeof context.activity.assignment?.metadata?.assessmentMode === "string"
             ? context.activity.assignment.metadata.assessmentMode

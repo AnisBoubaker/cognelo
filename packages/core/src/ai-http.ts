@@ -13,12 +13,13 @@ export function isPublicAiAddress(address: string) {
 }
 
 /** Pin the validated address and never forward model credentials through redirects. */
-export async function fetchAiResponse(endpoint: string, init: { headers: Record<string, string>; body: string }, allowPrivate = false,
+export async function fetchAiResponse(endpoint: string, init: { headers: Record<string, string>; body: string; signal?: AbortSignal }, allowPrivate = false,
   dependencies: { resolve?: (host: string) => Promise<Address[]> } = {}) {
   const url = new URL(endpoint);
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.hash) throw new AppError(400, "AI_ENDPOINT_INVALID", "Use an HTTP(S) model endpoint without credentials or fragments.");
   const hostname = url.hostname.replace(/^\[|\]$/g, "");
-  const timeout = AbortSignal.timeout(120_000);
+  const timeout = init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000);
+  timeout.throwIfAborted();
   const addresses = isIP(hostname) ? [{ address: hostname, family: isIP(hostname) }] : await Promise.race([
     (dependencies.resolve ?? ((host) => lookup(host, { all: true })))(hostname),
     new Promise<never>((_, reject) => timeout.addEventListener("abort", () => reject(new AppError(504, "AI_REQUEST_TIMEOUT", "The model request timed out.")), { once: true }))

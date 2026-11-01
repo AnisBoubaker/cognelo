@@ -42,6 +42,7 @@ import {
   type ActivityMessagingStatus
 } from "@/lib/api";
 import {
+  ActivitySubmissionManagement,
   getAiFeedbackReviewCalculatedGradePercent,
   getAiFeedbackReviewRenderer,
   getManualGradingRenderer,
@@ -895,6 +896,7 @@ export default function GradebookActivityResultsPage() {
             </button>
           </div>
 
+          <ActivitySubmissionManagement activityTypeKey={activityTypeKey} activityId={activityId} courseId={courseId} groupId={groupId} locale={locale} />
           {reportTab === "overview" ? (
             <div role="tabpanel">
               {!reviewAll ? <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p> : isTest ? (

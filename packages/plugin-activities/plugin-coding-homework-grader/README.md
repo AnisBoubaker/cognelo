@@ -1,73 +1,29 @@
 # Plugin: Coding Homework Grader
 
-`@cognelo/plugin-coding-homework-grader` provides the `coding-homework-grader` activity type for ZIP-based programming assignments. It supports teacher assignment/files/requirements authoring, prior-course documentation snapshots, ZIP validation, C function analysis, generated challenge questions, student answers, core attempts, and teacher manual grading.
+`@cognelo/plugin-coding-homework-grader` provides C homework preparation, immutable hand-in, queued challenge questions, timed/SEB answering and teacher grading.
 
-Teacher submission review and grading consume core grade capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs are limited to assigned sections. Assignment authoring, snapshots, and grade release remain course-management operations.
+Students prepare work by uploading individual files into folders or replacing the whole collection with a ZIP. Files persist across visits and can be removed/replaced until **Submit my work**. There is no browser code editor. Static filename/function-signature checks distinguish incomplete work requiring acknowledgement from blocking safety failures.
 
-Student-triggered challenge generation uses explicit course staff question-authoring preferences in creator, owner, then teacher order. Unusable preferences are skipped without exposing credentials, and generation fails only when no usable configured fallback remains.
+Teachers upload a private C solution and choose required filenames/functions manually or with AI assistance. In a course, they select references (defaulting to visible materials before the activity), generate/reuse embeddings, then enable final submissions manually. Material plugins own extraction/index refresh through core. GitHub freshness is configured on each repository material and checked when submissions open.
 
-Programming Homework does not advertise the [student solution capability](../../../docs/ACTIVITY_SOLUTIONS.md); it has no Release solution setting or Solution tab.
+Final hand-in freezes the actual validated files and atomically queues generation. Default parallelism is 2 students, configurable up to a server-wide ceiling of 4. Students can leave and return while questions generate. **Answer challenge questions** starts the core attempt and timer after any required SEB verification. Submitted files remain read-only; ordinary course materials stay accessible. Deadline finalization submits saved answers, including blanks.
 
-## Approved Next Workflow — Implementation Pending
+Teachers can cancel queued, answering or completed submissions from the activity details page (or editor): the old work is retained, associated grades are withdrawn, late generation cannot revive it, and the student may submit again. Students cannot cancel their frozen hand-in or question-generation job.
 
-The [November 1, 2026 decisions](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) define the next delivery: persistent individual-file/ZIP preparation, teacher-controlled submission opening, static requirements derived from a private solution, acknowledged incomplete work, reusable prepared material indexes, queued challenges and an explicit SEB/timer answering start. Student submissions are immutable and student generation is not cancellable; teacher cancellation is available from activity details. These are approved requirements, not claims about the current implementation below.
+## Read by topic
 
-## Current Workflow
-
-```text
-author assignment -> snapshot prior content -> validate ZIP -> reserve core attempt -> analyze functions
--> generate challenge questions -> collect answers -> submit core attempt -> review grade
-```
-
-Static C validation also recognizes required argument/return signatures; the parser exposes normalized types and the new readiness classifier separates academic incompleteness from hard safety failures. The revisioned preparation API and private teacher-solution/function-selection API are implemented; the new workspace and final hand-in flow remain in progress. See [preparation boundaries](docs/REFERENCE.md#prepared-files-and-private-solution).
-
-Uploads and finalization enforce [transactional limits and archive safety](docs/REFERENCE.md#upload-and-finalization-boundaries).
-
-Long-running analysis and question generation use the shared background-job service. Final submission requests are idempotent and teachers can reprocess unfinished or failed work. Student submission/preflight and visible background processing, plus teacher uploads, extraction, snapshots, preflight, and saves, use the platform shared blocking progress dialog.
-
-When the effective summative assignment setting enables challenges, teacher-entered released grades and feedback are challengeable through the core course workflow, which reuses the plugin's existing **Review and grade** panel.
-
-A valid final ZIP reserves a core attempt tagged with the assignment mode; finalized challenge answers submit that same attempt. Formative attempts remain available to the teacher's read-only inspector; only summative attempts may receive a grade.
-
-Course assignment settings may time this workflow. Core owns the explicit start and live deadline until submission. At zero the renderer finalizes complete challenge answers through the ordinary route; if the upload/analysis/questions are not ready or answers remain incomplete, core closes the timed attempt ungraded instead of fabricating plugin results.
-
-Teacher review can resolve one exact linked final submission. The shared report dialog loads the newest current-mode submission first and requests older submissions only when the teacher navigates; historical submissions are read-only.
-
-The activity definition explicitly declares read-only Student view support. The upload-based activity remains available for inspection, but its ZIP submission workflow stays disabled because the existing pipeline requires durable attachments and background jobs; preview must not borrow academic records and delete them afterward.
-
-Teachers can [reopen the last submission](../../../docs/SUBMISSION_CONTINUATION.md) so its saved answers can be continued using the original start and current effective settings.
-
-Learner responses use an explicit public projection; see [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
-
-## Read By Topic
-
-- [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
-
-- [Approved next submission workflow and remaining details](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md)
-- [Current capabilities and phase summary](docs/REFERENCE.md#current-state)
-- [Authoring, snapshots, extraction, and persistence](docs/REFERENCE.md#implementation-direction)
-- [Durable data and processing decisions](docs/DECISIONS.md)
-- [Full phased design and open decisions](../../../docs/CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md)
-
-Load only the topic relevant to the change.
+- [Approved choices and delivery scope](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md)
+- [Current routes, persistence and boundaries](docs/REFERENCE.md)
+- [Durable decisions and historical pipeline](docs/DECISIONS.md)
+- [Implementation checkpoints and validation](../../../docs/CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md)
+- [Material embedding services](../../../docs/MATERIAL_EMBEDDING_SERVICES.md)
+- [Queue concurrency and recovery](../../../docs/BACKGROUND_JOBS.md)
+- [Assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md), [content closure](../../../docs/ACTIVITY_CONTENT_ACCESS.md), [submission continuation](../../../docs/SUBMISSION_CONTINUATION.md), and [answer exports](../../../docs/ANSWER_EXPORTS.md)
 
 ## Boundaries
 
-- Assignment files and submissions are plugin-owned attachments.
-- Prior course resources are extracted and searched through core/content-type dispatchers; this plugin does not own content-type extraction or a private course-content vector store.
-- Student payloads never expose model prompts, nearest examples, reference provenance, credentials, or raw output.
-- Bank and course authoring rows are independent and synchronized through explicit hooks.
+Private solutions, model prompts, retrieved reference excerpts, credentials, filesystem paths and processing diagnostics stay server-side. Learners receive explicit public projections. Requirements use bounded static C normalization without compilation or execution; typedef spellings remain significant. Generated Prisma clients are ignored local artifacts; track schemas/migrations and regenerate through the normal database commands.
 
-When behavior changes, update this overview, `PROJECT_MEMORY.md` only if an invariant changed, and the relevant detailed section or implementation plan.
+Course/bank copies retain independent authoring and private solutions but clear submission enablement and prepared reference selection. Student view remains inspection-only. Teacher review/grading respects course and section staff capabilities; authoring and submission opening require course management. The activity does not advertise a released student-solution capability.
 
-Displayed submission and review timestamps use the shared [effective course timezone (application default unless overridden)](../../../docs/APPLICATION_TIME.md).
-
-The shared [activity content closure setting](../../../docs/ACTIVITY_CONTENT_ACCESS.md) can restrict student access after effective attempts or closing dates end. The host then shows only receipts and released grade totals; staff records remain available.
-
-Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.
-
-Teachers can [export submitted answers as PDF or ZIP](../../../docs/ANSWER_EXPORTS.md), including selectable prompts and grading content. See [export details](docs/REFERENCE.md#answer-exports).
-
-Prompt and feedback rendering follows the [shared Markdown security contract](../../../docs/plugin-authoring/03-core-services.md#what-markdownrenderer-gives-you); raw attributed HTML is shown literally.
-
-Dialogs follow the shared [persistent header and icon-only close pattern](../../../docs/DIALOGS.md), preserving cancellation guards and blocking progress.
+Local acceptance tests use a controlled AI endpoint with real APIs, persistence, queues and browser UI. Native SEB launch is simulated at its boundary; real activation/proof/configuration scoping is tested. See the progress record for actual checks and outstanding work.

@@ -34,15 +34,17 @@ export async function createCourseEmbeddingProvider(user: CurrentUser, courseId:
   const owner = connection.ownerId ? await prisma.user.findUnique({ where: { id: connection.ownerId }, select: { isActive: true, roles: { include: { role: true } } } }) : null;
   const allowPrivate = connection.ownerId === null || Boolean(owner?.isActive && owner.roles.some(entry => entry.role.key === "admin"));
   return { connectionId: connection.id, modelKey, dimensions: MATERIAL_EMBEDDING_DIMENSIONS,
-    async embedTexts(texts: string[]) {
+    async embedTexts(texts: string[], signal?: AbortSignal) {
+      signal?.throwIfAborted();
       const ids = texts.map(text => contentIndexRevision({ modelKey, text }));
       const cached = await prisma.contentMaterialVector.findMany({ where: { id: { in: [...new Set(ids)] } } });
       const vectors = new Map(cached.map(row => [row.id, decodeVector(row.values)]));
       const missing = [...new Map(texts.map((text, index) => [ids[index], text])).entries()].filter(([id]) => !vectors.has(id));
       for (let start = 0; start < missing.length; start += 32) {
+        signal?.throwIfAborted();
         const batch = missing.slice(start, start + 32);
         if (batch.some(([, text]) => !text.trim() || Buffer.byteLength(text) > 8000)) throw new AppError(400, "EMBEDDING_TEXT_LIMIT", "An embedding input is empty or exceeds its bounded text size.");
-        const response = await fetchAiResponse(`${baseUrl}/embeddings`, { headers: { "Authorization": `Bearer ${decryptCredential(connection.apiKey)}`, "Content-Type": "application/json" },
+        const response = await fetchAiResponse(`${baseUrl}/embeddings`, { signal, headers: { "Authorization": `Bearer ${decryptCredential(connection.apiKey)}`, "Content-Type": "application/json" },
           body: JSON.stringify({ model: MATERIAL_EMBEDDING_MODEL, dimensions: MATERIAL_EMBEDDING_DIMENSIONS, encoding_format: "float", input: batch.map(([, text]) => text) }) }, allowPrivate);
         if (!response.ok) throw new AppError(response.status === 429 ? 429 : 502, "EMBEDDING_REQUEST_FAILED", `Material embedding generation failed (HTTP ${response.status}). Try again after checking the OpenAI connection.`);
         const payload = await response.json() as { data?: Array<{ index: number; embedding: number[] }> };
@@ -113,7 +115,7 @@ export async function prepareMaterialIndex(user: CurrentUser, courseId: string, 
       const documents = chunkMaterialDocuments(extracted.documents);
       if (!documents.length) throw new AppError(422, "MATERIAL_TEXT_MISSING", "No readable teaching content was found in this material.");
       const contentFingerprint = contentIndexRevision(documents);
-      const vectors = await provider.embedTexts(documents.map(document => document.text));
+      const vectors = await provider.embedTexts(documents.map(document => document.text), options.signal);
       if (options.signal?.aborted) throw new AppError(409, "ACTION_CANCELLED", "Material preparation was cancelled.");
       const latest = toResource(await getContentResourceForPluginRoute(user, courseId, resourceId));
       const sourceRevision = service.policy(resource).revision;

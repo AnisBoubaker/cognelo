@@ -1,5 +1,8 @@
 "use client";
 
+import { HomeworkStudentWorkspace } from "./homework-student-workspace";
+import { HomeworkSolutionSelector, HomeworkTeacherWorkflow } from "./homework-teacher-workflow";
+import type { HomeworkRequest } from "./workflow-types";
 import { ActionIcon, isActivityContentClosedError } from "@cognelo/activity-ui";
 
 import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
@@ -83,6 +86,8 @@ type CodingHomeworkGraderActivityViewProps = {
   activity: RenderableActivity;
   activityFileUrl?: (attachmentId: string) => string;
   authoringClient?: AuthoringClient;
+  workflowRequest?: HomeworkRequest;
+  solutionRequest?: HomeworkRequest;
   canManage: boolean;
   course?: { id: string; title?: string } | null;
   locale?: CodingHomeworkLocale;
@@ -103,6 +108,7 @@ type RequirementDraft = {
   requiredFilesText: string;
   requiredFoldersText: string;
   requiredFunctionsText: string;
+  signatureRequirements: CodingHomeworkAuthoringSubmissionRequirements["requiredFunctions"];
 };
 
 const defaultRequirements: CodingHomeworkAuthoringSubmissionRequirements = {
@@ -148,10 +154,16 @@ function defaultAuthoring(activity: RenderableActivity): CodingHomeworkAuthoring
   };
 }
 
-export function CodingHomeworkGraderActivityView({
+export function CodingHomeworkGraderActivityView(props: CodingHomeworkGraderActivityViewProps) {
+  if (!props.canManage && props.workflowRequest) return <HomeworkStudentWorkspace request={props.workflowRequest} title={props.activity.title} locale={props.locale ?? "en"} activityFileUrl={props.activityFileUrl} onAssessmentAccessRequested={props.onAssessmentAccessRequested} onAssessmentStarted={props.onAssessmentStarted} onSubmitted={props.onSubmitted} timedAutoSubmit={props.timedAutoSubmit} />;
+  return <LegacyCodingHomeworkActivityView {...props} />;
+}
+function LegacyCodingHomeworkActivityView({
   activity,
   activityFileUrl,
   authoringClient,
+  workflowRequest,
+  solutionRequest,
   canManage,
   locale = "en",
   onSave,
@@ -918,6 +930,7 @@ export function CodingHomeworkGraderActivityView({
             />
           </div>
 
+          {(solutionRequest ?? workflowRequest) && <HomeworkSolutionSelector request={(solutionRequest ?? workflowRequest)!} locale={locale} requirements={draftToRequirements(requirementDraft, assignment.languageKey)} onChange={requirements => setRequirementDraft(requirementsToDraft(requirements))} />}
           <div className="section-subheading">
             <h3>{copy.requirements}</h3>
             <label className="button secondary">
@@ -990,7 +1003,7 @@ export function CodingHomeworkGraderActivityView({
         </div>
       </section>
 
-      {authoringClient?.getDocumentationPreview ? (
+      {authoringClient?.getDocumentationPreview && !workflowRequest ? (
         <section className="stack">
           <div className="section-subheading">
             <div>
@@ -1069,6 +1082,7 @@ export function CodingHomeworkGraderActivityView({
         saveDisabled={!authoringClient || !onSave}
       />
       </form>
+      {workflowRequest && <HomeworkTeacherWorkflow request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} />}
       <ProgressDialog
         open={teacherLongRunningTitle !== null}
         title={teacherLongRunningTitle ?? copy.save}
@@ -1409,6 +1423,7 @@ function uploadIdempotencyKey(activityId: string, file: File) {
 
 function requirementsToDraft(requirements: CodingHomeworkAuthoringSubmissionRequirements): RequirementDraft {
   return {
+    signatureRequirements: requirements.requiredFunctions,
     allowedExtensionsText: requirements.allowedExtensions.join(", "),
     ignoredPathsText: requirements.ignoredPaths.join("\n"),
     maxArchiveMb: Math.max(1, Math.round(requirements.maxArchiveBytes / (1024 * 1024))),
@@ -1430,16 +1445,10 @@ function draftToRequirements(draft: RequirementDraft, languageKey: string): Codi
     requiredFolders: splitLineList(draft.requiredFoldersText).map((path) => ({ path })),
     requiredFunctions: splitLineList(draft.requiredFunctionsText).map((line) => {
       const separatorIndex = line.lastIndexOf(":");
-      return separatorIndex > 0
-        ? {
-            filePath: line.slice(0, separatorIndex).trim(),
-            name: line.slice(separatorIndex + 1).trim(),
-            required: true
-          }
-        : {
-            name: line,
-            required: true
-          };
+      const filePath = separatorIndex > 0 ? line.slice(0, separatorIndex).trim() : undefined;
+      const name = separatorIndex > 0 ? line.slice(separatorIndex + 1).trim() : line;
+      const signature = draft.signatureRequirements.find(fn => fn.name === name && fn.filePath === filePath);
+      return { ...signature, filePath, name, required: true };
     })
   };
 }

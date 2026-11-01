@@ -1,5 +1,8 @@
+import { homeworkDeadlineHandler, processHomeworkDeadline } from "./deadline";
+import { processPreparedHomework } from "./prepared-processing";
 import {
   NonRetryableBackgroundJobError,
+  registerBackgroundJobQueueLimit,
   enqueueBackgroundJob,
   isBackgroundJobHandlerRegistered,
   registerBackgroundJobHandler,
@@ -29,6 +32,8 @@ type CodingHomeworkSubmissionProcessingPayload = CodingHomeworkProcessingScope &
 let unregisterCodingHomeworkProcessingHandler: (() => void) | null = null;
 
 export function registerCodingHomeworkBackgroundJobs() {
+  registerBackgroundJobQueueLimit(codingHomeworkProcessingQueue, 4);
+  if (!isBackgroundJobHandlerRegistered(homeworkDeadlineHandler)) registerBackgroundJobHandler(homeworkDeadlineHandler, ({ job }) => processHomeworkDeadline(job));
   if (unregisterCodingHomeworkProcessingHandler) {
     return unregisterCodingHomeworkProcessingHandler;
   }
@@ -79,6 +84,7 @@ export function startCodingHomeworkProcessingWorker() {
     return;
   }
   startBackgroundJobWorker({
+    concurrency: 4,
     idleTimeoutMs: 60_000,
     queue: codingHomeworkProcessingQueue,
     workerId: "coding-homework-grader-api-worker"
@@ -86,6 +92,7 @@ export function startCodingHomeworkProcessingWorker() {
 }
 
 async function processCodingHomeworkSubmissionJob(job: BackgroundJobRecord) {
+  if (job.payload.workflowVersion === 2) return processPreparedHomework(job);
   const payload = normalizeProcessingPayload(job.payload);
   const analysis = await analyzeCodingHomeworkSubmission(payload, { submissionId: payload.submissionId });
   const generation =

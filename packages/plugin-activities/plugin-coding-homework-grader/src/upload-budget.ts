@@ -9,8 +9,8 @@ export type UploadTransaction = {
 
 export async function limitHomeworkUploads(activityId: string, userId: string) {
   await consumeRateLimits([
-    { scope: "homework-upload-user", subject: userId, limit: 20, windowMs: 60_000 },
-    { scope: "homework-upload-activity", subject: activityId, limit: 100, windowMs: 60_000 }
+    { scope: "homework-upload-user", subject: userId, limit: 120, windowMs: 60_000 },
+    { scope: "homework-upload-activity", subject: activityId, limit: 600, windowMs: 60_000 }
   ]);
 }
 
@@ -37,7 +37,9 @@ export async function lockHomeworkUploadBudget(tx: UploadTransaction, activityId
   if (space.bavail * space.bsize < BigInt(incomingBytes) + 1024n * 1024n * 1024n) throw new AppError(507, "UPLOAD_STORAGE_UNAVAILABLE", "Upload storage is low. Contact your course staff.");
   const [usage] = await tx.$queryRaw<Array<{ bytes: bigint }>>`
     SELECT (
-      COALESCE((SELECT SUM(a."sizeBytes") FROM "PluginCodingHomeworkAttachment" a
+      COALESCE((SELECT SUM((file->>'sizeBytes')::bigint) FROM "PluginCodingHomeworkDraft" d, jsonb_array_elements(d.files) file
+        WHERE d."activityId"=${activityId} AND d."userId"=${userId}), 0)
+      + COALESCE((SELECT SUM(a."sizeBytes") FROM "PluginCodingHomeworkAttachment" a
         JOIN "PluginCodingHomeworkSubmission" s ON a."ownerId" = s.id AND a."ownerKind" = 'submission'
         WHERE s."activityId" = ${activityId} AND s."userId" = ${userId}), 0)
       + COALESCE((SELECT SUM(f."sizeBytes") FROM "PluginCodingHomeworkSubmissionFile" f

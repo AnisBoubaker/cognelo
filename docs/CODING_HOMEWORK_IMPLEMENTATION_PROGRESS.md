@@ -23,14 +23,14 @@ The user explicitly authorized reasonable remaining assumptions and requested th
 ## Checklist
 
 - [x] Record authorization, clarifications and recovery checklist.
-- [ ] Static C signature validation and private teacher-solution/function selection (signature core committed; private solution API implemented).
-- [ ] Persistent upload collection, ZIP replacement, validation acknowledgements and frozen hand-in.
-- [ ] Core-dispatched material-plugin indexing services, OpenAI embeddings, immutable reusable indexes and freshness.
-- [ ] Source selection/readiness/manual enablement; public GitHub, PDF, text and linked slides extraction.
-- [ ] Durable bounded FIFO processing, restart/retry/cancellation protection and correct question counts.
-- [ ] Deferred SEB/timed answering through shared contracts; deadline finalization and teacher cancellation.
-- [ ] Complete teacher/student UI and localized states; read-only submitted files and accessible course materials.
-- [ ] Unit, type, architecture and local Playwright integration checks, including bounded concurrent processing.
+- [x] Static C signature validation and private teacher-solution/function selection.
+- [x] Persistent upload collection, ZIP replacement, validation acknowledgements and frozen hand-in.
+- [x] Core-dispatched material-plugin indexing services, OpenAI embeddings, immutable reusable indexes and freshness.
+- [x] Source selection/readiness/manual enablement; public GitHub, PDF, text and linked slides extraction.
+- [x] Durable bounded FIFO processing, restart/retry/cancellation protection and correct question counts.
+- [x] Deferred SEB/timed answering through shared contracts; deadline finalization and teacher cancellation.
+- [x] Complete teacher/student UI and localized states; read-only submitted files and accessible course materials.
+- [x] Unit, type, architecture and local Playwright integration checks, including bounded concurrent processing.
 - [ ] Documentation review, operator notes and final runnable local handoff.
 
 ## Assumptions to report
@@ -71,3 +71,12 @@ The user explicitly authorized reasonable remaining assumptions and requested th
 - Full workflow Playwright passed: reusable indexes/model independence, immutable files, configured five questions from one function, explicit answering, timeout blanks, activity-details cancellation and fresh resubmission.
 - SEB and 30-student Playwright passed: verified return/no repeated launch, provider-failure retry, concurrency 2/4 with server cap, FIFO starts, stale lease recovery, cancelled running/queued jobs publish no questions.
 - Live extraction verification succeeded for the supplied public slide deck and a small public C repository; no AI calls or persisted material indexes were made by those read-only checks.
+
+## Final acceptance checkpoint
+
+- `35b126e`: stopped tracking the generated Prisma client/native binary; existing ignore rule retains local generated artifacts.
+- `142f57c`: durable queue concurrency, independent worker slots, lease recovery and cancellation ownership committed.
+- Full workspace typecheck passed. Full unit/architecture run: 316 files, 1769 tests passed.
+- Combined local Playwright run: 5 tests passed across preparation, material reuse/PDF/GitHub freshness, SEB, 30-student queue and complete workflow. It also covers offline deadline-job finalization, blanks, released-grade withdrawal, unchanged release state and replacement after release.
+- Incomplete-hand-in/teacher selector UI acceptance also passed, including AI-assisted selection, private signatures after reload, required acknowledgement, fallback questions without functions and mobile read-only viewing. Remaining: final build/review, commit and local service handoff. Caffeinate remains active until completion.
+- No real AI calls were used by acceptance: local controlled OpenAI endpoints verify requests, persistence and job behavior. Public slide/repository extraction checks were read-only. Native SEB startup still needs the user's native-client acceptance.

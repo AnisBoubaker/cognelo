@@ -296,3 +296,9 @@ Use the host-provided bounded `readJson`, and `readBoundedFormData` for multipar
 ### Deferred assessment preparation
 
 An activity definition may opt into `assessmentFlow: "deferred"` and mark individual trusted routes with `learnerAccessPhase: "preparation"` or `"assessment_start"`. Preparation retains assignment/availability/content authorization while bypassing SEB and an unstarted answer timer. Assessment start retains SEB verification and must establish its own core attempt; the generic host start rejects deferred activities. Unmarked routes remain protected. The renderer requests host SEB access through `onAssessmentAccessRequested` and refreshes timing after successful start through `onAssessmentStarted`. Do not mark answer, grading, or unrestricted mutation routes as preparation.
+
+### Deferred submission management and finalization
+
+An activity may advertise `submissionManagement.rendererKey` for its operational panel in the shared activity details report. The host resolves this through its renderer registry; the plugin owns pending submission data and staff actions. This includes preparation/generation workflows that have no core attempt yet.
+
+`ServerActivityPlugin.timedFinalization` lets the owning plugin finalize server-saved work after core verifies expiry. Return true after handling it; false uses core's generic fallback for legacy/incomplete states. Recheck effective deadlines, ignore new answer content at expiry, and serialize with saves/cancellation. Internal `deleteActivitySubmission` replacement options are server-only: they may cancel a started attempt, withdraw its associated grade and grant one replacement after release without altering class-wide release.

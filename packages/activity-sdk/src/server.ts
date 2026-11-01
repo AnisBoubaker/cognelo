@@ -356,6 +356,10 @@ export type ServerActivityPlugin = {
   };
   /** Restores learner-owned state inside the host's atomic reopening transaction.
    * SQL remains owned by the plugin; the SDK has no dependency on a Prisma client. */
+  timedFinalization?: {
+    activityTypeKeys: readonly string[];
+    finalize: (input: { user: CurrentUser; courseId: string; groupId: string; activityId: string; coreAttemptId: string }) => Promise<boolean>;
+  };
   attemptContinuation?: {
     activityTypeKeys: readonly string[];
     reopen: (input: {
@@ -787,4 +791,8 @@ export async function runActivityAttemptDeletedHooksForPlugins(
 
 export function getSubmissionExportHandler(activityTypeKey: string): SubmissionExportHandler | null {
   return currentServerPlugins().find((plugin) => plugin.submissionExport?.activityTypeKeys.includes(activityTypeKey))?.submissionExport?.getContent ?? null;
+}
+
+export function resolveActivityTimedFinalization(activityTypeKey: string) {
+  return listServerActivityPlugins().find(plugin => plugin.timedFinalization?.activityTypeKeys.includes(activityTypeKey))?.timedFinalization?.finalize ?? null;
 }

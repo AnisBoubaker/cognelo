@@ -1,62 +1,49 @@
-# Coding Homework Grader Detailed Reference
+# Coding Homework Grader detailed reference
 
-This reference describes the existing implementation baseline. The [approved next submission workflow](../../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) records the November 1, 2026 product choices and supersedes conflicting future-facing assumptions. Its implementation is pending; do not treat the current ZIP-only, whole-workflow timer, or strict-complete-function behavior as the next-delivery requirements.
+The [approved workflow](../../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) records product choices; the [progress record](../../../../docs/CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md) records local validation and commits. Version-2 preparation is the current student workflow. Legacy ZIP/analysis helpers remain for historical records and tests, but the old final-ZIP POST rejects new submissions.
 
-This document is the detailed reference for the Coding Homework Grader plugin.
+## Current state
 
-The package currently defines the activity shell, localized metadata, initial algorithm contracts, teacher authoring surface, prior-documentation snapshot/extraction behavior, first C parser adapter, ZIP preflight/final-submission validation, submitted-function candidate analysis, challenge question generation, student challenge answer collection, plugin-owned persistence schema, and config schema for a coding homework grading workflow.
+Teachers author the assignment, private C solution, selected function signatures and required paths. Students manage a persisted revisioned file collection, validate and acknowledge academic gaps, and explicitly hand it in after teacher enablement. No browser code editing, execution tests or automatic correctness grading are introduced.
 
-## Purpose
+The manual submission switch is backed by a prepared reference snapshot. Course-visible materials preceding the homework are selected by default; recursive folder toggles select their current descendants. Selection changes clear readiness, and material-source/freshness checks run before enablement. Empty selection can be explicitly prepared. See [material services](../../../../docs/MATERIAL_EMBEDDING_SERVICES.md) for extraction, compatibility and resource limits.
 
-`@cognelo/plugin-coding-homework-grader` is the planned home for programming-assignment submission and grading behavior.
+Hand-in freezes files and enqueues work atomically. FIFO dispatch has teacher parallelism 1–4 (default 2) and a server-wide homework ceiling of 4. The configured question count is 1–20 (default 3); candidates cycle when fewer functions exist, with distinct questions required. When no function can be parsed, questions use submitted source/assignment context. Jobs retry up to three times; cancelled/stale workers cannot publish. Students see persistent status, without a generation Cancel action.
 
-Current scope:
+The explicit Answer action creates the core attempt only after required SEB verification. Existing attempts preserve their start. Saves/finalization resolve current section/team/student policy. Timeout uses saved answers including blanks. The shared timed-finalization hook and a durable deadline job handle page departure; jobs recheck changed deadlines before finalizing. Normal course materials remain accessible, and submitted files have a read-only viewer. Activity availability and optional content-closure policy still apply.
 
-- plugin definition
-- localized labels
-- initial config schema
-- plugin-owned Prisma schema, generated client, and activation migration manifest
-- teacher authoring routes and React renderer
-- secure inline viewing of the plugin-owned assignment PDF and upload/download management for files provided with the assignment
-- prior-documentation preview and snapshot routes for course activities
-- prior-documentation extraction route that consumes generic content type plugin extracted documents
-- language-neutral parser registry with a C adapter
-- ZIP archive reader and structure validation service
-- temporary preflight upload route and UI for students and teacher sample checks
-- final student ZIP submission route and UI for assigned group activities
-- submitted-function parsing, deterministic dev embeddings, nearest-example retrieval, divergence scoring, and candidate selection
-- teacher-triggered challenge question generation and retry storage for analyzed submissions
-- automatic student-path challenge generation plus draft/final challenge answer routes and UI
-- bank-to-course copy hook for authored prompt/settings/requirements
-- assignment text, assignment PDF text, and provided source/text files included with prior course material during challenge-reference extraction and similarity analysis
+Teacher cancellation is available in the activity details report and editor, including submissions with no core attempt yet. It atomically preserves the old record, withdraws its associated selected/override grade, records the reason, cancels work and grants a replacement attempt where applicable. It does not change whole-class grade release. New work receives new questions; no student cancellation exists.
 
-## Activity Type
+## Routes and persistence
 
-- `coding-homework-grader`
+All routes are under `coding-homework-grader/` and retain the host's course/group/bank authorization.
 
-Current config shape:
+| Route | Purpose |
+| --- | --- |
+| `preparation` GET/POST/DELETE | Metadata/validation, file/ZIP/folder upload and file removal with revision checks. |
+| `prepared-file` GET | Read-only preview of a prepared file. |
+| `teacher-solution` GET/PUT; `select-functions` POST | Private solution upload and known-function AI selection. |
+| `workflow-settings` GET/PUT | Reference tree, readiness, bounded concurrency and manual opening. |
+| `prepare-material` POST; `prepare-references` POST | Core-dispatched plugin indexing and immutable snapshot completion. |
+| `workspace` GET; `hand-in` POST | Safe persistent state and atomic freezing/enqueueing. |
+| `answering` GET/POST | SEB-guarded question retrieval/explicit attempt start. |
+| `submitted-file` GET | Read-only frozen source. |
+| `challenge-answers` PUT/POST | Serialized autosave and final submission, including server-saved expiry. |
+| `manage-submissions` GET/DELETE | Scoped staff list/cancellation, including queued work. |
 
-- `gradingMode`
-- `maxAttempts`
-- optional `repositoryTemplateUrl`
+`PluginCodingHomeworkDraft` owns revisions/file hashes/folders. `PluginCodingHomeworkTeacherSolution` owns private files/parsed signatures. Existing submission/file/question tables hold frozen work and derived output; status adds `cancelled`. Assignment settings hold protected workflow keys and the prepared snapshot ID; ordinary authoring saves cannot overwrite these keys. Snapshots retain immutable core material-index IDs. `workflowVersion: 2` distinguishes new records from legacy analysis artifacts.
 
-## Current State
+Generated clients are local artifacts. Apply the additive manifest migration `202611010010_homework_preparation` and core material-index migration using `npm run db:migrate:all`. Material PDF extraction needs Poppler; no new environment variable is required. The API's ordinary background worker must remain enabled. Storage uses the existing private homework filesystem root and SHA-256 integrity checks.
 
-Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; unsubmitted attempt deadlines resolve the latest effective limit from the original start, and the host refreshes policy every 20 seconds. Submitted timing stays fixed.
+## Shared contracts
 
-Student view is inspection-only. A future interactive preview requires a separately named expiring workspace for ZIPs and derived analysis, with no core-attempt or grade linkage and guaranteed cleanup; ordinary student preflight/submission rows are not a preview transport.
-
-The plugin now has the complete manual-grading workflow: teacher authoring, prior-documentation snapshot/extraction, plugin-owned assignment/provided files, the first C parser adapter, ZIP preflight validation, final ZIP submission storage, submitted-function candidate analysis, challenge question generation, student challenge answers, core attempts, and teacher gradebook review. It is registered as `coding-homework-grader`, uses the package `@cognelo/plugin-coding-homework-grader`, and owns its authoring, attachment, snapshot, submission, challenge-question, and review records.
-
-Course activity assignment settings may time the standalone workflow. Core creates the ordinary attempt at the explicit start and resolves its limit live until submission instead of waiting for challenge-answer finalization. Draft answer writes stop after expiry. When the countdown reaches zero, `TimedActivityAutoSubmit` uses the existing final challenge-answer route if a complete ready question set exists; that route reuses the timed core attempt. If upload processing or question generation is still incomplete, or required answers are missing, the renderer reports that it cannot finalize and core closes the attempt as timed out and ungraded without fabricating plugin grading evidence.
-
-The teacher authoring form is registered with `useUnsavedChangesGuard` from `@cognelo/activity-ui` so navigation uses the platform-wide unsaved-change dialog. Teacher uploads, documentation preview/snapshot/extraction, preflight, and save operations display the shared blocking, indeterminate progress dialog.
+Core resolves assignment exceptions, current answering deadlines, attempt limits, grades and content closure. Student view stays inspection-only. Private solutions are not the shared released-student-solution feature. UI labels cover English, French, Chinese and Arabic; timestamps use the effective course timezone. Teacher assignment edits use the guarded action bar; independently persisted uploads/reference actions do not pretend to be part of its draft.
 
 ## Seed Fixture
 
 The root Prisma seed creates `Coding homework grader: INF-155 TP1 Labyrinthe` as a complete dev fixture in Programming 101 / Section A. It reads `tmp/INF155-A2023-TP1.pdf` with `pdftotext`, attaches a copied PDF to the activity when the local file exists, uses `tmp/FichiersFournis` to build starter-file documentation, and stores bank/course plugin authoring rows, required ZIP structure/functions, a ready group documentation snapshot, a summative group assignment, and a gradebook item. Challenge question generation uses a course teacher/owner's configured non-local question-authoring AI connection; the seed does not point teacher question authoring at the local Ollama fallback.
 
-## Implementation Direction
+## Legacy pipeline implementation (historical records)
 
 The phased implementation plan lives in:
 
@@ -168,9 +155,9 @@ The definition’s `studentConfig` returns only grading mode, attempt-display se
 
 ## Upload and finalization boundaries
 
-Preflight remains non-academic, with temporary artifacts expiring after 24 hours and cleaned on the learner's next upload. Final ZIP acceptance reserves the core attempt and persists private submission/file records in one database transaction. A transaction-scoped lock prevents concurrent retry keys from creating parallel unfinished workflows; repeated identical keys replay the existing result. Failures roll back records and clean staged files. Reprocessing uses the existing unfinished submission; completed work cannot be reanalyzed.
+Preflight remains non-academic and expires after 24 hours. Current preparation creates no core attempt. Final hand-in revalidates the actual draft, copies immutable files and queues generation in one transaction. A workflow lock and draft revision make repeated hand-ins idempotent and prohibit parallel unfinished work. Failed transactions remove staged files. Legacy analysis/reprocess routes reject current version-2 records.
 
-Answer saves/finalization lock the submission and its core attempt. Finalization updates every answer and submits the reserved core attempt atomically. Identical finalization retries return the retained result, while changes after completion or timeout are rejected. Legacy unfinished records without a core attempt reserve it during finalization. The deadline dispatcher replaces expired finalization input with saved answers and blocks new uploads.
+Answer saves/finalization lock the submission and its core attempt. Finalization updates every answer and submits the explicitly started core attempt atomically. Identical finalization retries return the retained result, while changes after completion or timeout are rejected. Legacy unfinished records without a core attempt reserve it during finalization. The deadline dispatcher replaces expired finalization input with saved answers and blocks new uploads.
 
 C source analysis also caps aggregate source text, function counts and retained diagnostics. New reference excerpts are bounded while retaining original reference IDs and source hashes; full source remains with its owning records. Analysis/question data and invalid reports count toward the upload admission budget. It scans signatures without backtracking, and uses precomputed line offsets. The ZIP reader validates the complete central directory before decompression, rejects unsafe/absolute/duplicate paths and header mismatches, and bounds each inflate operation even if sizes are dishonest. Hard limits and per-user/activity rates, storage allowances, concurrency limits, and minimum free space are specified in [Security boundaries](../../../../docs/SECURITY_BOUNDARIES.md). Migration `202610250010_bounded_upload_requirements` caps older oversized requirement settings; archive/file limits remain configurable below the hard ceilings.
 
@@ -194,4 +181,4 @@ The preparation API stores a revisioned, plugin-owned file collection without cr
 
 Private teacher solutions accept C/H files or ZIPs, retain parsed function signatures, and support an AI selector constrained to known candidate keys. Only authorized authoring owners can access them. Duplication copies independent solution records and clears operational submission/reference readiness settings.
 
-The shared deferred-assessment contract lets this activity declare preparation routes outside the SEB/timer start gate. Assessment routes remain guarded; only an explicit verified answering action may start the clock. The complete student workspace and hand-in endpoints are tracked in the implementation progress document.
+The shared deferred-assessment contract lets this activity declare preparation routes outside the SEB/timer start gate. Assessment routes remain guarded; only an explicit verified answering action may start the clock. The current student workspace uses these routes; acceptance evidence is tracked in the implementation progress document.

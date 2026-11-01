@@ -177,7 +177,7 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
         participantId: context.participant.id
       },
       orderBy: { attemptNumber: "desc" },
-      select: { attemptNumber: true }
+      select: { attemptNumber: true, id: true, lifecycle: true, metadata: true }
     });
 
     const attemptNumber = (latestAttempt?.attemptNumber ?? 0) + 1;
@@ -201,6 +201,7 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
         assessmentMode,
         metadata: {
           ...(asJsonObject(input.metadata) ?? {}),
+          ...(latestAttempt?.lifecycle === "deleted" && asJsonObject(latestAttempt.metadata)?.replacementAllowed ? { replacementOfAttemptId: latestAttempt.id } : {}),
           knowledgeSkillSnapshot: (context.groupActivity.activity.knowledgeConcepts ?? []).flatMap((link) => {
             const selectedIds = new Set(stringArray(link.selectedSkillIds));
             const selectedTitles = new Set(stringArray(link.selectedSkills));
@@ -279,6 +280,7 @@ async function findResumableAttempt(groupActivityId: string, participantId: stri
     || activityAttemptTimeLimitMinutes(attempt.metadata) !== null
     || asJsonObject(attempt.metadata)?.continuation
     || asJsonObject(attempt.metadata)?.uploadReserved === true
+    || typeof asJsonObject(attempt.metadata)?.assessmentStartedAt === "string"
   )) ?? null;
 }
 
@@ -352,7 +354,7 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
   const exceptions = await loadAssignmentExceptions([attempt.groupActivityId], db);
   const effectiveAssignment = applyAssignmentExceptions(attempt.groupActivity, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
 
-  if (attempt.assessmentMode !== "formative" && attempt.gradebookItem.gradesReleased && !asJsonObject(attempt.metadata)?.continuation) {
+  if (attempt.assessmentMode !== "formative" && attempt.gradebookItem.gradesReleased && !asJsonObject(attempt.metadata)?.continuation && !asJsonObject(attempt.metadata)?.replacementOfAttemptId) {
     throw new AppError(400, "GRADES_RELEASED", "No more submissions are allowed after grades have been released.");
   }
 
@@ -658,7 +660,7 @@ export async function reopenActivitySubmission(user: CurrentUser, courseId: stri
   }
 }
 
-export async function deleteActivitySubmission(user: CurrentUser, courseId: string, input: DeleteActivitySubmissionInput) {
+export async function deleteActivitySubmission(user: CurrentUser, courseId: string, input: DeleteActivitySubmissionInput, internal: { allowStartedReplacement?: boolean; transaction?: Prisma.TransactionClient } = {}) {
   await assertCanViewCourseGradebook(user, courseId);
   const reason = input.reason.trim();
   if (!reason) {
@@ -681,14 +683,15 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
   if (attempt.lifecycle === "deleted") {
     throw new AppError(400, "SUBMISSION_ALREADY_DELETED", "This submission has already been deleted.");
   }
-  if (attempt.lifecycle !== "submitted" && attempt.lifecycle !== "graded") {
+  if (attempt.lifecycle !== "submitted" && attempt.lifecycle !== "graded" && !(internal.allowStartedReplacement && attempt.lifecycle === "started")) {
     throw new AppError(409, "SUBMISSION_NOT_SUBMITTED", "Only a submitted attempt can be deleted. Refresh the results and try again.");
   }
 
   const exceptions = await loadAssignmentExceptions([attempt.groupActivityId]);
   const effectiveItem = applyGradebookExceptions(attempt.gradebookItem, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
 
-  return prisma.$transaction(async (tx) => {
+  const apply = async (tx: Prisma.TransactionClient) => {
+    await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${JSON.stringify([attempt.gradebookItemId, attempt.participantId])}, 0))`;
     const previousGrade = await tx.grade.findUnique({
       where: {
         gradebookItemId_participantId: {
@@ -723,6 +726,7 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
         lifecycle: "deleted",
         metadata: {
           ...(asJsonObject(attempt.metadata) ?? {}),
+          ...(internal.allowStartedReplacement ? { replacementAllowed: true } : {}),
           deletion: {
             deletedAt: now.toISOString(),
             deletedByUserId: user.id,
@@ -735,7 +739,7 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
     let grade = previousGrade;
     const shouldReplacePreviousGrade =
       previousGrade &&
-      previousGrade.source !== "override" &&
+      (previousGrade.source !== "override" || internal.allowStartedReplacement) &&
       (previousGrade.selectedAttemptId === attempt.id || previousGrade.selectedAttemptId === null || !remainingCandidates.length);
     if (shouldReplacePreviousGrade) {
       if (selectedGrade) {
@@ -791,7 +795,8 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
     });
 
     return { attempt: deletedAttempt, grade };
-  });
+  };
+  return internal.transaction ? apply(internal.transaction) : prisma.$transaction(apply);
 }
 
 export async function overrideGradebookGrade(user: CurrentUser, courseId: string, input: OverrideGradebookGradeInput, transaction?: Prisma.TransactionClient) {
@@ -2037,7 +2042,8 @@ async function assertAttemptCanStart(
   const availableUntil = context.groupActivity.availableUntil;
   const item = context.gradebookItem;
 
-  if (assessmentMode !== "formative" && item.gradesReleased) {
+  const latestForReplacement = item.gradesReleased ? await db.activityAttempt.findFirst({ where: { gradebookItemId: item.id, participantId: context.participant.id }, orderBy: { attemptNumber: "desc" } }) : null;
+  if (assessmentMode !== "formative" && item.gradesReleased && !(latestForReplacement?.lifecycle === "deleted" && asJsonObject(latestForReplacement.metadata)?.replacementAllowed)) {
     throw new AppError(400, "GRADES_RELEASED", "No more attempts are allowed after grades have been released.");
   }
 

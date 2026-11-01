@@ -1,3 +1,5 @@
+import { homeworkWorkflowRoutes } from "./workflow-routes";
+import { finalizeHomeworkSavedAnswers } from "./deadline";
 import { homeworkPreparationRoute, homeworkPreparedFileRoute, homeworkTeacherSolutionRoute, homeworkSelectFunctionsRoute } from "./preparation-routes";
 import { exportHomeworkSubmission } from "./submission-export";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
@@ -39,6 +41,7 @@ registerCodingHomeworkBackgroundJobs();
 export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
   submissionExport: { activityTypeKeys: ["coding-homework-grader"], getContent: exportHomeworkSubmission },
   key: "coding-homework-grader",
+  timedFinalization: { activityTypeKeys: ["coding-homework-grader"], finalize: finalizeHomeworkSavedAnswers },
   attemptContinuation: {
     activityTypeKeys: ["coding-homework-grader"],
     reopen: async ({ activityId, userId, pluginAttemptRef, metadata, transaction }) => {
@@ -57,6 +60,7 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
     }
   },
   routes: [
+    ...homeworkWorkflowRoutes,
     homeworkPreparationRoute, homeworkPreparedFileRoute, homeworkTeacherSolutionRoute, homeworkSelectFunctionsRoute,
     codingHomeworkAuthoringRoute,
     codingHomeworkAssignmentPdfRoute,

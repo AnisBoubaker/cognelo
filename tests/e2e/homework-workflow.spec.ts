@@ -1,0 +1,115 @@
+import { createServer } from "node:http";
+import { prisma, Prisma } from "@cognelo/db";
+import { encryptCredential } from "@cognelo/core";
+import { test, expect } from "./fixtures/bank-course";
+import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
+import { createAuthenticatedApi } from "./fixtures/auth";
+import { ensureContentTypePluginEnabled } from "./fixtures/content-plugins";
+
+test("prepared homework: reusable embeddings, frozen files, explicit answering, timeout and teacher cancellation", async ({ bankCourse: data, teacherApi, teacherPage, studentPage }) => {
+  test.setTimeout(180_000);
+  await ensureContentTypePluginEnabled("text-content");
+  let embeddingRequests = 0, questionRequests = 0;
+  const provider = createServer(async (request, response) => {
+    try {
+      let raw = ""; for await (const chunk of request) raw += chunk;
+      const input = JSON.parse(raw); response.writeHead(200, { "Content-Type": "application/json" });
+      if (request.url?.endsWith("/embeddings")) { embeddingRequests++; response.end(JSON.stringify({ data: input.input.map((_: string, index: number) => ({ index, embedding: Array.from({ length: 1536 }, (_, i) => i === 0 ? 1 : 0) })) })); }
+      else { questionRequests++; response.end(JSON.stringify({ output_text: JSON.stringify({ questionText: `Question ${questionRequests}: explain how your submitted function handles the input and its boundary values.` }) })); }
+    } catch { response.writeHead(500); response.end(); }
+  });
+  await new Promise<void>(resolve => provider.listen(0, "127.0.0.1", resolve));
+  const connection = await prisma.aiAgentConnection.create({ data: { displayName: `Homework model fixture ${data.token}`, provider: "openai", model: "homework-model", ownerId: null,
+    baseUrl: `http://127.0.0.1:${(provider.address() as { port: number }).port}/v1`, apiKey: encryptCredential("synthetic-homework-key") } });
+  const teacher = await prisma.user.findUniqueOrThrow({ where: { email: "teacher@cognelo.local" } });
+  const priorMetadata = teacher.metadata;
+  const student = await createAuthenticatedApi("student");
+  let activityId: string | undefined;
+  try {
+    await prisma.user.update({ where: { id: teacher.id }, data: { metadata: { ...priorMetadata as object, aiPreferences: { questionAuthoringAiAgentConnectionId: connection.id } } } });
+    const { resource } = await responseJson<{ resource: { id: string } }>(await teacherApi.post(`/api/courses/${data.courseId}/content-resources`, { data: { contentTypeKey: "text", payload: { title: "C reference", body: "# C functions\nFunctions have typed parameters and return values. Explain pointer and array parameters using boundary cases." }, isVisible: true } }));
+    activityId = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Ready C homework", config: {} });
+    await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/content/activities`, { data: { activityId, parentId: null, titleSnapshot: "Ready C homework", isVisible: true, position: 10, metadata: {} } }));
+    const authoring = `/api/courses/${data.courseId}/activities/${activityId}/coding-homework-grader`;
+    const current = await responseJson<{ assignment: Record<string, unknown> }>(await teacherApi.get(`${authoring}/authoring`));
+    await responseJson(await teacherApi.put(`${authoring}/authoring`, { data: { assignment: { ...current.assignment, promptMarkdown: "Submit a C function called add.", questionCount: 5 }, requirements: { requiredFiles: [{ path: "main.c" }], requiredFunctions: [{ name: "add", returnType: "int", parameterTypes: ["int", "int"] }] } } }));
+    await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/groups/${data.groupId}/activities`, { data: { activityId, availableFrom: null, availableUntil: null, metadata: { assessmentMode: "summative", timeLimitMinutes: 1 }, config: {}, gradebookSettings: { pointsPossible: 100, maxAttempts: 1, attemptLimitMode: "max_attempts", gradeStrategy: "latest" } } }));
+    const assigned = `/api/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}`;
+    const endpoint = `${assigned}/coding-homework-grader`;
+    expect((await teacherApi.put(`${authoring}/workflow-settings`, { data: { enabled: true } })).status()).toBe(409);
+    expect((await student.get(`${endpoint}/workflow-settings`)).status()).toBe(403);
+    await teacherPage.goto(`/courses/${data.courseId}/activities/${activityId}`);
+    await expect(teacherPage.getByRole("heading", { name: "Reference materials", exact: true })).toBeVisible();
+    await teacherPage.getByRole("button", { name: "Generate embeddings", exact: true }).click();
+    await expect(teacherPage.getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
+    expect(embeddingRequests).toBe(1);
+    await teacherPage.getByRole("button", { name: "Generate embeddings", exact: true }).click();
+    await expect(teacherPage.getByRole("dialog", { name: "Preparing reference materials…", exact: true })).toBeHidden();
+    expect(embeddingRequests).toBe(1);
+    await prisma.aiAgentConnection.update({ where: { id: connection.id }, data: { model: "new-question-model" } });
+    expect(await responseJson(await teacherApi.get(`${authoring}/workflow-settings`))).toMatchObject({ statuses: { [resource.id]: { state: "ready" } } });
+    await teacherPage.getByRole("button", { name: "Enable final submissions", exact: true }).click();
+    await expect(teacherPage.getByRole("button", { name: "Disable final submissions", exact: true })).toBeVisible();
+    expect((await teacherApi.put(`${authoring}/workflow-settings`, { data: { selected: [] } })).status()).toBe(409);
+    await studentPage.goto(assigned.replace(/^\/api/, ""));
+    await expect(studentPage.getByRole("heading", { name: "Prepare your work", exact: true })).toBeVisible();
+    const fileInput = studentPage.locator('input[type="file"][multiple]');
+    await fileInput.setInputFiles({ name: "main.c", mimeType: "text/plain", buffer: Buffer.from("int add(int x, int y) { return x + y; }") });
+    await expect(studentPage.getByText("The file requirements are satisfied.", { exact: true })).toBeVisible();
+    await studentPage.reload();
+    await expect(studentPage.getByText("main.c", { exact: true })).toBeVisible();
+    await studentPage.getByRole("button", { name: "Submit my work", exact: true }).click();
+    await studentPage.getByRole("dialog", { name: "Submit my work", exact: true }).getByRole("button", { name: "Submit my work", exact: true }).click();
+    await expect.poll(async () => {
+      const rows = await prisma.$queryRaw<Array<{ status: string; processingError: string | null }>>`SELECT status, "processingError" FROM "PluginCodingHomeworkSubmission" WHERE "activityId"=${activityId} ORDER BY "createdAt" DESC LIMIT 1`;
+      if (rows[0]?.status === "failed") throw new Error(rows[0].processingError ?? "Generation failed.");
+      return rows[0]?.status;
+    }, { timeout: 45_000 }).toBe("challenge_ready");
+    await expect(studentPage.getByRole("button", { name: "Answer challenge questions", exact: true })).toBeVisible();
+    expect(questionRequests).toBe(5); expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(0);
+    const state = await responseJson<{ submission: { id: string } }>(await student.get(`${endpoint}/workspace`));
+    expect((await student.post(`${endpoint}/preparation`, { data: { kind: "file", path: "main.c", base64: "YQ==", expectedRevision: 1, replace: true } })).status()).toBe(409);
+    expect((await student.get(`${endpoint}/answering`)).status()).toBe(409);
+    expect(JSON.stringify(await responseJson(await student.get(`${endpoint}/assignment`)))).not.toContain("boundary values");
+    expect((await student.post(`${endpoint}/hand-in`, { data: { expectedRevision: 1 } })).ok()).toBe(true);
+    await studentPage.getByRole("button", { name: "Answer challenge questions", exact: true }).click();
+    await expect(studentPage.getByRole("heading", { name: "Challenge questions", exact: true })).toBeVisible();
+    const attempt = await prisma.activityAttempt.findFirstOrThrow({ where: { activityId } });
+    const firstAnswer = studentPage.locator('textarea[id^="answer-"]').first();
+    await firstAnswer.fill("The function adds the two integers."); await firstAnswer.blur();
+    await expect(studentPage.getByText("Saved", { exact: true })).toBeVisible();
+    // Leave the page, then advance only disposable timing records to verify the durable deadline worker.
+    await studentPage.goto(`/courses/${data.courseId}/groups/${data.groupId}`);
+    await prisma.activityAttempt.update({ where: { id: attempt.id }, data: { startedAt: new Date(Date.now() - 61_000) } });
+    await prisma.backgroundJob.updateMany({ where: { handlerKey: "coding-homework-grader.answering-deadline", payload: { path: ["coreAttemptId"], equals: attempt.id } }, data: { runAfter: new Date(0) } });
+    await expect.poll(async () => (await prisma.activityAttempt.findUniqueOrThrow({ where: { id: attempt.id } })).lifecycle, { timeout: 20_000 }).toBe("submitted");
+    const [persisted] = await prisma.$queryRaw<Array<{ status: string }>>`SELECT status FROM "PluginCodingHomeworkSubmission" WHERE id=${state.submission.id}`;
+    expect(persisted.status).toBe("ready_for_grading");
+    const answers = await prisma.$queryRaw<Array<{ studentAnswer: string; answerSubmittedAt: Date }>>`SELECT "studentAnswer", "answerSubmittedAt" FROM "PluginCodingHomeworkChallengeQuestion" WHERE "submissionId"=${state.submission.id} ORDER BY "orderIndex"`;
+    expect(answers.map(answer => answer.studentAnswer)).toEqual(["The function adds the two integers.", "", "", "", ""]);
+    expect(answers.every(answer => answer.answerSubmittedAt)).toBe(true);
+    await responseJson(await teacherApi.patch(`/api/courses/${data.courseId}/gradebook/items/${attempt.gradebookItemId}/participants/${attempt.participantId}/override`, { data: { score: 80, maxScore: 100, reason: "Reviewed homework", expectedGradeUpdatedAt: null } }));
+    await responseJson(await teacherApi.patch(`/api/courses/${data.courseId}/gradebook/items/${attempt.gradebookItemId}/release`, { data: { released: true } }));
+    expect(await prisma.grade.count({ where: { gradebookItemId: attempt.gradebookItemId, participantId: attempt.participantId } })).toBe(1);
+    await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}?report=overview`);
+    await teacherPage.getByRole("button", { name: "Cancel submission", exact: true }).click();
+    const cancelDialog = teacherPage.getByRole("dialog", { name: "Cancel submission", exact: true });
+    await cancelDialog.getByLabel("Reason for cancellation", { exact: true }).fill("Permit corrected work.");
+    await cancelDialog.getByRole("button", { name: "Cancel submission", exact: true }).click();
+    await expect.poll(async () => (await prisma.activityAttempt.findUniqueOrThrow({ where: { id: attempt.id } })).lifecycle).toBe("deleted");
+    expect(await responseJson(await student.get(`${endpoint}/workspace`))).toMatchObject({ submission: null, previousCancelled: true });
+    expect(await prisma.grade.count({ where: { gradebookItemId: attempt.gradebookItemId, participantId: attempt.participantId } })).toBe(0);
+    expect((await prisma.gradebookItem.findUniqueOrThrow({ where: { id: attempt.gradebookItemId } })).gradesReleased).toBe(true);
+    await responseJson(await student.post(`${endpoint}/hand-in`, { data: { expectedRevision: 1 } }));
+    await expect.poll(async () => (await responseJson<{ submission: { status: string } }>(await student.get(`${endpoint}/workspace`))).submission.status, { timeout: 45_000 }).toBe("challenge_ready");
+    expect(questionRequests).toBe(10);
+    const replacement = await responseJson<{ submissionId: string; questions: Array<{ id: string }> }>(await student.post(`${endpoint}/answering`, { data: {} }));
+    await responseJson(await student.post(`${endpoint}/challenge-answers`, { data: { submissionId: replacement.submissionId, answers: replacement.questions.map(question => ({ questionId: question.id, answer: "The function adds two arguments." })) } }));
+    expect(await prisma.activityAttempt.count({ where: { activityId, lifecycle: "submitted" } })).toBe(1);
+  } finally {
+    if (activityId) await prisma.backgroundJob.deleteMany({ where: { OR: [{ metadata: { path: ["activityId"], equals: activityId } }, { payload: { path: ["activityId"], equals: activityId } }] } });
+    await prisma.user.update({ where: { id: teacher.id }, data: { metadata: priorMetadata ?? Prisma.JsonNull } });
+    await student.dispose(); await prisma.aiAgentConnection.delete({ where: { id: connection.id } });
+    provider.closeAllConnections(); await new Promise<void>(resolve => provider.close(() => resolve()));
+  }
+});

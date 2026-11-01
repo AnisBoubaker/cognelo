@@ -684,12 +684,20 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(teacherPage.getByText("Coding homework saved.", { exact: true })).toBeVisible();
     await publishCurrentBankActivity(teacherPage);
 
-    await copyAndAssignBankActivity(data, {
+    const assignedHomework = await copyAndAssignBankActivity(data, {
       activityTypeKey: "coding-homework-grader",
       bankActivityId,
       gradebookSettings: { maxAttempts: 3 },
       title
     });
+
+    const homeworkApi = await createAuthenticatedApi("teacher");
+    try {
+      const base = `/api/courses/${data.courseId}/activities/${assignedHomework.activityId}/coding-homework-grader`;
+      await responseJson(await homeworkApi.put(`${base}/workflow-settings`, { data: { selected: [] } }));
+      await responseJson(await homeworkApi.post(`${base}/prepare-references`, { data: {} }));
+      await responseJson(await homeworkApi.put(`${base}/workflow-settings`, { data: { enabled: true } }));
+    } finally { await homeworkApi.dispose(); }
 
     const submissionZip = createStoredZip([
       {
@@ -698,21 +706,14 @@ test.describe.serial("authoring and completing every activity type", () => {
       }
     ]);
     await openStudentActivity(studentPage, data, title);
-    await studentPage.getByLabel("Check ZIP").setInputFiles({
-      buffer: submissionZip,
-      mimeType: "application/zip",
-      name: "e2e-homework.zip"
-    });
-    await expect(studentPage.getByRole("status").getByText("Structure check passed.", { exact: true })).toBeVisible();
-    await studentPage.getByLabel("Submit ZIP").setInputFiles({
-      buffer: submissionZip,
-      mimeType: "application/zip",
-      name: "e2e-homework.zip"
-    });
-    await expect(studentPage.getByLabel("Answer 1")).toBeVisible({ timeout: 180_000 });
-    await studentPage.getByLabel("Answer 1").fill("The main function prints a greeting and exits successfully.");
-    await studentPage.getByRole("button", { name: "Save draft" }).click();
-    await expect(studentPage.getByText("Answers saved.")).toBeVisible();
+    await studentPage.locator('input[type="file"][accept=".zip"]').setInputFiles({ buffer: submissionZip, mimeType: "application/zip", name: "e2e-homework.zip" });
+    await expect(studentPage.getByText("The file requirements are satisfied.", { exact: true })).toBeVisible();
+    await studentPage.getByRole("button", { name: "Submit my work", exact: true }).click();
+    await studentPage.getByRole("dialog", { name: "Submit my work", exact: true }).getByRole("button", { name: "Submit my work", exact: true }).click();
+    await studentPage.getByRole("button", { name: "Answer challenge questions", exact: true }).click({ timeout: 180_000 });
+    await studentPage.locator('textarea[id^="answer-"]').first().fill("The main function prints a greeting and exits successfully.");
+    await studentPage.getByRole("button", { name: "Save answers", exact: true }).click();
+    await expect(studentPage.getByText("Saved", { exact: true })).toBeVisible();
     const answersSubmitted = studentPage.waitForResponse((response) =>
       response.request().method() === "POST" && response.url().endsWith("/coding-homework-grader/challenge-answers")
     );
@@ -725,8 +726,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(homeworkRow.getByText("Submitted", { exact: true })).toBeVisible();
     const verifyContinuation = await reopenLatestSubmission(data, title);
     await openStudentActivity(studentPage, data, title);
-    await expect(studentPage.getByLabel("Answer 1")).toHaveValue("The main function prints a greeting and exits successfully.");
-    await studentPage.getByLabel("Answer 1").fill("The main function calls puts to print hello, then returns zero.");
+    await expect(studentPage.locator('textarea[id^="answer-"]').first()).toHaveValue("The main function prints a greeting and exits successfully.");
+    await studentPage.locator('textarea[id^="answer-"]').first().fill("The main function calls puts to print hello, then returns zero.");
     await studentPage.getByRole("button", { name: "Submit answers" }).click();
     await expect(studentPage).toHaveURL(`/courses/${data.courseId}/groups/${data.groupId}`);
     await verifyContinuation();

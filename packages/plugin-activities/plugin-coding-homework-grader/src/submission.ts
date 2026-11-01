@@ -116,7 +116,7 @@ export async function getCodingHomeworkStudentAssignment(scope: SubmissionScope)
         sizeBytes: Number(file.sizeBytes)
       }))
     },
-    latestSubmission,
+    latestSubmission: latestSubmission ? { ...latestSubmission, questions: [] } : null,
     requirements: normalizeCodingHomeworkSubmissionRequirements(requirementSet?.requirements)
   };
 }
@@ -138,13 +138,13 @@ export async function getLatestCodingHomeworkSubmission(scope: SubmissionScope) 
   });
   const submission = submissions[0];
 
-  if (!submission || isCodingHomeworkSubmissionDeleted(submission.metadata)) {
+  if (!submission || submission.status === "cancelled" || isCodingHomeworkSubmissionDeleted(submission.metadata)) {
     return null;
   }
 
   return {
     files: submission.files.map(toSubmissionFileRecord),
-    questions: submission.questions.map(toStudentChallengeQuestionRecord),
+    questions: normalizeObject(submission.metadata).workflowVersion === 2 && !normalizeObject(submission.metadata).assessmentStartedAt ? [] : submission.questions.map(toStudentChallengeQuestionRecord),
     submission: toSubmissionRecord(submission)
   };
 }

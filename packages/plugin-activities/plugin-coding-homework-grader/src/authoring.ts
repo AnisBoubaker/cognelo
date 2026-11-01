@@ -1,9 +1,10 @@
+import { lockHomeworkSettings, workflowSettingKeys } from "./workflow-settings";
 import { copyHomeworkTeacherSolution } from "./teacher-solution";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { AppError } from "@cognelo/core";
+import { AppError, contentIndexRevision } from "@cognelo/core";
 import { Prisma, prisma } from "./db-client";
 
 const MAX_ASSIGNMENT_PDF_BYTES = 25 * 1024 * 1024;
@@ -150,6 +151,14 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
 
   await prisma.$transaction(async (transaction) => {
     if (owner.ownerKind === "course_activity") {
+      await lockHomeworkSettings(transaction, owner.ownerId);
+      const current = await transaction.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: owner.ownerId } });
+      const protectedSettings = normalizeObject(current?.settings);
+      for (const key of workflowSettingKeys) { delete assignment.settings[key]; if (protectedSettings[key] !== undefined) assignment.settings[key] = protectedSettings[key]; }
+      if (protectedSettings.submissionsEnabled) {
+        const currentRequirements = await transaction.pluginCodingHomeworkSubmissionRequirementSet.findUnique({ where: { activityId: owner.ownerId } });
+        if (contentIndexRevision(currentRequirements?.requirements) !== contentIndexRevision(requirements)) throw new AppError(409, "HOMEWORK_REQUIREMENTS_LOCKED", "Disable submissions before changing requirements.");
+      }
       await transaction.pluginCodingHomeworkAssignment.upsert({
         where: { activityId: owner.ownerId },
         create: {
@@ -653,7 +662,11 @@ async function upsertAssignmentPdfAttachment(owner: OwnerContext, attachmentId: 
 
 async function upsertRequirementUpload(owner: OwnerContext, attachmentId: string, requirements: CodingHomeworkSubmissionRequirements) {
   if (owner.ownerKind === "course_activity") {
-    await prisma.pluginCodingHomeworkSubmissionRequirementSet.upsert({
+    await prisma.$transaction(async tx => {
+    await lockHomeworkSettings(tx, owner.ownerId);
+    const current = await tx.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: owner.ownerId } });
+    if (normalizeObject(current?.settings).submissionsEnabled) throw new AppError(409, "HOMEWORK_REQUIREMENTS_LOCKED", "Disable submissions before changing requirements.");
+    await tx.pluginCodingHomeworkSubmissionRequirementSet.upsert({
       where: { activityId: owner.ownerId },
       create: {
         activityId: owner.ownerId,
@@ -666,6 +679,7 @@ async function upsertRequirementUpload(owner: OwnerContext, attachmentId: string
         requirements: requirements as Prisma.InputJsonValue,
         sourceAttachmentId: attachmentId
       }
+    });
     });
     return;
   }
@@ -779,6 +793,6 @@ function normalizeObject(value: unknown) {
 }
 
 function copiedHomeworkSettings(value: unknown) {
-  const { submissionsEnabled: _enabled, preparedSnapshotId: _snapshot, referenceMaterialIds: _materials, ...settings } = normalizeObject(value);
+  const { submissionsEnabled: _enabled, preparedSnapshotId: _snapshot, referenceMaterialIds: _materials, embeddingConnectionId: _embeddingConnection, ...settings } = normalizeObject(value);
   return { ...settings, submissionsEnabled: false };
 }

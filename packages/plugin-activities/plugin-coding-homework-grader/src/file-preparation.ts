@@ -28,7 +28,7 @@ export function normalizeHomeworkPath(value: string) {
   return normalized;
 }
 export function decodeHomeworkUpload(base64: string, maxBytes: number) {
-  if (!base64 || base64.length > Math.ceil(maxBytes / 3) * 4 + 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) throw new AppError(413, "HOMEWORK_UPLOAD_INVALID", "The upload is invalid or exceeds its size limit.");
+  if (base64.length > Math.ceil(maxBytes / 3) * 4 + 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) throw new AppError(413, "HOMEWORK_UPLOAD_INVALID", "The upload is invalid or exceeds its size limit.");
   const bytes = Buffer.from(base64, "base64");
   if (bytes.length > maxBytes) throw new AppError(413, "HOMEWORK_UPLOAD_TOO_LARGE", "The file exceeds its size limit.");
   return bytes;
@@ -84,8 +84,10 @@ export async function uploadHomeworkPreparation(scope: HomeworkStudentScope, inp
   await limitHomeworkUploads(scope.activityId, scope.user.id);
   const release = acquireHomeworkUploadSlot();
   const written: string[] = [];
+  let committed = false;
   const obsolete: string[] = [];
   try {
+    if (data.kind !== "folder" && typeof data.base64 !== "string") throw new AppError(400, "HOMEWORK_UPLOAD_REQUIRED", "Upload a file.");
     const requirements = await getHomeworkRequirements(scope.activityId);
     const bytes = data.kind === "folder" ? null : decodeHomeworkUpload(data.base64 ?? "", Math.min(requirements.maxArchiveBytes, data.kind === "file" ? 8 * 1024 * 1024 : 25 * 1024 * 1024));
     const zip = data.kind === "zip" ? readCodingHomeworkZip(bytes!, requirements) : null;
@@ -125,10 +127,11 @@ export async function uploadHomeworkPreparation(scope: HomeworkStudentScope, inp
       if (codingHomeworkSubmissionReadiness(report).blocking.length) throw new AppError(400, "HOMEWORK_FILES_INVALID", "The uploaded files violate the file requirements or safety limits.", { issues: codingHomeworkSubmissionReadiness(report).blocking });
       await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { files: json(next), folders: json(folders), revision: { increment: 1 } } });
       for (const file of previous) if (!next.some(next => next.storedName === file.storedName)) obsolete.push(draftFilePath(draft.id, file.storedName));
-    }, { timeout: 30_000 });
+    }, { timeout: 30_000, maxWait: 30_000 });
+    committed = true;
     await Promise.all(obsolete.map(file => unlink(file).catch(() => {})));
     return getHomeworkPreparation(scope);
-  } catch (error) { await Promise.all(written.map(file => unlink(file).catch(() => {}))); throw error; }
+  } catch (error) { if (!committed) await Promise.all(written.map(file => unlink(file).catch(() => {}))); throw error; }
   finally { release(); }
 }
 export async function removeHomeworkPreparedFile(scope: HomeworkStudentScope, input: unknown) {

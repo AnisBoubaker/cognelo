@@ -10,6 +10,9 @@ const coreMocks = vi.hoisted(() => ({
       this.code = code;
     }
   },
+  getGroupAssignedActivity: vi.fn().mockResolvedValue({ assignment: { metadata: {}, availableUntil: null } }),
+  assignmentTimeLimitMinutes: vi.fn().mockReturnValue(null),
+  assignmentAttemptExpiresAt: vi.fn().mockReturnValue(null),
   startActivityAttempt: vi.fn(),
   submitActivityAttempt: vi.fn()
 }));
@@ -44,7 +47,7 @@ describe("coding homework challenge answers", () => {
       const sql = query.join("?");
       if (sql.startsWith('SELECT * FROM "PluginCodingHomeworkSubmission"')) return [await dbMocks.pluginCodingHomeworkSubmission.findFirst()];
       if (sql.startsWith('SELECT * FROM "PluginCodingHomeworkChallengeQuestion"')) return (await dbMocks.pluginCodingHomeworkSubmission.findFirst()).questions;
-      if (sql.includes('SELECT lifecycle FROM "ActivityAttempt"')) return [{ lifecycle: "started" }];
+      if (sql.includes('SELECT lifecycle, "startedAt" FROM "ActivityAttempt"')) return [{ lifecycle: "started", startedAt: now }];
       return [await dbMocks.pluginCodingHomeworkSubmission.update({ where: { id: values[3] }, data: { coreAttemptId: values[0], metadata: JSON.parse(values[1]), processingError: null, status: values[2] } })];
     });
     dbMocks.$executeRaw.mockImplementation(async (_query, ...values) => dbMocks.pluginCodingHomeworkChallengeQuestion.update({ where: { id: values[2] }, data: { answerSubmittedAt: values[0], studentAnswer: values[1] } }));

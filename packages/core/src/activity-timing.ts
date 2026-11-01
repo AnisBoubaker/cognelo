@@ -1,3 +1,4 @@
+import { resolveActivityTimedFinalization } from "@cognelo/activity-sdk/server";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma } from "@cognelo/db";
@@ -95,6 +96,10 @@ export async function finalizeExpiredTimedActivityAttempt(
   if (options.graceMilliseconds && (!expiresAt || Date.now() < expiresAt.getTime() + options.graceMilliseconds)) return getTimedActivityRuntime(user, courseId, groupId, activityId);
   if (!expiresAt || Date.now() < expiresAt.getTime()) {
     throw new AppError(409, "ACTIVITY_TIME_LIMIT_ACTIVE", "The timed attempt has not expired.");
+  }
+  const finalize = resolveActivityTimedFinalization(context.activityTypeKey);
+  if (finalize) {
+    if (await finalize({ user, courseId, groupId, activityId, coreAttemptId: activeAttempt.id })) return getTimedActivityRuntime(user, courseId, groupId, activityId);
   }
   const draft = await prisma.activityResponseDraft.findUnique({
     where: {

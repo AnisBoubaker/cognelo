@@ -28,6 +28,8 @@ export type CodingHomeworkAssignmentRecord = {
 };
 
 export type CodingHomeworkAuthoringFunctionRequirement = {
+  returnType?: string;
+  parameterTypes?: string[];
   description?: string;
   filePath?: string;
   name: string;

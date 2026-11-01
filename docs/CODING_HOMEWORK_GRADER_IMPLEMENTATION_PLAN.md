@@ -2,15 +2,7 @@
 
 This plan describes the phased implementation of the new Coding Homework Grader activity plugin.
 
-The `plugin-coding-homework-grader` package implements an initial ZIP-based manual-grading workflow on plugin-owned persistence. The [approved November 1, 2026 workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) defines the next delivery and supersedes conflicting earlier product proposals below. Those requirements are documented, not yet implemented or validated. The current baseline workflow is:
-
-- Teachers define the homework statement as editable text or an uploaded PDF.
-- Teachers add and assign the activity through the normal course content and gradebook workflow.
-- Course content resources that appear before the assignment in the content tree are treated as the documentation/class examples available to students.
-- Students upload a final ZIP archive; a persistent file-by-file preparation workspace is part of the approved next delivery.
-- The plugin generates challenge questions based on structural differences between submitted code and prior course material.
-- Students answer the challenge questions.
-- The submission is then ready for teacher grading.
+The [approved November 1, 2026 workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) is implemented for local testing: persistent individual-file/ZIP preparation, private solution-derived static validation, prepared reusable material references, manual submission opening, immutable hand-in, bounded durable generation, explicit SEB/timed answering and teacher cancellation. See the [progress record](CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md) for exact acceptance runs and remaining final checks. Historical phases below describe the prior pipeline where they conflict with the approved workflow.
 
 ## Source Material
 
@@ -37,15 +29,15 @@ The implementation must be TypeScript/Node/Postgres-native. The Python prototype
 
 The canonical requirements are [Coding Homework submission workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md), approved November 1, 2026. The initial target is C and about 30 individual submissions per class, even when students did the work in teams. The source review found an existing ZIP/challenge pipeline, but it does not establish readiness for this new workflow.
 
-Pending implementation tracks:
+Current delivery tracks (implemented; acceptance recorded separately):
 
-- [ ] Persistent individual-file/ZIP preparation, whole-collection ZIP replacement, and immutable explicit submission behind a manual teacher switch.
-- [ ] Private teacher solution upload, manual/AI-assisted required-function selection, static filename/argument validation, and acknowledged incomplete work.
-- [ ] Material/folder selection, indexing readiness before enablement, real PDF/link/public-repository extraction and reusable compatible embeddings.
-- [ ] GitHub-plugin-owned per-repository freshness setting (48-hour default), checked at enablement; stable prepared references during the enabled workflow.
-- [ ] Durable FIFO challenge generation with teacher-selected, server-bounded parallelism; students cannot cancel, and teachers can cancel submissions from activity details.
-- [ ] Explicit Answer challenge questions start, phase-appropriate SEB verification, answering-only timing, read-only submitted-code consultation and accessible course material.
-- [ ] Local/preprod acceptance for the complete workflow and expected class load; no production E2E or synthetic data.
+- [x] Persistent individual-file/ZIP preparation, whole-collection ZIP replacement, and immutable explicit submission behind a manual teacher switch.
+- [x] Private teacher solution upload, manual/AI-assisted required-function selection, static filename/argument validation, and acknowledged incomplete work.
+- [x] Material/folder selection, indexing readiness before enablement, real PDF/link/public-repository extraction and reusable compatible embeddings.
+- [x] GitHub-plugin-owned per-repository freshness setting (48-hour default), checked at enablement; stable prepared references during the enabled workflow.
+- [x] Durable FIFO challenge generation with teacher-selected, server-bounded parallelism; students cannot cancel, and teachers can cancel submissions from activity details.
+- [x] Explicit Answer challenge questions start, phase-appropriate SEB verification, answering-only timing, read-only submitted-code consultation and accessible course material.
+- [x] Local/preprod acceptance for the complete workflow and expected class load; no production E2E or synthetic data.
 
 Open details and expressly deferred deadline behavior are listed in the [approved workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#remaining-details-and-deferred-work). Do not substitute the older phase-completion statements for these acceptance checks. OpenAI is selected; changing the question-generation model does not invalidate compatible indexes. No exact embedding model, parallelism ceiling or additional availability grace period is chosen by this documentation.
 

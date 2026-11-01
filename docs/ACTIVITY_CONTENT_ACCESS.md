@@ -21,7 +21,7 @@ This prevents later retrieval; it cannot revoke material copied, photographed, o
 
 ## Expired work
 
-Normal final submission remains available for an expired active attempt and completes through the owning plugin/Test runtime. A closed page can POST its metadata-only `content-access` endpoint to preserve server-saved expired work if the answering renderer is no longer mounted. Recovery waits 30 seconds to let normal submission finish, rechecks current deadlines, and uses the existing standalone/Test timeout fallback. Test recovery honors active submission claims and serializes with autosaves. It retains saved answers as submitted-ungraded work for later teacher grading; it never invents a grade. For a Test without a duration limit, this path can use the effective Until timestamp. No scheduled job is added.
+Normal final submission remains available for an expired active attempt and completes through the owning plugin/Test runtime. A closed page can POST its metadata-only `content-access` endpoint to preserve server-saved expired work if the answering renderer is no longer mounted. Recovery waits 30 seconds to let normal submission finish, rechecks current deadlines, and uses the existing standalone/Test timeout fallback. Test recovery honors active submission claims and serializes with autosaves. It retains saved answers as submitted-ungraded work for later teacher grading; it never invents a grade. For a Test without a duration limit, this path can use the effective Until timestamp. The generic recovery path adds no scheduled job. Coding Homework separately schedules its own durable answering deadline and uses the plugin timed-finalization contract to submit saved answers including blanks.
 
 ## Verification
 

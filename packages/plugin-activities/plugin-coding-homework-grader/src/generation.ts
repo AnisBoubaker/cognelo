@@ -107,6 +107,7 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
   if (!submission) {
     throw new AppError(404, "CODING_HOMEWORK_SUBMISSION_NOT_FOUND", "The requested submission was not found.");
   }
+  if (normalizeObject(submission.metadata).workflowVersion === 2 || submission.status === "cancelled") throw new AppError(409, "HOMEWORK_PREPARED_WORKFLOW_LOCKED", "Prepared submissions use the durable queue. Cancel the submission to allow a fresh hand-in.");
   if (submission.status !== "structure_valid" && submission.status !== "challenge_ready" && submission.status !== "failed") {
     throw new AppError(400, "CODING_HOMEWORK_SUBMISSION_NOT_READY", "Analyze a valid submission before generating challenge questions.");
   }

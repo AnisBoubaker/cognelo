@@ -96,6 +96,7 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
   if (!submission) {
     throw new AppError(404, "CODING_HOMEWORK_SUBMISSION_NOT_FOUND", "The requested submission was not found.");
   }
+  if (normalizeObject(submission.metadata).workflowVersion === 2 || submission.status === "cancelled") throw new AppError(409, "HOMEWORK_PREPARED_WORKFLOW_LOCKED", "Prepared submissions use the durable queue. Cancel the submission to allow a fresh hand-in.");
   if (["ready_for_grading", "graded"].includes(submission.status)) throw new AppError(409, "CODING_HOMEWORK_SUBMISSION_LOCKED", "Completed submissions cannot be reprocessed.");
   if (submission.kind !== "final") {
     throw new AppError(400, "CODING_HOMEWORK_FINAL_SUBMISSION_REQUIRED", "Only final submissions can be analyzed.");

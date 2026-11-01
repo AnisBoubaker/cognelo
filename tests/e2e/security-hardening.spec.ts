@@ -39,7 +39,7 @@ test("hidden placements, files and other sections cannot be enumerated through a
   } finally { await student.dispose(); await rm(path.join(process.cwd(), "storage/course-materials", data.courseId), { recursive: true, force: true }); }
 });
 
-test("homework reserves one workflow and finalizes answers atomically", async ({ bankCourse: data }) => {
+test("homework reserves one workflow and finalizes answers atomically", async ({ bankCourse: data, teacherApi }) => {
   test.setTimeout(120_000);
   const student = await createAuthenticatedApi("student");
   let activityId: string | undefined;
@@ -48,20 +48,23 @@ test("homework reserves one workflow and finalizes answers atomically", async ({
     await assignCourseTest(data, activityId, "Atomic homework");
     const assigned = `/api/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}/coding-homework-grader`;
     expect((await student.post(`${assigned}/submission-analysis`, { data: {} })).status()).toBe(403);
+    const teacherPath = `/api/courses/${data.courseId}/activities/${activityId}/coding-homework-grader`;
+    await responseJson(await teacherApi.put(`${teacherPath}/workflow-settings`, { data: { selected: [] } }));
+    await responseJson(await teacherApi.post(`${teacherPath}/prepare-references`, { data: {} }));
+    await responseJson(await teacherApi.put(`${teacherPath}/workflow-settings`, { data: { enabled: true } }));
     const base64 = createStoredZip([{ path: "main.c", contents: "int main(void) { return 0; }" }]).toString("base64");
     const preflight = await responseJson<{ preflight: { id: string; zipAttachmentId: string } }>(await student.post(`${assigned}/preflight`, { data: { base64, fileName: "preflight.zip" } }));
     const temporary = await homeworkDb.pluginCodingHomeworkAttachment.findUniqueOrThrow({ where: { id: preflight.preflight.zipAttachmentId } });
     await homeworkDb.pluginCodingHomeworkSubmission.update({ where: { id: preflight.preflight.id }, data: { metadata: { expiresAt: new Date(0).toISOString(), temporary: true } } });
-    const responses = await Promise.all(Array.from({ length: 4 }, (_, index) => student.post(`${assigned}/submission`, { data: { base64, fileName: "submission.zip", idempotencyKey: `${data.token}-${index}` } })));
-    const accepted = responses.filter((response) => response.ok());
-    expect(accepted).toHaveLength(1);
-    for (const response of responses.filter((response) => !response.ok())) expect([400, 409, 429]).toContain(response.status());
-    const payload = await accepted[0].json();
+    await responseJson(await student.post(`${assigned}/preparation`, { data: { kind: "zip", fileName: "submission.zip", base64, expectedRevision: 0 } }));
+    const responses = await Promise.all(Array.from({ length: 4 }, () => student.post(`${assigned}/hand-in`, { data: { expectedRevision: 1 } })));
+    for (const response of responses) expect(response.ok(), await response.text()).toBe(true);
+    const payload = await responses[0].json();
     const submissionId: string = payload.submission.id;
-    expect(payload.submission.coreAttemptId).toBeTruthy();
+    expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(0);
     expect(await homeworkDb.pluginCodingHomeworkSubmission.findUnique({ where: { id: preflight.preflight.id } })).toBeNull();
     await expect(access(path.join(process.cwd(), "storage/coding-homework-grader/preflight", temporary.storedName))).rejects.toMatchObject({ code: "ENOENT" });
-    expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(1);
+    expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(0);
     expect(await homeworkDb.pluginCodingHomeworkSubmission.count({ where: { activityId, kind: "final" } })).toBe(1);
     // Let the real worker finish before exercising concurrent finalization. Inserting
     // questions while it is running races its replace-on-process question writes.
@@ -75,6 +78,7 @@ test("homework reserves one workflow and finalizes answers atomically", async ({
     await homeworkDb.pluginCodingHomeworkSubmission.update({ where: { id: submissionId }, data: { metadata: { ...metadata, internalPrompt: "PRIVATE_ARTIFACT" } } });
     const questions = await homeworkDb.pluginCodingHomeworkChallengeQuestion.findMany({ where: { submissionId }, orderBy: { orderIndex: "asc" } });
     expect(questions.length).toBeGreaterThan(0);
+    await responseJson(await student.post(`${assigned}/answering`, { data: {} }));
     const answers = questions.map((question) => ({ questionId: question.id, answer: "The program returns zero." }));
     const finals = await Promise.all(Array.from({ length: 4 }, () => student.post(`${assigned}/challenge-answers`, { data: { submissionId, answers } })));
     for (const response of finals) expect(response.ok(), await response.text()).toBe(true);

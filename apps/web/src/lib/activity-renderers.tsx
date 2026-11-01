@@ -13,6 +13,7 @@ import {
 import {
   CodingHomeworkGraderActivityView,
   CodingHomeworkManualGradingPanel,
+  HomeworkSubmissionManagement,
   createCodingHomeworkGraderClient,
   type CodingHomeworkGradebookAttemptRecord
 } from "@cognelo/plugin-coding-homework-grader";
@@ -484,6 +485,8 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
         codingHomeworkClient.submitGroupChallengeAnswers(courseId, groupId, activityId, input)
     };
   }, [codingHomeworkClient, courseId, groupId, studentPreview]);
+  const workflowRequest = useMemo(() => !courseId || studentPreview ? undefined : <T,>(route: string, init?: RequestInit) => apiRequest<T>(
+    `/courses/${courseId}/${activityProps.canManage ? `activities/${activityProps.activity.id}` : `groups/${groupId}/activities/assigned/${activityProps.activity.id}`}/coding-homework-grader/${route}`, init), [courseId, groupId, studentPreview, activityProps.canManage, activityProps.activity.id]);
   return (
     <CodingHomeworkGraderActivityView
       {...activityProps}
@@ -494,6 +497,7 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
             : `/courses/${courseId}/activities/${activityProps.activity.id}/coding-homework-grader/activity-file?attachmentId=${encodeURIComponent(attachmentId)}`
         )
       }
+      workflowRequest={workflowRequest}
       authoringClient={authoringClient}
       preflightClient={preflightClient}
       submissionClient={submissionClient}
@@ -1310,8 +1314,10 @@ function CodingHomeworkGraderBankActivityRenderer(context: BankActivityRendererC
     }),
     [codingHomeworkClient, context.activityBankId]
   );
+  const solutionRequest = useMemo(() => <T,>(route: string, init?: RequestInit) => apiRequest<T>(`/activity-banks/${context.activityBankId}/activities/${context.activity.id}/coding-homework-grader/${route}`, init), [context.activityBankId, context.activity.id]);
   return (
     <CodingHomeworkGraderActivityView
+      solutionRequest={solutionRequest}
       activity={context.activity}
       activityFileUrl={(attachmentId) =>
         apiAbsoluteUrl(
@@ -1472,4 +1478,18 @@ export function getAiFeedbackReviewCalculatedGradePercent(activityTypeKey: strin
   const rendererKey = getActivityDefinition(activityTypeKey)?.aiFeedback?.rendererKey;
   if (rendererKey !== "coding-exercise-ai-feedback-review") return null;
   return getCodingExerciseGradingBreakdown(feedback)?.totalGrade ?? null;
+}
+
+
+type SubmissionManagementProps = { activityTypeKey: string; activityId: string; courseId: string; groupId?: string; locale: Locale; onChanged?: () => void };
+const submissionManagementRenderers: Record<string, ComponentType<SubmissionManagementProps>> = {
+  "coding-homework-submission-management": function HomeworkManagementRenderer({ activityId, courseId, groupId, locale, onChanged }) {
+    const request = useMemo(() => <T,>(route: string, init?: RequestInit) => apiRequest<T>(`/courses/${courseId}/${groupId ? `groups/${groupId}/activities/assigned` : "activities"}/${activityId}/coding-homework-grader/${route}`, init), [activityId, courseId, groupId]);
+    return <HomeworkSubmissionManagement request={request} locale={locale} onChanged={onChanged} />;
+  }
+};
+export function ActivitySubmissionManagement(props: SubmissionManagementProps) {
+  const key = getActivityDefinition(props.activityTypeKey)?.submissionManagement?.rendererKey;
+  const Renderer = key ? submissionManagementRenderers[key] : null;
+  return Renderer ? <Renderer {...props} /> : null;
 }
