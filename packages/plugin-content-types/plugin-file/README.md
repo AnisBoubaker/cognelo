@@ -13,3 +13,5 @@ Course content duplication copies the safe file metadata while sharing the immut
 Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.
 
 Uploads validate titles (180 characters) and original filenames (255 characters) before staging, use bounded multipart reads and remove staged files after persistence failures. Download and extraction share the server-owned storage containment check. Basic PDF extraction scans literal strings in linear time, including malformed files. See [security boundaries](../../../docs/SECURITY_BOUNDARIES.md).
+
+The [approved next Coding Homework workflow](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) requires PDF teaching content to participate in reusable prepared indexes. This is an implementation target; the current basic extractor and development indexes described above are not a declaration that the new workflow is ready.

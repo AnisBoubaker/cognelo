@@ -16,3 +16,9 @@ This file is for GitHub repo content plugin memory only.
 - Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.
 
 - Manifest migration `202610250020_github_url_credentials` removes userinfo from legacy GitHub resource URLs and drops derived `embeddingIndex` data; it is idempotent and runs through the combined migration command.
+
+## Approved Next Indexing Policy — Not Yet Implemented
+
+- [Coding Homework decisions](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#github-freshness) require public-repository contents, not URL-only vectors. Private repositories are out of scope for the first delivery.
+- Own the freshness interval in this plugin: 48-hour default with a per-repository material override. Consumers check it when enabling homework submissions; do not automatically refresh an enabled homework's prepared references.
+- Reuse unchanged compatible embeddings across homework selections. A question-generation model change is not an embedding-index invalidation event. Existing URL metadata/dev-index behavior above is still the runtime baseline.

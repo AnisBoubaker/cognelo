@@ -24,6 +24,10 @@ Course content duplication copies the normalized repository metadata and removes
 
 Repository cloning and source extraction are owned by this plugin. The current implementation exposes the repository URL as an external-reference document, stores a deterministic development vector index in resource metadata, and reports repository indexing as deferred through the shared content type server extraction interface.
 
+## Approved Indexing Target — Implementation Pending
+
+The [Coding Homework workflow decisions](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#github-freshness) require real content extraction from **public** repositories and a GitHub-material freshness setting: **48 hours by default, configurable for each repository**. Coding Homework checks this age when enabling final submissions and refreshes stale selected repositories before opening. It does not regenerate references during the enabled workflow. Compatible existing vectors are reused across homework selections. The URL-only development behavior above remains the current implementation.
+
 ## Contributor Workflow
 
 When changing this plugin, update:

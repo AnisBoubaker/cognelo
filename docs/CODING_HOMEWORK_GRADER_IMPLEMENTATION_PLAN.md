@@ -2,12 +2,12 @@
 
 This plan describes the phased implementation of the new Coding Homework Grader activity plugin.
 
-The `plugin-coding-homework-grader` package now implements the complete first manual-grading workflow on a plugin-owned persistence foundation. The remaining roadmap focuses on production storage hardening, shared vector retrieval, research analytics, and rollout. The implemented workflow is:
+The `plugin-coding-homework-grader` package implements an initial ZIP-based manual-grading workflow on plugin-owned persistence. The [approved November 1, 2026 workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) defines the next delivery and supersedes conflicting earlier product proposals below. Those requirements are documented, not yet implemented or validated. The current baseline workflow is:
 
 - Teachers define the homework statement as editable text or an uploaded PDF.
 - Teachers add and assign the activity through the normal course content and gradebook workflow.
 - Course content resources that appear before the assignment in the content tree are treated as the documentation/class examples available to students.
-- Students submit homework files, usually a ZIP archive.
+- Students upload a final ZIP archive; a persistent file-by-file preparation workspace is part of the approved next delivery.
 - The plugin generates challenge questions based on structural differences between submitted code and prior course material.
 - Students answer the challenge questions.
 - The submission is then ready for teacher grading.
@@ -33,6 +33,22 @@ The Python prototype maps to these future TypeScript modules:
 
 The implementation must be TypeScript/Node/Postgres-native. The Python prototype is only a behavioral reference.
 
+## Approved Next Delivery
+
+The canonical requirements are [Coding Homework submission workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md), approved November 1, 2026. The initial target is C and about 30 individual submissions per class, even when students did the work in teams. The source review found an existing ZIP/challenge pipeline, but it does not establish readiness for this new workflow.
+
+Pending implementation tracks:
+
+- [ ] Persistent individual-file/ZIP preparation, whole-collection ZIP replacement, and immutable explicit submission behind a manual teacher switch.
+- [ ] Private teacher solution upload, manual/AI-assisted required-function selection, static filename/argument validation, and acknowledged incomplete work.
+- [ ] Material/folder selection, indexing readiness before enablement, real PDF/link/public-repository extraction and reusable compatible embeddings.
+- [ ] GitHub-plugin-owned per-repository freshness setting (48-hour default), checked at enablement; stable prepared references during the enabled workflow.
+- [ ] Durable FIFO challenge generation with teacher-selected, server-bounded parallelism; students cannot cancel, and teachers can cancel submissions from activity details.
+- [ ] Explicit Answer challenge questions start, phase-appropriate SEB verification, answering-only timing, read-only submitted-code consultation and accessible course material.
+- [ ] Local/preprod acceptance for the complete workflow and expected class load; no production E2E or synthetic data.
+
+Open details and expressly deferred deadline behavior are listed in the [approved workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#remaining-details-and-deferred-work). Do not substitute the older phase-completion statements for these acceptance checks. OpenAI is selected; changing the question-generation model does not invalidate compatible indexes. No exact embedding model, parallelism ceiling or additional availability grace period is chosen by this documentation.
+
 ## Implementation Progress
 
 As of August 6, 2026:
@@ -56,6 +72,8 @@ As of August 6, 2026:
 ## Product Boundaries
 
 ### In Scope
+
+The following list records the original baseline/roadmap scope. The approved next-delivery workflow above controls current product priorities and resolves conflicts.
 
 - A real activity plugin named Coding Homework Grader.
 - Teacher authoring for assignment text and assignment PDF.
@@ -1009,14 +1027,16 @@ Frontend checks:
 
 ## Open Decisions
 
-- Resolved: reserve the attempt at valid ZIP upload and mark it submitted only after final answers.
-- Resolved: finish the existing workflow before another upload; then the ordinary attempt policy controls a new workflow and question set.
+The [approved workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) is authoritative for the next delivery. The entries below distinguish baseline implementation facts from longer-term design questions.
+
+- Baseline: valid final ZIP upload reserves the core attempt and final answers submit it. Next delivery separates persistent upload preparation, explicit work submission, and the later answering-clock start; it must not start the challenge countdown during upload or queueing.
+- Next-delivery decision: students may change the prepared upload collection until explicit submission; afterwards they cannot change/cancel it themselves. A teacher-controlled cancellation can permit resubmission. How that operation maps to attempts and prior completed grades remains to be designed.
 - Whether group-specific content before the assignment should be included in the documentation snapshot. Recommended: defer to a later phase.
-- Whether PDF assignment statements should also be indexed as documentation. Recommended: no; the assignment statement describes the task, while prior content resources define the taught material.
+- Baseline extraction includes the assignment statement and provided files. How these activity-owned sources join the new explicit material selection, and whether the new private teacher solution participates in retrieval, remains unspecified; course PDFs and linked teaching materials are required sources for the next delivery.
 - Whether a future deployment needs an external storage backend. Current decision: use hardened webserver-local storage in production and preserve the adapter boundary so this can change later without rewriting plugin workflows.
 - Whether to introduce `pgvector` before cross-course retrieval. Recommended: yes, as the shared Postgres-backed vector capability used by content plugins and activity plugins during development and early production.
 - Whether the vector retrieval service should be platform-wide or packaged as a separate indexing package/app. Recommended: start as a shared platform service with content-plugin extraction/chunking boundaries, then split operationally only if scale requires it.
-- Embedding model and vector dimensions for pgvector. Pending discussion; do not hardcode a production dimension until the first embedding provider/model is selected.
+- OpenAI is selected for the next delivery. The exact embedding model and dimensions remain unspecified; do not invent them from “same model.” Question-generation model changes must not invalidate indexes.
 - Shared table design for multiple dimensions/model versions. Pending discussion; likely either model/dimension-specific tables or partitioning by `modelKey`/`dimensions`.
 - Whether submitted homework functions should use the same common vector tables as course content or separate assessment-scoped tables with the same service contract.
 - Whether generated challenge answers should eventually be auto-graded. Recommended: treat answer assessment as advisory until validated.

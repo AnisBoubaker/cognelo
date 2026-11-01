@@ -8,7 +8,11 @@ Student-triggered challenge generation uses explicit course staff question-autho
 
 Programming Homework does not advertise the [student solution capability](../../../docs/ACTIVITY_SOLUTIONS.md); it has no Release solution setting or Solution tab.
 
-## Workflow
+## Approved Next Workflow — Implementation Pending
+
+The [November 1, 2026 decisions](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) define the next delivery: persistent individual-file/ZIP preparation, teacher-controlled submission opening, static requirements derived from a private solution, acknowledged incomplete work, reusable prepared material indexes, queued challenges and an explicit SEB/timer answering start. Student submissions are immutable and student generation is not cancellable; teacher cancellation is available from activity details. These are approved requirements, not claims about the current implementation below.
+
+## Current Workflow
 
 ```text
 author assignment -> snapshot prior content -> validate ZIP -> reserve core attempt -> analyze functions
@@ -37,6 +41,7 @@ Learner responses use an explicit public projection; see [learner data boundarie
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
 
+- [Approved next submission workflow and remaining details](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md)
 - [Current capabilities and phase summary](docs/REFERENCE.md#current-state)
 - [Authoring, snapshots, extraction, and persistence](docs/REFERENCE.md#implementation-direction)
 - [Durable data and processing decisions](docs/DECISIONS.md)

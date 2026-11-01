@@ -15,3 +15,5 @@
 - Use bounded form parsing and the shared no-follow storage opener for downloads and extraction. Never trust a metadata path or restore the backtracking PDF literal regex; malformed and whitespace-heavy input must remain linear.
 
 - Validate multipart title and original filename through the existing shared/plugin schemas before writing bytes. A failed metadata validation must leave neither a staged file nor a changed resource.
+
+- Pending delivery: [Coding Homework](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) requires PDF content extraction through this plugin into reusable compatible reference indexes. Do not treat support for URLs/file metadata or the current basic PDF extractor as acceptance of all PDFs; scanned-PDF/OCR scope remains unspecified.

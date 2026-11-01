@@ -39,3 +39,7 @@ Unit tests cover URL/status gating, public-address classification, redirect and 
 ## Shared action controls
 
 Teacher, learner, and settings actions follow the platform [button and icon contract](../../../../docs/ACTION_BUTTONS.md). Use explicit semantic `ActionIcon` names with localized labels; dimensions and interaction colors are shared CSS, while tabs, disclosure rows, and specialized editor controls retain their own layout.
+
+## Approved Homework Indexing Target — Not Yet Implemented
+
+The [November 1, 2026 Coding Homework choices](../../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) include linked teaching pages and a concrete lecture/slides example. That target needs content extraction for retrieval, beyond the current title/description/URL embedding document. It must remain separate from teacher-private internal summaries and preserve existing network and authorization boundaries. Link traversal and dynamic slide extraction details still need validation; this documentation does not claim the target is delivered.

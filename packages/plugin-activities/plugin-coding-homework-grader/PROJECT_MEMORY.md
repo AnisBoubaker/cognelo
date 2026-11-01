@@ -1,5 +1,15 @@
 # Coding Homework Grader Memory
 
+## Approved Next Workflow — Implementation Pending
+
+- Follow the [November 1, 2026 decisions](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) for the next delivery. Current ZIP-only and upload-start timing constraints below describe the baseline, not the new product contract.
+- Preparation manages uploaded files only; no browser code editing. A ZIP replaces the entire draft collection. Explicit submission freezes it; only a teacher can cancel a submission to permit another hand-in. Student question generation continues after leaving and has no Cancel action.
+- Requirements come from the teacher's private C solution, with manual or AI-assisted function selection. Validate filenames and function arguments statically; missing functions require an incomplete-work acknowledgement. Do not introduce execution tests or automatic correctness grading.
+- Answering starts explicitly, after any required SEB verification. Preparation/queueing consume no answering time, and activity availability still gates access. Submitted files are read-only and course materials remain accessible.
+- Material selection/index readiness gates the manual submission switch. Reuse compatible indexes and do not invalidate them when the question-generation model changes. GitHub freshness belongs to the GitHub material plugin (48-hour default, per-repository override), is checked at enablement, and does not trigger regeneration during an enabled workflow.
+
+## Current Implementation Constraints
+
 - Learner payloads use the definition’s allowlisted `studentConfig`; keep keys, solutions, private instructions, and authoring metadata server-side. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 

@@ -14,3 +14,5 @@
 - Host pages dispatch through the presentation/settings registries. Do not introduce concrete link-type branches into course pages or core.
 
 - Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.
+
+- Pending delivery: [Coding Homework](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) requires useful content from linked teaching pages/slides for reusable indexes. Keep extraction in this plugin and preserve the private-summary and network boundaries above; the new workflow is not yet implemented.

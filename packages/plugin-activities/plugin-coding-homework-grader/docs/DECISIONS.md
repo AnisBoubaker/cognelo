@@ -1,5 +1,7 @@
 # Coding Homework Grader Detailed Decisions
 
+The decisions below describe the existing implementation baseline and its earlier phases. The [approved next submission workflow](../../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) records the November 1, 2026 product choices and supersedes conflicting future-facing assumptions. Its implementation is pending; do not treat the current ZIP-only, whole-workflow timer, or strict-complete-function behavior as the next-delivery requirements.
+
 This document preserves detailed Coding Homework Grader decisions. Load only the sections relevant to the task.
 
 ## Current Decisions

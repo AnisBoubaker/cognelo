@@ -1,5 +1,7 @@
 # Coding Homework Grader Detailed Reference
 
+This reference describes the existing implementation baseline. The [approved next submission workflow](../../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) records the November 1, 2026 product choices and supersedes conflicting future-facing assumptions. Its implementation is pending; do not treat the current ZIP-only, whole-workflow timer, or strict-complete-function behavior as the next-delivery requirements.
+
 This document is the detailed reference for the Coding Homework Grader plugin.
 
 The package currently defines the activity shell, localized metadata, initial algorithm contracts, teacher authoring surface, prior-documentation snapshot/extraction behavior, first C parser adapter, ZIP preflight/final-submission validation, submitted-function candidate analysis, challenge question generation, student challenge answer collection, plugin-owned persistence schema, and config schema for a coding homework grading workflow.
