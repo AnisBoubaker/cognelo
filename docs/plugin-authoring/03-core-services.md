@@ -302,3 +302,5 @@ An activity definition may opt into `assessmentFlow: "deferred"` and mark indivi
 An activity may advertise `submissionManagement.rendererKey` for its operational panel in the shared activity details report. The host resolves this through its renderer registry; the plugin owns pending submission data and staff actions. This includes preparation/generation workflows that have no core attempt yet.
 
 `ServerActivityPlugin.timedFinalization` lets the owning plugin finalize server-saved work after core verifies expiry. Return true after handling it; false uses core's generic fallback for legacy/incomplete states. Recheck effective deadlines, ignore new answer content at expiry, and serialize with saves/cancellation. Internal `deleteActivitySubmission` replacement options are server-only: they may cancel a started attempt, withdraw its associated grade and grant one replacement after release without altering class-wide release.
+
+Replacement permissions are core-owned metadata. Ordinary start, submit and grading metadata cannot set or overwrite `replacementAllowed` or `replacementOfAttemptId`; only the authorized cancellation path grants replacement.

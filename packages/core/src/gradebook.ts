@@ -165,7 +165,7 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
             ? resumableAttempt.testRevisionId : input.testRevisionId ?? resumableAttempt.testRevisionId,
           metadata: {
             ...(asJsonObject(resumableAttempt.metadata) ?? {}),
-            ...(asJsonObject(input.metadata) ?? {})
+            ...attemptInputMetadata(input.metadata)
           } as JsonInput
         }
       });
@@ -200,7 +200,7 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
         pluginAttemptRef: input.pluginAttemptRef ?? null,
         assessmentMode,
         metadata: {
-          ...(asJsonObject(input.metadata) ?? {}),
+          ...attemptInputMetadata(input.metadata),
           ...(latestAttempt?.lifecycle === "deleted" && asJsonObject(latestAttempt.metadata)?.replacementAllowed ? { replacementOfAttemptId: latestAttempt.id } : {}),
           knowledgeSkillSnapshot: (context.groupActivity.activity.knowledgeConcepts ?? []).flatMap((link) => {
             const selectedIds = new Set(stringArray(link.selectedSkillIds));
@@ -376,7 +376,7 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
       pluginAttemptRef: input.pluginAttemptRef ?? attempt.pluginAttemptRef,
       metadata: {
         ...(asJsonObject(attempt.metadata) ?? {}),
-        ...(asJsonObject(input.metadata) ?? {}),
+        ...attemptInputMetadata(input.metadata),
         // Preserve the original attempt/manifest; record final timing separately.
         submittedTimeLimitMinutes: assignmentTimeLimitMinutes(effectiveAssignment.metadata),
         submittedAvailableUntil: effectiveAssignment.availableUntil?.toISOString() ?? null
@@ -524,7 +524,7 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
         nextValue: gradedAttemptSnapshot(gradedCandidate) as JsonInput,
         reason: input.reason ?? null,
         metadata: {
-          ...(asJsonObject(input.metadata) ?? {}),
+          ...attemptInputMetadata(input.metadata),
           selectedGrade: gradeSnapshot(grade)
         } as JsonInput,
         createdAt: now
@@ -2695,4 +2695,10 @@ function studentDeletedMetadata(attempt: Record<string, unknown>): Record<string
     result.submittedState = definition?.studentResponseState?.(asJsonObject(metadata.submittedState) ?? {}) ?? {};
   }
   return result;
+}
+
+/** Replacement grants are core-owned authorization, never plugin/learner input metadata. */
+function attemptInputMetadata(value: unknown) {
+  const { replacementAllowed: _allowed, replacementOfAttemptId: _replacement, ...metadata } = asJsonObject(value) ?? {};
+  return metadata;
 }

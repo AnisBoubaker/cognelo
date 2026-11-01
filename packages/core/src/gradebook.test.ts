@@ -199,6 +199,7 @@ describe("gradebook attempt services", () => {
         pluginVersion: "0.1.0",
         pluginAttemptRef: "plugin-attempt-1",
         activityConfigFingerprint: "fingerprint-1",
+        metadata: { replacementAllowed: true, replacementOfAttemptId: "untrusted-grant", safeMarker: "retained" },
         now
       })
     ).resolves.toMatchObject({
@@ -226,6 +227,10 @@ describe("gradebook attempt services", () => {
         activityVersionId: "version-1"
       })
     });
+    const metadata = tx.activityAttempt.create.mock.calls[0][0].data.metadata;
+    expect(metadata.safeMarker).toBe("retained");
+    expect(metadata).not.toHaveProperty("replacementAllowed");
+    expect(metadata).not.toHaveProperty("replacementOfAttemptId");
   });
 
   it("uses the student's due date and attempt allowance ahead of a matching team exception", async () => {

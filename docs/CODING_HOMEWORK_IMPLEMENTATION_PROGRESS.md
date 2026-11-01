@@ -36,7 +36,8 @@
 - `35b126e` — remove previously tracked generated Prisma artifacts containing machine paths/native binaries.
 - `142f57c` — durable concurrency, worker-slot replenishment and interruption recovery.
 - `5a7a117` — complete hand-in, queued challenges, timed/SEB answering, cancellation and user interfaces.
-- Final follow-up commit records the adapted acceptance fixtures and documentation review.
+- `720f7e9` — adapted acceptance fixtures and final documentation review.
+- Final hardening strips replacement-authorization keys from ordinary attempt metadata. The 44 core gradebook tests, core typecheck and released-grade cancellation/replacement E2E passed after this change.
 
 ## Implementation assumptions
 
