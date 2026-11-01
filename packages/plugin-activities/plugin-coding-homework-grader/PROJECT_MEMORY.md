@@ -48,3 +48,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - C signatures are normalized without execution: compare names, argument types/count and return type, ignoring parameter names/storage qualifiers and equivalent array parameters. Preserve pointer depth and pointee qualifiers. Academic gaps use the readiness acknowledgement classifier; parser resource limits and unsafe archives stay blocking.
 
 - Prepared files and private teacher solutions have separate plugin-owned persistence. Preparation creates no attempt, uses optimistic revisions, and freezes when final work exists. Copy hooks retain private solutions but clear submission enablement/reference readiness. See [prepared files](docs/REFERENCE.md#prepared-files-and-private-solution).
+
+- Generated Prisma clients are local build artifacts covered by the root ignore rule. Track the schema and manifest migrations, and regenerate clients with the normal database commands. Do not recommit generated clients: they contain machine paths and native binaries.
