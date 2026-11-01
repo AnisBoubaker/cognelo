@@ -51,6 +51,10 @@ const enqueueSchema = z.object({
 });
 
 const handlers = new Map<string, BackgroundJobHandler>();
+const queueLimits = new Map<string, number>();
+export function registerBackgroundJobQueueLimit(queue: string, maximum: number) {
+  queueLimits.set(queue, Math.max(1, Math.min(10, Math.trunc(maximum))));
+}
 const workers = new Map<string, { stop: () => void }>();
 
 export function registerBackgroundJobHandler(handlerKey: string, handler: BackgroundJobHandler) {
@@ -73,7 +77,7 @@ export function isBackgroundJobHandlerRegistered(handlerKey: string) {
   return handlers.has(handlerKey.trim());
 }
 
-export async function enqueueBackgroundJob(input: z.input<typeof enqueueSchema>) {
+export async function enqueueBackgroundJob(input: z.input<typeof enqueueSchema>, database: Pick<typeof prisma, "$queryRawUnsafe"> = prisma) {
   const data = enqueueSchema.parse(input);
   const now = new Date();
   const id = data.id ?? randomUUID();
@@ -85,7 +89,7 @@ export async function enqueueBackgroundJob(input: z.input<typeof enqueueSchema>)
   const priority = data.priority ?? 0;
 
   const rows = data.idempotencyKey
-    ? await prisma.$queryRawUnsafe<BackgroundJobRow[]>(
+    ? await database.$queryRawUnsafe<BackgroundJobRow[]>(
         `INSERT INTO "BackgroundJob"
           ("id", "queue", "handlerKey", "status", "priority", "payload", "metadata", "idempotencyKey", "attempts", "maxAttempts", "runAfter", "createdAt", "updatedAt")
          VALUES
@@ -103,7 +107,7 @@ export async function enqueueBackgroundJob(input: z.input<typeof enqueueSchema>)
         runAfter,
         now
       )
-    : await prisma.$queryRawUnsafe<BackgroundJobRow[]>(
+    : await database.$queryRawUnsafe<BackgroundJobRow[]>(
         `INSERT INTO "BackgroundJob"
           ("id", "queue", "handlerKey", "status", "priority", "payload", "metadata", "idempotencyKey", "attempts", "maxAttempts", "runAfter", "createdAt", "updatedAt")
          VALUES
@@ -144,7 +148,7 @@ export async function updateBackgroundJobMetadata(jobId: string, patch: Record<s
 
 export async function runBackgroundJobOnce(options: { queue?: string; workerId?: string } = {}) {
   const workerId = options.workerId ?? `worker-${randomUUID()}`;
-  const job = await claimBackgroundJob({ queue: options.queue, workerId });
+  const job = await claimBackgroundJob({ queue: options.queue, workerId: `${workerId}:${randomUUID()}` });
   if (!job) {
     return null;
   }
@@ -162,6 +166,8 @@ export async function runBackgroundJobOnce(options: { queue?: string; workerId?:
     return getBackgroundJob(job.id);
   }
 
+  const heartbeat = setInterval(() => { void prisma.$executeRaw`UPDATE "BackgroundJob" SET "lockedAt" = NOW() WHERE id = ${job.id} AND status IN ('running', 'cancelled') AND "lockedBy" = ${job.lockedBy}`.catch(() => {}); }, 15_000);
+  heartbeat.unref();
   try {
     const result = (await handler({ job })) ?? {};
     await prisma.$executeRawUnsafe(
@@ -174,13 +180,16 @@ export async function runBackgroundJobOnce(options: { queue?: string; workerId?:
            "completedAt" = $3,
            "failedAt" = NULL,
            "updatedAt" = $3
-       WHERE "id" = $1`,
+       WHERE "id" = $1 AND status = 'running' AND "lockedBy" = $4`,
       job.id,
       JSON.stringify(result),
-      new Date()
+      new Date(), job.lockedBy
     );
   } catch (error) {
     await failBackgroundJob(job, normalizeJobError(error));
+  } finally {
+    clearInterval(heartbeat);
+    await prisma.$executeRaw`UPDATE "BackgroundJob" SET "lockedAt"=NULL, "lockedBy"=NULL WHERE id=${job.id} AND status='cancelled' AND "lockedBy"=${job.lockedBy}`;
   }
 
   return getBackgroundJob(job.id);
@@ -200,7 +209,7 @@ export function startBackgroundJobWorker(options: { concurrency?: number; idleTi
   const idleTimeoutMs = options.idleTimeoutMs && options.idleTimeoutMs > 0 ? options.idleTimeoutMs : null;
   let lastWorkAt = Date.now();
   let stopped = false;
-  let running = false;
+  let activeRuns = 0;
   let interval: ReturnType<typeof setInterval> | null = null;
 
   const worker = {
@@ -214,26 +223,23 @@ export function startBackgroundJobWorker(options: { concurrency?: number; idleTi
   };
 
   const tick = async () => {
-    if (stopped || running) {
-      return;
-    }
-    running = true;
-    try {
-      const results = await Promise.all(Array.from({ length: concurrency }, () => runBackgroundJobOnce({ queue: options.queue, workerId })));
-      if (results.some(Boolean)) {
-        lastWorkAt = Date.now();
-      } else if (idleTimeoutMs && Date.now() - lastWorkAt >= idleTimeoutMs) {
-        worker.stop();
-      }
-    } finally {
-      running = false;
+    if (stopped) return;
+    const available = concurrency - activeRuns;
+    for (let slot = 0; slot < available; slot++) {
+      activeRuns++;
+      void runBackgroundJobOnce({ queue: options.queue, workerId }).then(result => {
+        if (result) lastWorkAt = Date.now();
+      }).catch(() => { lastWorkAt = Date.now(); }).finally(() => {
+        activeRuns--;
+        if (!activeRuns && idleTimeoutMs && Date.now() - lastWorkAt >= idleTimeoutMs) worker.stop();
+      });
     }
   };
 
   interval = setInterval(() => {
-    void tick();
+    void tick().catch(() => { /* A transient database failure must not terminate the worker. */ });
   }, intervalMs);
-  void tick();
+  void tick().catch(() => {});
 
   workers.set(key, worker);
   return worker;
@@ -251,30 +257,31 @@ export function startDefaultBackgroundJobWorker() {
 }
 
 async function claimBackgroundJob(options: { queue?: string; workerId: string }) {
-  const rows = await prisma.$transaction((transaction) =>
-    transaction.$queryRawUnsafe<BackgroundJobRow[]>(
+  const rows = await prisma.$transaction(async transaction => {
+    // Serialize only the short claim/count operation across every API worker.
+    await transaction.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended('background-job-claim', 0))`;
+    await transaction.$executeRaw`UPDATE "BackgroundJob" SET status = CASE WHEN attempts < "maxAttempts" THEN 'queued'::"BackgroundJobStatus" ELSE 'failed'::"BackgroundJobStatus" END,
+      "lockedBy" = NULL, "lockedAt" = NULL, "updatedAt" = NOW(), "runAfter" = NOW(),
+      error = '{"code":"WORKER_INTERRUPTED","message":"Processing was interrupted and will retry if attempts remain."}'::jsonb
+      WHERE status = 'running' AND "lockedAt" < NOW() - INTERVAL '2 minutes'`;
+    await transaction.$executeRaw`UPDATE "BackgroundJob" SET "lockedBy"=NULL, "lockedAt"=NULL WHERE status='cancelled' AND "lockedAt" < NOW() - INTERVAL '2 minutes'`;
+    return transaction.$queryRawUnsafe<BackgroundJobRow[]>(
       `WITH next_job AS (
-         SELECT "id"
-         FROM "BackgroundJob"
-         WHERE "status" = 'queued'
-           AND "runAfter" <= CURRENT_TIMESTAMP
-           AND ($2::text IS NULL OR "queue" = $2)
-         ORDER BY "priority" DESC, "runAfter" ASC, "createdAt" ASC
-         FOR UPDATE SKIP LOCKED
-         LIMIT 1
-       )
-       UPDATE "BackgroundJob"
-       SET "status" = 'running',
-           "attempts" = "attempts" + 1,
-           "lockedAt" = CURRENT_TIMESTAMP,
-           "lockedBy" = $1,
-           "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "id" IN (SELECT "id" FROM next_job)
-       RETURNING *`,
-      options.workerId,
-      options.queue ?? null
-    )
-  );
+         SELECT candidate."id" FROM "BackgroundJob" candidate
+         WHERE candidate."status" = 'queued' AND candidate."runAfter" <= CURRENT_TIMESTAMP
+           AND ($2::text IS NULL OR candidate."queue" = $2)
+           AND (SELECT COUNT(*) FROM "BackgroundJob" active WHERE (active.status = 'running' OR (active.status = 'cancelled' AND active."lockedBy" IS NOT NULL)) AND active.queue = candidate.queue)
+             < COALESCE(($3::jsonb ->> candidate.queue)::int, 10000)
+           AND (candidate.metadata->>'concurrencyGroup' IS NULL OR
+             (SELECT COUNT(*) FROM "BackgroundJob" active WHERE (active.status = 'running' OR (active.status = 'cancelled' AND active."lockedBy" IS NOT NULL)) AND active.queue = candidate.queue
+               AND active.metadata->>'concurrencyGroup' = candidate.metadata->>'concurrencyGroup')
+             < CASE WHEN candidate.metadata->>'concurrencyLimit' ~ '^[1-9][0-9]?$' THEN LEAST(10, (candidate.metadata->>'concurrencyLimit')::int) ELSE 1 END)
+         ORDER BY candidate."priority" DESC, candidate."createdAt" ASC, candidate.id ASC
+         FOR UPDATE SKIP LOCKED LIMIT 1
+       ) UPDATE "BackgroundJob" SET status = 'running', attempts = attempts + 1,
+           "lockedAt" = CURRENT_TIMESTAMP, "lockedBy" = $1, "updatedAt" = CURRENT_TIMESTAMP
+         WHERE id IN (SELECT id FROM next_job) RETURNING *`, options.workerId, options.queue ?? null, JSON.stringify(Object.fromEntries(queueLimits)));
+  });
   return rows[0] ? toBackgroundJobRecord(rows[0]) : null;
 }
 
@@ -296,12 +303,12 @@ async function failBackgroundJob(
          "lockedBy" = NULL,
          "failedAt" = CASE WHEN $2::"BackgroundJobStatus" = 'failed' THEN $5 ELSE NULL END,
          "updatedAt" = $5
-     WHERE "id" = $1`,
+     WHERE "id" = $1 AND status = 'running' AND "lockedBy" = $6`,
     job.id,
     status,
     JSON.stringify(failure.error),
     status === "queued" ? runAfter : job.runAfter,
-    now
+    now, job.lockedBy
   );
 }
 
@@ -378,4 +385,11 @@ function toBackgroundJobRecord(row: BackgroundJobRow | undefined): BackgroundJob
 function normalizeJsonObject(value: Prisma.JsonValue | string | null) {
   const parsed = typeof value === "string" ? JSON.parse(value) : value;
   return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+}
+
+/** Trusted scheduling policy update; affects waiting work, without restarting running jobs. */
+export async function updateBackgroundJobConcurrency(queue: string, group: string, limit: number, database: Pick<typeof prisma, "$executeRaw"> = prisma) {
+  const value = Math.max(1, Math.min(queueLimits.get(queue) ?? 10, Math.trunc(limit)));
+  await database.$executeRaw`UPDATE "BackgroundJob" SET metadata=jsonb_set(metadata, '{concurrencyLimit}', ${JSON.stringify(value)}::jsonb), "updatedAt"=NOW()
+    WHERE queue=${queue} AND status='queued' AND metadata->>'concurrencyGroup'=${group}`;
 }

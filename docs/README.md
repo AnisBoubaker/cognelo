@@ -17,6 +17,7 @@ This is the routing page for repository-maintained documentation. Read the small
 - [Dialog headers and dismissal](DIALOGS.md): persistent close controls, compact review actions, app-wide coverage, and dismissal semantics.
 - [Code editor undo and saved answers](EDITOR_UNDO.md): in-memory history isolation, saved-answer baselines, model disposal, and autosave regression checks.
 - [Email delivery and test recipients](EMAIL_DELIVERY.md): outbound mail boundary and private local capture for synthetic recipients.
+- [Durable background jobs](BACKGROUND_JOBS.md): atomic enqueue, concurrency, heartbeat/recovery and cancellation ownership.
 - [Prepared material embedding services](MATERIAL_EMBEDDING_SERVICES.md): plugin ownership, OpenAI embedding reuse, freshness and extraction limits.
 - [Text material editor and display](../packages/plugin-content-types/plugin-text/docs/REFERENCE.md): full Markdown authoring, display modes, and material image access.
 - [Rich-text media](MEDIA_ASSETS.md): media assets, references, lifecycle, and garbage collection.

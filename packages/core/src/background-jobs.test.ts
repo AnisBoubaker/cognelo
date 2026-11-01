@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPrisma = vi.hoisted(() => ({
+  $executeRaw: vi.fn().mockResolvedValue(0),
+  $queryRaw: vi.fn().mockResolvedValue([]),
   $executeRawUnsafe: vi.fn(),
   $queryRawUnsafe: vi.fn(),
   $transaction: vi.fn()
@@ -25,7 +27,7 @@ describe("background job service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.$transaction.mockImplementation((handler: (transaction: { $queryRawUnsafe: (query: string, ...params: unknown[]) => unknown }) => unknown) =>
-      handler({ $queryRawUnsafe: mockPrisma.$queryRawUnsafe })
+      handler(mockPrisma)
     );
   });
 
@@ -67,7 +69,7 @@ describe("background job service", () => {
       result: { handled: "job-success" },
       status: "succeeded"
     });
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('"status" = \'succeeded\''), "job-success", JSON.stringify({ handled: "job-success" }), expect.any(Date));
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('"status" = \'succeeded\''), "job-success", JSON.stringify({ handled: "job-success" }), expect.any(Date), null);
     unregister();
   });
 
@@ -92,7 +94,7 @@ describe("background job service", () => {
       error: { code: "BACKGROUND_JOB_FAILED", message: "Temporary outage", retryable: true },
       status: "queued"
     });
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('$2::"BackgroundJobStatus"'), "job-retry", "queued", expect.any(String), expect.any(Date), expect.any(Date));
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('$2::"BackgroundJobStatus"'), "job-retry", "queued", expect.any(String), expect.any(Date), expect.any(Date), null);
     unregister();
   });
 
@@ -117,7 +119,7 @@ describe("background job service", () => {
       error: { code: "BAD_REQUEST", retryable: false },
       status: "failed"
     });
-    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('$2::"BackgroundJobStatus"'), "job-failed", "failed", expect.any(String), expect.any(Date), expect.any(Date));
+    expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(expect.stringContaining('$2::"BackgroundJobStatus"'), "job-failed", "failed", expect.any(String), expect.any(Date), expect.any(Date), null);
     unregister();
   });
 
