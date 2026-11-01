@@ -45,6 +45,7 @@ enum PluginCodingHomeworkSubmissionStatus {
   ready_for_grading
   graded
   failed
+  cancelled
 }
 
 model PluginCodingHomeworkAssignment {
@@ -256,4 +257,28 @@ model PluginCodingHomeworkReview {
 
   @@index([submissionId], map: "PluginCodingHomeworkReview_submission_idx")
   @@index([reviewerUserId, createdAt], map: "PluginCodingHomeworkReview_reviewer_idx")
+}
+
+model PluginCodingHomeworkDraft {
+  id String @id @default(cuid())
+  activityId String
+  groupId String
+  userId String
+  revision Int @default(0)
+  files Json @default("[]")
+  folders Json @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([activityId, groupId, userId])
+}
+
+model PluginCodingHomeworkTeacherSolution {
+  id String @id @default(cuid())
+  ownerKind String
+  ownerId String
+  files Json @default("[]")
+  functions Json @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([ownerKind, ownerId])
 }

@@ -143,7 +143,7 @@ export async function requireSafeExamBrowserAccess(
   courseId: string,
   groupId: string,
   activityId: string,
-  options: { allowFinalization?: boolean; receiptOnly?: boolean } = {}
+  options: { allowFinalization?: boolean; receiptOnly?: boolean; preparation?: boolean } = {}
 ) {
   void request;
   const access: Awaited<ReturnType<typeof getGroupAssignedActivityAccess>> & { contentClosed?: boolean } = await getGroupAssignedActivityAccess(user, courseId, groupId, activityId);
@@ -151,7 +151,7 @@ export async function requireSafeExamBrowserAccess(
     const content = await assertActivityContentAccess(user, courseId, groupId, activityId, options);
     if (content.locked) access.contentClosed = true;
   }
-  if (!access.requiresSafeExamBrowser || access.canBypass) return access;
+  if (!access.requiresSafeExamBrowser || access.canBypass || (options.preparation && access.preparationAllowed)) return access;
   if (await hasSafeExamBrowserAccess(user, { courseId, groupId, activityId })) return access;
   throw new AppError(
     403,

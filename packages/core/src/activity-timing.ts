@@ -1,3 +1,4 @@
+import { getActivityDefinition } from "@cognelo/activity-sdk";
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma } from "@cognelo/db";
 import { assignmentAttemptExpiresAt, assignmentTimeLimitMinutes } from "./activity-assignment-policy";
@@ -46,6 +47,9 @@ export async function startOrResumeTimedActivityAttempt(
   activityId: string
 ) {
   const context = await resolveTimedActivityContext(user, courseId, groupId, activityId);
+  if (getActivityDefinition(context.activityTypeKey)?.assessmentFlow === "deferred") {
+    throw new AppError(409, "ACTIVITY_DEFERRED_START_REQUIRED", "Use the activity's assessment start action after preparing your work.");
+  }
   const existing = await findActiveAttempt(context.assignmentId, context.participantId);
   if (!existing) {
     const timeLimitMinutes = assignmentTimeLimitMinutes(context.assignmentMetadata);
@@ -170,7 +174,7 @@ async function findActiveAttempt(groupActivityId: string, participantId: string)
     where: { groupActivityId, participantId, lifecycle: "started" },
     orderBy: [{ attemptNumber: "desc" }]
   });
-  return attempts.find((attempt) => (activityAttemptTimeLimitMinutes(attempt.metadata) !== null || asRecord(attempt.metadata).continuation || asRecord(attempt.metadata).uploadReserved === true)) ?? null;
+  return attempts.find((attempt) => (activityAttemptTimeLimitMinutes(attempt.metadata) !== null || asRecord(attempt.metadata).continuation || asRecord(attempt.metadata).uploadReserved === true || typeof asRecord(attempt.metadata).assessmentStartedAt === "string")) ?? null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

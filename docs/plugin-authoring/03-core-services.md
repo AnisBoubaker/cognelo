@@ -292,3 +292,7 @@ Next: [Build A Real Plugin](04-building-a-plugin.md)
 ## Security-sensitive request boundaries
 
 Use the host-provided bounded `readJson`, and `readBoundedFormData` for multipart uploads. Do not parse an unbounded request stream inside a plugin. Declaring an expired final-submission method also requires `expiredAttemptInput`: it must reconstruct the final input from saved server data, never the incoming late body. The host rechecks time after reading the body and fails closed when the callback is absent. See [Security boundaries](../SECURITY_BOUNDARIES.md).
+
+### Deferred assessment preparation
+
+An activity definition may opt into `assessmentFlow: "deferred"` and mark individual trusted routes with `learnerAccessPhase: "preparation"` or `"assessment_start"`. Preparation retains assignment/availability/content authorization while bypassing SEB and an unstarted answer timer. Assessment start retains SEB verification and must establish its own core attempt; the generic host start rejects deferred activities. Unmarked routes remain protected. The renderer requests host SEB access through `onAssessmentAccessRequested` and refreshes timing after successful start through `onAssessmentStarted`. Do not mark answer, grading, or unrestricted mutation routes as preparation.

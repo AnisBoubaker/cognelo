@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, activityId } = await params;
-    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
+    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, { preparation: true });
     const activity = await getGroupAssignedActivity(user, courseId, groupId, activityId);
     return json({ activity: { ...projectStudentActivity(activity), assignment: { ...activity.assignment, config: {} } } });
   });

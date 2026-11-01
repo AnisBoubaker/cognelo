@@ -1,3 +1,4 @@
+import { homeworkPreparationRoute, homeworkPreparedFileRoute, homeworkTeacherSolutionRoute, homeworkSelectFunctionsRoute } from "./preparation-routes";
 import { exportHomeworkSubmission } from "./submission-export";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { AppError } from "@cognelo/core";
@@ -56,6 +57,7 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
     }
   },
   routes: [
+    homeworkPreparationRoute, homeworkPreparedFileRoute, homeworkTeacherSolutionRoute, homeworkSelectFunctionsRoute,
     codingHomeworkAuthoringRoute,
     codingHomeworkAssignmentPdfRoute,
     codingHomeworkActivityFileRoute,

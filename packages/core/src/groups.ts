@@ -929,6 +929,7 @@ export async function getGroupAssignedActivityAccess(
     assignmentId: activity.assignment.id,
     title: activity.title,
     requiresSafeExamBrowser: assignmentRequiresSafeExamBrowser(activity.assignment.metadata),
+    ...(getActivityDefinition(activity.activityType.key)?.assessmentFlow === "deferred" ? { preparationAllowed: true } : {}),
     hideAfterAttempts: courseActivityHidesAfterAttempts(activity.metadata),
     canBypass: isAdmin(user) || (await canManageCourse(user, courseId))
   };

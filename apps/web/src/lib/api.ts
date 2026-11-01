@@ -729,6 +729,7 @@ export type Activity = {
 };
 
 export type SafeExamBrowserAccess = {
+  preparationAllowed?: boolean;
   title: string;
   requiresSafeExamBrowser: boolean;
   accessGranted: boolean;

@@ -76,6 +76,8 @@ type ActivityRendererProps<T extends ElementType> = ComponentProps<T> & {
   onPreviousSubmissionsAvailabilityChange?: (hasPreviousSubmissions: boolean) => void;
   studentPreview?: { sessionId: string };
   timedAutoSubmit?: TimedActivityAutoSubmit;
+  onAssessmentAccessRequested?: () => void;
+  onAssessmentStarted?: () => void;
 };
 
 type RenderableActivity = {

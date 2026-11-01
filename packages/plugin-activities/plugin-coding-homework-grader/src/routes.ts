@@ -42,7 +42,7 @@ function normalizeReprocessInput(input: unknown) {
   return { locale, submissionId };
 }
 
-async function resolveOwner(context: PluginRouteContext) {
+export async function resolveOwner(context: PluginRouteContext) {
   if (context.activityBankId) {
     await assertCanManageActivityBank(context.user, context.activityBankId);
     return {
@@ -90,7 +90,7 @@ async function resolveCourseSnapshotScope(context: PluginRouteContext) {
   };
 }
 
-function resolveStudentSubmissionScope(context: PluginRouteContext) {
+export function resolveStudentSubmissionScope(context: PluginRouteContext) {
   const courseId = requireCourseId(context.courseId);
   if (!context.groupId) {
     throw new AppError(400, "GROUP_CONTEXT_REQUIRED", "Student submissions require an assigned group activity context.");

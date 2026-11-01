@@ -110,6 +110,8 @@ export type ActivityProvider =
 export type ActivityCreationScope = "bank" | "course";
 
 export type ActivityDefinition = {
+  /** Preparation is available before the explicit, plugin-owned assessment start. */
+  assessmentFlow?: "deferred";
   /** Allowlisted learner config. Omission fails closed to an empty config. */
   studentConfig?: (config: Record<string, unknown>) => Record<string, unknown>;
   /** Opt-in reference solution, served only through the host's release gate. */

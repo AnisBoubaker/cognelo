@@ -291,6 +291,28 @@ exports.Prisma.PluginCodingHomeworkReviewScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.PluginCodingHomeworkDraftScalarFieldEnum = {
+  id: 'id',
+  activityId: 'activityId',
+  groupId: 'groupId',
+  userId: 'userId',
+  revision: 'revision',
+  files: 'files',
+  folders: 'folders',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.PluginCodingHomeworkTeacherSolutionScalarFieldEnum = {
+  id: 'id',
+  ownerKind: 'ownerKind',
+  ownerId: 'ownerId',
+  files: 'files',
+  functions: 'functions',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -351,7 +373,8 @@ exports.PluginCodingHomeworkSubmissionStatus = exports.$Enums.PluginCodingHomewo
   answered: 'answered',
   ready_for_grading: 'ready_for_grading',
   graded: 'graded',
-  failed: 'failed'
+  failed: 'failed',
+  cancelled: 'cancelled'
 };
 
 exports.Prisma.ModelName = {
@@ -366,7 +389,9 @@ exports.Prisma.ModelName = {
   PluginCodingHomeworkSubmissionFile: 'PluginCodingHomeworkSubmissionFile',
   PluginCodingHomeworkSubmissionFunction: 'PluginCodingHomeworkSubmissionFunction',
   PluginCodingHomeworkChallengeQuestion: 'PluginCodingHomeworkChallengeQuestion',
-  PluginCodingHomeworkReview: 'PluginCodingHomeworkReview'
+  PluginCodingHomeworkReview: 'PluginCodingHomeworkReview',
+  PluginCodingHomeworkDraft: 'PluginCodingHomeworkDraft',
+  PluginCodingHomeworkTeacherSolution: 'PluginCodingHomeworkTeacherSolution'
 };
 
 /**

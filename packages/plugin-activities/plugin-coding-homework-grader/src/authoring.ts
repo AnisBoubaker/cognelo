@@ -1,3 +1,4 @@
+import { copyHomeworkTeacherSolution } from "./teacher-solution";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -314,6 +315,7 @@ export async function copyBankCodingHomeworkAuthoringToCourseActivity(params: { 
   });
 
   await prisma.$transaction(async (transaction) => {
+    await copyHomeworkTeacherSolution({ ownerKind: "bank_activity", ownerId: params.bankActivityId }, { ownerKind: "course_activity", ownerId: params.activityId }, transaction);
     await transaction.pluginCodingHomeworkAssignment.deleteMany({ where: { activityId: params.activityId } });
     await transaction.pluginCodingHomeworkSubmissionRequirementSet.deleteMany({ where: { activityId: params.activityId } });
     await transaction.pluginCodingHomeworkAttachment.deleteMany({
@@ -360,7 +362,7 @@ export async function copyBankCodingHomeworkAuthoringToCourseActivity(params: { 
           retrievedExampleCount: assignment.retrievedExampleCount,
           questionCount: assignment.questionCount,
           generationInstructions: assignment.generationInstructions,
-          settings: normalizeObject(assignment.settings) as Prisma.InputJsonValue
+          settings: copiedHomeworkSettings(assignment.settings) as Prisma.InputJsonValue
         }
       });
     }
@@ -386,6 +388,7 @@ export async function copyBankCodingHomeworkAuthoring(params: { sourceBankActivi
     prisma.pluginCodingHomeworkAttachment.findMany({ where: { ownerKind: "bank_activity", ownerId: params.sourceBankActivityId } })
   ]);
   await prisma.$transaction(async (transaction) => {
+    await copyHomeworkTeacherSolution({ ownerKind: "bank_activity", ownerId: params.sourceBankActivityId }, { ownerKind: "bank_activity", ownerId: params.bankActivityId }, transaction);
     const attachmentIdMap = new Map<string, string>();
     for (const source of attachments) {
       const copied = await transaction.pluginCodingHomeworkAttachment.create({
@@ -414,7 +417,7 @@ export async function copyBankCodingHomeworkAuthoring(params: { sourceBankActivi
           retrievedExampleCount: assignment.retrievedExampleCount,
           questionCount: assignment.questionCount,
           generationInstructions: assignment.generationInstructions,
-          settings: normalizeObject(assignment.settings) as Prisma.InputJsonValue
+          settings: copiedHomeworkSettings(assignment.settings) as Prisma.InputJsonValue
         }
       });
     }
@@ -441,6 +444,7 @@ export async function copyCourseCodingHomeworkAuthoringToBankActivity(params: { 
     })
   ]);
   await prisma.$transaction(async (transaction) => {
+    await copyHomeworkTeacherSolution({ ownerKind: "course_activity", ownerId: params.activityId }, { ownerKind: "bank_activity", ownerId: params.bankActivityId }, transaction);
     await transaction.pluginBankCodingHomeworkAssignment.deleteMany({ where: { bankActivityId: params.bankActivityId } });
     await transaction.pluginBankCodingHomeworkSubmissionRequirementSet.deleteMany({ where: { bankActivityId: params.bankActivityId } });
     await transaction.pluginCodingHomeworkAttachment.deleteMany({
@@ -460,7 +464,7 @@ export async function copyCourseCodingHomeworkAuthoringToBankActivity(params: { 
       promptPdfAttachmentId: assignment.promptPdfAttachmentId ? attachmentIdMap.get(assignment.promptPdfAttachmentId) ?? null : null,
       languageKey: assignment.languageKey, candidateLimit: assignment.candidateLimit,
       retrievedExampleCount: assignment.retrievedExampleCount, questionCount: assignment.questionCount,
-      generationInstructions: assignment.generationInstructions, settings: normalizeObject(assignment.settings) as Prisma.InputJsonValue
+      generationInstructions: assignment.generationInstructions, settings: copiedHomeworkSettings(assignment.settings) as Prisma.InputJsonValue
     } });
     if (requirementSet) await transaction.pluginBankCodingHomeworkSubmissionRequirementSet.create({ data: {
       bankActivityId: params.bankActivityId, languageKey: requirementSet.languageKey,
@@ -480,6 +484,7 @@ export async function copyCourseCodingHomeworkAuthoring(params: { sourceActivity
     })
   ]);
   await prisma.$transaction(async (transaction) => {
+    await copyHomeworkTeacherSolution({ ownerKind: "course_activity", ownerId: params.sourceActivityId }, { ownerKind: "course_activity", ownerId: params.activityId }, transaction);
     const attachmentIdMap = new Map<string, string>();
     for (const source of attachments) {
       const copied = await transaction.pluginCodingHomeworkAttachment.create({
@@ -508,7 +513,7 @@ export async function copyCourseCodingHomeworkAuthoring(params: { sourceActivity
           retrievedExampleCount: assignment.retrievedExampleCount,
           questionCount: assignment.questionCount,
           generationInstructions: assignment.generationInstructions,
-          settings: normalizeObject(assignment.settings) as Prisma.InputJsonValue
+          settings: copiedHomeworkSettings(assignment.settings) as Prisma.InputJsonValue
         }
       });
     }
@@ -528,6 +533,7 @@ export async function copyCourseCodingHomeworkAuthoring(params: { sourceActivity
 
 export async function deleteBankCodingHomeworkAuthoring(params: { bankActivityId: string }) {
   await prisma.$transaction(async (transaction) => {
+    await transaction.pluginCodingHomeworkTeacherSolution.deleteMany({ where: { ownerKind: "bank_activity", ownerId: params.bankActivityId } });
     await transaction.pluginBankCodingHomeworkAssignment.deleteMany({
       where: { bankActivityId: params.bankActivityId }
     });
@@ -545,6 +551,7 @@ export async function deleteBankCodingHomeworkAuthoring(params: { bankActivityId
 
 export async function deleteCourseCodingHomeworkData(params: { activityId: string }) {
   await prisma.$transaction(async (transaction) => {
+    await transaction.pluginCodingHomeworkTeacherSolution.deleteMany({ where: { ownerKind: "course_activity", ownerId: params.activityId } });
     const submissions = await transaction.pluginCodingHomeworkSubmission.findMany({
       where: { activityId: params.activityId },
       select: { id: true }
@@ -769,4 +776,9 @@ function normalizeRequirements(value: unknown): CodingHomeworkSubmissionRequirem
 
 function normalizeObject(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function copiedHomeworkSettings(value: unknown) {
+  const { submissionsEnabled: _enabled, preparedSnapshotId: _snapshot, referenceMaterialIds: _materials, ...settings } = normalizeObject(value);
+  return { ...settings, submissionsEnabled: false };
 }

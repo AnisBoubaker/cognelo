@@ -159,10 +159,8 @@ function GroupActivityContent() {
         if (cancelled || safeExamBrowserLaunchDismissedRef.current) return;
         setSafeExamBrowserAccess(access);
         if (access.requiresSafeExamBrowser && !access.accessGranted) {
-          setIsSafeExamBrowserGateOpen(true);
-          return;
-        }
-        setIsSafeExamBrowserGateOpen(false);
+          if (!access.preparationAllowed) { setIsSafeExamBrowserGateOpen(true); return; }
+        } else setIsSafeExamBrowserGateOpen(false);
         const [{ activity: latest }, solutionStatus, gradesResult] = await Promise.all([
           api.groupActivity(courseId, groupId, activityId),
           api.activitySolutionAvailability(courseId, groupId, activityId),
@@ -265,7 +263,7 @@ function GroupActivityContent() {
             setSafeExamBrowserError(t("groupPage.safeExamBrowserActivationError"));
             return;
           }
-        } else {
+        } else if (!sebAccessResult.access.preparationAllowed) {
           setActivity(null);
           setReleasedGrade(null);
           setDeletedSubmissions([]);
@@ -581,7 +579,7 @@ function GroupActivityContent() {
           </section>
         ) : null}
 
-        {!showSolution && !isActivityUnavailable && timingStatus === "ready" && timedRuntime?.timeLimitMinutes && !timedRuntime.attempt && selectedTab === "attempt" ? (
+        {!showSolution && !isActivityUnavailable && !safeExamBrowserAccess?.preparationAllowed && timingStatus === "ready" && timedRuntime?.timeLimitMinutes && !timedRuntime.attempt && selectedTab === "attempt" ? (
           <section className="section stack">
             <div>
               <p className="eyebrow">{t("groupPage.timedActivityEyebrow")}</p>
@@ -624,10 +622,10 @@ function GroupActivityContent() {
           historyOnly={selectedTab !== "attempt"}
         />
 
-        <div hidden={showSolution || isActivityUnavailable || Boolean(safeExamBrowserAccess?.requiresSafeExamBrowser && !safeExamBrowserAccess.accessGranted)}>
-        {(!isLearner || activity?.activityType.key === "test" || timingStatus === "ready") && (!timedRuntime?.timeLimitMinutes || timedRuntime.attempt || selectedTab === "previous") && (
+        <div hidden={showSolution || isActivityUnavailable || Boolean(safeExamBrowserAccess?.requiresSafeExamBrowser && !safeExamBrowserAccess.accessGranted && !safeExamBrowserAccess.preparationAllowed)}>
+        {(!isLearner || activity?.activityType.key === "test" || timingStatus === "ready") && (safeExamBrowserAccess?.preparationAllowed || !timedRuntime?.timeLimitMinutes || timedRuntime.attempt || selectedTab === "previous") && (
           (selectedTab === "attempt" && (
-            canStartNewAttempt !== false || activity?.activityType.key === "test"
+            canStartNewAttempt !== false || activity?.activityType.key === "test" || safeExamBrowserAccess?.preparationAllowed
           )) || selectedTab === "previous"
         ) ? (
           activity && ActivityRenderer ? (
@@ -639,6 +637,8 @@ function GroupActivityContent() {
               course={course ? { id: course.id, title: course.title } : null}
               groupId={groupId}
               hasQuestionAuthoringAgent={hasQuestionAuthoringAgent}
+              onAssessmentAccessRequested={() => setIsSafeExamBrowserGateOpen(true)}
+              onAssessmentStarted={() => { void api.timedActivityRuntime(courseId, groupId, activityId).then(result => setTimedRuntime(result.runtime)); }}
               onSubmitted={() => router.push(`/courses/${courseId}/groups/${groupId}`)}
               onSave={saveActivity}
               showReleasedAnswers={releasedGrade?.gradeKind === "final"}

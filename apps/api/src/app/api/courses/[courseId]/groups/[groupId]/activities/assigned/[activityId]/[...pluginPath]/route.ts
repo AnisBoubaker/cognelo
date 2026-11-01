@@ -1,3 +1,4 @@
+import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { readBoundedJson, MAX_UPLOAD_JSON_BYTES } from "@cognelo/core";
 import { NextRequest } from "next/server";
 import { resolvePluginRoute } from "@cognelo/activity-sdk/server";
@@ -17,7 +18,6 @@ export function OPTIONS() {
 async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params["params"]>) {
   const user = await requireUser();
   const { courseId, groupId, activityId, pluginPath } = params;
-  const access = await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, { receiptOnly: true });
   const activity = await getGroupAssignedActivity(user, courseId, groupId, activityId);
   await assertActivityTypePluginEnabled(activity.activityType.key);
   const route = resolvePluginRoute(activity.activityType.key, pluginPath);
@@ -25,6 +25,11 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
   if (!route) {
     throw new AppError(404, "PLUGIN_ROUTE_NOT_FOUND", "The requested plugin route does not exist for this activity.");
   }
+
+  const deferred = getActivityDefinition(activity.activityType.key)?.assessmentFlow === "deferred";
+  const preparation = deferred && route.learnerAccessPhase === "preparation";
+  const startingAssessment = deferred && route.learnerAccessPhase === "assessment_start";
+  const access = await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, { receiptOnly: true, preparation });
 
   const handler = route.methods[request.method as keyof typeof route.methods];
   if (!handler) {
@@ -37,7 +42,7 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
       allowFinalization: route.allowExpiredTimedAttemptMethods?.includes(unsafeMethod) === true
     });
   }
-  if (["POST", "PATCH", "PUT", "DELETE"].includes(unsafeMethod)) {
+  if (!preparation && !startingAssessment && ["POST", "PATCH", "PUT", "DELETE"].includes(unsafeMethod)) {
     await assertTimedActivityWriteAllowed(user, courseId, groupId, activityId, {
       allowExpiredAttempt: route.allowExpiredTimedAttemptMethods?.includes(unsafeMethod) === true
     });
@@ -83,7 +88,7 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
       const body = await readBoundedJson(request, MAX_UPLOAD_JSON_BYTES);
       // A request can straddle the deadline while uploading. Recheck after the
       // body is read and replace late input, rather than trusting arrival time.
-      const timing = await assertTimedActivityWriteAllowed(user, courseId, groupId, activityId, {
+      const timing = preparation || startingAssessment ? undefined : await assertTimedActivityWriteAllowed(user, courseId, groupId, activityId, {
         allowExpiredAttempt: route.allowExpiredTimedAttemptMethods?.includes(unsafeMethod) === true
       });
       if (timing?.expiredAttemptId) {

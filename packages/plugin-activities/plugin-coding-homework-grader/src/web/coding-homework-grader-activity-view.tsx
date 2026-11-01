@@ -91,6 +91,8 @@ type CodingHomeworkGraderActivityViewProps = {
   submissionClient?: SubmissionClient;
   onSubmitted?: () => void;
   timedAutoSubmit?: TimedActivityAutoSubmit;
+  onAssessmentAccessRequested?: () => void;
+  onAssessmentStarted?: () => void;
 };
 
 type RequirementDraft = {

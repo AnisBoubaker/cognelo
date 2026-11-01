@@ -73,6 +73,16 @@ export type PluginCodingHomeworkChallengeQuestion = $Result.DefaultSelection<Pri
  * 
  */
 export type PluginCodingHomeworkReview = $Result.DefaultSelection<Prisma.$PluginCodingHomeworkReviewPayload>
+/**
+ * Model PluginCodingHomeworkDraft
+ * 
+ */
+export type PluginCodingHomeworkDraft = $Result.DefaultSelection<Prisma.$PluginCodingHomeworkDraftPayload>
+/**
+ * Model PluginCodingHomeworkTeacherSolution
+ * 
+ */
+export type PluginCodingHomeworkTeacherSolution = $Result.DefaultSelection<Prisma.$PluginCodingHomeworkTeacherSolutionPayload>
 
 /**
  * Enums
@@ -126,7 +136,8 @@ export const PluginCodingHomeworkSubmissionStatus: {
   answered: 'answered',
   ready_for_grading: 'ready_for_grading',
   graded: 'graded',
-  failed: 'failed'
+  failed: 'failed',
+  cancelled: 'cancelled'
 };
 
 export type PluginCodingHomeworkSubmissionStatus = (typeof PluginCodingHomeworkSubmissionStatus)[keyof typeof PluginCodingHomeworkSubmissionStatus]
@@ -395,6 +406,26 @@ export class PrismaClient<
     * ```
     */
   get pluginCodingHomeworkReview(): Prisma.PluginCodingHomeworkReviewDelegate<ExtArgs>;
+
+  /**
+   * `prisma.pluginCodingHomeworkDraft`: Exposes CRUD operations for the **PluginCodingHomeworkDraft** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more PluginCodingHomeworkDrafts
+    * const pluginCodingHomeworkDrafts = await prisma.pluginCodingHomeworkDraft.findMany()
+    * ```
+    */
+  get pluginCodingHomeworkDraft(): Prisma.PluginCodingHomeworkDraftDelegate<ExtArgs>;
+
+  /**
+   * `prisma.pluginCodingHomeworkTeacherSolution`: Exposes CRUD operations for the **PluginCodingHomeworkTeacherSolution** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more PluginCodingHomeworkTeacherSolutions
+    * const pluginCodingHomeworkTeacherSolutions = await prisma.pluginCodingHomeworkTeacherSolution.findMany()
+    * ```
+    */
+  get pluginCodingHomeworkTeacherSolution(): Prisma.PluginCodingHomeworkTeacherSolutionDelegate<ExtArgs>;
 }
 
 export namespace Prisma {
@@ -847,7 +878,9 @@ export namespace Prisma {
     PluginCodingHomeworkSubmissionFile: 'PluginCodingHomeworkSubmissionFile',
     PluginCodingHomeworkSubmissionFunction: 'PluginCodingHomeworkSubmissionFunction',
     PluginCodingHomeworkChallengeQuestion: 'PluginCodingHomeworkChallengeQuestion',
-    PluginCodingHomeworkReview: 'PluginCodingHomeworkReview'
+    PluginCodingHomeworkReview: 'PluginCodingHomeworkReview',
+    PluginCodingHomeworkDraft: 'PluginCodingHomeworkDraft',
+    PluginCodingHomeworkTeacherSolution: 'PluginCodingHomeworkTeacherSolution'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -863,7 +896,7 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, ClientOptions = {}> = {
     meta: {
-      modelProps: "pluginCodingHomeworkAssignment" | "pluginBankCodingHomeworkAssignment" | "pluginCodingHomeworkSubmissionRequirementSet" | "pluginBankCodingHomeworkSubmissionRequirementSet" | "pluginCodingHomeworkAttachment" | "pluginCodingHomeworkDocumentationSnapshot" | "pluginCodingHomeworkReferenceFunction" | "pluginCodingHomeworkSubmission" | "pluginCodingHomeworkSubmissionFile" | "pluginCodingHomeworkSubmissionFunction" | "pluginCodingHomeworkChallengeQuestion" | "pluginCodingHomeworkReview"
+      modelProps: "pluginCodingHomeworkAssignment" | "pluginBankCodingHomeworkAssignment" | "pluginCodingHomeworkSubmissionRequirementSet" | "pluginBankCodingHomeworkSubmissionRequirementSet" | "pluginCodingHomeworkAttachment" | "pluginCodingHomeworkDocumentationSnapshot" | "pluginCodingHomeworkReferenceFunction" | "pluginCodingHomeworkSubmission" | "pluginCodingHomeworkSubmissionFile" | "pluginCodingHomeworkSubmissionFunction" | "pluginCodingHomeworkChallengeQuestion" | "pluginCodingHomeworkReview" | "pluginCodingHomeworkDraft" | "pluginCodingHomeworkTeacherSolution"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1704,6 +1737,146 @@ export namespace Prisma {
           count: {
             args: Prisma.PluginCodingHomeworkReviewCountArgs<ExtArgs>
             result: $Utils.Optional<PluginCodingHomeworkReviewCountAggregateOutputType> | number
+          }
+        }
+      }
+      PluginCodingHomeworkDraft: {
+        payload: Prisma.$PluginCodingHomeworkDraftPayload<ExtArgs>
+        fields: Prisma.PluginCodingHomeworkDraftFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.PluginCodingHomeworkDraftFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkDraftPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.PluginCodingHomeworkDraftFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkDraftPayload>
+          }
+          findFirst: {
+            args: Prisma.PluginCodingHomeworkDraftFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkDraftPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.PluginCodingHomeworkDraftFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkDraftPayload>
+          }
+          findMany: {
+            args: Prisma.PluginCodingHomeworkDraftFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkDraftPayload>[]
+          }
+          create: {
+            args: Prisma.PluginCodingHomeworkDraftCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkDraftPayload>
+          }
+          createMany: {
+            args: Prisma.PluginCodingHomeworkDraftCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.PluginCodingHomeworkDraftCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkDraftPayload>[]
+          }
+          delete: {
+            args: Prisma.PluginCodingHomeworkDraftDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkDraftPayload>
+          }
+          update: {
+            args: Prisma.PluginCodingHomeworkDraftUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkDraftPayload>
+          }
+          deleteMany: {
+            args: Prisma.PluginCodingHomeworkDraftDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.PluginCodingHomeworkDraftUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.PluginCodingHomeworkDraftUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkDraftPayload>
+          }
+          aggregate: {
+            args: Prisma.PluginCodingHomeworkDraftAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregatePluginCodingHomeworkDraft>
+          }
+          groupBy: {
+            args: Prisma.PluginCodingHomeworkDraftGroupByArgs<ExtArgs>
+            result: $Utils.Optional<PluginCodingHomeworkDraftGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.PluginCodingHomeworkDraftCountArgs<ExtArgs>
+            result: $Utils.Optional<PluginCodingHomeworkDraftCountAggregateOutputType> | number
+          }
+        }
+      }
+      PluginCodingHomeworkTeacherSolution: {
+        payload: Prisma.$PluginCodingHomeworkTeacherSolutionPayload<ExtArgs>
+        fields: Prisma.PluginCodingHomeworkTeacherSolutionFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload>
+          }
+          findFirst: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload>
+          }
+          findMany: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload>[]
+          }
+          create: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload>
+          }
+          createMany: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload>[]
+          }
+          delete: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload>
+          }
+          update: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload>
+          }
+          deleteMany: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload>
+          }
+          aggregate: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregatePluginCodingHomeworkTeacherSolution>
+          }
+          groupBy: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionGroupByArgs<ExtArgs>
+            result: $Utils.Optional<PluginCodingHomeworkTeacherSolutionGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.PluginCodingHomeworkTeacherSolutionCountArgs<ExtArgs>
+            result: $Utils.Optional<PluginCodingHomeworkTeacherSolutionCountAggregateOutputType> | number
           }
         }
       }
@@ -14238,6 +14411,1852 @@ export namespace Prisma {
 
 
   /**
+   * Model PluginCodingHomeworkDraft
+   */
+
+  export type AggregatePluginCodingHomeworkDraft = {
+    _count: PluginCodingHomeworkDraftCountAggregateOutputType | null
+    _avg: PluginCodingHomeworkDraftAvgAggregateOutputType | null
+    _sum: PluginCodingHomeworkDraftSumAggregateOutputType | null
+    _min: PluginCodingHomeworkDraftMinAggregateOutputType | null
+    _max: PluginCodingHomeworkDraftMaxAggregateOutputType | null
+  }
+
+  export type PluginCodingHomeworkDraftAvgAggregateOutputType = {
+    revision: number | null
+  }
+
+  export type PluginCodingHomeworkDraftSumAggregateOutputType = {
+    revision: number | null
+  }
+
+  export type PluginCodingHomeworkDraftMinAggregateOutputType = {
+    id: string | null
+    activityId: string | null
+    groupId: string | null
+    userId: string | null
+    revision: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type PluginCodingHomeworkDraftMaxAggregateOutputType = {
+    id: string | null
+    activityId: string | null
+    groupId: string | null
+    userId: string | null
+    revision: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type PluginCodingHomeworkDraftCountAggregateOutputType = {
+    id: number
+    activityId: number
+    groupId: number
+    userId: number
+    revision: number
+    files: number
+    folders: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type PluginCodingHomeworkDraftAvgAggregateInputType = {
+    revision?: true
+  }
+
+  export type PluginCodingHomeworkDraftSumAggregateInputType = {
+    revision?: true
+  }
+
+  export type PluginCodingHomeworkDraftMinAggregateInputType = {
+    id?: true
+    activityId?: true
+    groupId?: true
+    userId?: true
+    revision?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type PluginCodingHomeworkDraftMaxAggregateInputType = {
+    id?: true
+    activityId?: true
+    groupId?: true
+    userId?: true
+    revision?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type PluginCodingHomeworkDraftCountAggregateInputType = {
+    id?: true
+    activityId?: true
+    groupId?: true
+    userId?: true
+    revision?: true
+    files?: true
+    folders?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type PluginCodingHomeworkDraftAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PluginCodingHomeworkDraft to aggregate.
+     */
+    where?: PluginCodingHomeworkDraftWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PluginCodingHomeworkDrafts to fetch.
+     */
+    orderBy?: PluginCodingHomeworkDraftOrderByWithRelationInput | PluginCodingHomeworkDraftOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: PluginCodingHomeworkDraftWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PluginCodingHomeworkDrafts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PluginCodingHomeworkDrafts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned PluginCodingHomeworkDrafts
+    **/
+    _count?: true | PluginCodingHomeworkDraftCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: PluginCodingHomeworkDraftAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: PluginCodingHomeworkDraftSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: PluginCodingHomeworkDraftMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: PluginCodingHomeworkDraftMaxAggregateInputType
+  }
+
+  export type GetPluginCodingHomeworkDraftAggregateType<T extends PluginCodingHomeworkDraftAggregateArgs> = {
+        [P in keyof T & keyof AggregatePluginCodingHomeworkDraft]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregatePluginCodingHomeworkDraft[P]>
+      : GetScalarType<T[P], AggregatePluginCodingHomeworkDraft[P]>
+  }
+
+
+
+
+  export type PluginCodingHomeworkDraftGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PluginCodingHomeworkDraftWhereInput
+    orderBy?: PluginCodingHomeworkDraftOrderByWithAggregationInput | PluginCodingHomeworkDraftOrderByWithAggregationInput[]
+    by: PluginCodingHomeworkDraftScalarFieldEnum[] | PluginCodingHomeworkDraftScalarFieldEnum
+    having?: PluginCodingHomeworkDraftScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: PluginCodingHomeworkDraftCountAggregateInputType | true
+    _avg?: PluginCodingHomeworkDraftAvgAggregateInputType
+    _sum?: PluginCodingHomeworkDraftSumAggregateInputType
+    _min?: PluginCodingHomeworkDraftMinAggregateInputType
+    _max?: PluginCodingHomeworkDraftMaxAggregateInputType
+  }
+
+  export type PluginCodingHomeworkDraftGroupByOutputType = {
+    id: string
+    activityId: string
+    groupId: string
+    userId: string
+    revision: number
+    files: JsonValue
+    folders: JsonValue
+    createdAt: Date
+    updatedAt: Date
+    _count: PluginCodingHomeworkDraftCountAggregateOutputType | null
+    _avg: PluginCodingHomeworkDraftAvgAggregateOutputType | null
+    _sum: PluginCodingHomeworkDraftSumAggregateOutputType | null
+    _min: PluginCodingHomeworkDraftMinAggregateOutputType | null
+    _max: PluginCodingHomeworkDraftMaxAggregateOutputType | null
+  }
+
+  type GetPluginCodingHomeworkDraftGroupByPayload<T extends PluginCodingHomeworkDraftGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<PluginCodingHomeworkDraftGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof PluginCodingHomeworkDraftGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], PluginCodingHomeworkDraftGroupByOutputType[P]>
+            : GetScalarType<T[P], PluginCodingHomeworkDraftGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type PluginCodingHomeworkDraftSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    activityId?: boolean
+    groupId?: boolean
+    userId?: boolean
+    revision?: boolean
+    files?: boolean
+    folders?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["pluginCodingHomeworkDraft"]>
+
+  export type PluginCodingHomeworkDraftSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    activityId?: boolean
+    groupId?: boolean
+    userId?: boolean
+    revision?: boolean
+    files?: boolean
+    folders?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["pluginCodingHomeworkDraft"]>
+
+  export type PluginCodingHomeworkDraftSelectScalar = {
+    id?: boolean
+    activityId?: boolean
+    groupId?: boolean
+    userId?: boolean
+    revision?: boolean
+    files?: boolean
+    folders?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+
+  export type $PluginCodingHomeworkDraftPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "PluginCodingHomeworkDraft"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      activityId: string
+      groupId: string
+      userId: string
+      revision: number
+      files: Prisma.JsonValue
+      folders: Prisma.JsonValue
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["pluginCodingHomeworkDraft"]>
+    composites: {}
+  }
+
+  type PluginCodingHomeworkDraftGetPayload<S extends boolean | null | undefined | PluginCodingHomeworkDraftDefaultArgs> = $Result.GetResult<Prisma.$PluginCodingHomeworkDraftPayload, S>
+
+  type PluginCodingHomeworkDraftCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<PluginCodingHomeworkDraftFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: PluginCodingHomeworkDraftCountAggregateInputType | true
+    }
+
+  export interface PluginCodingHomeworkDraftDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['PluginCodingHomeworkDraft'], meta: { name: 'PluginCodingHomeworkDraft' } }
+    /**
+     * Find zero or one PluginCodingHomeworkDraft that matches the filter.
+     * @param {PluginCodingHomeworkDraftFindUniqueArgs} args - Arguments to find a PluginCodingHomeworkDraft
+     * @example
+     * // Get one PluginCodingHomeworkDraft
+     * const pluginCodingHomeworkDraft = await prisma.pluginCodingHomeworkDraft.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends PluginCodingHomeworkDraftFindUniqueArgs>(args: SelectSubset<T, PluginCodingHomeworkDraftFindUniqueArgs<ExtArgs>>): Prisma__PluginCodingHomeworkDraftClient<$Result.GetResult<Prisma.$PluginCodingHomeworkDraftPayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one PluginCodingHomeworkDraft that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {PluginCodingHomeworkDraftFindUniqueOrThrowArgs} args - Arguments to find a PluginCodingHomeworkDraft
+     * @example
+     * // Get one PluginCodingHomeworkDraft
+     * const pluginCodingHomeworkDraft = await prisma.pluginCodingHomeworkDraft.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends PluginCodingHomeworkDraftFindUniqueOrThrowArgs>(args: SelectSubset<T, PluginCodingHomeworkDraftFindUniqueOrThrowArgs<ExtArgs>>): Prisma__PluginCodingHomeworkDraftClient<$Result.GetResult<Prisma.$PluginCodingHomeworkDraftPayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first PluginCodingHomeworkDraft that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkDraftFindFirstArgs} args - Arguments to find a PluginCodingHomeworkDraft
+     * @example
+     * // Get one PluginCodingHomeworkDraft
+     * const pluginCodingHomeworkDraft = await prisma.pluginCodingHomeworkDraft.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends PluginCodingHomeworkDraftFindFirstArgs>(args?: SelectSubset<T, PluginCodingHomeworkDraftFindFirstArgs<ExtArgs>>): Prisma__PluginCodingHomeworkDraftClient<$Result.GetResult<Prisma.$PluginCodingHomeworkDraftPayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first PluginCodingHomeworkDraft that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkDraftFindFirstOrThrowArgs} args - Arguments to find a PluginCodingHomeworkDraft
+     * @example
+     * // Get one PluginCodingHomeworkDraft
+     * const pluginCodingHomeworkDraft = await prisma.pluginCodingHomeworkDraft.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends PluginCodingHomeworkDraftFindFirstOrThrowArgs>(args?: SelectSubset<T, PluginCodingHomeworkDraftFindFirstOrThrowArgs<ExtArgs>>): Prisma__PluginCodingHomeworkDraftClient<$Result.GetResult<Prisma.$PluginCodingHomeworkDraftPayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more PluginCodingHomeworkDrafts that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkDraftFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all PluginCodingHomeworkDrafts
+     * const pluginCodingHomeworkDrafts = await prisma.pluginCodingHomeworkDraft.findMany()
+     * 
+     * // Get first 10 PluginCodingHomeworkDrafts
+     * const pluginCodingHomeworkDrafts = await prisma.pluginCodingHomeworkDraft.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const pluginCodingHomeworkDraftWithIdOnly = await prisma.pluginCodingHomeworkDraft.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends PluginCodingHomeworkDraftFindManyArgs>(args?: SelectSubset<T, PluginCodingHomeworkDraftFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PluginCodingHomeworkDraftPayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a PluginCodingHomeworkDraft.
+     * @param {PluginCodingHomeworkDraftCreateArgs} args - Arguments to create a PluginCodingHomeworkDraft.
+     * @example
+     * // Create one PluginCodingHomeworkDraft
+     * const PluginCodingHomeworkDraft = await prisma.pluginCodingHomeworkDraft.create({
+     *   data: {
+     *     // ... data to create a PluginCodingHomeworkDraft
+     *   }
+     * })
+     * 
+     */
+    create<T extends PluginCodingHomeworkDraftCreateArgs>(args: SelectSubset<T, PluginCodingHomeworkDraftCreateArgs<ExtArgs>>): Prisma__PluginCodingHomeworkDraftClient<$Result.GetResult<Prisma.$PluginCodingHomeworkDraftPayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many PluginCodingHomeworkDrafts.
+     * @param {PluginCodingHomeworkDraftCreateManyArgs} args - Arguments to create many PluginCodingHomeworkDrafts.
+     * @example
+     * // Create many PluginCodingHomeworkDrafts
+     * const pluginCodingHomeworkDraft = await prisma.pluginCodingHomeworkDraft.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends PluginCodingHomeworkDraftCreateManyArgs>(args?: SelectSubset<T, PluginCodingHomeworkDraftCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many PluginCodingHomeworkDrafts and returns the data saved in the database.
+     * @param {PluginCodingHomeworkDraftCreateManyAndReturnArgs} args - Arguments to create many PluginCodingHomeworkDrafts.
+     * @example
+     * // Create many PluginCodingHomeworkDrafts
+     * const pluginCodingHomeworkDraft = await prisma.pluginCodingHomeworkDraft.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many PluginCodingHomeworkDrafts and only return the `id`
+     * const pluginCodingHomeworkDraftWithIdOnly = await prisma.pluginCodingHomeworkDraft.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends PluginCodingHomeworkDraftCreateManyAndReturnArgs>(args?: SelectSubset<T, PluginCodingHomeworkDraftCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PluginCodingHomeworkDraftPayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a PluginCodingHomeworkDraft.
+     * @param {PluginCodingHomeworkDraftDeleteArgs} args - Arguments to delete one PluginCodingHomeworkDraft.
+     * @example
+     * // Delete one PluginCodingHomeworkDraft
+     * const PluginCodingHomeworkDraft = await prisma.pluginCodingHomeworkDraft.delete({
+     *   where: {
+     *     // ... filter to delete one PluginCodingHomeworkDraft
+     *   }
+     * })
+     * 
+     */
+    delete<T extends PluginCodingHomeworkDraftDeleteArgs>(args: SelectSubset<T, PluginCodingHomeworkDraftDeleteArgs<ExtArgs>>): Prisma__PluginCodingHomeworkDraftClient<$Result.GetResult<Prisma.$PluginCodingHomeworkDraftPayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one PluginCodingHomeworkDraft.
+     * @param {PluginCodingHomeworkDraftUpdateArgs} args - Arguments to update one PluginCodingHomeworkDraft.
+     * @example
+     * // Update one PluginCodingHomeworkDraft
+     * const pluginCodingHomeworkDraft = await prisma.pluginCodingHomeworkDraft.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends PluginCodingHomeworkDraftUpdateArgs>(args: SelectSubset<T, PluginCodingHomeworkDraftUpdateArgs<ExtArgs>>): Prisma__PluginCodingHomeworkDraftClient<$Result.GetResult<Prisma.$PluginCodingHomeworkDraftPayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more PluginCodingHomeworkDrafts.
+     * @param {PluginCodingHomeworkDraftDeleteManyArgs} args - Arguments to filter PluginCodingHomeworkDrafts to delete.
+     * @example
+     * // Delete a few PluginCodingHomeworkDrafts
+     * const { count } = await prisma.pluginCodingHomeworkDraft.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends PluginCodingHomeworkDraftDeleteManyArgs>(args?: SelectSubset<T, PluginCodingHomeworkDraftDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more PluginCodingHomeworkDrafts.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkDraftUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many PluginCodingHomeworkDrafts
+     * const pluginCodingHomeworkDraft = await prisma.pluginCodingHomeworkDraft.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends PluginCodingHomeworkDraftUpdateManyArgs>(args: SelectSubset<T, PluginCodingHomeworkDraftUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one PluginCodingHomeworkDraft.
+     * @param {PluginCodingHomeworkDraftUpsertArgs} args - Arguments to update or create a PluginCodingHomeworkDraft.
+     * @example
+     * // Update or create a PluginCodingHomeworkDraft
+     * const pluginCodingHomeworkDraft = await prisma.pluginCodingHomeworkDraft.upsert({
+     *   create: {
+     *     // ... data to create a PluginCodingHomeworkDraft
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the PluginCodingHomeworkDraft we want to update
+     *   }
+     * })
+     */
+    upsert<T extends PluginCodingHomeworkDraftUpsertArgs>(args: SelectSubset<T, PluginCodingHomeworkDraftUpsertArgs<ExtArgs>>): Prisma__PluginCodingHomeworkDraftClient<$Result.GetResult<Prisma.$PluginCodingHomeworkDraftPayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of PluginCodingHomeworkDrafts.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkDraftCountArgs} args - Arguments to filter PluginCodingHomeworkDrafts to count.
+     * @example
+     * // Count the number of PluginCodingHomeworkDrafts
+     * const count = await prisma.pluginCodingHomeworkDraft.count({
+     *   where: {
+     *     // ... the filter for the PluginCodingHomeworkDrafts we want to count
+     *   }
+     * })
+    **/
+    count<T extends PluginCodingHomeworkDraftCountArgs>(
+      args?: Subset<T, PluginCodingHomeworkDraftCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], PluginCodingHomeworkDraftCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a PluginCodingHomeworkDraft.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkDraftAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends PluginCodingHomeworkDraftAggregateArgs>(args: Subset<T, PluginCodingHomeworkDraftAggregateArgs>): Prisma.PrismaPromise<GetPluginCodingHomeworkDraftAggregateType<T>>
+
+    /**
+     * Group by PluginCodingHomeworkDraft.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkDraftGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends PluginCodingHomeworkDraftGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: PluginCodingHomeworkDraftGroupByArgs['orderBy'] }
+        : { orderBy?: PluginCodingHomeworkDraftGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, PluginCodingHomeworkDraftGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetPluginCodingHomeworkDraftGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the PluginCodingHomeworkDraft model
+   */
+  readonly fields: PluginCodingHomeworkDraftFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for PluginCodingHomeworkDraft.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__PluginCodingHomeworkDraftClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the PluginCodingHomeworkDraft model
+   */ 
+  interface PluginCodingHomeworkDraftFieldRefs {
+    readonly id: FieldRef<"PluginCodingHomeworkDraft", 'String'>
+    readonly activityId: FieldRef<"PluginCodingHomeworkDraft", 'String'>
+    readonly groupId: FieldRef<"PluginCodingHomeworkDraft", 'String'>
+    readonly userId: FieldRef<"PluginCodingHomeworkDraft", 'String'>
+    readonly revision: FieldRef<"PluginCodingHomeworkDraft", 'Int'>
+    readonly files: FieldRef<"PluginCodingHomeworkDraft", 'Json'>
+    readonly folders: FieldRef<"PluginCodingHomeworkDraft", 'Json'>
+    readonly createdAt: FieldRef<"PluginCodingHomeworkDraft", 'DateTime'>
+    readonly updatedAt: FieldRef<"PluginCodingHomeworkDraft", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * PluginCodingHomeworkDraft findUnique
+   */
+  export type PluginCodingHomeworkDraftFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkDraft
+     */
+    select?: PluginCodingHomeworkDraftSelect<ExtArgs> | null
+    /**
+     * Filter, which PluginCodingHomeworkDraft to fetch.
+     */
+    where: PluginCodingHomeworkDraftWhereUniqueInput
+  }
+
+  /**
+   * PluginCodingHomeworkDraft findUniqueOrThrow
+   */
+  export type PluginCodingHomeworkDraftFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkDraft
+     */
+    select?: PluginCodingHomeworkDraftSelect<ExtArgs> | null
+    /**
+     * Filter, which PluginCodingHomeworkDraft to fetch.
+     */
+    where: PluginCodingHomeworkDraftWhereUniqueInput
+  }
+
+  /**
+   * PluginCodingHomeworkDraft findFirst
+   */
+  export type PluginCodingHomeworkDraftFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkDraft
+     */
+    select?: PluginCodingHomeworkDraftSelect<ExtArgs> | null
+    /**
+     * Filter, which PluginCodingHomeworkDraft to fetch.
+     */
+    where?: PluginCodingHomeworkDraftWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PluginCodingHomeworkDrafts to fetch.
+     */
+    orderBy?: PluginCodingHomeworkDraftOrderByWithRelationInput | PluginCodingHomeworkDraftOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PluginCodingHomeworkDrafts.
+     */
+    cursor?: PluginCodingHomeworkDraftWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PluginCodingHomeworkDrafts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PluginCodingHomeworkDrafts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PluginCodingHomeworkDrafts.
+     */
+    distinct?: PluginCodingHomeworkDraftScalarFieldEnum | PluginCodingHomeworkDraftScalarFieldEnum[]
+  }
+
+  /**
+   * PluginCodingHomeworkDraft findFirstOrThrow
+   */
+  export type PluginCodingHomeworkDraftFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkDraft
+     */
+    select?: PluginCodingHomeworkDraftSelect<ExtArgs> | null
+    /**
+     * Filter, which PluginCodingHomeworkDraft to fetch.
+     */
+    where?: PluginCodingHomeworkDraftWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PluginCodingHomeworkDrafts to fetch.
+     */
+    orderBy?: PluginCodingHomeworkDraftOrderByWithRelationInput | PluginCodingHomeworkDraftOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PluginCodingHomeworkDrafts.
+     */
+    cursor?: PluginCodingHomeworkDraftWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PluginCodingHomeworkDrafts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PluginCodingHomeworkDrafts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PluginCodingHomeworkDrafts.
+     */
+    distinct?: PluginCodingHomeworkDraftScalarFieldEnum | PluginCodingHomeworkDraftScalarFieldEnum[]
+  }
+
+  /**
+   * PluginCodingHomeworkDraft findMany
+   */
+  export type PluginCodingHomeworkDraftFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkDraft
+     */
+    select?: PluginCodingHomeworkDraftSelect<ExtArgs> | null
+    /**
+     * Filter, which PluginCodingHomeworkDrafts to fetch.
+     */
+    where?: PluginCodingHomeworkDraftWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PluginCodingHomeworkDrafts to fetch.
+     */
+    orderBy?: PluginCodingHomeworkDraftOrderByWithRelationInput | PluginCodingHomeworkDraftOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing PluginCodingHomeworkDrafts.
+     */
+    cursor?: PluginCodingHomeworkDraftWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PluginCodingHomeworkDrafts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PluginCodingHomeworkDrafts.
+     */
+    skip?: number
+    distinct?: PluginCodingHomeworkDraftScalarFieldEnum | PluginCodingHomeworkDraftScalarFieldEnum[]
+  }
+
+  /**
+   * PluginCodingHomeworkDraft create
+   */
+  export type PluginCodingHomeworkDraftCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkDraft
+     */
+    select?: PluginCodingHomeworkDraftSelect<ExtArgs> | null
+    /**
+     * The data needed to create a PluginCodingHomeworkDraft.
+     */
+    data: XOR<PluginCodingHomeworkDraftCreateInput, PluginCodingHomeworkDraftUncheckedCreateInput>
+  }
+
+  /**
+   * PluginCodingHomeworkDraft createMany
+   */
+  export type PluginCodingHomeworkDraftCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many PluginCodingHomeworkDrafts.
+     */
+    data: PluginCodingHomeworkDraftCreateManyInput | PluginCodingHomeworkDraftCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * PluginCodingHomeworkDraft createManyAndReturn
+   */
+  export type PluginCodingHomeworkDraftCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkDraft
+     */
+    select?: PluginCodingHomeworkDraftSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many PluginCodingHomeworkDrafts.
+     */
+    data: PluginCodingHomeworkDraftCreateManyInput | PluginCodingHomeworkDraftCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * PluginCodingHomeworkDraft update
+   */
+  export type PluginCodingHomeworkDraftUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkDraft
+     */
+    select?: PluginCodingHomeworkDraftSelect<ExtArgs> | null
+    /**
+     * The data needed to update a PluginCodingHomeworkDraft.
+     */
+    data: XOR<PluginCodingHomeworkDraftUpdateInput, PluginCodingHomeworkDraftUncheckedUpdateInput>
+    /**
+     * Choose, which PluginCodingHomeworkDraft to update.
+     */
+    where: PluginCodingHomeworkDraftWhereUniqueInput
+  }
+
+  /**
+   * PluginCodingHomeworkDraft updateMany
+   */
+  export type PluginCodingHomeworkDraftUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update PluginCodingHomeworkDrafts.
+     */
+    data: XOR<PluginCodingHomeworkDraftUpdateManyMutationInput, PluginCodingHomeworkDraftUncheckedUpdateManyInput>
+    /**
+     * Filter which PluginCodingHomeworkDrafts to update
+     */
+    where?: PluginCodingHomeworkDraftWhereInput
+  }
+
+  /**
+   * PluginCodingHomeworkDraft upsert
+   */
+  export type PluginCodingHomeworkDraftUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkDraft
+     */
+    select?: PluginCodingHomeworkDraftSelect<ExtArgs> | null
+    /**
+     * The filter to search for the PluginCodingHomeworkDraft to update in case it exists.
+     */
+    where: PluginCodingHomeworkDraftWhereUniqueInput
+    /**
+     * In case the PluginCodingHomeworkDraft found by the `where` argument doesn't exist, create a new PluginCodingHomeworkDraft with this data.
+     */
+    create: XOR<PluginCodingHomeworkDraftCreateInput, PluginCodingHomeworkDraftUncheckedCreateInput>
+    /**
+     * In case the PluginCodingHomeworkDraft was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<PluginCodingHomeworkDraftUpdateInput, PluginCodingHomeworkDraftUncheckedUpdateInput>
+  }
+
+  /**
+   * PluginCodingHomeworkDraft delete
+   */
+  export type PluginCodingHomeworkDraftDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkDraft
+     */
+    select?: PluginCodingHomeworkDraftSelect<ExtArgs> | null
+    /**
+     * Filter which PluginCodingHomeworkDraft to delete.
+     */
+    where: PluginCodingHomeworkDraftWhereUniqueInput
+  }
+
+  /**
+   * PluginCodingHomeworkDraft deleteMany
+   */
+  export type PluginCodingHomeworkDraftDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PluginCodingHomeworkDrafts to delete
+     */
+    where?: PluginCodingHomeworkDraftWhereInput
+  }
+
+  /**
+   * PluginCodingHomeworkDraft without action
+   */
+  export type PluginCodingHomeworkDraftDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkDraft
+     */
+    select?: PluginCodingHomeworkDraftSelect<ExtArgs> | null
+  }
+
+
+  /**
+   * Model PluginCodingHomeworkTeacherSolution
+   */
+
+  export type AggregatePluginCodingHomeworkTeacherSolution = {
+    _count: PluginCodingHomeworkTeacherSolutionCountAggregateOutputType | null
+    _min: PluginCodingHomeworkTeacherSolutionMinAggregateOutputType | null
+    _max: PluginCodingHomeworkTeacherSolutionMaxAggregateOutputType | null
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionMinAggregateOutputType = {
+    id: string | null
+    ownerKind: string | null
+    ownerId: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionMaxAggregateOutputType = {
+    id: string | null
+    ownerKind: string | null
+    ownerId: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionCountAggregateOutputType = {
+    id: number
+    ownerKind: number
+    ownerId: number
+    files: number
+    functions: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type PluginCodingHomeworkTeacherSolutionMinAggregateInputType = {
+    id?: true
+    ownerKind?: true
+    ownerId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionMaxAggregateInputType = {
+    id?: true
+    ownerKind?: true
+    ownerId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionCountAggregateInputType = {
+    id?: true
+    ownerKind?: true
+    ownerId?: true
+    files?: true
+    functions?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PluginCodingHomeworkTeacherSolution to aggregate.
+     */
+    where?: PluginCodingHomeworkTeacherSolutionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PluginCodingHomeworkTeacherSolutions to fetch.
+     */
+    orderBy?: PluginCodingHomeworkTeacherSolutionOrderByWithRelationInput | PluginCodingHomeworkTeacherSolutionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: PluginCodingHomeworkTeacherSolutionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PluginCodingHomeworkTeacherSolutions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PluginCodingHomeworkTeacherSolutions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned PluginCodingHomeworkTeacherSolutions
+    **/
+    _count?: true | PluginCodingHomeworkTeacherSolutionCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: PluginCodingHomeworkTeacherSolutionMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: PluginCodingHomeworkTeacherSolutionMaxAggregateInputType
+  }
+
+  export type GetPluginCodingHomeworkTeacherSolutionAggregateType<T extends PluginCodingHomeworkTeacherSolutionAggregateArgs> = {
+        [P in keyof T & keyof AggregatePluginCodingHomeworkTeacherSolution]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregatePluginCodingHomeworkTeacherSolution[P]>
+      : GetScalarType<T[P], AggregatePluginCodingHomeworkTeacherSolution[P]>
+  }
+
+
+
+
+  export type PluginCodingHomeworkTeacherSolutionGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PluginCodingHomeworkTeacherSolutionWhereInput
+    orderBy?: PluginCodingHomeworkTeacherSolutionOrderByWithAggregationInput | PluginCodingHomeworkTeacherSolutionOrderByWithAggregationInput[]
+    by: PluginCodingHomeworkTeacherSolutionScalarFieldEnum[] | PluginCodingHomeworkTeacherSolutionScalarFieldEnum
+    having?: PluginCodingHomeworkTeacherSolutionScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: PluginCodingHomeworkTeacherSolutionCountAggregateInputType | true
+    _min?: PluginCodingHomeworkTeacherSolutionMinAggregateInputType
+    _max?: PluginCodingHomeworkTeacherSolutionMaxAggregateInputType
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionGroupByOutputType = {
+    id: string
+    ownerKind: string
+    ownerId: string
+    files: JsonValue
+    functions: JsonValue
+    createdAt: Date
+    updatedAt: Date
+    _count: PluginCodingHomeworkTeacherSolutionCountAggregateOutputType | null
+    _min: PluginCodingHomeworkTeacherSolutionMinAggregateOutputType | null
+    _max: PluginCodingHomeworkTeacherSolutionMaxAggregateOutputType | null
+  }
+
+  type GetPluginCodingHomeworkTeacherSolutionGroupByPayload<T extends PluginCodingHomeworkTeacherSolutionGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<PluginCodingHomeworkTeacherSolutionGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof PluginCodingHomeworkTeacherSolutionGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], PluginCodingHomeworkTeacherSolutionGroupByOutputType[P]>
+            : GetScalarType<T[P], PluginCodingHomeworkTeacherSolutionGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type PluginCodingHomeworkTeacherSolutionSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerKind?: boolean
+    ownerId?: boolean
+    files?: boolean
+    functions?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["pluginCodingHomeworkTeacherSolution"]>
+
+  export type PluginCodingHomeworkTeacherSolutionSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerKind?: boolean
+    ownerId?: boolean
+    files?: boolean
+    functions?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["pluginCodingHomeworkTeacherSolution"]>
+
+  export type PluginCodingHomeworkTeacherSolutionSelectScalar = {
+    id?: boolean
+    ownerKind?: boolean
+    ownerId?: boolean
+    files?: boolean
+    functions?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+
+  export type $PluginCodingHomeworkTeacherSolutionPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "PluginCodingHomeworkTeacherSolution"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      ownerKind: string
+      ownerId: string
+      files: Prisma.JsonValue
+      functions: Prisma.JsonValue
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["pluginCodingHomeworkTeacherSolution"]>
+    composites: {}
+  }
+
+  type PluginCodingHomeworkTeacherSolutionGetPayload<S extends boolean | null | undefined | PluginCodingHomeworkTeacherSolutionDefaultArgs> = $Result.GetResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload, S>
+
+  type PluginCodingHomeworkTeacherSolutionCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<PluginCodingHomeworkTeacherSolutionFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: PluginCodingHomeworkTeacherSolutionCountAggregateInputType | true
+    }
+
+  export interface PluginCodingHomeworkTeacherSolutionDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['PluginCodingHomeworkTeacherSolution'], meta: { name: 'PluginCodingHomeworkTeacherSolution' } }
+    /**
+     * Find zero or one PluginCodingHomeworkTeacherSolution that matches the filter.
+     * @param {PluginCodingHomeworkTeacherSolutionFindUniqueArgs} args - Arguments to find a PluginCodingHomeworkTeacherSolution
+     * @example
+     * // Get one PluginCodingHomeworkTeacherSolution
+     * const pluginCodingHomeworkTeacherSolution = await prisma.pluginCodingHomeworkTeacherSolution.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends PluginCodingHomeworkTeacherSolutionFindUniqueArgs>(args: SelectSubset<T, PluginCodingHomeworkTeacherSolutionFindUniqueArgs<ExtArgs>>): Prisma__PluginCodingHomeworkTeacherSolutionClient<$Result.GetResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one PluginCodingHomeworkTeacherSolution that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {PluginCodingHomeworkTeacherSolutionFindUniqueOrThrowArgs} args - Arguments to find a PluginCodingHomeworkTeacherSolution
+     * @example
+     * // Get one PluginCodingHomeworkTeacherSolution
+     * const pluginCodingHomeworkTeacherSolution = await prisma.pluginCodingHomeworkTeacherSolution.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends PluginCodingHomeworkTeacherSolutionFindUniqueOrThrowArgs>(args: SelectSubset<T, PluginCodingHomeworkTeacherSolutionFindUniqueOrThrowArgs<ExtArgs>>): Prisma__PluginCodingHomeworkTeacherSolutionClient<$Result.GetResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first PluginCodingHomeworkTeacherSolution that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkTeacherSolutionFindFirstArgs} args - Arguments to find a PluginCodingHomeworkTeacherSolution
+     * @example
+     * // Get one PluginCodingHomeworkTeacherSolution
+     * const pluginCodingHomeworkTeacherSolution = await prisma.pluginCodingHomeworkTeacherSolution.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends PluginCodingHomeworkTeacherSolutionFindFirstArgs>(args?: SelectSubset<T, PluginCodingHomeworkTeacherSolutionFindFirstArgs<ExtArgs>>): Prisma__PluginCodingHomeworkTeacherSolutionClient<$Result.GetResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first PluginCodingHomeworkTeacherSolution that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkTeacherSolutionFindFirstOrThrowArgs} args - Arguments to find a PluginCodingHomeworkTeacherSolution
+     * @example
+     * // Get one PluginCodingHomeworkTeacherSolution
+     * const pluginCodingHomeworkTeacherSolution = await prisma.pluginCodingHomeworkTeacherSolution.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends PluginCodingHomeworkTeacherSolutionFindFirstOrThrowArgs>(args?: SelectSubset<T, PluginCodingHomeworkTeacherSolutionFindFirstOrThrowArgs<ExtArgs>>): Prisma__PluginCodingHomeworkTeacherSolutionClient<$Result.GetResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more PluginCodingHomeworkTeacherSolutions that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkTeacherSolutionFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all PluginCodingHomeworkTeacherSolutions
+     * const pluginCodingHomeworkTeacherSolutions = await prisma.pluginCodingHomeworkTeacherSolution.findMany()
+     * 
+     * // Get first 10 PluginCodingHomeworkTeacherSolutions
+     * const pluginCodingHomeworkTeacherSolutions = await prisma.pluginCodingHomeworkTeacherSolution.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const pluginCodingHomeworkTeacherSolutionWithIdOnly = await prisma.pluginCodingHomeworkTeacherSolution.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends PluginCodingHomeworkTeacherSolutionFindManyArgs>(args?: SelectSubset<T, PluginCodingHomeworkTeacherSolutionFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a PluginCodingHomeworkTeacherSolution.
+     * @param {PluginCodingHomeworkTeacherSolutionCreateArgs} args - Arguments to create a PluginCodingHomeworkTeacherSolution.
+     * @example
+     * // Create one PluginCodingHomeworkTeacherSolution
+     * const PluginCodingHomeworkTeacherSolution = await prisma.pluginCodingHomeworkTeacherSolution.create({
+     *   data: {
+     *     // ... data to create a PluginCodingHomeworkTeacherSolution
+     *   }
+     * })
+     * 
+     */
+    create<T extends PluginCodingHomeworkTeacherSolutionCreateArgs>(args: SelectSubset<T, PluginCodingHomeworkTeacherSolutionCreateArgs<ExtArgs>>): Prisma__PluginCodingHomeworkTeacherSolutionClient<$Result.GetResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many PluginCodingHomeworkTeacherSolutions.
+     * @param {PluginCodingHomeworkTeacherSolutionCreateManyArgs} args - Arguments to create many PluginCodingHomeworkTeacherSolutions.
+     * @example
+     * // Create many PluginCodingHomeworkTeacherSolutions
+     * const pluginCodingHomeworkTeacherSolution = await prisma.pluginCodingHomeworkTeacherSolution.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends PluginCodingHomeworkTeacherSolutionCreateManyArgs>(args?: SelectSubset<T, PluginCodingHomeworkTeacherSolutionCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many PluginCodingHomeworkTeacherSolutions and returns the data saved in the database.
+     * @param {PluginCodingHomeworkTeacherSolutionCreateManyAndReturnArgs} args - Arguments to create many PluginCodingHomeworkTeacherSolutions.
+     * @example
+     * // Create many PluginCodingHomeworkTeacherSolutions
+     * const pluginCodingHomeworkTeacherSolution = await prisma.pluginCodingHomeworkTeacherSolution.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many PluginCodingHomeworkTeacherSolutions and only return the `id`
+     * const pluginCodingHomeworkTeacherSolutionWithIdOnly = await prisma.pluginCodingHomeworkTeacherSolution.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends PluginCodingHomeworkTeacherSolutionCreateManyAndReturnArgs>(args?: SelectSubset<T, PluginCodingHomeworkTeacherSolutionCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a PluginCodingHomeworkTeacherSolution.
+     * @param {PluginCodingHomeworkTeacherSolutionDeleteArgs} args - Arguments to delete one PluginCodingHomeworkTeacherSolution.
+     * @example
+     * // Delete one PluginCodingHomeworkTeacherSolution
+     * const PluginCodingHomeworkTeacherSolution = await prisma.pluginCodingHomeworkTeacherSolution.delete({
+     *   where: {
+     *     // ... filter to delete one PluginCodingHomeworkTeacherSolution
+     *   }
+     * })
+     * 
+     */
+    delete<T extends PluginCodingHomeworkTeacherSolutionDeleteArgs>(args: SelectSubset<T, PluginCodingHomeworkTeacherSolutionDeleteArgs<ExtArgs>>): Prisma__PluginCodingHomeworkTeacherSolutionClient<$Result.GetResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one PluginCodingHomeworkTeacherSolution.
+     * @param {PluginCodingHomeworkTeacherSolutionUpdateArgs} args - Arguments to update one PluginCodingHomeworkTeacherSolution.
+     * @example
+     * // Update one PluginCodingHomeworkTeacherSolution
+     * const pluginCodingHomeworkTeacherSolution = await prisma.pluginCodingHomeworkTeacherSolution.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends PluginCodingHomeworkTeacherSolutionUpdateArgs>(args: SelectSubset<T, PluginCodingHomeworkTeacherSolutionUpdateArgs<ExtArgs>>): Prisma__PluginCodingHomeworkTeacherSolutionClient<$Result.GetResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more PluginCodingHomeworkTeacherSolutions.
+     * @param {PluginCodingHomeworkTeacherSolutionDeleteManyArgs} args - Arguments to filter PluginCodingHomeworkTeacherSolutions to delete.
+     * @example
+     * // Delete a few PluginCodingHomeworkTeacherSolutions
+     * const { count } = await prisma.pluginCodingHomeworkTeacherSolution.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends PluginCodingHomeworkTeacherSolutionDeleteManyArgs>(args?: SelectSubset<T, PluginCodingHomeworkTeacherSolutionDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more PluginCodingHomeworkTeacherSolutions.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkTeacherSolutionUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many PluginCodingHomeworkTeacherSolutions
+     * const pluginCodingHomeworkTeacherSolution = await prisma.pluginCodingHomeworkTeacherSolution.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends PluginCodingHomeworkTeacherSolutionUpdateManyArgs>(args: SelectSubset<T, PluginCodingHomeworkTeacherSolutionUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one PluginCodingHomeworkTeacherSolution.
+     * @param {PluginCodingHomeworkTeacherSolutionUpsertArgs} args - Arguments to update or create a PluginCodingHomeworkTeacherSolution.
+     * @example
+     * // Update or create a PluginCodingHomeworkTeacherSolution
+     * const pluginCodingHomeworkTeacherSolution = await prisma.pluginCodingHomeworkTeacherSolution.upsert({
+     *   create: {
+     *     // ... data to create a PluginCodingHomeworkTeacherSolution
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the PluginCodingHomeworkTeacherSolution we want to update
+     *   }
+     * })
+     */
+    upsert<T extends PluginCodingHomeworkTeacherSolutionUpsertArgs>(args: SelectSubset<T, PluginCodingHomeworkTeacherSolutionUpsertArgs<ExtArgs>>): Prisma__PluginCodingHomeworkTeacherSolutionClient<$Result.GetResult<Prisma.$PluginCodingHomeworkTeacherSolutionPayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of PluginCodingHomeworkTeacherSolutions.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkTeacherSolutionCountArgs} args - Arguments to filter PluginCodingHomeworkTeacherSolutions to count.
+     * @example
+     * // Count the number of PluginCodingHomeworkTeacherSolutions
+     * const count = await prisma.pluginCodingHomeworkTeacherSolution.count({
+     *   where: {
+     *     // ... the filter for the PluginCodingHomeworkTeacherSolutions we want to count
+     *   }
+     * })
+    **/
+    count<T extends PluginCodingHomeworkTeacherSolutionCountArgs>(
+      args?: Subset<T, PluginCodingHomeworkTeacherSolutionCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], PluginCodingHomeworkTeacherSolutionCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a PluginCodingHomeworkTeacherSolution.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkTeacherSolutionAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends PluginCodingHomeworkTeacherSolutionAggregateArgs>(args: Subset<T, PluginCodingHomeworkTeacherSolutionAggregateArgs>): Prisma.PrismaPromise<GetPluginCodingHomeworkTeacherSolutionAggregateType<T>>
+
+    /**
+     * Group by PluginCodingHomeworkTeacherSolution.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PluginCodingHomeworkTeacherSolutionGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends PluginCodingHomeworkTeacherSolutionGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: PluginCodingHomeworkTeacherSolutionGroupByArgs['orderBy'] }
+        : { orderBy?: PluginCodingHomeworkTeacherSolutionGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, PluginCodingHomeworkTeacherSolutionGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetPluginCodingHomeworkTeacherSolutionGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the PluginCodingHomeworkTeacherSolution model
+   */
+  readonly fields: PluginCodingHomeworkTeacherSolutionFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for PluginCodingHomeworkTeacherSolution.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__PluginCodingHomeworkTeacherSolutionClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the PluginCodingHomeworkTeacherSolution model
+   */ 
+  interface PluginCodingHomeworkTeacherSolutionFieldRefs {
+    readonly id: FieldRef<"PluginCodingHomeworkTeacherSolution", 'String'>
+    readonly ownerKind: FieldRef<"PluginCodingHomeworkTeacherSolution", 'String'>
+    readonly ownerId: FieldRef<"PluginCodingHomeworkTeacherSolution", 'String'>
+    readonly files: FieldRef<"PluginCodingHomeworkTeacherSolution", 'Json'>
+    readonly functions: FieldRef<"PluginCodingHomeworkTeacherSolution", 'Json'>
+    readonly createdAt: FieldRef<"PluginCodingHomeworkTeacherSolution", 'DateTime'>
+    readonly updatedAt: FieldRef<"PluginCodingHomeworkTeacherSolution", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * PluginCodingHomeworkTeacherSolution findUnique
+   */
+  export type PluginCodingHomeworkTeacherSolutionFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkTeacherSolution
+     */
+    select?: PluginCodingHomeworkTeacherSolutionSelect<ExtArgs> | null
+    /**
+     * Filter, which PluginCodingHomeworkTeacherSolution to fetch.
+     */
+    where: PluginCodingHomeworkTeacherSolutionWhereUniqueInput
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution findUniqueOrThrow
+   */
+  export type PluginCodingHomeworkTeacherSolutionFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkTeacherSolution
+     */
+    select?: PluginCodingHomeworkTeacherSolutionSelect<ExtArgs> | null
+    /**
+     * Filter, which PluginCodingHomeworkTeacherSolution to fetch.
+     */
+    where: PluginCodingHomeworkTeacherSolutionWhereUniqueInput
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution findFirst
+   */
+  export type PluginCodingHomeworkTeacherSolutionFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkTeacherSolution
+     */
+    select?: PluginCodingHomeworkTeacherSolutionSelect<ExtArgs> | null
+    /**
+     * Filter, which PluginCodingHomeworkTeacherSolution to fetch.
+     */
+    where?: PluginCodingHomeworkTeacherSolutionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PluginCodingHomeworkTeacherSolutions to fetch.
+     */
+    orderBy?: PluginCodingHomeworkTeacherSolutionOrderByWithRelationInput | PluginCodingHomeworkTeacherSolutionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PluginCodingHomeworkTeacherSolutions.
+     */
+    cursor?: PluginCodingHomeworkTeacherSolutionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PluginCodingHomeworkTeacherSolutions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PluginCodingHomeworkTeacherSolutions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PluginCodingHomeworkTeacherSolutions.
+     */
+    distinct?: PluginCodingHomeworkTeacherSolutionScalarFieldEnum | PluginCodingHomeworkTeacherSolutionScalarFieldEnum[]
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution findFirstOrThrow
+   */
+  export type PluginCodingHomeworkTeacherSolutionFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkTeacherSolution
+     */
+    select?: PluginCodingHomeworkTeacherSolutionSelect<ExtArgs> | null
+    /**
+     * Filter, which PluginCodingHomeworkTeacherSolution to fetch.
+     */
+    where?: PluginCodingHomeworkTeacherSolutionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PluginCodingHomeworkTeacherSolutions to fetch.
+     */
+    orderBy?: PluginCodingHomeworkTeacherSolutionOrderByWithRelationInput | PluginCodingHomeworkTeacherSolutionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PluginCodingHomeworkTeacherSolutions.
+     */
+    cursor?: PluginCodingHomeworkTeacherSolutionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PluginCodingHomeworkTeacherSolutions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PluginCodingHomeworkTeacherSolutions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PluginCodingHomeworkTeacherSolutions.
+     */
+    distinct?: PluginCodingHomeworkTeacherSolutionScalarFieldEnum | PluginCodingHomeworkTeacherSolutionScalarFieldEnum[]
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution findMany
+   */
+  export type PluginCodingHomeworkTeacherSolutionFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkTeacherSolution
+     */
+    select?: PluginCodingHomeworkTeacherSolutionSelect<ExtArgs> | null
+    /**
+     * Filter, which PluginCodingHomeworkTeacherSolutions to fetch.
+     */
+    where?: PluginCodingHomeworkTeacherSolutionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PluginCodingHomeworkTeacherSolutions to fetch.
+     */
+    orderBy?: PluginCodingHomeworkTeacherSolutionOrderByWithRelationInput | PluginCodingHomeworkTeacherSolutionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing PluginCodingHomeworkTeacherSolutions.
+     */
+    cursor?: PluginCodingHomeworkTeacherSolutionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PluginCodingHomeworkTeacherSolutions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PluginCodingHomeworkTeacherSolutions.
+     */
+    skip?: number
+    distinct?: PluginCodingHomeworkTeacherSolutionScalarFieldEnum | PluginCodingHomeworkTeacherSolutionScalarFieldEnum[]
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution create
+   */
+  export type PluginCodingHomeworkTeacherSolutionCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkTeacherSolution
+     */
+    select?: PluginCodingHomeworkTeacherSolutionSelect<ExtArgs> | null
+    /**
+     * The data needed to create a PluginCodingHomeworkTeacherSolution.
+     */
+    data: XOR<PluginCodingHomeworkTeacherSolutionCreateInput, PluginCodingHomeworkTeacherSolutionUncheckedCreateInput>
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution createMany
+   */
+  export type PluginCodingHomeworkTeacherSolutionCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many PluginCodingHomeworkTeacherSolutions.
+     */
+    data: PluginCodingHomeworkTeacherSolutionCreateManyInput | PluginCodingHomeworkTeacherSolutionCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution createManyAndReturn
+   */
+  export type PluginCodingHomeworkTeacherSolutionCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkTeacherSolution
+     */
+    select?: PluginCodingHomeworkTeacherSolutionSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many PluginCodingHomeworkTeacherSolutions.
+     */
+    data: PluginCodingHomeworkTeacherSolutionCreateManyInput | PluginCodingHomeworkTeacherSolutionCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution update
+   */
+  export type PluginCodingHomeworkTeacherSolutionUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkTeacherSolution
+     */
+    select?: PluginCodingHomeworkTeacherSolutionSelect<ExtArgs> | null
+    /**
+     * The data needed to update a PluginCodingHomeworkTeacherSolution.
+     */
+    data: XOR<PluginCodingHomeworkTeacherSolutionUpdateInput, PluginCodingHomeworkTeacherSolutionUncheckedUpdateInput>
+    /**
+     * Choose, which PluginCodingHomeworkTeacherSolution to update.
+     */
+    where: PluginCodingHomeworkTeacherSolutionWhereUniqueInput
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution updateMany
+   */
+  export type PluginCodingHomeworkTeacherSolutionUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update PluginCodingHomeworkTeacherSolutions.
+     */
+    data: XOR<PluginCodingHomeworkTeacherSolutionUpdateManyMutationInput, PluginCodingHomeworkTeacherSolutionUncheckedUpdateManyInput>
+    /**
+     * Filter which PluginCodingHomeworkTeacherSolutions to update
+     */
+    where?: PluginCodingHomeworkTeacherSolutionWhereInput
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution upsert
+   */
+  export type PluginCodingHomeworkTeacherSolutionUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkTeacherSolution
+     */
+    select?: PluginCodingHomeworkTeacherSolutionSelect<ExtArgs> | null
+    /**
+     * The filter to search for the PluginCodingHomeworkTeacherSolution to update in case it exists.
+     */
+    where: PluginCodingHomeworkTeacherSolutionWhereUniqueInput
+    /**
+     * In case the PluginCodingHomeworkTeacherSolution found by the `where` argument doesn't exist, create a new PluginCodingHomeworkTeacherSolution with this data.
+     */
+    create: XOR<PluginCodingHomeworkTeacherSolutionCreateInput, PluginCodingHomeworkTeacherSolutionUncheckedCreateInput>
+    /**
+     * In case the PluginCodingHomeworkTeacherSolution was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<PluginCodingHomeworkTeacherSolutionUpdateInput, PluginCodingHomeworkTeacherSolutionUncheckedUpdateInput>
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution delete
+   */
+  export type PluginCodingHomeworkTeacherSolutionDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkTeacherSolution
+     */
+    select?: PluginCodingHomeworkTeacherSolutionSelect<ExtArgs> | null
+    /**
+     * Filter which PluginCodingHomeworkTeacherSolution to delete.
+     */
+    where: PluginCodingHomeworkTeacherSolutionWhereUniqueInput
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution deleteMany
+   */
+  export type PluginCodingHomeworkTeacherSolutionDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PluginCodingHomeworkTeacherSolutions to delete
+     */
+    where?: PluginCodingHomeworkTeacherSolutionWhereInput
+  }
+
+  /**
+   * PluginCodingHomeworkTeacherSolution without action
+   */
+  export type PluginCodingHomeworkTeacherSolutionDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PluginCodingHomeworkTeacherSolution
+     */
+    select?: PluginCodingHomeworkTeacherSolutionSelect<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -14454,6 +16473,34 @@ export namespace Prisma {
   };
 
   export type PluginCodingHomeworkReviewScalarFieldEnum = (typeof PluginCodingHomeworkReviewScalarFieldEnum)[keyof typeof PluginCodingHomeworkReviewScalarFieldEnum]
+
+
+  export const PluginCodingHomeworkDraftScalarFieldEnum: {
+    id: 'id',
+    activityId: 'activityId',
+    groupId: 'groupId',
+    userId: 'userId',
+    revision: 'revision',
+    files: 'files',
+    folders: 'folders',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type PluginCodingHomeworkDraftScalarFieldEnum = (typeof PluginCodingHomeworkDraftScalarFieldEnum)[keyof typeof PluginCodingHomeworkDraftScalarFieldEnum]
+
+
+  export const PluginCodingHomeworkTeacherSolutionScalarFieldEnum: {
+    id: 'id',
+    ownerKind: 'ownerKind',
+    ownerId: 'ownerId',
+    files: 'files',
+    functions: 'functions',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type PluginCodingHomeworkTeacherSolutionScalarFieldEnum = (typeof PluginCodingHomeworkTeacherSolutionScalarFieldEnum)[keyof typeof PluginCodingHomeworkTeacherSolutionScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -15711,6 +17758,144 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"PluginCodingHomeworkReview"> | Date | string
   }
 
+  export type PluginCodingHomeworkDraftWhereInput = {
+    AND?: PluginCodingHomeworkDraftWhereInput | PluginCodingHomeworkDraftWhereInput[]
+    OR?: PluginCodingHomeworkDraftWhereInput[]
+    NOT?: PluginCodingHomeworkDraftWhereInput | PluginCodingHomeworkDraftWhereInput[]
+    id?: StringFilter<"PluginCodingHomeworkDraft"> | string
+    activityId?: StringFilter<"PluginCodingHomeworkDraft"> | string
+    groupId?: StringFilter<"PluginCodingHomeworkDraft"> | string
+    userId?: StringFilter<"PluginCodingHomeworkDraft"> | string
+    revision?: IntFilter<"PluginCodingHomeworkDraft"> | number
+    files?: JsonFilter<"PluginCodingHomeworkDraft">
+    folders?: JsonFilter<"PluginCodingHomeworkDraft">
+    createdAt?: DateTimeFilter<"PluginCodingHomeworkDraft"> | Date | string
+    updatedAt?: DateTimeFilter<"PluginCodingHomeworkDraft"> | Date | string
+  }
+
+  export type PluginCodingHomeworkDraftOrderByWithRelationInput = {
+    id?: SortOrder
+    activityId?: SortOrder
+    groupId?: SortOrder
+    userId?: SortOrder
+    revision?: SortOrder
+    files?: SortOrder
+    folders?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PluginCodingHomeworkDraftWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    activityId_groupId_userId?: PluginCodingHomeworkDraftActivityIdGroupIdUserIdCompoundUniqueInput
+    AND?: PluginCodingHomeworkDraftWhereInput | PluginCodingHomeworkDraftWhereInput[]
+    OR?: PluginCodingHomeworkDraftWhereInput[]
+    NOT?: PluginCodingHomeworkDraftWhereInput | PluginCodingHomeworkDraftWhereInput[]
+    activityId?: StringFilter<"PluginCodingHomeworkDraft"> | string
+    groupId?: StringFilter<"PluginCodingHomeworkDraft"> | string
+    userId?: StringFilter<"PluginCodingHomeworkDraft"> | string
+    revision?: IntFilter<"PluginCodingHomeworkDraft"> | number
+    files?: JsonFilter<"PluginCodingHomeworkDraft">
+    folders?: JsonFilter<"PluginCodingHomeworkDraft">
+    createdAt?: DateTimeFilter<"PluginCodingHomeworkDraft"> | Date | string
+    updatedAt?: DateTimeFilter<"PluginCodingHomeworkDraft"> | Date | string
+  }, "id" | "activityId_groupId_userId">
+
+  export type PluginCodingHomeworkDraftOrderByWithAggregationInput = {
+    id?: SortOrder
+    activityId?: SortOrder
+    groupId?: SortOrder
+    userId?: SortOrder
+    revision?: SortOrder
+    files?: SortOrder
+    folders?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: PluginCodingHomeworkDraftCountOrderByAggregateInput
+    _avg?: PluginCodingHomeworkDraftAvgOrderByAggregateInput
+    _max?: PluginCodingHomeworkDraftMaxOrderByAggregateInput
+    _min?: PluginCodingHomeworkDraftMinOrderByAggregateInput
+    _sum?: PluginCodingHomeworkDraftSumOrderByAggregateInput
+  }
+
+  export type PluginCodingHomeworkDraftScalarWhereWithAggregatesInput = {
+    AND?: PluginCodingHomeworkDraftScalarWhereWithAggregatesInput | PluginCodingHomeworkDraftScalarWhereWithAggregatesInput[]
+    OR?: PluginCodingHomeworkDraftScalarWhereWithAggregatesInput[]
+    NOT?: PluginCodingHomeworkDraftScalarWhereWithAggregatesInput | PluginCodingHomeworkDraftScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"PluginCodingHomeworkDraft"> | string
+    activityId?: StringWithAggregatesFilter<"PluginCodingHomeworkDraft"> | string
+    groupId?: StringWithAggregatesFilter<"PluginCodingHomeworkDraft"> | string
+    userId?: StringWithAggregatesFilter<"PluginCodingHomeworkDraft"> | string
+    revision?: IntWithAggregatesFilter<"PluginCodingHomeworkDraft"> | number
+    files?: JsonWithAggregatesFilter<"PluginCodingHomeworkDraft">
+    folders?: JsonWithAggregatesFilter<"PluginCodingHomeworkDraft">
+    createdAt?: DateTimeWithAggregatesFilter<"PluginCodingHomeworkDraft"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"PluginCodingHomeworkDraft"> | Date | string
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionWhereInput = {
+    AND?: PluginCodingHomeworkTeacherSolutionWhereInput | PluginCodingHomeworkTeacherSolutionWhereInput[]
+    OR?: PluginCodingHomeworkTeacherSolutionWhereInput[]
+    NOT?: PluginCodingHomeworkTeacherSolutionWhereInput | PluginCodingHomeworkTeacherSolutionWhereInput[]
+    id?: StringFilter<"PluginCodingHomeworkTeacherSolution"> | string
+    ownerKind?: StringFilter<"PluginCodingHomeworkTeacherSolution"> | string
+    ownerId?: StringFilter<"PluginCodingHomeworkTeacherSolution"> | string
+    files?: JsonFilter<"PluginCodingHomeworkTeacherSolution">
+    functions?: JsonFilter<"PluginCodingHomeworkTeacherSolution">
+    createdAt?: DateTimeFilter<"PluginCodingHomeworkTeacherSolution"> | Date | string
+    updatedAt?: DateTimeFilter<"PluginCodingHomeworkTeacherSolution"> | Date | string
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionOrderByWithRelationInput = {
+    id?: SortOrder
+    ownerKind?: SortOrder
+    ownerId?: SortOrder
+    files?: SortOrder
+    functions?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    ownerKind_ownerId?: PluginCodingHomeworkTeacherSolutionOwnerKindOwnerIdCompoundUniqueInput
+    AND?: PluginCodingHomeworkTeacherSolutionWhereInput | PluginCodingHomeworkTeacherSolutionWhereInput[]
+    OR?: PluginCodingHomeworkTeacherSolutionWhereInput[]
+    NOT?: PluginCodingHomeworkTeacherSolutionWhereInput | PluginCodingHomeworkTeacherSolutionWhereInput[]
+    ownerKind?: StringFilter<"PluginCodingHomeworkTeacherSolution"> | string
+    ownerId?: StringFilter<"PluginCodingHomeworkTeacherSolution"> | string
+    files?: JsonFilter<"PluginCodingHomeworkTeacherSolution">
+    functions?: JsonFilter<"PluginCodingHomeworkTeacherSolution">
+    createdAt?: DateTimeFilter<"PluginCodingHomeworkTeacherSolution"> | Date | string
+    updatedAt?: DateTimeFilter<"PluginCodingHomeworkTeacherSolution"> | Date | string
+  }, "id" | "ownerKind_ownerId">
+
+  export type PluginCodingHomeworkTeacherSolutionOrderByWithAggregationInput = {
+    id?: SortOrder
+    ownerKind?: SortOrder
+    ownerId?: SortOrder
+    files?: SortOrder
+    functions?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: PluginCodingHomeworkTeacherSolutionCountOrderByAggregateInput
+    _max?: PluginCodingHomeworkTeacherSolutionMaxOrderByAggregateInput
+    _min?: PluginCodingHomeworkTeacherSolutionMinOrderByAggregateInput
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionScalarWhereWithAggregatesInput = {
+    AND?: PluginCodingHomeworkTeacherSolutionScalarWhereWithAggregatesInput | PluginCodingHomeworkTeacherSolutionScalarWhereWithAggregatesInput[]
+    OR?: PluginCodingHomeworkTeacherSolutionScalarWhereWithAggregatesInput[]
+    NOT?: PluginCodingHomeworkTeacherSolutionScalarWhereWithAggregatesInput | PluginCodingHomeworkTeacherSolutionScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"PluginCodingHomeworkTeacherSolution"> | string
+    ownerKind?: StringWithAggregatesFilter<"PluginCodingHomeworkTeacherSolution"> | string
+    ownerId?: StringWithAggregatesFilter<"PluginCodingHomeworkTeacherSolution"> | string
+    files?: JsonWithAggregatesFilter<"PluginCodingHomeworkTeacherSolution">
+    functions?: JsonWithAggregatesFilter<"PluginCodingHomeworkTeacherSolution">
+    createdAt?: DateTimeWithAggregatesFilter<"PluginCodingHomeworkTeacherSolution"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"PluginCodingHomeworkTeacherSolution"> | Date | string
+  }
+
   export type PluginCodingHomeworkAssignmentCreateInput = {
     id?: string
     activityId: string
@@ -16918,6 +19103,160 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type PluginCodingHomeworkDraftCreateInput = {
+    id?: string
+    activityId: string
+    groupId: string
+    userId: string
+    revision?: number
+    files?: JsonNullValueInput | InputJsonValue
+    folders?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PluginCodingHomeworkDraftUncheckedCreateInput = {
+    id?: string
+    activityId: string
+    groupId: string
+    userId: string
+    revision?: number
+    files?: JsonNullValueInput | InputJsonValue
+    folders?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PluginCodingHomeworkDraftUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    activityId?: StringFieldUpdateOperationsInput | string
+    groupId?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    revision?: IntFieldUpdateOperationsInput | number
+    files?: JsonNullValueInput | InputJsonValue
+    folders?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PluginCodingHomeworkDraftUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    activityId?: StringFieldUpdateOperationsInput | string
+    groupId?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    revision?: IntFieldUpdateOperationsInput | number
+    files?: JsonNullValueInput | InputJsonValue
+    folders?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PluginCodingHomeworkDraftCreateManyInput = {
+    id?: string
+    activityId: string
+    groupId: string
+    userId: string
+    revision?: number
+    files?: JsonNullValueInput | InputJsonValue
+    folders?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PluginCodingHomeworkDraftUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    activityId?: StringFieldUpdateOperationsInput | string
+    groupId?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    revision?: IntFieldUpdateOperationsInput | number
+    files?: JsonNullValueInput | InputJsonValue
+    folders?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PluginCodingHomeworkDraftUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    activityId?: StringFieldUpdateOperationsInput | string
+    groupId?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    revision?: IntFieldUpdateOperationsInput | number
+    files?: JsonNullValueInput | InputJsonValue
+    folders?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionCreateInput = {
+    id?: string
+    ownerKind: string
+    ownerId: string
+    files?: JsonNullValueInput | InputJsonValue
+    functions?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionUncheckedCreateInput = {
+    id?: string
+    ownerKind: string
+    ownerId: string
+    files?: JsonNullValueInput | InputJsonValue
+    functions?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerKind?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    files?: JsonNullValueInput | InputJsonValue
+    functions?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerKind?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    files?: JsonNullValueInput | InputJsonValue
+    functions?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionCreateManyInput = {
+    id?: string
+    ownerKind: string
+    ownerId: string
+    files?: JsonNullValueInput | InputJsonValue
+    functions?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerKind?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    files?: JsonNullValueInput | InputJsonValue
+    functions?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerKind?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    files?: JsonNullValueInput | InputJsonValue
+    functions?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -17893,6 +20232,83 @@ export namespace Prisma {
   export type PluginCodingHomeworkReviewSumOrderByAggregateInput = {
     score?: SortOrder
     maxScore?: SortOrder
+  }
+
+  export type PluginCodingHomeworkDraftActivityIdGroupIdUserIdCompoundUniqueInput = {
+    activityId: string
+    groupId: string
+    userId: string
+  }
+
+  export type PluginCodingHomeworkDraftCountOrderByAggregateInput = {
+    id?: SortOrder
+    activityId?: SortOrder
+    groupId?: SortOrder
+    userId?: SortOrder
+    revision?: SortOrder
+    files?: SortOrder
+    folders?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PluginCodingHomeworkDraftAvgOrderByAggregateInput = {
+    revision?: SortOrder
+  }
+
+  export type PluginCodingHomeworkDraftMaxOrderByAggregateInput = {
+    id?: SortOrder
+    activityId?: SortOrder
+    groupId?: SortOrder
+    userId?: SortOrder
+    revision?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PluginCodingHomeworkDraftMinOrderByAggregateInput = {
+    id?: SortOrder
+    activityId?: SortOrder
+    groupId?: SortOrder
+    userId?: SortOrder
+    revision?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PluginCodingHomeworkDraftSumOrderByAggregateInput = {
+    revision?: SortOrder
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionOwnerKindOwnerIdCompoundUniqueInput = {
+    ownerKind: string
+    ownerId: string
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionCountOrderByAggregateInput = {
+    id?: SortOrder
+    ownerKind?: SortOrder
+    ownerId?: SortOrder
+    files?: SortOrder
+    functions?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionMaxOrderByAggregateInput = {
+    id?: SortOrder
+    ownerKind?: SortOrder
+    ownerId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PluginCodingHomeworkTeacherSolutionMinOrderByAggregateInput = {
+    id?: SortOrder
+    ownerKind?: SortOrder
+    ownerId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -20498,6 +22914,14 @@ export namespace Prisma {
      * @deprecated Use PluginCodingHomeworkReviewDefaultArgs instead
      */
     export type PluginCodingHomeworkReviewArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = PluginCodingHomeworkReviewDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use PluginCodingHomeworkDraftDefaultArgs instead
+     */
+    export type PluginCodingHomeworkDraftArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = PluginCodingHomeworkDraftDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use PluginCodingHomeworkTeacherSolutionDefaultArgs instead
+     */
+    export type PluginCodingHomeworkTeacherSolutionArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = PluginCodingHomeworkTeacherSolutionDefaultArgs<ExtArgs>
 
   /**
    * Batch Payload for updateMany & deleteMany & createMany

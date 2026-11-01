@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, activityId } = await params;
-    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, { receiptOnly: true });
+    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, { receiptOnly: true, preparation: true });
     return json({ runtime: await getTimedActivityRuntime(user, courseId, groupId, activityId) });
   });
 }

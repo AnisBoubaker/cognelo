@@ -46,7 +46,8 @@ describe("assigned group activity detail route", () => {
       { id: "teacher-1", roles: ["teacher"] },
       "course-1",
       "group-1",
-      "activity-1"
+      "activity-1",
+      { preparation: true }
     );
   });
 });

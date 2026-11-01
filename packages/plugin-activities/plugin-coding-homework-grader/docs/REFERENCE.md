@@ -187,3 +187,11 @@ Authoring, confirmation, submission, and review dialogs reuse the [shared persis
 ## Static signature validation
 
 The C parser now supplies normalized argument and return types alongside its existing source/AST records. Requirement entries optionally carry `parameterTypes` and `returnType`; older name-only entries remain valid. Signature mismatches are reported distinctly. `codingHomeworkSubmissionReadiness` separates acknowledgement-based academic gaps (missing files/folders/functions, mismatched signatures and syntax diagnostics) from hard archive, extension and resource-limit failures; at least one valid file is required. The new upload workflow will consume this classifier; existing strict preflight `isValid` semantics remain unchanged.
+
+## Prepared files and private solution
+
+The preparation API stores a revisioned, plugin-owned file collection without creating a core attempt. Individual files may target relative folders; same-path replacement requires confirmation. ZIP replaces the complete collection. Optimistic revisions and an advisory workflow lock protect concurrent tabs; immutable physical objects are validated against recorded size/hash. Final workflows freeze preparation until teacher cancellation. Collection size is conservatively bounded by the configured archive-byte limit, in addition to ZIP expansion and parser limits.
+
+Private teacher solutions accept C/H files or ZIPs, retain parsed function signatures, and support an AI selector constrained to known candidate keys. Only authorized authoring owners can access them. Duplication copies independent solution records and clears operational submission/reference readiness settings.
+
+The shared deferred-assessment contract lets this activity declare preparation routes outside the SEB/timer start gate. Assessment routes remain guarded; only an explicit verified answering action may start the clock. The complete student workspace and hand-in endpoints are tracked in the implementation progress document.

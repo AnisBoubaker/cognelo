@@ -11,7 +11,7 @@ function handle(request: NextRequest, { params }: Params, reveal: boolean) {
   return handleRoute(async () => {
     const user = await requireUser();
     const { courseId, groupId, activityId } = await params;
-    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId);
+    await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, { preparation: !reveal });
     return json(reveal
       ? { solution: await getActivitySolution(user, courseId, groupId, activityId) }
       : await getActivitySolutionAvailability(user, courseId, groupId, activityId));

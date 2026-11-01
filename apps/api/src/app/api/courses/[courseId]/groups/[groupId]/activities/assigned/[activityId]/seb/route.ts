@@ -30,6 +30,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       access: {
         title: access.title,
         requiresSafeExamBrowser: access.requiresSafeExamBrowser,
+        preparationAllowed: access.preparationAllowed === true,
         accessGranted,
         downloadSafeExamBrowserUrl: SAFE_EXAM_BROWSER_DOWNLOAD_URL
       }

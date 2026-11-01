@@ -23,7 +23,7 @@ The user explicitly authorized reasonable remaining assumptions and requested th
 ## Checklist
 
 - [x] Record authorization, clarifications and recovery checklist.
-- [ ] Static C signature validation and private teacher-solution/function selection.
+- [ ] Static C signature validation and private teacher-solution/function selection (signature core committed; private solution API implemented).
 - [ ] Persistent upload collection, ZIP replacement, validation acknowledgements and frozen hand-in.
 - [ ] Core-dispatched material-plugin indexing services, OpenAI embeddings, immutable reusable indexes and freshness.
 - [ ] Source selection/readiness/manual enablement; public GitHub, PDF, text and linked slides extraction.
@@ -44,7 +44,16 @@ The user explicitly authorized reasonable remaining assumptions and requested th
 - A task-owned macOS `caffeinate -i -s` assertion is active during implementation. The local PID is in `.git/info/cognelo-homework-caffeinate.pid`; stop only that process when the job finishes.
 - Resume by reading this file and the current Git diff; do not redo completed work.
 
+- Preparation/private solution foundation validated by local Playwright: persistence, replacement confirmation, ZIP replacement, path rejection, signature acknowledgement, no attempt/timer before answering, and staff-only solution access. API/web/plugin typechecks passed. New final hand-in/UI remains in progress.
+
 ## Validation and commits
 
 - `93ec082`: recorded implementation checklist and the user’s follow-up clarifications.
-- Static signature slice: 19 focused parser/validation tests passed; plugin typecheck passed. Commit follows this checkpoint.
+- `235c5ce`: static signature requirements/readiness classifier; 19 focused tests and plugin typecheck passed.
+
+## Important implementation pointers
+
+- New plugin files: `src/c-signatures.ts`, `file-preparation.ts`, `teacher-solution.ts`, `preparation-routes.ts`.
+- Deferred gates: `ActivityDefinition.assessmentFlow`, `PluginRouteDefinition.learnerAccessPhase`, assigned API dispatcher and host SEB/timing callbacks. Homework currently opts in; finish the new student renderer before handoff.
+- New plugin Prisma models: `PluginCodingHomeworkDraft` and `PluginCodingHomeworkTeacherSolution`; submission status adds `cancelled`. Generated homework Prisma sources are tracked in this repository and must stay synchronized.
+- Material index generation/refresh MUST remain a material-plugin service dispatched by core. Shared storage/provider helpers may be used through core; no homework-to-material-plugin import.

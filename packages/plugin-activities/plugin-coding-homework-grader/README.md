@@ -19,7 +19,7 @@ author assignment -> snapshot prior content -> validate ZIP -> reserve core atte
 -> generate challenge questions -> collect answers -> submit core attempt -> review grade
 ```
 
-Static C validation also recognizes required argument/return signatures; the parser exposes normalized types and the new readiness classifier separates academic incompleteness from hard safety failures. The upload-preparation UI is still being implemented.
+Static C validation also recognizes required argument/return signatures; the parser exposes normalized types and the new readiness classifier separates academic incompleteness from hard safety failures. The revisioned preparation API and private teacher-solution/function-selection API are implemented; the new workspace and final hand-in flow remain in progress. See [preparation boundaries](docs/REFERENCE.md#prepared-files-and-private-solution).
 
 Uploads and finalization enforce [transactional limits and archive safety](docs/REFERENCE.md#upload-and-finalization-boundaries).
 

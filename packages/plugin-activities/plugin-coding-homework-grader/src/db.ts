@@ -10,7 +10,9 @@ export const codingHomeworkGraderTables = [
   "PluginCodingHomeworkSubmissionFile",
   "PluginCodingHomeworkSubmissionFunction",
   "PluginCodingHomeworkChallengeQuestion",
-  "PluginCodingHomeworkReview"
+  "PluginCodingHomeworkReview",
+  "PluginCodingHomeworkDraft",
+  "PluginCodingHomeworkTeacherSolution"
 ] as const;
 
 export const codingHomeworkGraderDatabaseModule = {
@@ -311,6 +313,25 @@ WHERE (requirements->>'maxArchiveBytes')::bigint > 26214400 OR (requirements->>'
   jsonb_set(requirements, '{maxArchiveBytes}', to_jsonb(LEAST(COALESCE((requirements->>'maxArchiveBytes')::bigint, 26214400), 26214400))),
   '{maxFileCount}', to_jsonb(LEAST(COALESCE((requirements->>'maxFileCount')::int, 200), 1000))), "updatedAt" = NOW()
 WHERE (requirements->>'maxArchiveBytes')::bigint > 26214400 OR (requirements->>'maxFileCount')::int > 1000`
+      ]
+    }
+,
+    {
+      id: "202611010010_homework_preparation",
+      statements: [
+        `ALTER TYPE "PluginCodingHomeworkSubmissionStatus" ADD VALUE IF NOT EXISTS 'cancelled'`,
+        `CREATE TABLE IF NOT EXISTS "PluginCodingHomeworkDraft" (
+          id TEXT PRIMARY KEY, "activityId" TEXT NOT NULL REFERENCES "Activity"(id) ON DELETE CASCADE,
+          "groupId" TEXT NOT NULL REFERENCES "CourseGroup"(id) ON DELETE CASCADE,
+          "userId" TEXT NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
+          revision INTEGER NOT NULL DEFAULT 0, files JSONB NOT NULL DEFAULT '[]', folders JSONB NOT NULL DEFAULT '[]',
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS "PluginCodingHomeworkDraft_activityId_groupId_userId_key" ON "PluginCodingHomeworkDraft"("activityId", "groupId", "userId")`,
+        `CREATE TABLE IF NOT EXISTS "PluginCodingHomeworkTeacherSolution" (
+          id TEXT PRIMARY KEY, "ownerKind" TEXT NOT NULL, "ownerId" TEXT NOT NULL,
+          files JSONB NOT NULL DEFAULT '[]', functions JSONB NOT NULL DEFAULT '[]',
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS "PluginCodingHomeworkTeacherSolution_ownerKind_ownerId_key" ON "PluginCodingHomeworkTeacherSolution"("ownerKind", "ownerId")`
       ]
     }
   ],
