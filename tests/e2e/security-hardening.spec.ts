@@ -1,3 +1,4 @@
+import { homeworkModelFixture } from "./fixtures/homework-model";
 import { generateAiAgentText } from "../../packages/core/src/ai-agents";
 import { requestEmailVerification, verifyEmailAddress } from "../../packages/core/src/email-verification";
 import { request } from "@playwright/test";
@@ -42,6 +43,7 @@ test("hidden placements, files and other sections cannot be enumerated through a
 test("homework reserves one workflow and finalizes answers atomically", async ({ bankCourse: data, teacherApi }) => {
   test.setTimeout(120_000);
   const student = await createAuthenticatedApi("student");
+  const model = await homeworkModelFixture(data.token);
   let activityId: string | undefined;
   try {
     activityId = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Atomic homework", config: { gradingMode: "manual", maxAttempts: 1 } });
@@ -89,7 +91,7 @@ test("homework reserves one workflow and finalizes answers atomically", async ({
     expect((await student.post(`${assigned}/submission`, { data: { base64, fileName: "another.zip", idempotencyKey: `${data.token}-again` } })).ok()).toBe(false);
   } finally {
     if (activityId) await prisma.$executeRaw`DELETE FROM "BackgroundJob" WHERE metadata->>'activityId' = ${activityId}`;
-    await student.dispose();
+    await student.dispose(); await model.close();
   }
 });
 

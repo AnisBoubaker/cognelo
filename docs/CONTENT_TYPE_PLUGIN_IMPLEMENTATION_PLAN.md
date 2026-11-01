@@ -737,6 +737,10 @@ Verification:
   - `packages/plugin-content-types/plugin-file/src/file-content.test.ts`
   - `packages/plugin-content-types/plugin-text/src/text-content.test.ts`
 
+### Prepared semantic indexing follow-up — November 1, 2026
+
+Implemented `ContentIndexingService` with plugin-owned revision/freshness and extraction, dispatched through core. File/Text/Link/GitHub provide real teaching content; core stores reusable OpenAI vectors and immutable private indexes. GitHub owns per-repository freshness (48 hours by default). Homework consumes pinned prepared indexes without sibling plugin imports or model-dependent invalidation. Legacy deterministic handlers remain compatibility paths. See [material embedding services](MATERIAL_EMBEDDING_SERVICES.md) and [homework acceptance](CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md) for bounds, migration/runtime requirements and verification.
+
 ### Phase 12: Documentation And Authoring Guide
 
 Implemented.

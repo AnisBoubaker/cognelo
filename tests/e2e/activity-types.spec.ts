@@ -1,3 +1,4 @@
+import { homeworkModelFixture } from "./fixtures/homework-model";
 import type { Locator, Page, Request } from "@playwright/test";
 import { prisma } from "@cognelo/db";
 import { createAuthenticatedApi, credentialsFor, expect, test } from "./fixtures/auth";
@@ -9,6 +10,7 @@ import {
   createCourseTestThroughUi,
   openStudentActivity,
   provisionActivitySuite,
+  responseJson,
   publishCurrentBankActivity,
   removeActivitySuite,
   type ActivitySuiteData
@@ -666,6 +668,8 @@ test.describe.serial("authoring and completing every activity type", () => {
   test("teacher authors a Coding Homework assignment and the student completes ZIP and challenge stages", async ({ teacherPage, studentPage }) => {
     test.setTimeout(240_000);
     if (!data) throw new Error("The activity suite was not provisioned.");
+    const model = await homeworkModelFixture(data.token);
+    try {
     const title = `E2E authored coding homework ${data.token}`;
     const bankActivityId = await createBankActivityThroughUi(teacherPage, data, {
       category: "Programming",
@@ -706,6 +710,7 @@ test.describe.serial("authoring and completing every activity type", () => {
       }
     ]);
     await openStudentActivity(studentPage, data, title);
+    await expect(studentPage.locator('input[type="file"][accept=".zip"]')).toBeEnabled();
     await studentPage.locator('input[type="file"][accept=".zip"]').setInputFiles({ buffer: submissionZip, mimeType: "application/zip", name: "e2e-homework.zip" });
     await expect(studentPage.getByText("The file requirements are satisfied.", { exact: true })).toBeVisible();
     await studentPage.getByRole("button", { name: "Submit my work", exact: true }).click();
@@ -731,6 +736,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await studentPage.getByRole("button", { name: "Submit answers" }).click();
     await expect(studentPage).toHaveURL(`/courses/${data.courseId}/groups/${data.groupId}`);
     await verifyContinuation();
+    } finally { await model.close(); }
   });
 
   test("teacher composes a Test from authored activities and the student completes the whole assessment", async ({ teacherPage, studentPage }) => {

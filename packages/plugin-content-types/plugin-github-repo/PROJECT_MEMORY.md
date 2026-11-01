@@ -5,11 +5,11 @@ This file is for GitHub repo content plugin memory only.
 ## Current Decisions
 
 - The plugin content type key is `github-repo`; legacy material records still use `github_repo` until migration phases finish.
-- The plugin stores its URL in generic content resource metadata as `{ "url": "https://github.com/org/repo" }`.
+- The plugin stores its URL in generic content resource metadata with `embeddingFreshnessHours` (48 by default).
 - URL validation accepts only HTTP(S) inputs for `github.com` and `*.github.com`, rejects username/password components, and normalizes to HTTPS. Never return embedded URL credentials in public resource metadata.
 - URL normalization trims input, forces `https:`, removes hashes, and removes trailing slashes.
-- The server plugin implements `getEmbeddingDocuments` by returning the repository URL as an external-reference document and a deferred-indexing diagnostic. Repository cloning/source extraction must be implemented inside this plugin, not in activity plugins.
-- The server plugin implements `indexEmbeddingDocuments` and `searchEmbeddingDocuments`. The current dev index is stored in resource metadata under `embeddingIndex`; future repository clone indexing and pgvector/plugin-owned table storage should stay behind those handlers.
+- The server plugin implements `getEmbeddingDocuments` by returning the repository URL as an external-reference document and a deferred-indexing diagnostic. This is a legacy path; the prepared service owns actual public source extraction inside this plugin.
+- The server plugin implements `indexEmbeddingDocuments` and `searchEmbeddingDocuments`. The current dev index is stored in resource metadata under `embeddingIndex`; new consumers use `indexing.prepare` with core-provided private shared storage instead.
 - No plugin-owned tables are needed for the first version. Future repository sync/indexing state can add plugin-owned persistence.
 - The server `duplicate` handler copies repository metadata but removes `embeddingIndex` so the new resource identity rebuilds derived search state independently.
 
@@ -17,10 +17,10 @@ This file is for GitHub repo content plugin memory only.
 
 - Manifest migration `202610250020_github_url_credentials` removes userinfo from legacy GitHub resource URLs and drops derived `embeddingIndex` data; it is idempotent and runs through the combined migration command.
 
-## Approved Next Indexing Policy — Not Yet Implemented
+## Prepared indexing policy
 
 - [Coding Homework decisions](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#github-freshness) require public-repository contents, not URL-only vectors. Private repositories are out of scope for the first delivery.
 - Own the freshness interval in this plugin: 48-hour default with a per-repository material override. Consumers check it when enabling homework submissions; do not automatically refresh an enabled homework's prepared references.
-- Reuse unchanged compatible embeddings across homework selections. A question-generation model change is not an embedding-index invalidation event. Existing URL metadata/dev-index behavior above is still the runtime baseline.
+- Reuse unchanged compatible embeddings across homework selections. A question-generation model change is not an embedding-index invalidation event. URL-only development handlers remain legacy compatibility paths.
 
 - Own `indexing.policy` and `indexing.prepare`; core supplies authorized embedding storage and search. Never call a sibling plugin. Prepared semantic indexes remain outside public resource metadata. See [service contract](../../../docs/MATERIAL_EMBEDDING_SERVICES.md).

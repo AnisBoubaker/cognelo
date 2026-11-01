@@ -2,11 +2,11 @@
 
 `@cognelo/plugin-file-content` owns uploaded file content resources.
 
-It provides picker metadata, upload/download behavior, safe file metadata, embedding source hints, extracted embedding documents for supported files, and vector search handlers. The first implementation stores safe file metadata and a deterministic development vector index in `CourseContentResource.metadata`; object storage and production vector state can move to plugin-owned tables later.
+It provides picker metadata, upload/download behavior, safe file metadata, embedding source hints, extracted embedding documents for supported files, and vector search handlers. Safe file metadata stays in `CourseContentResource.metadata`; legacy deterministic indexes remain there for older consumers. Prepared semantic indexes use core private storage.
 
 Course content rows pass the stored `mimeType` to the platform icon layer, which selects semantic Tabler icons for PDFs, office documents, spreadsheets, presentations, images, audio, video, archives, code/text, and unknown files.
 
-The file plugin owns file-specific extraction. It currently exposes source-like/plain text files and basic local PDF text extraction through the shared content type server extraction interface.
+The file plugin owns file-specific extraction. The prepared service handles source/plain text and text-based PDFs through bounded Poppler extraction. Older extraction handlers retain the basic local PDF compatibility path.
 
 Course content duplication copies the safe file metadata while sharing the immutable stored-file reference. The copied resource drops any derived embedding index so it can be rebuilt under the new resource identity.
 
@@ -14,7 +14,7 @@ Interface actions use the shared [button style and semantic icons](../../../docs
 
 Uploads validate titles (180 characters) and original filenames (255 characters) before staging, use bounded multipart reads and remove staged files after persistence failures. Download and extraction share the server-owned storage containment check. Basic PDF extraction scans literal strings in linear time, including malformed files. See [security boundaries](../../../docs/SECURITY_BOUNDARIES.md).
 
-The [approved next Coding Homework workflow](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) requires PDF teaching content to participate in reusable prepared indexes. This is an implementation target; the current basic extractor and development indexes described above are not a declaration that the new workflow is ready.
+The [Coding Homework workflow](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) consumes this plugin’s prepared PDF/text service. Scanned PDFs require OCR before upload; unreadable PDFs fail explicitly.
 
 ## Prepared embedding service
 

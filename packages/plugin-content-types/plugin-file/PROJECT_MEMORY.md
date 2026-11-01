@@ -6,8 +6,8 @@
 - Safe file metadata lives in `CourseContentResource.metadata`: `originalName`, `storedName`, `mimeType`, `size`, and `setupStatus`.
 - Course and group content rows derive uploaded-file icons from the stored MIME type through the platform's centralized Tabler icon layer; missing or generic binary MIME types use the neutral file icon.
 - The server plugin implements `getEmbeddingDocuments` and owns file-specific extraction. It currently supports text/source-like files and a basic local PDF text extractor, returning diagnostics instead of throwing for unsupported file types.
-- The server plugin implements `indexEmbeddingDocuments` and `searchEmbeddingDocuments`. The current dev index is stored in resource metadata under `embeddingIndex`; future pgvector/plugin-owned table storage should stay behind those handlers.
-- No plugin-owned table is used yet; future extraction/indexing state should add plugin-owned persistence.
+- The server plugin implements `indexEmbeddingDocuments` and `searchEmbeddingDocuments`. The legacy dev index remains under `embeddingIndex`; prepared semantic consumers use `indexing.prepare` and private core storage.
+- No plugin-owned table is used; source metadata stays on the generic resource and prepared indexes use private core storage.
 - The server `duplicate` handler copies safe metadata and shares the immutable `storedName` file reference, but removes `embeddingIndex`. A future mutable/object-storage backend must replace this with explicit reference counting or physical copy semantics.
 
 - Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.
@@ -16,6 +16,7 @@
 
 - Validate multipart title and original filename through the existing shared/plugin schemas before writing bytes. A failed metadata validation must leave neither a staged file nor a changed resource.
 
-- Pending delivery: [Coding Homework](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) requires PDF content extraction through this plugin into reusable compatible reference indexes. Do not treat support for URLs/file metadata or the current basic PDF extractor as acceptance of all PDFs; scanned-PDF/OCR scope remains unspecified.
+- The prepared service extracts text-based PDFs with bounded Poppler execution and indexes reusable semantic vectors through core. Reject unreadable/empty PDFs; OCR is not implemented.
+
 
 - Own `indexing.policy` and `indexing.prepare`; core supplies authorized embedding storage and search. Never call a sibling plugin. Prepared semantic indexes remain outside public resource metadata. See [service contract](../../../docs/MATERIAL_EMBEDDING_SERVICES.md).

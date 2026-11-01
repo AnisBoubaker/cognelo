@@ -2,7 +2,7 @@
 
 - Plugin key: `link-content`; content type key: `link`.
 - Link text is the resource title. Metadata owns `url`, `description`, and `openInNewTab`; the latter defaults to true and must preserve an explicit false.
-- Accept only absolute HTTP(S) URLs without embedded credentials. Preserve query strings and fragments. Ordinary opening is a browser action. Only explicit AI summarization fetches the page server-side, with public-IP validation, pinned DNS, validated redirects, size/time limits, and a strict final HTTP 200 gate before AI.
+- Accept only absolute HTTP(S) URLs without embedded credentials. Preserve query strings and fragments. Ordinary opening is a browser action. Only explicit AI summarization or prepared reference indexing fetches the page server-side, with public-IP validation, pinned DNS, validated redirects, size/time limits, and a strict final HTTP 200 gate before AI.
 - New picker shells may lack a URL and resolve to no action until configured. The settings form requires a URL; explicitly blank or unsafe URLs are rejected by server updates.
 - Row presentation and server open actions use the same validated metadata projection. Descriptions are plain text, rendered by the host as text rather than HTML.
 - Internal summaries, maximum-word preferences, and the follow-same-domain flag are private plugin-table data, never public resource metadata or embedding documents. Authenticated course managers load them through the plugin summary route. Create/update/duplicate use the generic `afterPersist` hook inside the host transaction; the foreign key removes private settings on resource deletion.
@@ -15,6 +15,7 @@
 
 - Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.
 
-- Pending delivery: [Coding Homework](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) requires useful content from linked teaching pages/slides for reusable indexes. Keep extraction in this plugin and preserve the private-summary and network boundaries above; the new workflow is not yet implemented.
+- Prepared reference indexing extracts public static teaching pages, PDFs and Reveal.js inline/same-origin external Markdown. Keep it separate from private summarization and retain the public-network limits; do not execute page scripts.
+
 
 - Own `indexing.policy` and `indexing.prepare`; core supplies authorized embedding storage and search. Never call a sibling plugin. Prepared semantic indexes remain outside public resource metadata. See [service contract](../../../docs/MATERIAL_EMBEDDING_SERVICES.md).

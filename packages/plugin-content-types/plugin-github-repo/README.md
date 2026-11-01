@@ -14,7 +14,8 @@ This plugin currently uses generic `CourseContentResource.metadata` for its sour
 
 ```json
 {
-  "url": "https://github.com/org/repo"
+  "url": "https://github.com/org/repo",
+  "embeddingFreshnessHours": 48
 }
 ```
 
@@ -22,11 +23,11 @@ No plugin-owned tables are required yet.
 
 Course content duplication copies the normalized repository metadata and removes any derived embedding index so the new resource can be indexed independently.
 
-Repository cloning and source extraction are owned by this plugin. The current implementation exposes the repository URL as an external-reference document, stores a deterministic development vector index in resource metadata, and reports repository indexing as deferred through the shared content type server extraction interface.
+The plugin-owned prepared-index service reads public default-branch source at a pinned commit, without cloning or executing it. Core supplies private shared embedding storage/search. Older document/index/search handlers retain URL-only deterministic behavior for legacy consumers.
 
-## Approved Indexing Target — Implementation Pending
+## Prepared repository indexing
 
-The [Coding Homework workflow decisions](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#github-freshness) require real content extraction from **public** repositories and a GitHub-material freshness setting: **48 hours by default, configurable for each repository**. Coding Homework checks this age when enabling final submissions and refreshes stale selected repositories before opening. It does not regenerate references during the enabled workflow. Compatible existing vectors are reused across homework selections. The URL-only development behavior above remains the current implementation.
+The [Coding Homework workflow](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#github-freshness) uses actual **public** repository content. The material settings form owns freshness: **48 hours by default**, configurable per repository. Homework checks it when opening submissions and retains pinned reference versions while enabled. Compatible vectors are reused; question-model changes do not invalidate indexes. See the service reference below for extraction bounds and supported formats.
 
 ## Contributor Workflow
 

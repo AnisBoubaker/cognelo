@@ -1,82 +1,59 @@
-# Coding Homework implementation progress
+# Coding Homework implementation checkpoint
 
-This is the resumable work record requested by the user. It complements the [product specification](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) and must be updated at each validated implementation slice.
+**Status: implemented and locally validated on November 1, 2026.** No production deployment or production testing was performed. This is the resumable record requested by the user; the [approved workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) and [plugin reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md) are the canonical behavior documents.
 
-## Objective and authorization
+## Delivered
 
-Implement the agreed Coding Homework workflow for local testing: C, 30 individual students, persistent file/ZIP preparation, static solution-derived requirements, manual submission opening after reference preparation, immutable work, queued question generation, explicit SEB/timed answering, read-only source consultation, and teacher cancellation/resubmission. Do not deploy or test production.
+- [x] Private C teacher solution; manual/AI function selection; normalized argument/return signatures; explicit incomplete-work acknowledgement.
+- [x] Persistent file/folder preparation, confirmed replacements, whole-collection ZIP replacement, read-only preview and frozen final hand-in.
+- [x] Plugin-owned material indexing dispatched through core; actual PDF, text, linked-slide and public GitHub extraction; reusable OpenAI embeddings and immutable snapshots.
+- [x] Default preceding-material selection, recursive folder toggles, readiness invalidation, GitHub freshness settings and manual submission opening.
+- [x] Atomic enqueueing, FIFO admission, teacher concurrency 1–4/default 2, queue-wide cap 4, heartbeats/retries/stale-worker recovery and cancellation protection.
+- [x] Explicit SEB-verified answering start, core timing/attempts, saved-answer autosave, offline deadline finalization including blanks and continued read-only source access.
+- [x] Teacher cancellation from activity details/editor, retained evidence, associated grade withdrawal and one replacement after release without changing class-wide release.
+- [x] English/French/Chinese/Arabic states, course and bank private-solution authoring, migrated existing homework acceptance tests and updated documentation.
+- [x] Local migration, full typecheck/unit/architecture/build validation, eight focused E2E scenarios and public extraction checks.
 
-The user explicitly authorized reasonable remaining assumptions and requested them in the final report. Commit validated slices along the way rather than one huge final commit. Do not stop after a partial implementation merely because a slice is complete.
+## Validation evidence
 
-## Confirmed follow-up choices — November 1, 2026
+- Full workspace typecheck passed.
+- `npm test`: **316 test files / 1769 tests passed**, with plugin architecture checks.
+- `npm run build`: API and web production builds passed.
+- Focused lint: no errors; the retained legacy renderer has its pre-existing hook-dependency warning.
+- **Eight local Playwright scenarios passed**: six new acceptance scenarios plus updated bank-authoring/continuation and atomic-submission security regressions. Seven passed in the final combined run; the bank test then passed after fixing its wait for an enabled upload input. No product failure is left marked expected/skipped.
+- New files: `homework-preparation.spec.ts`, `homework-workflow.spec.ts`, `homework-queue-seb.spec.ts` (two scenarios), `homework-materials.spec.ts`, `homework-incomplete.spec.ts`.
+- The 30-student run validated 2/4 concurrency, the hard cap, FIFO starts, interrupted-worker recovery, and suppression of late output after running/queued cancellation. Remaining 28 students received all three questions each.
+- Material checks covered compressed PDF extraction, exact index reuse across homework, question-model independence, GitHub 48-hour default/per-material override, enablement-time freshness and selection invalidation. Read-only live extraction succeeded on the supplied lecture deck and a small public C repository.
+- Complete workflow checks covered five questions from one function, no attempt before Answer, offline saved/blank deadline submission, released-grade withdrawal and successful replacement. Private-solution UI checks covered manual/AI selection, reload persistence, incomplete-code fallback and mobile read-only viewing.
+- AI acceptance used controlled local OpenAI-compatible endpoints; it exercised real browser UI, API routes, persistence, encryption, queues and grading policy without paid model calls. Native SEB startup was simulated; real proof/configuration scoping and session reuse were tested. Native-client acceptance remains for the user.
 
-- Match C function name, argument count/types and return type; ignore parameter names and equivalent pointer/array notation.
-- Missing files, missing functions and signature mismatches require explicit incomplete-work acknowledgement rather than blocking solely for incompleteness. Safety/authorization limits remain hard failures.
-- Individual uploads support destination folders and confirmed replacement at the same path. ZIP replaces the entire prepared collection.
-- OpenAI `text-embedding-3-small` for embeddings; question-generation model changes do not invalidate indexes.
-- Question-generation concurrency defaults to 2, with a server-enforced maximum of 4.
-- Lock material selection while submissions are enabled.
-- At the answering deadline submit saved answers, including blanks.
-- Teacher cancellation retains the old record, withdraws its associated grade, and permits a new submission with newly generated questions.
-- Material plugins own generation/refresh of their indexes as a service. All inter-plugin requests are routed through core; never import a sibling material plugin from homework.
+## Commits
 
-## Checklist
+- `93ec082` — initial decisions and recovery checklist.
+- `235c5ce` — static C signature validation and acknowledgement classifier.
+- `e62b9a9` — persistent preparation/private solutions and deferred-assessment foundations.
+- `b1fe883` — plugin-owned reusable material embedding services.
+- `35b126e` — remove previously tracked generated Prisma artifacts containing machine paths/native binaries.
+- `142f57c` — durable concurrency, worker-slot replenishment and interruption recovery.
+- `5a7a117` — complete hand-in, queued challenges, timed/SEB answering, cancellation and user interfaces.
+- Final follow-up commit records the adapted acceptance fixtures and documentation review.
 
-- [x] Record authorization, clarifications and recovery checklist.
-- [x] Static C signature validation and private teacher-solution/function selection.
-- [x] Persistent upload collection, ZIP replacement, validation acknowledgements and frozen hand-in.
-- [x] Core-dispatched material-plugin indexing services, OpenAI embeddings, immutable reusable indexes and freshness.
-- [x] Source selection/readiness/manual enablement; public GitHub, PDF, text and linked slides extraction.
-- [x] Durable bounded FIFO processing, restart/retry/cancellation protection and correct question counts.
-- [x] Deferred SEB/timed answering through shared contracts; deadline finalization and teacher cancellation.
-- [x] Complete teacher/student UI and localized states; read-only submitted files and accessible course materials.
-- [x] Unit, type, architecture and local Playwright integration checks, including bounded concurrent processing.
-- [ ] Documentation review, operator notes and final runnable local handoff.
+## Implementation assumptions
 
-## Assumptions to report
+These were authorized as reasonable choices and must be reported at handoff:
 
-- Static C validation uses bounded declaration normalization, without compilation/preprocessing. Typedefs retain their spelling; common builtin spelling, parameter names, storage qualifiers and array-to-pointer adjustment are normalized. Syntax failures can be acknowledged as incomplete work, while analysis/storage/ZIP safety limits remain blocking.
+- Bounded static C normalization, without preprocessing/compilation; typedef spelling remains significant. Missing academic requirements and syntax incompleteness require acknowledgement; resource/archive/storage failures block.
+- Question count 1–20/default 3; cycle candidate functions for distinct questions, or use submitted source/assignment text when none parse. Three automatic generation attempts; terminal failure requires teacher cancellation/resubmission.
+- Visible shared course materials only in the chooser. Folder selection includes current recursive descendants. An empty selection can be explicitly prepared. Private teacher solutions are never automatically indexed.
+- Public GitHub default branches pinned to a commit, static linked content/Reveal.js Markdown, and text-based PDFs. No private repos, arbitrary JavaScript execution, branch/path chooser or OCR.
+- Float32 vectors in PostgreSQL with bounded exact cosine search; no pgvector extension or database-image replacement. Existing configurable upload limits remain, with 8 MB individual files and the archive-size ceiling applied to the prepared collection.
 
-## Current checkpoint
+See [full choices and limits](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#recorded-implementation-assumptions-and-deferred-work) and [material services](MATERIAL_EMBEDDING_SERVICES.md).
 
-- Baseline: documentation commit `d67e1ea`; working tree was clean before this task.
-- Static validation slice implemented: signature-bearing parser results and requirements, signature mismatch reports, and an acknowledgement/readiness classifier. Legacy strict preflight remains intact until the new preparation workflow uses the classifier.
-- A task-owned macOS `caffeinate -i -s` assertion is active during implementation. The local PID is in `.git/info/cognelo-homework-caffeinate.pid`; stop only that process when the job finishes.
-- Resume by reading this file and the current Git diff; do not redo completed work.
+## Local handoff and privacy
 
-- Preparation/private solution foundation validated by local Playwright: persistence, replacement confirmation, ZIP replacement, path rejection, signature acknowledgement, no attempt/timer before answering, and staff-only solution access. API/web/plugin typechecks passed. New final hand-in/UI remains in progress.
+Both additive migrations were applied locally with `npm run db:migrate:all`; Poppler is available. The API worker must remain enabled for queue/deadline processing. To test: upload the teacher solution, choose requirements and save; select references and Generate embeddings; enable final submissions; then use an enrolled student's preparation and answering flow.
 
-## Validation and commits
+Credentials, private course/student data, local logs, generated clients, screenshots and deployment inventory are excluded from Git. The existing ignore rule now applies to the untracked homework-generated Prisma client; regenerate through normal database commands. All affected root/plugin READMEs, project memories and canonical references were reviewed and updated.
 
-- `93ec082`: recorded implementation checklist and the user’s follow-up clarifications.
-- `235c5ce`: static signature requirements/readiness classifier; 19 focused tests and plugin typecheck passed.
-
-## Important implementation pointers
-
-- New plugin files: `src/c-signatures.ts`, `file-preparation.ts`, `teacher-solution.ts`, `preparation-routes.ts`.
-- Deferred gates: `ActivityDefinition.assessmentFlow`, `PluginRouteDefinition.learnerAccessPhase`, assigned API dispatcher and host SEB/timing callbacks. Homework currently opts in; finish the new student renderer before handoff.
-- New plugin Prisma models: `PluginCodingHomeworkDraft` and `PluginCodingHomeworkTeacherSolution`; submission status adds `cancelled`. Generated homework Prisma artifacts are now removed from Git tracking (the existing ignore rule applies). Generate them locally with the normal database commands; schemas/migrations remain tracked.
-- Material index generation/refresh MUST remain a material-plugin service dispatched by core. Shared storage/provider helpers may be used through core; no homework-to-material-plugin import.
-
-## Active integration checkpoint
-
-- `e62b9a9` committed persistent preparation, private teacher solution and deferred assessment foundations; preparation Playwright passed.
-- Material service implementation now includes private shared OpenAI vectors/indexes, plugin-owned text/file/link/GitHub extraction, public DNS-pinned fetching and per-repository freshness settings. Core migration applied locally.
-- Final hand-in, queue limits/heartbeats/recovery, atomic full question publication, deferred answering, deadline jobs, teacher cancellation and initial UI are implemented but integration validation is in progress. Do not report completion yet.
-- Assume bounded exact cosine search over real embeddings in PostgreSQL Float32 storage for the initial class size; no pgvector/server-image replacement. Text PDFs only (Poppler), no OCR. Empty reference selection is explicitly preparable; questions then use the assignment/submitted work.
-- New key files: `workflow-settings.ts`, `hand-in.ts`, `prepared-processing.ts`, `deadline.ts`, `submission-management.ts`, `workflow-routes.ts`, and `src/web/homework-*.tsx`.
-- Pending: local full workflow/SEB/cancellation/deadline/concurrency Playwright tests; update old unit mocks/route lists; full locales; correctness/privacy/documentation review and remaining commits.
-
-- `b1fe883`: committed plugin-owned semantic material services; 94 focused material tests passed.
-- Full workflow Playwright passed: reusable indexes/model independence, immutable files, configured five questions from one function, explicit answering, timeout blanks, activity-details cancellation and fresh resubmission.
-- SEB and 30-student Playwright passed: verified return/no repeated launch, provider-failure retry, concurrency 2/4 with server cap, FIFO starts, stale lease recovery, cancelled running/queued jobs publish no questions.
-- Live extraction verification succeeded for the supplied public slide deck and a small public C repository; no AI calls or persisted material indexes were made by those read-only checks.
-
-## Final acceptance checkpoint
-
-- `35b126e`: stopped tracking the generated Prisma client/native binary; existing ignore rule retains local generated artifacts.
-- `142f57c`: durable queue concurrency, independent worker slots, lease recovery and cancellation ownership committed.
-- Full workspace typecheck passed. Full unit/architecture run: 316 files, 1769 tests passed.
-- Combined local Playwright run: 5 tests passed across preparation, material reuse/PDF/GitHub freshness, SEB, 30-student queue and complete workflow. It also covers offline deadline-job finalization, blanks, released-grade withdrawal, unchanged release state and replacement after release.
-- Incomplete-hand-in/teacher selector UI acceptance also passed, including AI-assisted selection, private signatures after reload, required acknowledgement, fallback questions without functions and mobile read-only viewing. Remaining: final build/review, commit and local service handoff. Caffeinate remains active until completion.
-- No real AI calls were used by acceptance: local controlled OpenAI endpoints verify requests, persistence and job behavior. Public slide/repository extraction checks were read-only. Native SEB startup still needs the user's native-client acceptance.
+The task-owned macOS caffeinate assertion was kept active during implementation and validation. It is stopped at final handoff, and the ordinary local API/web development services are left available for the user's test. No synthetic test material or fake AI connection is intentionally retained in the visible application.

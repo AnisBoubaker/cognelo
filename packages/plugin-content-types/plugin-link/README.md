@@ -16,7 +16,7 @@ See [reference](docs/REFERENCE.md) for persistence, validation, and integration 
 
 Interface actions use the shared [button style and semantic icons](../../../docs/ACTION_BUTTONS.md), including teacher and learner controls.
 
-The [approved next Coding Homework workflow](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) requires linked teaching-page/lecture content for reusable reference indexes, including the supplied slides example. This remains planned; the existing URL/description embedding projection and private AI-summary feature are not equivalent to that extraction workflow.
+The [Coding Homework workflow](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#initial-material-formats) uses actual teaching-page/PDF/Reveal.js content through this plugin’s prepared indexing service. Private AI summaries and URL/description projections remain separate.
 
 ## Prepared embedding service
 
