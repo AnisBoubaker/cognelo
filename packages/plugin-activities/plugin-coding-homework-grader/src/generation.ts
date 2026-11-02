@@ -1,3 +1,5 @@
+import { getHomeworkQuestionLanguage, homeworkQuestionSystemPrompt } from "./question-generation-policy";
+import { makeStudentQuestionContext, studentQuestionContext } from "./question-context";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
@@ -49,6 +51,7 @@ type SubmissionFunctionRow = {
   nearestExamples: unknown;
   divergenceScore: number | null;
   selectedForQuestion: boolean;
+  file?: { path: string; languageKey: string | null };
   createdAt: Date;
   updatedAt: Date;
 };
@@ -119,6 +122,7 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
       submissionId: submission.id,
       selectedForQuestion: true
     },
+    include: { file: { select: { path: true, languageKey: true } } },
     orderBy: [{ divergenceScore: "desc" }, { functionName: "asc" }]
   });
   if (!candidates.length) {
@@ -145,6 +149,7 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
   try {
     const assignment = await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId } });
     const aiConnection = await resolveAiConnection(scope, options.aiConnectionKind, assignment?.settings);
+    const questionLanguage = await getHomeworkQuestionLanguage(scope.courseId);
     const questionCount = clampQuestionCount(assignment?.questionCount ?? candidates.length, candidates.length);
     const generationCandidates = candidates.slice(0, questionCount) as SubmissionFunctionRow[];
     const generatedAt = new Date().toISOString();
@@ -160,7 +165,7 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
           questionCount: generationCandidates.length
         },
         candidate,
-        locale: parsed.locale,
+        locale: questionLanguage,
         orderIndex: index
       });
       const result = await generateOneChallengeQuestion({
@@ -183,7 +188,10 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
         data: {
           generationModel: question.generationModel,
           generationPromptVersion: codingHomeworkChallengePromptVersion,
-          metadata: question.metadata as Prisma.InputJsonValue,
+          metadata: { ...question.metadata, questionLanguage, studentCodeContext: makeStudentQuestionContext({
+            code: generationCandidates[question.orderIndex].functionCode, functionName: generationCandidates[question.orderIndex].functionName,
+            filePath: generationCandidates[question.orderIndex].file?.path, languageKey: assignment?.languageKey ?? "c"
+          }) } as Prisma.InputJsonValue,
           nearestExamples: question.nearestExamples as Prisma.InputJsonValue,
           orderIndex: question.orderIndex,
           questionText: question.questionText,
@@ -252,42 +260,18 @@ export function buildChallengeQuestionPrompt(input: {
   orderIndex: number;
 }) {
   const nearestExamples = normalizeArray(input.candidate.nearestExamples);
-  const systemPrompt = [
-    "You generate free-response oral-defense style challenge questions for Cognelo coding homework submissions.",
-    "Return only valid JSON. Do not wrap the JSON in Markdown fences. Do not add explanations.",
-    "",
-    "Required JSON shape:",
-    "{",
-    '  "questionText": "one student-facing free-response question"',
-    "}",
-    "",
-    "Rules:",
-    `- Programming language: ${input.assignment.languageKey}.`,
-    `- Current UI/content language: ${localeName(input.locale)}.`,
-    "- Generate the question in the current UI/content language.",
-    "- Ask exactly one question.",
-    "- The question must require the student to explain, justify, trace, or compare their own submitted function.",
-    "- The question must be answerable from the submitted function and the assignment context.",
-    "- Do not include the answer, rubric, hints, or grading criteria.",
-    "- Do not quote, mention, or reveal the prior reference examples.",
-    "- Do not say that similarity search, embeddings, nearest examples, or plagiarism detection were used.",
-    "- Prefer questions that reveal whether the student understands their implementation choices.",
-    "- Keep the question concise, normally one or two sentences."
-  ].join("\n");
+  const systemPrompt = homeworkQuestionSystemPrompt(input.locale, input.assignment.generationInstructions);
   const userPrompt = [
     "Assignment prompt:",
     input.assignment.promptMarkdown.trim() || "No assignment prompt was provided.",
     "",
-    "Additional teacher generation notes:",
-    input.assignment.generationInstructions.trim() || "No additional notes were provided.",
-    "",
     "Submitted function:",
     "```",
-    input.candidate.functionCode,
+    makeStudentQuestionContext({ code: input.candidate.functionCode }).code,
     "```",
     "",
     "Submitted function normalized AST text:",
-    input.candidate.astText,
+    input.candidate.astText.slice(0, 24_000),
     "",
     "Nearest prior reference examples for private teacher/model context only. Do not reveal them to the student:",
     JSON.stringify(nearestExamples, null, 2),
@@ -460,8 +444,12 @@ export function toStudentChallengeQuestionRecord(row: {
   questionText: string;
   studentAnswer?: string | null;
   submissionId: string;
+  metadata?: unknown;
+  submissionFunction?: unknown;
 }) {
+  const context = studentQuestionContext(row);
   return {
+    ...(context ? { context } : {}),
     id: row.id,
     answerSubmittedAt:
       row.answerSubmittedAt instanceof Date ? row.answerSubmittedAt.toISOString() : typeof row.answerSubmittedAt === "string" ? row.answerSubmittedAt : null,
@@ -498,17 +486,4 @@ function clampQuestionCount(value: number, candidateCount: number) {
 
 function fingerprint(value: string) {
   return createHash("sha256").update(value).digest("hex");
-}
-
-function localeName(locale: "en" | "fr" | "zh" | "ar") {
-  if (locale === "fr") {
-    return "French";
-  }
-  if (locale === "zh") {
-    return "Chinese";
-  }
-  if (locale === "ar") {
-    return "Arabic";
-  }
-  return "English";
 }

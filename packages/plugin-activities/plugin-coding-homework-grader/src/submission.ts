@@ -1,3 +1,4 @@
+import { studentQuestionContextInclude } from "./question-context";
 import { prisma as corePrisma, type Prisma as CorePrisma } from "@cognelo/db";
 import { acquireHomeworkUploadSlot, limitHomeworkUploads, lockHomeworkUploadBudget } from "./upload-budget";
 import { createHash, randomUUID } from "node:crypto";
@@ -133,7 +134,7 @@ export async function getLatestCodingHomeworkSubmission(scope: SubmissionScope) 
     take: 20,
     include: {
       files: { orderBy: { path: "asc" } },
-      questions: { orderBy: { orderIndex: "asc" } }
+      questions: { orderBy: { orderIndex: "asc" }, include: studentQuestionContextInclude }
     }
   });
   const submission = submissions[0];
@@ -283,7 +284,7 @@ async function findIdempotentSubmission(scope: SubmissionScope, idempotencyKey: 
     take: 20,
     include: {
       files: { orderBy: { path: "asc" } },
-      questions: { orderBy: { orderIndex: "asc" } }
+      questions: { orderBy: { orderIndex: "asc" }, include: studentQuestionContextInclude }
     }
   });
 

@@ -53,7 +53,7 @@ describe("coding homework grader plugin manifest", () => {
   });
 
   it("documents the research prototype pipeline without depending on tmp files at runtime", () => {
-    expect(codingHomeworkChallengePromptVersion).toBe("coding-homework-grader.challenge-question.v1");
+    expect(codingHomeworkChallengePromptVersion).toBe("coding-homework-grader.challenge-question.v2");
     expect(prototypePipelineSteps.map((step) => step.prototypeScript)).toEqual([
       "0_data_cleanup.py",
       "1_parse_code.py",

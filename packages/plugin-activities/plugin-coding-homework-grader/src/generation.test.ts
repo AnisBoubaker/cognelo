@@ -37,6 +37,7 @@ const dbMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@cognelo/core", () => coreMocks);
+vi.mock("./question-generation-policy", async importOriginal => ({ ...await importOriginal<typeof import("./question-generation-policy")>(), getHomeworkQuestionLanguage: vi.fn().mockResolvedValue("fr") }));
 vi.mock("./db-client", () => ({
   Prisma: {},
   prisma: dbMocks
@@ -106,6 +107,10 @@ describe("coding homework challenge generation", () => {
 
     expect(coreMocks.getQuestionAuthoringAiAgentConnection).toHaveBeenCalledWith(testUser());
     expect(coreMocks.generateAiAgentText).toHaveBeenCalledTimes(1);
+    const prompt = coreMocks.generateAiAgentText.mock.calls[0][1];
+    expect(prompt.systemPrompt).toContain("COURSE TEACHING LANGUAGE: French");
+    expect(prompt.systemPrompt).toContain("Focus on reasoning about loops.");
+    expect(prompt.userPrompt).not.toContain("Focus on reasoning about loops.");
     expect(dbMocks.pluginCodingHomeworkSubmission.update).toHaveBeenNthCalledWith(1, {
       where: { id: "submission-1" },
       data: expect.objectContaining({
@@ -123,7 +128,7 @@ describe("coding homework challenge generation", () => {
     expect(dbMocks.pluginCodingHomeworkChallengeQuestion.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         generationModel: "gpt-test",
-        generationPromptVersion: "coding-homework-grader.challenge-question.v1",
+        generationPromptVersion: "coding-homework-grader.challenge-question.v2",
         orderIndex: 0,
         questionText: "Explain why this function updates the accumulator before returning the result.",
         submissionFunctionId: "function-1",
@@ -243,6 +248,7 @@ describe("coding homework challenge generation", () => {
       questionCount: 1
     });
     expect(safe.questions[0]).toEqual({
+      context: expect.objectContaining({ code: testFunction({ id: "function-1", functionName: "sum_values" }).functionCode, functionName: "sum_values", languageKey: "c" }),
       id: "question-0",
       answerSubmittedAt: null,
       orderIndex: 0,

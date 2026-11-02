@@ -86,6 +86,12 @@ Teacher cancellation must be coordinated with queued/running work so a late resu
 
 At timeout, finalize the server-saved answers, including blanks. Do not accept new answer content after expiry or invent an availability extension.
 
+## Question content and language — November 2, 2026
+
+Each challenge shows the relevant function code from the student's frozen submission, with its filename and function name, beside the answer area. It is read-only; private reference code and teacher instructions are never included. For incomplete/unparseable work, show the submitted-code context used by generation. Bounded excerpts indicate truncation and the complete submitted files remain available.
+
+Teachers enter private AI question-generation instructions in the homework Settings tab and save them with the activity. These are authoritative generation policy, not ordinary evidence or grading notes. Questions use the course Subject's teaching language, never the student/session UI locale. Language and instructions are frozen for each new hand-in so later settings changes cannot split an existing question set. Existing questions retain their wording and gain available code context without being regenerated.
+
 ## Queue and load control
 
 - Use a **FIFO dispatch queue** for challenge generation rather than launching every student's AI requests at once.

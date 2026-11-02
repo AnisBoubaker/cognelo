@@ -1,3 +1,5 @@
+import { studentQuestionContextInclude } from "./question-context";
+import { getHomeworkQuestionLanguage } from "./question-generation-policy";
 import { getHomeworkQuestionConnection } from "./ai-selection";
 import { lockHomeworkUploadBudget } from "./upload-budget";
 import { scheduleHomeworkDeadline } from "./deadline";
@@ -39,9 +41,10 @@ export async function handInHomework(scope: HomeworkStudentScope, input: unknown
       await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, entries.reduce((sum, file) => sum + file.uncompressedSize, 0));
       if (!readiness.canSubmit) throw new AppError(400, "HOMEWORK_FILES_INVALID", "Your work cannot be submitted until the file safety issues are resolved.");
       if (readiness.requiresAcknowledgement && !data.acknowledgeIncomplete) throw new AppError(409, "HOMEWORK_INCOMPLETE_ACKNOWLEDGEMENT_REQUIRED", "Confirm that you are submitting incomplete work.", { issues: readiness.incomplete });
+      const questionLanguage = await getHomeworkQuestionLanguage(scope.courseId);
       const questionGenerationAi = snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings));
       await tx.pluginCodingHomeworkSubmission.create({ data: { id: submissionId, ...activeWhere(scope), status: "uploaded", documentationSnapshotId: settings.preparedSnapshotId,
-        structureValidationSummary: json(validation), metadata: json({ workflowVersion: 2, questionGenerationAi, draftRevision: draft.revision, handInAt: new Date().toISOString(), incompleteAcknowledged: readiness.requiresAcknowledgement, locale: data.locale,
+        structureValidationSummary: json(validation), metadata: json({ workflowVersion: 2, questionGenerationAi, draftRevision: draft.revision, handInAt: new Date().toISOString(), incompleteAcknowledged: readiness.requiresAcknowledgement, questionLanguage,
           assignment: { candidateLimit: assignment.candidateLimit, languageKey: assignment.languageKey, promptMarkdown: assignment.promptMarkdown, generationInstructions: assignment.generationInstructions, questionCount: assignment.questionCount, retrievedExampleCount: assignment.retrievedExampleCount } }) } });
       await mkdir(path.join(directory, "files"), { recursive: true, mode: 0o750 });
       for (const entry of entries) {
@@ -55,7 +58,7 @@ export async function handInHomework(scope: HomeworkStudentScope, input: unknown
         idempotencyKey: `submission:${submissionId}`, maxAttempts: 3,
         metadata: { workflowVersion: 2, activityId: scope.activityId, groupId: scope.groupId, courseId: scope.courseId, userId: scope.user.id,
           concurrencyGroup: scope.activityId, concurrencyLimit: Math.max(1, Math.min(4, Number(settings.generationConcurrency ?? 2))) },
-        payload: { ...scope, submissionId, locale: data.locale, mode: "student", workflowVersion: 2 } }, tx);
+        payload: { ...scope, submissionId, questionLanguage, mode: "student", workflowVersion: 2 } }, tx);
     }, { timeout: 30_000, maxWait: 30_000 });
     committed = true; startCodingHomeworkProcessingWorker();
     return getHomeworkWorkspace(scope);
@@ -81,7 +84,7 @@ export async function getHomeworkWorkspace(scope: HomeworkStudentScope) {
 /** This route remains SEB-guarded; the public workspace never returns challenge text. */
 export async function getStartedHomeworkQuestions(scope: HomeworkStudentScope) {
   await assertHomeworkStudentScope(scope);
-  const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({ where: activeWhere(scope), orderBy: { createdAt: "desc" }, include: { questions: { orderBy: { orderIndex: "asc" } } } });
+  const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({ where: activeWhere(scope), orderBy: { createdAt: "desc" }, include: { questions: { orderBy: { orderIndex: "asc" }, include: studentQuestionContextInclude } } });
   if (!submission || submission.status === "cancelled" || record(submission.metadata).deletion || !submission.coreAttemptId || !record(submission.metadata).assessmentStartedAt) throw new AppError(409, "HOMEWORK_ASSESSMENT_NOT_STARTED", "Click Answer challenge questions to begin.");
   return { questions: submission.questions.map(toStudentChallengeQuestionRecord), status: submission.status, submissionId: submission.id };
 }
