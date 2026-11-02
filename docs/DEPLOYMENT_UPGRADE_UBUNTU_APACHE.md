@@ -365,6 +365,8 @@ When the private upgrade checklist introduces rich-text media, set `MEDIA_STORAG
 
 ## 5. Run migrations and activate the release
 
+The additive `202611020001_ai_connection_models` migration adds model catalogues and prepared embedding configuration. Run the combined migration command, regenerate Prisma clients, and restart API/web processes; a running client retains the old schema until restarted. Existing default models, tokens and indexes remain valid. No new environment variable is required. See [AI model connections](AI_MODEL_CONNECTIONS.md).
+
 The additive `202610310001_atomic_ai_grading_runs` migration supports [durable AI grading recovery](AI_GRADING_RUNS.md). Apply it through the combined migration command and restart the API/web services to load the generated client. No environment-variable or runner upgrade is required. Existing grades and feedback are unchanged.
 
 With both services still stopped, run all core and plugin migrations from the new release. The combined command applies both activity-plugin and content-type-plugin manifest migrations, including new private tables for already activated plugins (such as Link internal summaries):

@@ -168,6 +168,7 @@ export type ContentTypeEmbeddingSearchHandler = (input: {
 }) => Promise<ContentVectorSearchResult>;
 
 export type PreparedContentIndex = {
+  embeddingModel?: string;
   id: string; sourceId: string; modelKey: string; sourceRevision: string; contentFingerprint: string;
   indexedAt: string; checkedAt: string; documentCount: number; connectionId: string;
 };
