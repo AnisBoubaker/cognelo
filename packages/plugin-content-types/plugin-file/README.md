@@ -6,7 +6,7 @@ It provides picker metadata, upload/download behavior, safe file metadata, embed
 
 Course content rows pass the stored `mimeType` to the platform icon layer, which selects semantic Tabler icons for PDFs, office documents, spreadsheets, presentations, images, audio, video, archives, code/text, and unknown files.
 
-The file plugin owns file-specific extraction. The prepared service handles source/plain text and text-based PDFs through bounded Poppler extraction. Older extraction handlers retain the basic local PDF compatibility path.
+The file plugin owns file-specific extraction. The prepared service handles source/plain text, text-based PDFs through bounded Poppler extraction, and source/text entries inside ZIPs. Archives are read in memory with bounded expansion, path/header/checksum validation, and no code execution. Executables, nested archives, generated folders and macOS metadata are skipped; an archive without readable source/text fails with an actionable explanation. Older extraction handlers retain the basic local PDF compatibility path.
 
 Course content duplication copies the safe file metadata while sharing the immutable stored-file reference. The copied resource drops any derived embedding index so it can be rebuilt under the new resource identity.
 

@@ -1,4 +1,5 @@
-import { readBoundedFormData, openStoredMaterial, contentIndexRevision, extractMaterialPdfText } from "@cognelo/core";
+import { readArchiveText } from "./archive-text";
+import { AppError, readBoundedFormData, openStoredMaterial, contentIndexRevision, extractMaterialPdfText } from "@cognelo/core";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -365,7 +366,22 @@ async function getPreparedFileDocuments(resource: ServerContentResourceRecord, s
   if (!metadata.storedName) return { sourceId: resource.id, documents: [], diagnostics: [] };
   const file = await openStoredMaterial(path.resolve(process.cwd(), "../../storage/course-content-files"), [resource.courseId], metadata.storedName);
   const bytes = await (async () => { try { if ((await file.stat()).size > MAX_UPLOAD_BYTES) throw new Error("Material exceeds extraction limit."); return await file.readFile(); } finally { await file.close(); } })();
-  const pdf = metadata.mimeType === "application/pdf" || /\.pdf$/i.test(metadata.originalName ?? "");
-  const text = pdf ? await extractMaterialPdfText(bytes, signal) : extractFileText(bytes, metadata.mimeType ?? "", metadata.originalName ?? resource.title).text;
-  return { sourceId: resource.id, documents: text ? [{ id: `${resource.id}:file`, sourceId: resource.id, title: resource.title, text, kind: "plain_text", path: metadata.originalName }] : [], diagnostics: [] };
+  return extractPreparedFileBytes(resource, bytes, signal);
+}
+
+export async function extractPreparedFileBytes(resource: ServerContentResourceRecord, bytes: Buffer, signal?: AbortSignal): Promise<ContentEmbeddingDocumentsResult> {
+  signal?.throwIfAborted();
+  const metadata = readMetadata(resource.metadata);
+  const fileName = metadata.originalName ?? resource.title;
+  const zip = /\.zip$/i.test(fileName) || ["application/zip", "application/x-zip-compressed"].includes(metadata.mimeType ?? "");
+  if (zip) {
+    const entries = readArchiveText(bytes, signal);
+    if (!entries.length) throw new AppError(422, "MATERIAL_ZIP_NO_TEXT", "This ZIP contains no readable source/text files. Executables, nested archives, generated files and macOS metadata are ignored. Unselect this material or upload its source/text files.");
+    return { sourceId: resource.id, documents: entries.map(entry => ({ id: `${resource.id}:zip:${entry.path}`, sourceId: resource.id, title: `${resource.title} — ${entry.path}`, text: entry.text,
+      kind: isCodeFile(entry.path) ? "code" : "plain_text", languageKey: languageKeyForFile(entry.path), path: entry.path })), diagnostics: [] };
+  }
+  const pdf = metadata.mimeType === "application/pdf" || /\.pdf$/i.test(fileName);
+  if (!pdf && !isPlainTextFile(metadata.mimeType ?? "", fileName)) throw new AppError(422, "MATERIAL_FILE_UNSUPPORTED", "This file type cannot be indexed. Select a text-based PDF, source/text file, or ZIP containing source/text files.");
+  const extracted = pdf ? { text: await extractMaterialPdfText(bytes, signal), kind: "plain_text" as const, languageKey: null, diagnostics: [] } : extractFileText(bytes, metadata.mimeType ?? "", fileName);
+  return { sourceId: resource.id, documents: extracted.text.trim() ? [{ id: `${resource.id}:file`, sourceId: resource.id, title: resource.title, text: extracted.text, kind: extracted.kind, languageKey: extracted.languageKey, path: fileName }] : [], diagnostics: extracted.diagnostics };
 }

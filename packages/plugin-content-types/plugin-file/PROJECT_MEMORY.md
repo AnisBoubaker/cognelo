@@ -20,3 +20,5 @@
 
 
 - Own `indexing.policy` and `indexing.prepare`; core supplies authorized embedding storage and search. Never call a sibling plugin. Prepared semantic indexes remain outside public resource metadata. See [service contract](../../../docs/MATERIAL_EMBEDDING_SERVICES.md).
+
+- Prepared ZIP extraction is file-plugin-owned (`archive-text.ts`), never a call to the homework plugin. Bound archives to 25 MB/1000 directory entries and selected text to 200 files, 512 KB each, 4 MB total. Check paths, encryption, symlinks, local/central headers, declared/actual sizes and CRC before returning any documents; zlib must enforce the output ceiling even when metadata lies. Do not execute files, write extracted content to disk, or recurse into nested archives. Skip binaries, generated directories and macOS metadata. Preserve per-entry paths and source provenance; empty/binary-only archives fail explicitly.

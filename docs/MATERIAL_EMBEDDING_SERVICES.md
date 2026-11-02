@@ -9,11 +9,13 @@ Vectors are stored as Float32 bytes in PostgreSQL and searched with bounded exac
 ## Owning plugin extraction
 
 - Text: the saved Markdown body.
-- File: bounded textual/code files and text-based PDFs. PDFs use Poppler `pdftotext` with bounded input/output/time and private temporary files. Install `poppler-utils` on Ubuntu, or Poppler through the local package manager. Empty, scanned, encrypted or unextractable PDFs fail explicitly; OCR is not performed.
+- File: bounded textual/code files, source/text entries inside ZIPs, and text-based PDFs. PDFs use Poppler `pdftotext` with bounded input/output/time and private temporary files. Install `poppler-utils` on Ubuntu, or Poppler through the local package manager. Empty, scanned, encrypted or unextractable PDFs fail explicitly; OCR is not performed.
 - Link: public HTML, Markdown/plain text and linked PDFs. Reveal.js inline template Markdown and same-origin `data-markdown` files are included without executing JavaScript. The page must expose its teaching text statically. Private internal link summaries are not an indexing source.
 - GitHub: public repository root URLs, default-branch content pinned to one commit. Includes common source/text formats, skips symlinks, submodules and generated/dependency directories, and limits extraction to 200 files, 512 KB each, 4 MB total. No checkout or source execution occurs. Public GitHub API rate-limit errors fail visibly and can be retried.
 
-External fetches validate and pin public DNS addresses, reject credentials/private addresses, bound redirects, time, downloaded and decompressed sizes, and never send application cookies. Teacher solution files are independent private activity records and are never automatically embedded as course materials.
+External fetches validate and pin public DNS addresses, reject credentials/private addresses, bound redirects, time, downloaded and decompressed sizes, and never send application cookies. ZIP preparation reads stored/deflated entries only in memory: at most 25 MB compressed, 1000 directory entries, 200 selected text files, 512 KB per text file and 4 MB total text. Validate paths, local/central headers, sizes and CRC; reject symlinks/encryption and cap actual decompression. UTF-8 and BOM-marked UTF-16 text are supported. Executables, nested archives, hidden/macOS metadata and generated/dependency folders are skipped; archives without readable text fail explicitly. Each retained file has its own path/provenance.
+
+Teacher solution files are independent private activity records and are never automatically embedded as course materials.
 
 GitHub owns `embeddingFreshnessHours`: default 48, configurable from 1 to 8760 per repository in material settings. Freshness measures the last successful check, even when unchanged vectors were reused. Other material types become stale when their saved source changes; a teacher can request an explicit forced refresh through core. Homework checks freshness before enabling submissions and then uses its pinned prepared snapshot. Student generation never refreshes reference materials.
 

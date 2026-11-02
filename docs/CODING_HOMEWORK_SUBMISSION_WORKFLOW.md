@@ -110,7 +110,7 @@ At timeout, finalize the server-saved answers, including blanks. Do not accept n
 
 ### Initial material formats
 
-Required sources for this delivery are **PDFs, links and public GitHub repositories**, alongside the platform's existing course-material selection.
+Required sources for this delivery are **PDFs, links and public GitHub repositories**, alongside the platform's existing course-material selection. Uploaded ZIP references also support source/text files through the owning File plugin; executable-only or unreadable archives fail explicitly. See the bounded extraction rules in [material services](MATERIAL_EMBEDDING_SERVICES.md).
 
 The user supplied this lecture/slides link as a required example of linked teaching material:
 
