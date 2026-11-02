@@ -1,5 +1,5 @@
 import { lockHomeworkSettings, workflowSettingKeys } from "./workflow-settings";
-import { copyHomeworkTeacherSolution } from "./teacher-solution";
+import { copyHomeworkTeacherSolution, lockHomeworkTeacherSolution } from "./teacher-solution";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -150,6 +150,7 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
   const requirements = parsed.requirements;
 
   await prisma.$transaction(async (transaction) => {
+    await lockHomeworkTeacherSolution(transaction, owner);
     if (owner.ownerKind === "course_activity") {
       await lockHomeworkSettings(transaction, owner.ownerId);
       const current = await transaction.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: owner.ownerId } });

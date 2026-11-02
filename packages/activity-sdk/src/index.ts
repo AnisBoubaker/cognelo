@@ -92,6 +92,10 @@ export type ActivityAiFeedbackContract = {
 
 export type ActivityAuthoringContract = {
   gradingTab?: boolean;
+  /** Course reference preparation rendered through the host editor portal. */
+  referenceMaterialsTab?: boolean;
+  /** Optional course operational settings supplied by the activity renderer. */
+  settingsTab?: boolean;
   supportsVariations?: boolean;
 };
 

@@ -1,6 +1,6 @@
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import { getHomeworkPreparation, uploadHomeworkPreparation, removeHomeworkPreparedFile, getHomeworkPreparedFile } from "./file-preparation";
-import { getHomeworkTeacherSolution, saveHomeworkTeacherSolution, selectHomeworkFunctionsWithAi } from "./teacher-solution";
+import { getHomeworkTeacherSolution, saveHomeworkTeacherSolution, removeHomeworkTeacherSolution, selectHomeworkFunctionsWithAi } from "./teacher-solution";
 import { resolveOwner, resolveStudentSubmissionScope } from "./routes";
 
 export const homeworkPreparationRoute: PluginRouteDefinition = {
@@ -18,7 +18,8 @@ export const homeworkPreparedFileRoute: PluginRouteDefinition = {
 export const homeworkTeacherSolutionRoute: PluginRouteDefinition = {
   path: "coding-homework-grader/teacher-solution", activityTypeKeys: ["coding-homework-grader"],
   methods: { GET: async ({ context }) => getHomeworkTeacherSolution(await resolveOwner(context)),
-    PUT: async ({ context, readJson }) => saveHomeworkTeacherSolution(await resolveOwner(context), await readJson()) }
+    PUT: async ({ context, readJson, request }) => saveHomeworkTeacherSolution(await resolveOwner(context), await readJson(), request.signal),
+    DELETE: async ({ context, readJson, request }) => removeHomeworkTeacherSolution(await resolveOwner(context), await readJson(), request.signal) }
 };
 export const homeworkSelectFunctionsRoute: PluginRouteDefinition = {
   path: "coding-homework-grader/select-functions", activityTypeKeys: ["coding-homework-grader"],

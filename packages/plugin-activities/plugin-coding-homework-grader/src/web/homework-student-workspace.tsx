@@ -113,7 +113,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     {preview && <section className="stack"><div className="row"><h4>{preview.path}</h4><button type="button" className="secondary" onClick={() => setPreview(null)}>{copy.close}</button></div><pre style={{ maxHeight: "28rem", overflow: "auto", whiteSpace: "pre-wrap" }}>{preview.text}</pre></section>}
     {!active && preparation && <>
       <h3>{copy.validation}</h3>{preparation.validation.issues.length ? <ul>{preparation.validation.issues.map((issue, index) => <li key={index}>{issue.path ? `${issue.path}: ` : ""}{issue.message}</li>)}</ul> : files.length > 0 && <p>{copy.ready}</p>}
-      {preparation.readiness.requiresAcknowledgement && <label><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /> {copy.incomplete}</label>}
+      {preparation.readiness.requiresAcknowledgement && <label className="homework-choice"><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /> {copy.incomplete}</label>}
       {!workspace?.submissionsEnabled && <p role="status">{copy.closed}</p>}
       <button type="button" disabled={!workspace?.submissionsEnabled || !preparation.readiness.canSubmit || (preparation.readiness.requiresAcknowledgement && !acknowledged)} onClick={async () => {
         if (await dialogs.confirm({ title: copy.handIn, message: copy.handInDetail, confirmLabel: copy.handIn })) await run(copy.handIn, async signal => { await request("hand-in", body("POST", { expectedRevision: preparation.draft.revision, acknowledgeIncomplete: acknowledged, locale }, signal)); });

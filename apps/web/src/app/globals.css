@@ -150,7 +150,7 @@ button > svg,
   :root { --button-height: 44px; }
 }
 
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 textarea,
 select {
   background: rgba(255, 255, 255, 0.92);
@@ -164,6 +164,16 @@ select {
     box-shadow 140ms ease,
     background 140ms ease;
   width: 100%;
+}
+
+/* Choice controls must never inherit the full-width, padded text-field recipe. */
+:where(input[type="checkbox"], input[type="radio"]) {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  vertical-align: middle;
+  accent-color: var(--accent-strong);
 }
 
 textarea {
@@ -6123,6 +6133,18 @@ button:hover > .disclosure-indicator {
   grid-area: prompt;
   min-width: 0;
 }
+
+/* Homework choices use compact native checkboxes, independent of text-input sizing. */
+.homework-solution-list { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; }
+.homework-solution-row { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.homework-choice { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.homework-solution-row > .homework-choice { flex: 1 1 180px; }
+.homework-choice input[type="checkbox"] { flex: 0 0 18px; width: 18px; height: 18px; min-height: 0; padding: 0; margin: 3px 0 0; }
+.homework-choice-text { display: grid; gap: 3px; min-width: 0; }
+.homework-choice-text code, .homework-choice-text .muted { white-space: normal; overflow-wrap: anywhere; }
+.homework-solution-selector [aria-disabled="true"] { opacity: 0.6; cursor: not-allowed; }
+.homework-pdf-preview { margin: 0; display: grid; gap: 8px; }
+.homework-pdf-preview iframe { width: 100%; height: 32rem; border: 1px solid var(--line); border-radius: 8px; }
 
 .coding-homework-authoring-grid {
   align-items: start;

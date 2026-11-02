@@ -17,6 +17,7 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
     {
       key: "coding-homework-grader",
       assessmentFlow: "deferred",
+      authoring: { referenceMaterialsTab: true, settingsTab: true },
       name: "Coding Homework Grader",
       description: "Programming assignment submission and grading workflow.",
       defaultCategoryIds: ["programming"],

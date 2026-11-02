@@ -16,7 +16,15 @@ type ActivityEditorTabsProps = {
   t: (key: string, values?: Record<string, string | number>) => string;
   locale: string;
   showGradingTab?: boolean;
+  showReferenceMaterialsTab?: boolean;
+  showSettingsTab?: boolean;
 };
+
+const ActivityEditorSettingsPortalContext = createContext<HTMLElement | null | undefined>(undefined);
+export function useActivityEditorSettingsPortalTarget() { return useContext(ActivityEditorSettingsPortalContext); }
+
+const ActivityEditorReferenceMaterialsPortalContext = createContext<HTMLElement | null | undefined>(undefined);
+export function useActivityEditorReferenceMaterialsPortalTarget() { return useContext(ActivityEditorReferenceMaterialsPortalContext); }
 
 const ActivityEditorGradingPortalContext = createContext<HTMLElement | null | undefined>(undefined);
 
@@ -70,10 +78,12 @@ function ConceptCheckbox({ checked, partial, label, onChange }: { checked: boole
   return <input ref={ref} type="checkbox" checked={checked} aria-label={label} onChange={(event) => onChange(event.target.checked)} />;
 }
 
-export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites, selectedConcepts, onSaveConcepts, onConceptDraftChange, t, locale, showGradingTab = false }: ActivityEditorTabsProps) {
+export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites, selectedConcepts, onSaveConcepts, onConceptDraftChange, t, locale, showGradingTab = false, showReferenceMaterialsTab = false, showSettingsTab = false }: ActivityEditorTabsProps) {
   const notifications = useNotifications();
   const unsavedActions = useUnsavedChangesActions();
-  const [activeTab, setActiveTab] = useState<"activity" | "concepts" | "grading">("activity");
+  const [activeTab, setActiveTab] = useState<"activity" | "concepts" | "grading" | "references" | "settings">("activity");
+  const [settingsPortalTarget, setSettingsPortalTarget] = useState<HTMLDivElement | null>(null);
+  const [referenceMaterialsPortalTarget, setReferenceMaterialsPortalTarget] = useState<HTMLDivElement | null>(null);
   const [gradingPortalTarget, setGradingPortalTarget] = useState<HTMLDivElement | null>(null);
   const [draftSelections, setDraftSelections] = useState(selectedConcepts);
   const [savedSelections, setSavedSelections] = useState(selectedConcepts);
@@ -84,6 +94,8 @@ export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites,
   const skillsPaneRef = useRef<HTMLDivElement | null>(null);
   const selectedConceptsKeyRef = useRef(canonicalSelections(selectedConcepts));
   const isDirty = canonicalSelections(draftSelections) !== canonicalSelections(savedSelections);
+  const settingsPortalRef = useCallback((node: HTMLDivElement | null) => setSettingsPortalTarget(current => current === node ? current : node), []);
+  const referenceMaterialsPortalRef = useCallback((node: HTMLDivElement | null) => setReferenceMaterialsPortalTarget(current => current === node ? current : node), []);
   const gradingPortalRef = useCallback((node: HTMLDivElement | null) => {
     setGradingPortalTarget((current) => current === node ? current : node);
   }, []);
@@ -238,6 +250,8 @@ export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites,
   }
 
   return (
+    <ActivityEditorSettingsPortalContext.Provider value={showSettingsTab ? settingsPortalTarget : undefined}>
+    <ActivityEditorReferenceMaterialsPortalContext.Provider value={showReferenceMaterialsTab ? referenceMaterialsPortalTarget : undefined}>
     <ActivityEditorGradingPortalContext.Provider value={showGradingTab ? gradingPortalTarget : undefined}>
     <ActivityKnowledgeGenerationProvider value={{
       mode: generationMode,
@@ -252,6 +266,16 @@ export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites,
           <button type="button" role="tab" aria-selected={activeTab === "concepts"} onClick={() => setActiveTab("concepts")}>
             {t("activityConcepts.conceptsTab")}{savedSelections.length ? ` (${savedSelections.length})` : ""}
           </button>
+          {showReferenceMaterialsTab ? (
+            <button id="activity-editor-references-tab" type="button" role="tab" aria-selected={activeTab === "references"} aria-controls="activity-editor-references-panel" onClick={() => setActiveTab("references")}>
+              {t("activityConcepts.referenceMaterialsTab")}
+            </button>
+          ) : null}
+          {showSettingsTab ? (
+            <button id="activity-editor-settings-tab" type="button" role="tab" aria-selected={activeTab === "settings"} aria-controls="activity-editor-settings-panel" onClick={() => setActiveTab("settings")}>
+              {t("activityConcepts.settingsTab")}
+            </button>
+          ) : null}
           {showGradingTab ? (
             <button type="button" role="tab" aria-selected={activeTab === "grading"} onClick={() => setActiveTab("grading")}>
               {t("activityConcepts.gradingTab")}
@@ -323,9 +347,13 @@ export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites,
           </section>
         )}
       </div>
+      {showReferenceMaterialsTab ? <div id="activity-editor-references-panel" role="tabpanel" aria-labelledby="activity-editor-references-tab" hidden={activeTab !== "references"} ref={referenceMaterialsPortalRef} /> : null}
+      {showSettingsTab ? <div id="activity-editor-settings-panel" role="tabpanel" aria-labelledby="activity-editor-settings-tab" hidden={activeTab !== "settings"} ref={settingsPortalRef} /> : null}
       {showGradingTab ? <div role="tabpanel" hidden={activeTab !== "grading"} ref={gradingPortalRef} /> : null}
     </div>
     </ActivityKnowledgeGenerationProvider>
     </ActivityEditorGradingPortalContext.Provider>
+    </ActivityEditorReferenceMaterialsPortalContext.Provider>
+    </ActivityEditorSettingsPortalContext.Provider>
   );
 }

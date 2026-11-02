@@ -1,5 +1,8 @@
 "use client";
 
+import { createPortal } from "react-dom";
+import { HomeworkSubmissionManagement } from "./homework-submission-management";
+import { reconcileTeacherSolutionRequirements, type TeacherSolutionSelection } from "../teacher-solution-selection";
 import { HomeworkStudentWorkspace } from "./homework-student-workspace";
 import { HomeworkSolutionSelector, HomeworkTeacherWorkflow } from "./homework-teacher-workflow";
 import type { HomeworkRequest } from "./workflow-types";
@@ -87,6 +90,8 @@ type CodingHomeworkGraderActivityViewProps = {
   activityFileUrl?: (attachmentId: string) => string;
   authoringClient?: AuthoringClient;
   workflowRequest?: HomeworkRequest;
+  authoringReferenceMaterialsPortalTarget?: HTMLElement | null;
+  authoringSettingsPortalTarget?: HTMLElement | null;
   solutionRequest?: HomeworkRequest;
   canManage: boolean;
   course?: { id: string; title?: string } | null;
@@ -163,6 +168,8 @@ function LegacyCodingHomeworkActivityView({
   activityFileUrl,
   authoringClient,
   workflowRequest,
+  authoringReferenceMaterialsPortalTarget,
+  authoringSettingsPortalTarget,
   solutionRequest,
   canManage,
   locale = "en",
@@ -400,6 +407,17 @@ function LegacyCodingHomeworkActivityView({
     setRequirementDraft(snapshot.requirementDraft);
     setTitle(snapshot.title);
   }, []);
+
+  function reconcileSolution(previous: TeacherSolutionSelection, next: TeacherSolutionSelection) {
+    const reconcileDraft = (draft: RequirementDraft, languageKey: string) => requirementsToDraft(
+      reconcileTeacherSolutionRequirements(draftToRequirements(draft, languageKey), previous, next)
+    );
+    setRequirementDraft(current => reconcileDraft(current, assignment.languageKey));
+    if (savedSnapshotRef.current) {
+      const saved = JSON.parse(savedSnapshotRef.current) as { assignment: CodingHomeworkAssignmentRecord; description: string; requirementDraft: RequirementDraft; title: string };
+      savedSnapshotRef.current = serializeSnapshot({ ...saved, requirementDraft: reconcileDraft(saved.requirementDraft, saved.assignment.languageKey) });
+    }
+  }
 
   const saveHomework = useCallback(
     async (options?: { rethrow?: boolean }) => {
@@ -772,11 +790,17 @@ function LegacyCodingHomeworkActivityView({
     );
   }
 
+  const referenceWorkflow = workflowRequest ? <HomeworkTeacherWorkflow key="homework-references" request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} settingsPortalTarget={authoringSettingsPortalTarget} /> : null;
+  const referenceMaterials = authoringReferenceMaterialsPortalTarget === undefined
+    ? referenceWorkflow
+    : authoringReferenceMaterialsPortalTarget && referenceWorkflow
+      ? createPortal(referenceWorkflow, authoringReferenceMaterialsPortalTarget, "homework-references") : null;
+
   if (loading) {
     return (
-      <section className="section stack">
+      <><section className="section stack">
         <p>{copy.loading}</p>
-      </section>
+      </section>{referenceMaterials}</>
     );
   }
 
@@ -846,11 +870,10 @@ function LegacyCodingHomeworkActivityView({
               ) : null}
             </div>
             {assignmentPdf && activityFileUrl ? (
-              <iframe
-                src={activityFileUrl(assignmentPdf.id)}
-                title={`${copy.assignmentPdf}: ${assignmentPdf.originalName}`}
-                style={{ border: "1px solid var(--color-border, #d8deea)", borderRadius: "0.5rem", minHeight: "32rem", width: "100%" }}
-              />
+              <figure className="homework-pdf-preview">
+                <figcaption className="muted">{copy.preview}</figcaption>
+                <iframe src={activityFileUrl(assignmentPdf.id)} title={`${copy.assignmentPdf}: ${assignmentPdf.originalName}`} />
+              </figure>
             ) : null}
           </div>
           <div className="field">
@@ -930,7 +953,7 @@ function LegacyCodingHomeworkActivityView({
             />
           </div>
 
-          {(solutionRequest ?? workflowRequest) && <HomeworkSolutionSelector request={(solutionRequest ?? workflowRequest)!} locale={locale} requirements={draftToRequirements(requirementDraft, assignment.languageKey)} onChange={requirements => setRequirementDraft(requirementsToDraft(requirements))} />}
+          {(solutionRequest ?? workflowRequest) && <HomeworkSolutionSelector request={(solutionRequest ?? workflowRequest)!} locale={locale} onSolutionChanged={reconcileSolution} requirements={draftToRequirements(requirementDraft, assignment.languageKey)} onChange={requirements => setRequirementDraft(requirementsToDraft(requirements))} />}
           <div className="section-subheading">
             <h3>{copy.requirements}</h3>
             <label className="button secondary">
@@ -1082,7 +1105,8 @@ function LegacyCodingHomeworkActivityView({
         saveDisabled={!authoringClient || !onSave}
       />
       </form>
-      {workflowRequest && <HomeworkTeacherWorkflow request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} />}
+      {workflowRequest && <HomeworkSubmissionManagement request={workflowRequest} locale={locale} />}
+      {referenceMaterials}
       <ProgressDialog
         open={teacherLongRunningTitle !== null}
         title={teacherLongRunningTitle ?? copy.save}

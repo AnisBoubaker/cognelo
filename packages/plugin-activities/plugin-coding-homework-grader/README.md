@@ -4,11 +4,13 @@
 
 Students prepare work by uploading individual files into folders or replacing the whole collection with a ZIP. Files persist across visits and can be removed/replaced until **Submit my work**. There is no browser code editor. Static filename/function-signature checks distinguish incomplete work requiring acknowledgement from blocking safety failures.
 
-Teachers upload a private C solution and choose required filenames/functions manually or with AI assistance. In a course, they select references (defaulting to visible materials before the activity), generate/reuse embeddings, then enable final submissions manually. Material plugins own extraction/index refresh through core. GitHub freshness is configured on each repository material and checked when submissions open.
+Teachers upload a private C solution and choose required filenames/functions manually or with AI assistance. ZIPs replace the solution; files and detected functions can be removed individually or cleared together, with linked requirements reconciled. In a course, **Reference materials** holds material selection (defaulting to visible materials before the activity). **Settings** holds generation concurrency, Generate embeddings, and the manual final-submission switch. Both tabs preserve the activity draft and reference selection. Material plugins own extraction/index refresh through core. GitHub freshness is configured on each repository material and checked when submissions open.
 
 Final hand-in freezes the actual validated files and atomically queues generation. Default parallelism is 2 students, configurable up to a server-wide ceiling of 4. Students can leave and return while questions generate. **Answer challenge questions** starts the core attempt and timer after any required SEB verification. Submitted files remain read-only; ordinary course materials stay accessible. Deadline finalization submits saved answers, including blanks.
 
 Teachers can cancel queued, answering or completed submissions from the activity details page (or editor): the old work is retained, associated grades are withdrawn, late generation cannot revive it, and the student may submit again. Students cannot cancel their frozen hand-in or question-generation job.
+
+Assignment PDF previews and View PDF use authorized file responses that preserve the PDF bytes and content type.
 
 ## Read by topic
 

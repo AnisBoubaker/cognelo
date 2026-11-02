@@ -13,7 +13,7 @@ test("teacher selects private solution signatures and student explicitly acknowl
     const base = `/api/courses/${data.courseId}/activities/${id}/coding-homework-grader`;
     await teacherPage.goto(`/courses/${data.courseId}/activities/${id}`);
     const solution = teacherPage.locator("section").filter({ has: teacherPage.getByRole("heading", { name: "Private teacher solution", exact: true }) }).last();
-    await solution.locator('input[type="file"]').setInputFiles({ name: "teacher.zip", mimeType: "application/zip", buffer: createStoredZip([{ path: "src/main.c", contents: "int add(int values[], int count) { return count; }" }]) });
+    await solution.locator('input[type="file"][accept=".zip"]').setInputFiles({ name: "teacher.zip", mimeType: "application/zip", buffer: createStoredZip([{ path: "src/main.c", contents: "int add(int values[], int count) { return count; }" }]) });
     await solution.getByRole("checkbox", { name: "src/main.c", exact: true }).check();
     const fn = solution.getByRole("checkbox", { name: "int add(int*, int) src/main.c", exact: true });
     await fn.check(); await fn.uncheck();
@@ -24,6 +24,7 @@ test("teacher selects private solution signatures and student explicitly acknowl
     await expect(fn).toBeChecked();
     expect(await responseJson(await teacherApi.get(`${base}/authoring`))).toMatchObject({ requirements: { requirements: { requiredFunctions: [{ name: "add", filePath: "src/main.c", returnType: "int", parameterTypes: ["int*", "int"] }] } } });
     await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/groups/${data.groupId}/activities`, { data: { activityId: id, metadata: { assessmentMode: "summative" }, gradebookSettings: { maxAttempts: 1, attemptLimitMode: "max_attempts", pointsPossible: 100 } } }));
+    await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Generate embeddings", exact: true }).click();
     await expect(teacherPage.getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
     await teacherPage.getByRole("button", { name: "Enable final submissions", exact: true }).click();

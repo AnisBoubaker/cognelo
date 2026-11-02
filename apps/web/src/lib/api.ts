@@ -683,6 +683,8 @@ export type ActivityDefinition = {
   };
   authoring?: {
     gradingTab?: boolean;
+    referenceMaterialsTab?: boolean;
+    settingsTab?: boolean;
     supportsVariations?: boolean;
   };
   studentView: {

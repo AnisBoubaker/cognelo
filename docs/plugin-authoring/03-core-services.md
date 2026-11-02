@@ -308,3 +308,7 @@ Replacement permissions are core-owned metadata. Ordinary start, submit and grad
 ### Plugin file responses
 
 An authorized plugin route may return a native `Response` for files/streams. The API response helper preserves its body, MIME/content-disposition headers and status, then applies host CORS/no-store policy; do not JSON-stringify the Response object. Assigned activity delivery still runs the post-handler content-closure check and cancels a file stream if access closes before delivery. Use explicit safe MIME types and private-file authorization in the owning plugin.
+
+### Reference and settings authoring tabs
+
+Course activity definitions may opt into `authoring.referenceMaterialsTab` and `authoring.settingsTab`. The shared editor owns these optional tabs and mounted portal targets; the renderer registry passes the targets to the plugin. Bank editors omit these course-specific panels. One plugin state can render into both targets without losing selection or draft edits during tab changes. Portal progress dialogs to the document body so a hidden source tab cannot hide cancellation/progress. Incidental settings saves must not replace an unsaved material-selection draft.

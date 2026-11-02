@@ -39,7 +39,9 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
     expect((await teacherApi.put(`${authoring}/workflow-settings`, { data: { enabled: true } })).status()).toBe(409);
     expect((await student.get(`${endpoint}/workflow-settings`)).status()).toBe(403);
     await teacherPage.goto(`/courses/${data.courseId}/activities/${activityId}`);
+    await teacherPage.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await expect(teacherPage.getByRole("heading", { name: "Reference materials", exact: true })).toBeVisible();
+    await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Generate embeddings", exact: true }).click();
     await expect(teacherPage.getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
     expect(embeddingRequests).toBe(1);

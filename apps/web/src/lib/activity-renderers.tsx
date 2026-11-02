@@ -39,7 +39,7 @@ import {
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import { TestActivityView, type TestStudentItemRendererContext } from "@/components/test-activity-view";
 import { TestManualGradingPanel } from "@/components/test-manual-grading-panel";
-import { useActivityEditorGradingPortalTarget } from "@/components/activity-editor-tabs";
+import { useActivityEditorGradingPortalTarget, useActivityEditorReferenceMaterialsPortalTarget, useActivityEditorSettingsPortalTarget } from "@/components/activity-editor-tabs";
 import { createStandaloneActivityDraftHost } from "@/lib/activity-response-draft-host";
 import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
 import { isTestItemAnswered } from "@/lib/test-item-answer-status";
@@ -415,6 +415,8 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
 }
 
 function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeof CodingHomeworkGraderActivityView>) {
+  const authoringReferenceMaterialsPortalTarget = useActivityEditorReferenceMaterialsPortalTarget();
+  const authoringSettingsPortalTarget = useActivityEditorSettingsPortalTarget();
   const {
     activityRouteCourseId,
     groupId,
@@ -497,6 +499,8 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
             : `/courses/${courseId}/activities/${activityProps.activity.id}/coding-homework-grader/activity-file?attachmentId=${encodeURIComponent(attachmentId)}`
         )
       }
+      authoringReferenceMaterialsPortalTarget={authoringReferenceMaterialsPortalTarget}
+      authoringSettingsPortalTarget={authoringSettingsPortalTarget}
       workflowRequest={workflowRequest}
       authoringClient={authoringClient}
       preflightClient={preflightClient}

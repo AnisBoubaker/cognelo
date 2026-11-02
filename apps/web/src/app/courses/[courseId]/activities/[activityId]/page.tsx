@@ -112,6 +112,8 @@ export default function ActivityPage() {
             onConceptDraftChange={updateConceptDraft}
             t={t}
             locale={locale}
+            showSettingsTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.settingsTab === true}
+            showReferenceMaterialsTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.referenceMaterialsTab === true}
             showGradingTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.gradingTab === true}
           >
           <ActivityRenderer
@@ -146,6 +148,8 @@ export default function ActivityPage() {
             onConceptDraftChange={updateConceptDraft}
             t={t}
             locale={locale}
+            showSettingsTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.settingsTab === true}
+            showReferenceMaterialsTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.referenceMaterialsTab === true}
             showGradingTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.gradingTab === true}
           >
             <section className="section stack">

@@ -968,6 +968,8 @@ export const zhMessages = {
       versionNote: "保存草稿只更新可变活动，不创建版本。以“已发布”状态保存时，仅在编写内容发生变化后创建新版本。"
     },
     activityConcepts: {
+      settingsTab: "设置",
+      referenceMaterialsTab: "参考资料",
       tabsLabel: "活动编辑器", activityTab: "活动", conceptsTab: "概念", gradingTab: "评分", title: "知识概念",
       description: "选择此活动帮助学习者练习或展示的学科概念。", search: "搜索概念",
       empty: "此学科尚无知识概念。请先在学科知识图谱中添加概念。", noMatches: "没有符合搜索条件的概念。",

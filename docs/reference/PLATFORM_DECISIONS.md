@@ -155,6 +155,9 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 
 ## Frontend Platform Decisions
 
+- Native checkbox/radio controls are excluded from the text-input width, padding and minimum-height recipe. The compact default is 18px, with component-specific choice styles retained; do not fix each new checkbox by relying on a missing wrapper class.
+
+
 - Subjects and activity banks are top-level navigation items alongside courses.
 - The subjects section follows the same list-first management pattern as other sections: `/subjects` shows the subject list with an Add action, `/subjects/:subjectId` shows linked activity banks/courses, and `/subjects/:subjectId/edit` edits subject metadata.
 - `/subjects/:subjectId/edit` owns the visual knowledge-graph editor directly after the description. `/subjects/:subjectId` shows only the graph preview after Activity banks and Courses. Keep knowledge concepts subject-scoped until an explicit future migration introduces reusable cross-subject knowledge identities.
