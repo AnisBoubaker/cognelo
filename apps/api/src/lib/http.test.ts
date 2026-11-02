@@ -16,6 +16,20 @@ const { listContentTypeDefinitions } = await import("@cognelo/content-type-sdk")
 const { listServerContentTypePlugins } = await import("@cognelo/content-type-sdk/server");
 
 describe("API HTTP helpers", () => {
+  it("preserves plugin file bytes, content headers and status while applying host response policy", async () => {
+    const bytes = new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55, 10, 0, 255]);
+    const response = json(new Response(bytes, { status: 206, headers: {
+      "Content-Type": "application/pdf", "Content-Disposition": 'inline; filename="assignment.pdf"',
+      "Content-Length": String(bytes.length), "Content-Range": "bytes 0-10/11", "X-Content-Type-Options": "nosniff"
+    } }));
+    expect(response.status).toBe(206);
+    expect(response.headers.get("Content-Type")).toBe("application/pdf");
+    expect(response.headers.get("Content-Disposition")).toContain("inline");
+    expect(response.headers.get("Content-Range")).toBe("bytes 0-10/11");
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3000");
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(bytes);
+  });
   it("streams measured progress before the final result with CORS and no buffering", async () => {
     let finish!: () => void;
     const gate = new Promise<void>(resolve => { finish = resolve; });

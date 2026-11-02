@@ -304,3 +304,7 @@ An activity may advertise `submissionManagement.rendererKey` for its operational
 `ServerActivityPlugin.timedFinalization` lets the owning plugin finalize server-saved work after core verifies expiry. Return true after handling it; false uses core's generic fallback for legacy/incomplete states. Recheck effective deadlines, ignore new answer content at expiry, and serialize with saves/cancellation. Internal `deleteActivitySubmission` replacement options are server-only: they may cancel a started attempt, withdraw its associated grade and grant one replacement after release without altering class-wide release.
 
 Replacement permissions are core-owned metadata. Ordinary start, submit and grading metadata cannot set or overwrite `replacementAllowed` or `replacementOfAttemptId`; only the authorized cancellation path grants replacement.
+
+### Plugin file responses
+
+An authorized plugin route may return a native `Response` for files/streams. The API response helper preserves its body, MIME/content-disposition headers and status, then applies host CORS/no-store policy; do not JSON-stringify the Response object. Assigned activity delivery still runs the post-handler content-closure check and cancels a file stream if access closes before delivery. Use explicit safe MIME types and private-file authorization in the owning plugin.

@@ -49,6 +49,15 @@ function corsHeaders(init?: ResponseInit) {
 }
 
 export function json(data: unknown, init?: ResponseInit) {
+  // Plugin handlers may return authorized file/stream responses. JSON-stringifying
+  // a Response loses its body and Content-Type, producing an empty object.
+  if (data instanceof Response) {
+    const headers = new Headers(data.headers);
+    new Headers(corsHeaders(init)).forEach((value, key) => headers.set(key, value));
+    return new NextResponse(data.body, {
+      ...init, status: init?.status ?? data.status, statusText: init?.statusText ?? data.statusText, headers
+    });
+  }
   return NextResponse.json(data, {
     ...init,
     headers: corsHeaders(init)
