@@ -1,5 +1,6 @@
 "use client";
 
+import { QuestionCodeContext } from "./question-code-context";
 import { createPortal } from "react-dom";
 import { HomeworkSubmissionManagement } from "./homework-submission-management";
 import { reconcileTeacherSolutionRequirements, type TeacherSolutionSelection } from "../teacher-solution-selection";
@@ -765,6 +766,7 @@ function LegacyCodingHomeworkActivityView({
                 submitting={submitting}
               />
               <ChallengeQuestionsPanel
+                locale={locale}
                 answers={challengeAnswers}
                 copy={copy}
                 questions={challengeQuestions}
@@ -790,7 +792,19 @@ function LegacyCodingHomeworkActivityView({
     );
   }
 
-  const referenceWorkflow = workflowRequest ? <HomeworkTeacherWorkflow key="homework-references" request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} settingsPortalTarget={authoringSettingsPortalTarget} /> : null;
+  const generationInstructionsField = <div className="field">
+    <label htmlFor="coding-homework-generation-instructions">{copy.generationInstructions}</label>
+    <textarea id="coding-homework-generation-instructions" rows={5} maxLength={12000} disabled={loading || saving} value={assignment.generationInstructions}
+      onChange={event => { const generationInstructions = event.currentTarget.value; setAssignment(current => ({ ...current, generationInstructions })); }} />
+    <p className="muted">{copy.generationInstructionsHelp}</p>
+  </div>;
+  const generationSettings = <section className="stack">
+    {generationInstructionsField}
+    <EditActionBar isDirty={hasUnsavedChanges} isSaving={saving} savedLabel={actionCopy.saved} unsavedLabel={actionCopy.unsaved}
+      saveLabel={copy.save} savingLabel={actionCopy.saving} cancelLabel={actionCopy.cancel} onCancel={discardChanges}
+      onSave={() => saveHomework()} saveDisabled={!authoringClient || !onSave} />
+  </section>;
+  const referenceWorkflow = workflowRequest ? <HomeworkTeacherWorkflow key="homework-references" request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} settingsPortalTarget={authoringSettingsPortalTarget} generationSettings={loading ? null : generationSettings} /> : null;
   const referenceMaterials = authoringReferenceMaterialsPortalTarget === undefined
     ? referenceWorkflow
     : authoringReferenceMaterialsPortalTarget && referenceWorkflow
@@ -821,6 +835,18 @@ function LegacyCodingHomeworkActivityView({
                 : saving
                   ? copy.save
                   : null;
+
+  const teacherProgress = <ProgressDialog
+        open={teacherLongRunningTitle !== null}
+        title={teacherLongRunningTitle ?? copy.save}
+        progressLabel={teacherLongRunningTitle ?? copy.save}
+        eyebrow={activity.title}
+        message={
+          creatingSnapshot || extractingDocumentation || showDocumentationProgress
+            ? copy.documentation
+            : undefined
+        }
+      />;
 
   return (
     <>
@@ -943,15 +969,7 @@ function LegacyCodingHomeworkActivityView({
             />
           </div>
 
-          <div className="field">
-            <label htmlFor="coding-homework-generation-instructions">{copy.generationInstructions}</label>
-            <textarea
-              id="coding-homework-generation-instructions"
-              rows={4}
-              value={assignment.generationInstructions}
-              onChange={(event) => setAssignment((current) => ({ ...current, generationInstructions: event.target.value }))}
-            />
-          </div>
+          {!workflowRequest && generationInstructionsField}
 
           {(solutionRequest ?? workflowRequest) && <HomeworkSolutionSelector request={(solutionRequest ?? workflowRequest)!} locale={locale} onSolutionChanged={reconcileSolution} requirements={draftToRequirements(requirementDraft, assignment.languageKey)} onChange={requirements => setRequirementDraft(requirementsToDraft(requirements))} />}
           <div className="section-subheading">
@@ -1107,17 +1125,7 @@ function LegacyCodingHomeworkActivityView({
       </form>
       {workflowRequest && <HomeworkSubmissionManagement request={workflowRequest} locale={locale} />}
       {referenceMaterials}
-      <ProgressDialog
-        open={teacherLongRunningTitle !== null}
-        title={teacherLongRunningTitle ?? copy.save}
-        progressLabel={teacherLongRunningTitle ?? copy.save}
-        eyebrow={activity.title}
-        message={
-          creatingSnapshot || extractingDocumentation || showDocumentationProgress
-            ? copy.documentation
-            : undefined
-        }
-      />
+      {authoringSettingsPortalTarget ? createPortal(teacherProgress, authoringSettingsPortalTarget.ownerDocument.body) : teacherProgress}
     </>
   );
 }
@@ -1313,6 +1321,7 @@ const spinnerStyle = {
 } as const;
 
 function ChallengeQuestionsPanel({
+  locale,
   answers,
   copy,
   onAnswerChange,
@@ -1323,6 +1332,7 @@ function ChallengeQuestionsPanel({
   status,
   submitting
 }: {
+  locale: CodingHomeworkLocale;
   answers: Record<string, string>;
   copy: CodingHomeworkCopy;
   onAnswerChange: (questionId: string, answer: string) => void;
@@ -1352,6 +1362,7 @@ function ChallengeQuestionsPanel({
       <div className="stack">
         {questions.map((question) => (
           <div className="challenge-question" key={question.id}>
+            <QuestionCodeContext context={question.context} locale={locale} />
             <p>
               <strong>{question.orderIndex + 1}.</strong> {question.questionText}
             </p>

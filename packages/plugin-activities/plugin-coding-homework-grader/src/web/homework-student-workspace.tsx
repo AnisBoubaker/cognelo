@@ -1,4 +1,5 @@
 "use client";
+import { QuestionCodeContext } from "./question-code-context";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActionIcon, MarkdownRenderer, ProgressDialog, useDialogs, isActivityContentClosedError } from "@cognelo/activity-ui";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
@@ -116,12 +117,12 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
       {preparation.readiness.requiresAcknowledgement && <label className="homework-choice"><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /> {copy.incomplete}</label>}
       {!workspace?.submissionsEnabled && <p role="status">{copy.closed}</p>}
       <button type="button" disabled={!workspace?.submissionsEnabled || !preparation.readiness.canSubmit || (preparation.readiness.requiresAcknowledgement && !acknowledged)} onClick={async () => {
-        if (await dialogs.confirm({ title: copy.handIn, message: copy.handInDetail, confirmLabel: copy.handIn })) await run(copy.handIn, async signal => { await request("hand-in", body("POST", { expectedRevision: preparation.draft.revision, acknowledgeIncomplete: acknowledged, locale }, signal)); });
+        if (await dialogs.confirm({ title: copy.handIn, message: copy.handInDetail, confirmLabel: copy.handIn })) await run(copy.handIn, async signal => { await request("hand-in", body("POST", { expectedRevision: preparation.draft.revision, acknowledgeIncomplete: acknowledged }, signal)); });
       }}><ActionIcon name="submit" /> {copy.handIn}</button>
     </>}
     {active && !["challenge_ready", "ready_for_grading", "graded"].includes(active.status) && <div role="status" className="preview-panel"><strong>{active.processingStatus === "failed" ? copy.generationFailed : copy.generating}</strong>{active.queuePosition && <p>{copy.queue}: {active.queuePosition}</p>}<p>{copy.leave}</p></div>}
     {active?.status === "challenge_ready" && !questions.length && <><p>{copy.answerHelp}</p><button type="button" onClick={() => void start()}><ActionIcon name="open" /> {copy.answer}</button></>}
-    {questions.length > 0 && <><h3>{copy.answers}</h3><p className="muted">{copy.autoSave}</p>{questions.map((question, index) => <div key={question.id} className="field"><label htmlFor={`answer-${question.id}`}><strong>{index + 1}.</strong><MarkdownRenderer markdown={question.questionText} /></label><textarea id={`answer-${question.id}`} rows={5} maxLength={12000} disabled={completed || Boolean(timedAutoSubmit)} value={answers[question.id] ?? ""} onChange={event => { dirty.current = true; setSaved(false); setAnswers(current => ({ ...current, [question.id]: event.target.value })); }} onBlur={() => void saveAnswers()} /></div>)}
+    {questions.length > 0 && <><h3>{copy.answers}</h3><p className="muted">{copy.autoSave}</p>{questions.map((question, index) => <div key={question.id} className="field"><QuestionCodeContext context={question.context} locale={locale} /><label htmlFor={`answer-${question.id}`}><strong>{index + 1}.</strong><MarkdownRenderer markdown={question.questionText} /></label><textarea id={`answer-${question.id}`} rows={5} maxLength={12000} disabled={completed || Boolean(timedAutoSubmit)} value={answers[question.id] ?? ""} onChange={event => { dirty.current = true; setSaved(false); setAnswers(current => ({ ...current, [question.id]: event.target.value })); }} onBlur={() => void saveAnswers()} /></div>)}
       {!completed && <div className="row"><button type="button" className="secondary" onClick={() => void saveAnswers()}><ActionIcon name="save" /> {copy.saveAnswers}</button><button type="button" onClick={() => void submitAnswers()}><ActionIcon name="submit" /> {copy.submitAnswers}</button>{saved && <span role="status">{copy.saved}</span>}</div>}
     </>}
     {completed && <p role="status">{copy.submitted}</p>}

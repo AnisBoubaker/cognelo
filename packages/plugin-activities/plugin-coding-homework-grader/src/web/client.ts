@@ -1,3 +1,4 @@
+import type { StudentQuestionContext } from "../question-context";
 export type CodingHomeworkAttachmentRecord = {
   id: string;
   createdAt: string;
@@ -248,6 +249,7 @@ export type CodingHomeworkChallengeQuestionRecord = {
 };
 
 export type CodingHomeworkStudentChallengeQuestionRecord = {
+  context?: StudentQuestionContext;
   id: string;
   answerSubmittedAt: string | null;
   orderIndex: number;

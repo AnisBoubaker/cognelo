@@ -4,18 +4,18 @@ import { encryptCredential } from "@cognelo/core";
 import { credentialsFor } from "./auth";
 
 /** Local-only OpenAI boundary stand-in; all homework/core APIs and storage remain real. */
-export async function homeworkModelFixture(token: string, options: { hold?: boolean; failFirst?: number; provider?: "openai" | "codex" | "claude" | "ollama" } = {}) {
+export async function homeworkModelFixture(token: string, options: { hold?: boolean; failFirst?: number; provider?: "openai" | "codex" | "claude" | "ollama"; questionText?: (number: number) => string } = {}) {
   const teacher = await prisma.user.findUniqueOrThrow({ where: { email: credentialsFor("teacher").email } });
   let sequence = 0, active = 0, maximum = 0, hold = options.hold ?? false, failures = options.failFirst ?? 0;
   const embeddingTexts: string[] = [];
-  const requests: Array<{ path: string; model: string; authenticated: boolean }> = [];
+  const requests: Array<{ path: string; model: string; authenticated: boolean; systemPrompt?: string; userPrompt?: string }> = [];
   const starts: string[] = [], waiting: Array<() => void> = [];
   const server = createServer(async (request, response) => {
     let counted = false;
     try {
       let raw = ""; for await (const chunk of request) raw += chunk;
       const body = JSON.parse(raw);
-      requests.push({ path: request.url ?? "", model: body.model, authenticated: request.headers.authorization === "Bearer synthetic-test-key" || request.headers["x-api-key"] === "synthetic-test-key" });
+      requests.push({ path: request.url ?? "", model: body.model, systemPrompt: body.instructions ?? body.system ?? body.messages?.[0]?.content, userPrompt: typeof body.input === "string" ? body.input : body.messages?.at(-1)?.content, authenticated: request.headers.authorization === "Bearer synthetic-test-key" || request.headers["x-api-key"] === "synthetic-test-key" });
       if (request.url?.endsWith("/embeddings") || request.url?.endsWith("/api/embed")) { embeddingTexts.push(...body.input); response.writeHead(200, { "Content-Type": "application/json" }); const vectors = body.input.map(() => Array.from({ length: body.dimensions ?? 8 }, (_, i) => i === 0 ? 1 : 0)); response.end(JSON.stringify(request.url?.endsWith("/api/embed") ? { embeddings: vectors } : { data: vectors.map((embedding: number[], index: number) => ({ index, embedding })) })); return; }
       const prompt = body.input ?? body.messages.at(-1).content;
       if (prompt.startsWith("Generate a grading rubric")) {
@@ -28,7 +28,7 @@ export async function homeworkModelFixture(token: string, options: { hold?: bool
       if (hold) await new Promise<void>(resolve => waiting.push(resolve));
       if (response.destroyed) return;
       if (failures-- > 0) { response.writeHead(503); response.end(); return; }
-      response.writeHead(200, { "Content-Type": "application/json" }); const text = JSON.stringify({ questionText: `Question ${number}: explain the main control flow and boundary cases of your submitted C function.` }); response.end(JSON.stringify({ output_text: text, content: [{ text }], message: { content: text } }));
+      response.writeHead(200, { "Content-Type": "application/json" }); const text = JSON.stringify({ questionText: options.questionText?.(number) ?? `Question ${number}: explain the main control flow and boundary cases of your submitted C function.` }); response.end(JSON.stringify({ output_text: text, content: [{ text }], message: { content: text } }));
     } catch { if (!response.headersSent) response.writeHead(500); response.end(); }
     finally { if (counted) active--; }
   });

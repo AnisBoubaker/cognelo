@@ -1,6 +1,6 @@
 "use client";
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionIcon, AiModelPicker, type AiModelConnectionOption, ProgressDialog, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { AiModelSelection } from "@cognelo/contracts";
 import type { CodingHomeworkLocale } from "./messages";
@@ -11,7 +11,7 @@ export { HomeworkSolutionSelector } from "./homework-solution-selector";
 
 type AiChoice = { selection: AiModelSelection | null; resolved: { connectionId: string; model: string; displayName?: string; provider?: string } | null; error: string | null };
 type Settings = { ai: { connections: AiModelConnectionOption[]; question: AiChoice; embedding: AiChoice }; rows: Array<{ id: string; parentId: string | null; kind: string; title: string; depth: number; resourceId: string | null }>; selected: string[]; statuses: Record<string, { state: string; maxAgeHours?: number | null; error?: string }>; enabled: boolean; prepared: boolean; concurrency: number };
-export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, settingsPortalTarget }: { request: HomeworkRequest; locale: CodingHomeworkLocale; hasUnsavedChanges: boolean; settingsPortalTarget?: HTMLElement | null }) {
+export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, settingsPortalTarget, generationSettings }: { request: HomeworkRequest; locale: CodingHomeworkLocale; hasUnsavedChanges: boolean; settingsPortalTarget?: HTMLElement | null; generationSettings?: ReactNode }) {
   const copy = homeworkWorkflowCopy(locale);
   const notifications = useNotifications();
   const [materialErrors, setMaterialErrors] = useState<Record<string, string>>({});
@@ -102,6 +102,7 @@ export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, se
     {error && <p className="error" role="alert">{error}</p>}
     {!settings && <p>{copy.loading}</p>}
     {modelPicker("generation")}
+    {generationSettings}
     <p>{copy.materials}: {selected.length}</p>
     {settings && <>
       <label className="field">{copy.concurrency}<input type="number" min={1} max={4} value={settings.concurrency} onChange={event => { const concurrency = Number(event.target.value); if (concurrency >= 1 && concurrency <= 4) void run(copy.save, async signal => { await request("workflow-settings", body("PUT", { concurrency }, signal)); }); }} /></label>
