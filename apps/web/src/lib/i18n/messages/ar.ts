@@ -753,6 +753,15 @@ export const arMessages = {
       loadError: "تعذر تحميل المقرر."
     },
     settings: {
+      questionAuthoringModel: "نموذج تأليف الأسئلة",
+      aiModelUnavailable: "النموذج أو الاتصال غير متاح",
+      aiNoGenerationModels: "أضف نموذج توليد نص إلى اتصال أولاً.",
+      aiModelCatalogHelp: "احفظ الرمز مرة واحدة. يعيد النموذج الافتراضي والنماذج الإضافية استخدام الاتصال نفسه. أدخل اسماً واحداً في كل سطر.",
+      aiDefaultModelPurpose: "نوع النموذج الافتراضي",
+      aiGenerationModels: "توليد النص",
+      aiEmbeddingModels: "نماذج التضمين",
+      aiAdditionalModels: "نماذج نص إضافية",
+      aiEmbeddingUnsupported: "يدعم Claude توليد النص؛ اختر اتصالاً يدعم التضمين لإنشاء الفهرس.",
       eyebrow: "الإعدادات",
       title: "الإعدادات العامة",
       subtitle: "إدارة تفضيلات الحساب العامة غير المرتبطة بمقرر محدد.",

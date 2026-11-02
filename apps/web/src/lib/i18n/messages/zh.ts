@@ -425,6 +425,15 @@ export const zhMessages = {
       researchText: "活动从一开始就支持可配置元数据。"
     },
     settings: {
+      questionAuthoringModel: "题目编写模型",
+      aiModelUnavailable: "模型或连接不可用",
+      aiNoGenerationModels: "请先为连接添加文本生成模型。",
+      aiModelCatalogHelp: "令牌只需保存一次。默认模型及其他模型共用此连接。每行输入一个模型名称。",
+      aiDefaultModelPurpose: "默认模型类型",
+      aiGenerationModels: "文本生成",
+      aiEmbeddingModels: "向量嵌入模型",
+      aiAdditionalModels: "其他文本模型",
+      aiEmbeddingUnsupported: "Claude 支持文本生成；索引需要另一个支持向量嵌入的连接。",
       eyebrow: "设置",
       title: "通用设置",
       subtitle: "管理不属于某一门课程的账户级偏好。",

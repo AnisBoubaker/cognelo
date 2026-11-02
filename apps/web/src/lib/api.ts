@@ -90,6 +90,7 @@ export type AdminUserFilters = { role?: string; firstName?: string; lastName?: s
 export type Pagination = { page: number; pageSize: number; total: number; totalPages: number };
 
 export type AiAgentConnection = {
+  models?: Array<{ model: string; purpose: "generation" | "embedding" }>;
   id: string;
   scope: "personal" | "global";
   provider: "ollama" | "openai" | "codex" | "claude";
@@ -104,6 +105,7 @@ export type AiAgentConnection = {
 
 export type AiAgentPreferences = {
   questionAuthoringAiAgentConnectionId: string | null;
+  questionAuthoringModel?: string | null;
 };
 
 export type EmailDeliveryConfiguration = {

@@ -194,10 +194,30 @@ export const UserPasswordChangeSchema = z
   });
 export type UserPasswordChange = z.infer<typeof UserPasswordChangeSchema>;
 
+export const AiAgentModelSchema = z.object({
+  model: z.string().trim().min(1).max(160).refine(value => !/[\u0000-\u001f\u007f]/.test(value), "Model names cannot contain control characters."),
+  purpose: z.enum(["generation", "embedding"])
+});
+export type AiAgentModel = z.infer<typeof AiAgentModelSchema>;
+export const AiModelSelectionSchema = z.object({ connectionId: RecordIdSchema, model: AiAgentModelSchema.shape.model }).strict();
+export type AiModelSelection = z.infer<typeof AiModelSelectionSchema>;
+
+/** Existing single-model connections remain usable; credentials are never copied into this catalog. */
+export function aiAgentModels(connection: { model: string; models?: unknown; provider?: string }): AiAgentModel[] {
+  const parsed = z.array(AiAgentModelSchema).max(100).safeParse(connection.models);
+  const entries: AiAgentModel[] = parsed.success ? [...parsed.data] : [];
+  if (!entries.some(entry => entry.model === connection.model)) entries.unshift({ model: connection.model, purpose: "generation" });
+  if ((!parsed.success || !parsed.data.length) && (connection.provider === "openai" || connection.provider === "codex")) {
+    if (!entries.some(entry => entry.model === "text-embedding-3-small" && entry.purpose === "embedding")) entries.push({ model: "text-embedding-3-small", purpose: "embedding" });
+  }
+  return [...new Map(entries.map(entry => [`${entry.purpose}:${entry.model}`, entry])).values()];
+}
+
 export const AiAgentConnectionInputSchema = z.object({
   displayName: z.string().trim().min(2).max(160),
   provider: AiAgentProviderSchema,
-  model: z.string().trim().min(1).max(160),
+  model: AiAgentModelSchema.shape.model,
+  models: z.array(AiAgentModelSchema).max(100).optional(),
   baseUrl: z.string().trim().url().max(500).refine((value) => {
     try {
       const url = new URL(value);
@@ -214,7 +234,8 @@ export const AiAgentConnectionUpdateSchema = partialWithoutDefaults(AiAgentConne
 export type AiAgentConnectionUpdate = z.infer<typeof AiAgentConnectionUpdateSchema>;
 
 export const AiAgentPreferencesInputSchema = z.object({
-  questionAuthoringAiAgentConnectionId: RecordIdSchema.nullable().optional()
+  questionAuthoringAiAgentConnectionId: RecordIdSchema.nullable().optional(),
+  questionAuthoringModel: AiAgentModelSchema.shape.model.nullable().optional()
 });
 export type AiAgentPreferencesInput = z.infer<typeof AiAgentPreferencesInputSchema>;
 
@@ -320,6 +341,8 @@ export type CourseUpdate = z.infer<typeof CourseUpdateSchema>;
 
 export const CourseSettingsInputSchema = z.object({
   studentSupportAiAgentConnectionId: RecordIdSchema.nullable().optional(),
+  studentSupportAiAgentModel: AiAgentModelSchema.shape.model.nullable().optional(),
+  assessmentFeedbackAiAgentModel: AiAgentModelSchema.shape.model.nullable().optional(),
   automaticFeedbackEnabled: z.boolean().optional().default(false),
   assessmentFeedbackAiAgentConnectionId: RecordIdSchema.nullable().optional()
 }).superRefine((value, context) => {

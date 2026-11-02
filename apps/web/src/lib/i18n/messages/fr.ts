@@ -425,6 +425,15 @@ export const frMessages = {
       researchText: "Les activités portent des métadonnées configurables dès le départ."
     },
     settings: {
+      questionAuthoringModel: "Modèle de création de questions",
+      aiModelUnavailable: "Modèle ou connexion indisponible",
+      aiNoGenerationModels: "Ajoutez d’abord un modèle de génération de texte à une connexion.",
+      aiModelCatalogHelp: "Enregistrez le jeton une seule fois. Le modèle par défaut et les modèles supplémentaires réutilisent cette connexion. Saisissez un nom de modèle par ligne.",
+      aiDefaultModelPurpose: "Type du modèle par défaut",
+      aiGenerationModels: "Génération de texte",
+      aiEmbeddingModels: "Modèles de plongement vectoriel",
+      aiAdditionalModels: "Modèles de texte supplémentaires",
+      aiEmbeddingUnsupported: "Claude génère du texte; choisissez une connexion offrant des plongements vectoriels pour l’indexation.",
       eyebrow: "Configuration",
       title: "Configuration générale",
       subtitle: "Gérez les préférences globales qui ne sont pas liées à un cours précis.",

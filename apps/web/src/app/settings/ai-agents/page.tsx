@@ -1,9 +1,10 @@
 "use client";
 
+import { aiAgentModels } from "@cognelo/contracts";
 import { AppIcon } from "@/components/app-icon";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useDialogs, useNotifications } from "@cognelo/activity-ui";
+import { AiModelPicker, useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { SettingsNav } from "@/components/settings-nav";
@@ -17,6 +18,9 @@ type FormState = {
   displayName: string;
   provider: (typeof providers)[number];
   model: string;
+  modelPurpose: "generation" | "embedding";
+  otherModels: string;
+  embeddingModels: string;
   baseUrl: string;
   apiKey: string;
   scope: "personal" | "global";
@@ -27,7 +31,7 @@ const emptyForm: FormState = {
   id: null,
   displayName: "",
   provider: "ollama",
-  model: "",
+  model: "", modelPurpose: "generation", otherModels: "", embeddingModels: "",
   baseUrl: "",
   apiKey: "",
   scope: "personal",
@@ -41,6 +45,7 @@ export default function AiAgentSettingsPage() {
   const notifications = useNotifications();
   const [connections, setConnections] = useState<AiAgentConnection[]>([]);
   const [questionAuthoringAgentId, setQuestionAuthoringAgentId] = useState("");
+  const [questionAuthoringModel, setQuestionAuthoringModel] = useState("");
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -50,6 +55,8 @@ export default function AiAgentSettingsPage() {
   const personalConnections = connections.filter((connection) => connection.scope === "personal");
   const globalConnections = connections.filter((connection) => connection.scope === "global");
 
+  const preferredConnection = connections.find(connection => connection.id === questionAuthoringAgentId);
+  const defaultQuestionModel = preferredConnection ? aiAgentModels(preferredConnection).find(model => model.purpose === "generation" && model.model === preferredConnection.model)?.model ?? aiAgentModels(preferredConnection).find(model => model.purpose === "generation")?.model ?? "" : "";
   const formTitle = useMemo(() => (form.id ? t("settings.aiAgentEditTitle") : t("settings.aiAgentNewTitle")), [form.id, t]);
 
   useEffect(() => {
@@ -62,6 +69,7 @@ export default function AiAgentSettingsPage() {
       const result = await api.aiAgentConnections();
       setConnections(result.connections);
       setQuestionAuthoringAgentId(result.preferences.questionAuthoringAiAgentConnectionId ?? "");
+      setQuestionAuthoringModel(result.preferences.questionAuthoringModel ?? "");
     } finally {
       setLoading(false);
     }
@@ -73,7 +81,8 @@ export default function AiAgentSettingsPage() {
     setSaving(true);
     try {
       const result = await api.updateAiAgentPreferences({
-        questionAuthoringAiAgentConnectionId: questionAuthoringAgentId || null
+        questionAuthoringAiAgentConnectionId: questionAuthoringAgentId || null,
+        questionAuthoringModel: questionAuthoringModel || null
       });
       setQuestionAuthoringAgentId(result.preferences.questionAuthoringAiAgentConnectionId ?? "");
       notifications.success(t("settings.aiAgentPreferencesSaved"));
@@ -93,6 +102,9 @@ export default function AiAgentSettingsPage() {
       displayName: connection.displayName,
       provider: connection.provider,
       model: connection.model,
+      modelPurpose: aiAgentModels(connection).find(entry => entry.model === connection.model)?.purpose ?? "generation",
+      otherModels: aiAgentModels(connection).filter(entry => entry.purpose === "generation" && entry.model !== connection.model).map(entry => entry.model).join("\n"),
+      embeddingModels: aiAgentModels(connection).filter(entry => entry.purpose === "embedding" && entry.model !== connection.model).map(entry => entry.model).join("\n"),
       baseUrl: connection.baseUrl ?? "",
       apiKey: "",
       scope: connection.scope,
@@ -109,6 +121,11 @@ export default function AiAgentSettingsPage() {
         displayName: form.displayName,
         provider: form.provider,
         model: form.model,
+        models: [
+          { model: form.model, purpose: form.modelPurpose },
+          ...form.otherModels.split(/\r?\n/).map(model => model.trim()).filter(Boolean).map(model => ({ model, purpose: "generation" as const })),
+          ...form.embeddingModels.split(/\r?\n/).map(model => model.trim()).filter(Boolean).map(model => ({ model, purpose: "embedding" as const }))
+        ],
         baseUrl: form.baseUrl || null,
         ...(form.apiKey || !form.id ? { apiKey: form.apiKey || null } : {}),
         scope: form.scope,
@@ -174,24 +191,11 @@ export default function AiAgentSettingsPage() {
               {loading ? <p className="muted">{t("common.loading")}</p> : null}
 
               <form className="inline-panel form" onSubmit={savePreferences}>
-                <div className="field">
-                  <label htmlFor="questionAuthoringAgent">{t("settings.questionAuthoringAgent")}</label>
-                  <select
-                    id="questionAuthoringAgent"
-                    value={questionAuthoringAgentId}
-                    onChange={(event) => setQuestionAuthoringAgentId(event.target.value)}
-                  >
-                    <option value="">{t("settings.noAiAgentSelected")}</option>
-                    {connections
-                      .filter((connection) => connection.isEnabled)
-                      .map((connection) => (
-                        <option key={connection.id} value={connection.id}>
-                          {formatAiAgentOption(connection, t)}
-                        </option>
-                      ))}
-                  </select>
-                  <p className="muted">{t("settings.questionAuthoringAgentHelp")}</p>
-                </div>
+                <AiModelPicker connections={connections} purpose="generation"
+                  value={questionAuthoringAgentId ? { connectionId: questionAuthoringAgentId, model: questionAuthoringModel || defaultQuestionModel } : null}
+                  onChange={selection => { setQuestionAuthoringAgentId(selection?.connectionId ?? ""); setQuestionAuthoringModel(selection?.model ?? ""); }} disabled={saving}
+                  labels={{ connection: t("settings.questionAuthoringAgent"), model: t("settings.questionAuthoringModel"), inherit: t("settings.noAiAgentSelected"), unavailable: t("settings.aiModelUnavailable"), noModels: t("settings.aiNoGenerationModels") }} />
+                <p className="muted">{t("settings.questionAuthoringAgentHelp")}</p>
                 <div className="row">
                   <button disabled={saving} type="submit">
                     <AppIcon name="save" />
@@ -254,7 +258,7 @@ export default function AiAgentSettingsPage() {
                       id="provider"
                       value={form.provider}
                       onChange={(event) =>
-                        setForm((current) => ({ ...current, provider: event.target.value as FormState["provider"] }))
+                        setForm((current) => ({ ...current, provider: event.target.value as FormState["provider"], ...(event.target.value === "claude" ? { modelPurpose: "generation", embeddingModels: "" } : {}) }))
                       }
                     >
                       {providers.map((provider) => (
@@ -289,6 +293,14 @@ export default function AiAgentSettingsPage() {
                   </div>
                 </div>
 
+                <p className="muted">{t("settings.aiModelCatalogHelp")}</p>
+                <div className="field"><label htmlFor="modelPurpose">{t("settings.aiDefaultModelPurpose")}</label><select id="modelPurpose" value={form.modelPurpose} onChange={event => setForm(current => ({ ...current, modelPurpose: event.target.value as FormState["modelPurpose"] }))}>
+                  <option value="generation">{t("settings.aiGenerationModels")}</option><option value="embedding" disabled={form.provider === "claude"}>{t("settings.aiEmbeddingModels")}</option>
+                </select></div>
+                <div className="form-grid-two">
+                  <div className="field"><label htmlFor="otherModels">{t("settings.aiAdditionalModels")}</label><textarea id="otherModels" rows={3} value={form.otherModels} onChange={event => setForm(current => ({ ...current, otherModels: event.target.value }))} /></div>
+                  <div className="field"><label htmlFor="embeddingModels">{t("settings.aiEmbeddingModels")}</label><textarea id="embeddingModels" rows={3} disabled={form.provider === "claude"} value={form.embeddingModels} onChange={event => setForm(current => ({ ...current, embeddingModels: event.target.value }))} />{form.provider === "claude" && <p className="muted">{t("settings.aiEmbeddingUnsupported")}</p>}</div>
+                </div>
                 <div className="form-grid-two">
                   <div className="field">
                     <label htmlFor="apiKey">{t("settings.aiAgentApiKey")}</label>
@@ -339,11 +351,6 @@ export default function AiAgentSettingsPage() {
   );
 }
 
-function formatAiAgentOption(connection: AiAgentConnection, t: (key: string, values?: Record<string, string | number>) => string) {
-  const scope = connection.scope === "global" ? t("settings.aiAgentScopeGlobal") : t("settings.aiAgentScopePersonal");
-  return `${connection.displayName} · ${t(`aiAgentProviders.${connection.provider}`)} · ${connection.model} · ${scope}`;
-}
-
 function AgentList({
   connections,
   emptyText,
@@ -373,7 +380,7 @@ function AgentList({
               <div className="table-main-stack">
                 <strong>{connection.displayName}</strong>
                 <span className="table-meta">
-                  {t(`aiAgentProviders.${connection.provider}`)} · {connection.model}
+                  {t(`aiAgentProviders.${connection.provider}`)} · {aiAgentModels(connection).map(model => model.model).filter((model, index, all) => all.indexOf(model) === index).join(", ")}
                 </span>
                 <span className="table-meta">{connection.baseUrl || t("settings.aiAgentDefaultEndpoint")}</span>
               </div>

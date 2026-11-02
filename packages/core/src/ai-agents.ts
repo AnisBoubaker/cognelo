@@ -1,6 +1,11 @@
+import { createHash } from "node:crypto";
 import { encryptCredential, decryptCredential } from "./credentials";
 import { fetchAiResponse } from "./ai-http";
 import {
+  aiAgentModels,
+  AiModelSelectionSchema,
+  type AiAgentModel,
+  type AiModelSelection,
   AiAgentConnectionInputSchema,
   AiAgentConnectionUpdateSchema,
   AiAgentPreferencesInputSchema,
@@ -37,6 +42,7 @@ export async function createAiAgentConnection(user: CurrentUser, input: unknown)
       provider: data.provider,
       displayName: data.displayName,
       model: data.model,
+      ...(data.models ? { models: validatedModelCatalog(data.provider, data.model, data.models) as Prisma.InputJsonValue } : {}),
       baseUrl: normalizeNullable(data.baseUrl),
       apiKey: encryptCredential(normalizeNullable(data.apiKey)),
       isEnabled: data.isEnabled
@@ -56,6 +62,8 @@ export async function updateAiAgentConnection(user: CurrentUser, connectionId: s
     ...(data.provider ? { provider: data.provider } : {}),
     ...(data.displayName !== undefined ? { displayName: data.displayName } : {}),
     ...(data.model !== undefined ? { model: data.model } : {}),
+    ...(data.models !== undefined ? { models: validatedModelCatalog(data.provider ?? existing.provider, data.model ?? existing.model, data.models) as Prisma.InputJsonValue }
+      : (data.model !== undefined || data.provider !== undefined) && Array.isArray(existing.models) && existing.models.length ? { models: validatedModelCatalog(data.provider ?? existing.provider, data.model ?? existing.model, aiAgentModels(existing)) as Prisma.InputJsonValue } : {}),
     ...(data.baseUrl !== undefined ? { baseUrl: normalizeNullable(data.baseUrl) } : {}),
     ...(data.apiKey !== undefined ? { apiKey: encryptCredential(normalizeNullable(data.apiKey)) } : {}),
     ...(data.scope !== undefined ? { ownerId: data.scope === "global" ? null : user.id } : {}),
@@ -78,10 +86,14 @@ export async function deleteAiAgentConnection(user: CurrentUser, connectionId: s
 
 export async function updateAiAgentPreferences(user: CurrentUser, input: unknown) {
   const data = AiAgentPreferencesInputSchema.parse(input);
-  await assertAiAgentConnectionCanBeSelected(user, data.questionAuthoringAiAgentConnectionId);
   const userRecord = await prisma.user.findUnique({ where: { id: user.id }, select: { metadata: true } });
   const metadata = asMetadataRecord(userRecord?.metadata);
   const aiPreferences = asMetadataRecord(metadata.aiPreferences);
+  const previous = getAiPreferences(userRecord?.metadata);
+  const connectionId = data.questionAuthoringAiAgentConnectionId !== undefined ? data.questionAuthoringAiAgentConnectionId : previous.questionAuthoringAiAgentConnectionId;
+  const model = !connectionId ? null : data.questionAuthoringModel !== undefined ? data.questionAuthoringModel : connectionId === previous.questionAuthoringAiAgentConnectionId ? previous.questionAuthoringModel : null;
+  const selectedConnection = await assertAiAgentConnectionCanBeSelected(user, connectionId);
+  if (selectedConnection) selectAiAgentModel(selectedConnection, "generation", model ?? undefined);
   const updatedUser = await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -89,7 +101,8 @@ export async function updateAiAgentPreferences(user: CurrentUser, input: unknown
         ...metadata,
         aiPreferences: {
           ...aiPreferences,
-          questionAuthoringAiAgentConnectionId: data.questionAuthoringAiAgentConnectionId ?? null
+          questionAuthoringAiAgentConnectionId: connectionId,
+          questionAuthoringModel: model
         }
       }
     },
@@ -121,7 +134,7 @@ export async function getQuestionAuthoringAiAgentConnection(user: CurrentUser) {
     throw new AppError(400, "AI_AGENT_KEY_MISSING", "The selected AI agent connection does not have an API key.");
   }
 
-  return connection;
+  return selectAiAgentModel(connection, "generation", preferences.questionAuthoringModel ?? undefined);
 }
 
 export async function getCourseTeacherQuestionAuthoringAiAgentConnection(user: CurrentUser, courseId: string) {
@@ -167,7 +180,8 @@ export async function getCourseTeacherQuestionAuthoringAiAgentConnection(user: C
       }
     });
     if (connection && (connection.apiKey || connection.provider === "ollama")) {
-      return connection;
+      try { return selectAiAgentModel(connection, "generation", staffPreference.preferences.questionAuthoringModel ?? undefined); }
+      catch (error) { if (!(error instanceof AppError)) throw error; }
     }
   }
   throw new AppError(400, "AI_AGENT_NOT_CONFIGURED", "No usable course teacher AI agent is configured for question authoring.");
@@ -201,7 +215,7 @@ export async function getCourseStudentSupportAiAgentConnection(user: CurrentUser
     throw new AppError(400, "AI_AGENT_KEY_MISSING", "The selected AI agent connection does not have an API key.");
   }
 
-  return connection;
+  return selectAiAgentModel(connection, "generation", typeof aiSettings.studentSupportAiAgentModel === "string" ? aiSettings.studentSupportAiAgentModel : undefined);
 }
 
 export async function getCourseAssessmentFeedbackAiAgentConnection(user: CurrentUser, courseId: string) {
@@ -232,7 +246,7 @@ export async function getCourseAssessmentFeedbackAiAgentConnection(user: Current
   if (!connection.apiKey && connection.provider !== "ollama") {
     throw new AppError(400, "AI_AGENT_KEY_MISSING", "The selected AI agent connection does not have an API key.");
   }
-  return connection;
+  return selectAiAgentModel(connection, "generation", typeof aiSettings.assessmentFeedbackAiAgentModel === "string" ? aiSettings.assessmentFeedbackAiAgentModel : undefined);
 }
 
 export async function generateQuestionAuthoringText(
@@ -324,6 +338,7 @@ async function assertAiAgentConnectionCanBeSelected(user: CurrentUser, connectio
   if (!connection) {
     throw notFound("AI agent connection");
   }
+  return connection;
 }
 
 function getAiPreferences(metadata: Prisma.JsonValue | undefined) {
@@ -331,7 +346,8 @@ function getAiPreferences(metadata: Prisma.JsonValue | undefined) {
   const aiPreferences = asMetadataRecord(root.aiPreferences);
   return {
     questionAuthoringAiAgentConnectionId:
-      typeof aiPreferences.questionAuthoringAiAgentConnectionId === "string" ? aiPreferences.questionAuthoringAiAgentConnectionId : null
+      typeof aiPreferences.questionAuthoringAiAgentConnectionId === "string" ? aiPreferences.questionAuthoringAiAgentConnectionId : null,
+    questionAuthoringModel: typeof aiPreferences.questionAuthoringModel === "string" ? aiPreferences.questionAuthoringModel : null
   };
 }
 
@@ -342,12 +358,13 @@ function asMetadataRecord(value: Prisma.JsonValue | undefined): Record<string, P
   return value as Record<string, Prisma.JsonValue>;
 }
 
-function toPublicAiAgentConnection(connection: {
+export function toPublicAiAgentConnection(connection: {
   id: string;
   ownerId: string | null;
   provider: "ollama" | "openai" | "codex" | "claude";
   displayName: string;
   model: string;
+  models?: unknown;
   baseUrl: string | null;
   apiKey: string | null;
   isEnabled: boolean;
@@ -360,6 +377,7 @@ function toPublicAiAgentConnection(connection: {
     provider: connection.provider,
     displayName: connection.displayName,
     model: connection.model,
+    models: aiAgentModels(connection),
     baseUrl: connection.baseUrl,
     hasApiKey: Boolean(connection.apiKey),
     isEnabled: connection.isEnabled,
@@ -438,12 +456,12 @@ async function callClaude(
 }
 
 async function callOllama(
-  connection: { model: string; baseUrl: string | null; allowPrivate?: boolean },
+  connection: { model: string; baseUrl: string | null; apiKey?: string | null; allowPrivate?: boolean },
   input: { systemPrompt: string; userPrompt: string }
 ) {
   const baseUrl = normalizeBaseUrl(connection.baseUrl ?? "http://localhost:11434");
   const response = await fetchAiResponse(`${baseUrl}/api/chat`, {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(connection.apiKey ? { Authorization: `Bearer ${connection.apiKey}` } : {}) },
     body: JSON.stringify({
       model: connection.model,
       stream: false,
@@ -502,4 +520,54 @@ function normalizeBaseUrl(value: string) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+
+export type StoredAiModelSelection = AiModelSelection & { selectedByUserId?: string; endpointKey?: string };
+type ModelConnection = { model: string; models?: unknown; provider: "openai" | "codex" | "claude" | "ollama"; baseUrl: string | null };
+export function aiConnectionBaseUrl(connection: Pick<ModelConnection, "provider" | "baseUrl">) {
+  return (connection.baseUrl ?? (connection.provider === "ollama" ? "http://localhost:11434" : connection.provider === "claude" ? "https://api.anthropic.com/v1" : "https://api.openai.com/v1")).replace(/\/+$/, "");
+}
+export function aiConnectionEndpointKey(connection: Pick<ModelConnection, "provider" | "baseUrl">) {
+  return createHash("sha256").update(JSON.stringify({ protocol: connection.provider === "codex" ? "openai" : connection.provider, baseUrl: aiConnectionBaseUrl(connection) })).digest("hex");
+}
+export function selectAiAgentModel<T extends ModelConnection>(connection: T, purpose: AiAgentModel["purpose"], model?: string, allowHistoricalModel = false): T {
+  if (purpose === "embedding" && connection.provider === "claude") throw new AppError(409, "AI_EMBEDDING_PROVIDER_UNSUPPORTED", "This connection supports question generation. Choose an embedding-capable connection for reference indexing.");
+  const options = aiAgentModels(connection).filter(entry => entry.purpose === purpose);
+  const selected = model ? options.find(entry => entry.model === model) : options.find(entry => entry.model === connection.model) ?? options[0];
+  if (!selected && !(model && allowHistoricalModel)) throw new AppError(409, "AI_MODEL_NOT_CONFIGURED", `Choose a configured ${purpose === "embedding" ? "embedding" : "generation"} model for this connection.`);
+  return { ...connection, model: selected?.model ?? model! };
+}
+function validatedModelCatalog(provider: ModelConnection["provider"], model: string, models: AiAgentModel[]) {
+  const catalog = aiAgentModels({ provider, model, models });
+  if (provider === "claude" && catalog.some(entry => entry.purpose === "embedding")) throw new AppError(400, "AI_EMBEDDING_PROVIDER_UNSUPPORTED", "Claude connections do not expose an embedding API. Configure an embedding-capable connection separately.");
+  return catalog;
+}
+function assertConnectionCredential(connection: { provider: string; apiKey: string | null }) {
+  if (!connection.apiKey && connection.provider !== "ollama") throw new AppError(409, "AI_AGENT_KEY_MISSING", "The selected connection has no API key.");
+}
+export async function getAiAgentConnectionForUser(user: CurrentUser, input: AiModelSelection, purpose: AiAgentModel["purpose"]) {
+  const selection = AiModelSelectionSchema.parse(input);
+  const connection = await prisma.aiAgentConnection.findFirst({ where: { id: selection.connectionId, isEnabled: true, OR: [{ ownerId: user.id }, { ownerId: null }] } });
+  if (!connection) throw new AppError(403, "AI_CONNECTION_UNAVAILABLE", "Choose an enabled personal or shared connection you can access.");
+  assertConnectionCredential(connection);
+  return selectAiAgentModel(connection, purpose, selection.model);
+}
+/** For trusted, server-persisted course selections. Students cannot provide a connection grant. */
+export async function getCourseAiAgentConnection(user: CurrentUser, courseId: string, selection: Omit<StoredAiModelSelection, "model"> & { model?: string }, purpose: AiAgentModel["purpose"], allowHistoricalModel = false) {
+  await assertCanViewCourse(user, courseId);
+  const connection = await prisma.aiAgentConnection.findFirst({ where: { id: selection.connectionId, isEnabled: true } });
+  if (!connection) throw new AppError(409, "AI_CONNECTION_UNAVAILABLE", "The selected model connection is disabled or no longer exists.");
+  if (connection.ownerId) {
+    const owner = await prisma.user.findUnique({ where: { id: connection.ownerId }, select: { isActive: true, roles: { include: { role: true } } } });
+    const membership = await prisma.courseMembership.findFirst({ where: { courseId, userId: connection.ownerId, source: "explicit", role: { in: ["owner", "teacher"] } } });
+    const administratorGrant = owner?.roles.some(entry => entry.role.key === "admin") && (selection.selectedByUserId === connection.ownerId || user.id === connection.ownerId);
+    if (!owner?.isActive || (!membership && !administratorGrant)) throw new AppError(403, "AI_CONNECTION_UNAVAILABLE", "The connection owner is no longer authorized for this course.");
+  }
+  if (selection.endpointKey && selection.endpointKey !== aiConnectionEndpointKey(connection)) throw new AppError(409, "AI_CONNECTION_CHANGED", "The connection endpoint changed after this work was prepared. Reconfigure the activity before starting new work.");
+  assertConnectionCredential(connection);
+  return selectAiAgentModel(connection, purpose, selection.model, allowHistoricalModel);
+}
+export function snapshotAiModelSelection(connection: { id: string; model: string; provider: ModelConnection["provider"]; baseUrl: string | null; ownerId?: string | null }, selectedByUserId?: string): StoredAiModelSelection {
+  return { connectionId: connection.id, model: connection.model, endpointKey: aiConnectionEndpointKey(connection), ...(selectedByUserId || connection.ownerId ? { selectedByUserId: selectedByUserId ?? connection.ownerId! } : {}) };
 }

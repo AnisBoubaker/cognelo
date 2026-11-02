@@ -308,6 +308,7 @@ model AiAgentConnection {
   provider    AiAgentProvider
   displayName String
   model       String
+  models      Json            @default("[]")
   baseUrl     String?
   apiKey      String?
   isEnabled   Boolean         @default(true)
@@ -1697,6 +1698,7 @@ model ContentMaterialIndex {
   sourceId String
   connectionId String?
   modelKey String
+  embeddingConfig Json @default("{}")
   sourceRevision String
   contentFingerprint String
   documents Json

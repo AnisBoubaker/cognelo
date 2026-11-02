@@ -17,6 +17,7 @@ const mockPrisma = vi.hoisted(() => ({
     findFirst: vi.fn()
   },
   courseMembership: {
+    findFirst: vi.fn(),
     findMany: vi.fn()
   },
   user: {
@@ -35,6 +36,11 @@ const {
   deleteAiAgentConnection,
   getCourseTeacherQuestionAuthoringAiAgentConnection,
   getCourseStudentSupportAiAgentConnection,
+  getCourseAssessmentFeedbackAiAgentConnection,
+  getAiAgentConnectionForUser,
+  getCourseAiAgentConnection,
+  selectAiAgentModel,
+  snapshotAiModelSelection,
   generateQuestionAuthoringText,
   getQuestionAuthoringAiAgentConnection,
   listAiAgentConnections,
@@ -167,7 +173,7 @@ describe("AI agent services", () => {
       updateAiAgentPreferences(teacherUser, {
         questionAuthoringAiAgentConnectionId: connectionId
       })
-    ).resolves.toEqual({ questionAuthoringAiAgentConnectionId: connectionId });
+    ).resolves.toEqual({ questionAuthoringAiAgentConnectionId: connectionId, questionAuthoringModel: null });
 
     mockPrisma.aiAgentConnection.findFirst.mockResolvedValue(null);
     await expect(
@@ -347,5 +353,80 @@ describe("AI agent services", () => {
     });
 
     fetchMock.mockRestore();
+  });
+});
+
+const catalogConnection = {
+  id: connectionId, ownerId: "teacher-1", displayName: "Shared credential", provider: "codex" as const,
+  model: "default-text", models: [{ model: "default-text", purpose: "generation" }, { model: "alternate-text", purpose: "generation" }, { model: "vector-model", purpose: "embedding" }],
+  apiKey: "synthetic-secret", baseUrl: "https://provider.example/v1", isEnabled: true,
+  createdAt: new Date(), updatedAt: new Date()
+};
+
+describe("reusable AI model connections", () => {
+  beforeEach(() => { vi.resetAllMocks(); });
+  it("preserves legacy generation defaults and implicit compatible embeddings", () => {
+    const legacy = { ...catalogConnection, models: [] };
+    expect(selectAiAgentModel(legacy, "generation").model).toBe("default-text");
+    expect(selectAiAgentModel(legacy, "embedding").model).toBe("text-embedding-3-small");
+    expect(selectAiAgentModel(catalogConnection, "generation", "alternate-text")).toMatchObject({ id: connectionId, apiKey: "synthetic-secret", model: "alternate-text" });
+    expect(catalogConnection.model).toBe("default-text");
+    expect(() => selectAiAgentModel(catalogConnection, "generation", "vector-model")).toThrow();
+    expect(() => selectAiAgentModel(catalogConnection, "embedding", "not-configured")).toThrow();
+    expect(() => selectAiAgentModel({ ...catalogConnection, provider: "claude" }, "embedding")).toThrow();
+  });
+  it("edits the catalogue without rewriting or exposing the stored credential", async () => {
+    mockPrisma.aiAgentConnection.findUnique.mockResolvedValue(catalogConnection);
+    mockPrisma.aiAgentConnection.update.mockImplementation(async ({ data }) => ({ ...catalogConnection, ...data }));
+    const result = await updateAiAgentConnection(teacherUser, connectionId, { models: [...catalogConnection.models, { model: "third-text", purpose: "generation" }] });
+    expect(mockPrisma.aiAgentConnection.update.mock.calls[0][0].data).not.toHaveProperty("apiKey");
+    expect(result.models).toContainEqual({ model: "third-text", purpose: "generation" });
+    expect(result).toHaveProperty("hasApiKey", true);
+    expect(JSON.stringify(result)).not.toContain("synthetic-secret");
+    expect(result).not.toHaveProperty("apiKey");
+  });
+  it("uses the account override for all shared authoring consumers and preserves it on legacy updates", async () => {
+    const metadata = { aiPreferences: { questionAuthoringAiAgentConnectionId: connectionId, questionAuthoringModel: "alternate-text" } };
+    mockPrisma.user.findUnique.mockResolvedValue({ metadata });
+    mockPrisma.user.update.mockImplementation(async ({ data }) => data);
+    mockPrisma.aiAgentConnection.findFirst.mockResolvedValue(catalogConnection);
+    expect((await getQuestionAuthoringAiAgentConnection(teacherUser)).model).toBe("alternate-text");
+    expect(await updateAiAgentPreferences(teacherUser, { questionAuthoringAiAgentConnectionId: connectionId })).toMatchObject(metadata.aiPreferences);
+    await expect(updateAiAgentPreferences(teacherUser, { questionAuthoringModel: "vector-model" })).rejects.toMatchObject({ code: "AI_MODEL_NOT_CONFIGURED" });
+    expect(await updateAiAgentPreferences(teacherUser, { questionAuthoringAiAgentConnectionId: null })).toEqual({ questionAuthoringAiAgentConnectionId: null, questionAuthoringModel: null });
+  });
+  it("resolves course support, assessment feedback, and teacher authoring overrides independently", async () => {
+    mockPrisma.aiAgentConnection.findFirst.mockResolvedValue(catalogConnection);
+    mockPrisma.course.findUnique.mockResolvedValue({ metadata: { aiSettings: {
+      studentSupportAiAgentConnectionId: connectionId, studentSupportAiAgentModel: "alternate-text",
+      automaticFeedbackEnabled: true, assessmentFeedbackAiAgentConnectionId: connectionId, assessmentFeedbackAiAgentModel: "default-text"
+    } }, createdById: teacherUser.id, memberships: [{ userId: teacherUser.id, role: "owner", user: { metadata: { aiPreferences: { questionAuthoringAiAgentConnectionId: connectionId, questionAuthoringModel: "alternate-text" } } } }] });
+    expect((await getCourseStudentSupportAiAgentConnection(adminUser, "course-1")).model).toBe("alternate-text");
+    expect((await getCourseAssessmentFeedbackAiAgentConnection(adminUser, "course-1")).model).toBe("default-text");
+    expect((await getCourseTeacherQuestionAuthoringAiAgentConnection(adminUser, "course-1")).model).toBe("alternate-text");
+  });
+  it("rejects private selections without an owner grant and rejects changed endpoints for frozen work", async () => {
+    mockPrisma.aiAgentConnection.findFirst.mockResolvedValue(null);
+    await expect(getAiAgentConnectionForUser(teacherUser, { connectionId, model: "alternate-text" }, "generation")).rejects.toMatchObject({ code: "AI_CONNECTION_UNAVAILABLE" });
+    mockPrisma.aiAgentConnection.findFirst.mockResolvedValue(catalogConnection);
+    mockPrisma.user.findUnique.mockResolvedValue({ isActive: true, roles: [{ role: { key: "teacher" } }] });
+    const pinned = snapshotAiModelSelection({ ...catalogConnection, model: "alternate-text" });
+    await expect(getCourseAiAgentConnection(adminUser, "course-1", pinned, "generation")).rejects.toMatchObject({ code: "AI_CONNECTION_UNAVAILABLE" });
+    mockPrisma.courseMembership.findFirst.mockResolvedValue({ id: "membership" });
+    expect((await getCourseAiAgentConnection(adminUser, "course-1", pinned, "generation")).model).toBe("alternate-text");
+    mockPrisma.aiAgentConnection.findFirst.mockResolvedValue({ ...catalogConnection, baseUrl: "https://changed.example/v1" });
+    await expect(getCourseAiAgentConnection(adminUser, "course-1", pinned, "generation", true)).rejects.toMatchObject({ code: "AI_CONNECTION_CHANGED" });
+  });
+  it.each(["openai", "codex", "claude", "ollama"] as const)("sends the selected model and same credential through %s text transport", async provider => {
+    mockPrisma.user.findUnique.mockResolvedValue({ metadata: { aiPreferences: { questionAuthoringAiAgentConnectionId: connectionId, questionAuthoringModel: "alternate-text" } }, isActive: false });
+    mockPrisma.aiAgentConnection.findFirst.mockResolvedValue({ ...catalogConnection, provider });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ output_text: "answer", content: [{ text: "answer" }], message: { content: "answer" } }));
+    try {
+      expect(await generateQuestionAuthoringText(teacherUser, { systemPrompt: "system", userPrompt: "prompt" })).toBe("answer");
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(String(url).endsWith(provider === "claude" ? "/messages" : provider === "ollama" ? "/api/chat" : "/responses")).toBe(true);
+      expect(JSON.parse(String(init?.body)).model).toBe("alternate-text");
+      expect(new Headers(init?.headers).get(provider === "claude" ? "x-api-key" : "authorization")).toBe(provider === "claude" ? "synthetic-secret" : "Bearer synthetic-secret");
+    } finally { fetchMock.mockRestore(); }
   });
 });

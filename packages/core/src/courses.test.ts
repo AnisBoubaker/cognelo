@@ -383,7 +383,9 @@ describe("course services", () => {
               previous: true,
               studentSupportAiAgentConnectionId: agentId,
               automaticFeedbackEnabled: false,
-              assessmentFeedbackAiAgentConnectionId: null
+              assessmentFeedbackAiAgentConnectionId: null,
+              studentSupportAiAgentModel: null,
+              assessmentFeedbackAiAgentModel: null
             }
           }
         }
@@ -407,7 +409,9 @@ describe("course services", () => {
               previous: true,
               studentSupportAiAgentConnectionId: null,
               automaticFeedbackEnabled: false,
-              assessmentFeedbackAiAgentConnectionId: null
+              assessmentFeedbackAiAgentConnectionId: null,
+              studentSupportAiAgentModel: null,
+              assessmentFeedbackAiAgentModel: null
             }
           }
         }
@@ -444,6 +448,8 @@ describe("course services", () => {
           aiSettings: {
             automaticFeedbackEnabled: true,
             assessmentFeedbackAiAgentConnectionId: agentId,
+            studentSupportAiAgentModel: null,
+            assessmentFeedbackAiAgentModel: null,
             studentSupportAiAgentConnectionId: null
           }
         }

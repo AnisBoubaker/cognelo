@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { aiAgentModels, type AiModelSelection } from "@cognelo/contracts";
+import { AiModelPicker, EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { CourseForm } from "@/components/course-form";
 import { CourseTimeSettings } from "@/components/course-time-settings";
 import { SettingsSectionNav } from "@/components/settings-nav";
@@ -28,6 +29,10 @@ export function CourseSettingsPanel({
   const initialAiSettings = getCourseAiSettings(course);
   const initialStudentSupportAgentId = initialAiSettings.studentSupportAiAgentConnectionId;
   const initialAssessmentFeedbackAgentId = initialAiSettings.assessmentFeedbackAiAgentConnectionId;
+  const initialSupportModel = initialAiSettings.studentSupportAiAgentModel;
+  const initialFeedbackModel = initialAiSettings.assessmentFeedbackAiAgentModel;
+  const [supportModel, setSupportModel] = useState(initialSupportModel), [savedSupportModel, setSavedSupportModel] = useState(initialSupportModel);
+  const [feedbackModel, setFeedbackModel] = useState(initialFeedbackModel), [savedFeedbackModel, setSavedFeedbackModel] = useState(initialFeedbackModel);
   const initialAutomaticFeedbackEnabled = initialAiSettings.automaticFeedbackEnabled;
   const [studentSupportAgentId, setStudentSupportAgentId] = useState(initialStudentSupportAgentId);
   const [savedStudentSupportAgentId, setSavedStudentSupportAgentId] = useState(initialStudentSupportAgentId);
@@ -38,22 +43,27 @@ export function CourseSettingsPanel({
   const [isSavingAiSettings, setIsSavingAiSettings] = useState(false);
 
   useEffect(() => {
+    setSupportModel(initialSupportModel); setSavedSupportModel(initialSupportModel);
+    setFeedbackModel(initialFeedbackModel); setSavedFeedbackModel(initialFeedbackModel);
     setStudentSupportAgentId(initialStudentSupportAgentId);
     setSavedStudentSupportAgentId(initialStudentSupportAgentId);
     setAssessmentFeedbackAgentId(initialAssessmentFeedbackAgentId);
     setSavedAssessmentFeedbackAgentId(initialAssessmentFeedbackAgentId);
     setAutomaticFeedbackEnabled(initialAutomaticFeedbackEnabled);
     setSavedAutomaticFeedbackEnabled(initialAutomaticFeedbackEnabled);
-  }, [initialAssessmentFeedbackAgentId, initialAutomaticFeedbackEnabled, initialStudentSupportAgentId]);
+  }, [initialAssessmentFeedbackAgentId, initialAutomaticFeedbackEnabled, initialStudentSupportAgentId, initialSupportModel, initialFeedbackModel]);
 
   const saveAiSettings = useCallback(async () => {
     setIsSavingAiSettings(true);
     try {
       const result = await api.updateCourseSettings(course.id, {
         studentSupportAiAgentConnectionId: studentSupportAgentId || null,
+        studentSupportAiAgentModel: supportModel || null,
+        assessmentFeedbackAiAgentModel: feedbackModel || null,
         automaticFeedbackEnabled,
         assessmentFeedbackAiAgentConnectionId: assessmentFeedbackAgentId || null
       });
+      setSavedSupportModel(supportModel); setSavedFeedbackModel(feedbackModel);
       setSavedStudentSupportAgentId(studentSupportAgentId);
       setSavedAssessmentFeedbackAgentId(assessmentFeedbackAgentId);
       setSavedAutomaticFeedbackEnabled(automaticFeedbackEnabled);
@@ -66,15 +76,16 @@ export function CourseSettingsPanel({
     } finally {
       setIsSavingAiSettings(false);
     }
-  }, [assessmentFeedbackAgentId, automaticFeedbackEnabled, course.id, notifications, onCourseUpdated, studentSupportAgentId, t]);
+  }, [assessmentFeedbackAgentId, automaticFeedbackEnabled, course.id, notifications, onCourseUpdated, studentSupportAgentId, supportModel, feedbackModel, t]);
 
   const discardAiSettings = useCallback(() => {
+    setSupportModel(savedSupportModel); setFeedbackModel(savedFeedbackModel);
     setStudentSupportAgentId(savedStudentSupportAgentId);
     setAssessmentFeedbackAgentId(savedAssessmentFeedbackAgentId);
     setAutomaticFeedbackEnabled(savedAutomaticFeedbackEnabled);
-  }, [savedAssessmentFeedbackAgentId, savedAutomaticFeedbackEnabled, savedStudentSupportAgentId]);
+  }, [savedAssessmentFeedbackAgentId, savedAutomaticFeedbackEnabled, savedStudentSupportAgentId, savedSupportModel, savedFeedbackModel]);
 
-  const aiSettingsDirty = studentSupportAgentId !== savedStudentSupportAgentId ||
+  const aiSettingsDirty = supportModel !== savedSupportModel || feedbackModel !== savedFeedbackModel || studentSupportAgentId !== savedStudentSupportAgentId ||
     assessmentFeedbackAgentId !== savedAssessmentFeedbackAgentId ||
     automaticFeedbackEnabled !== savedAutomaticFeedbackEnabled;
 
@@ -98,6 +109,12 @@ export function CourseSettingsPanel({
     }
   }
 
+  function pickerValue(connectionId: string, selectedModel: string): AiModelSelection | null {
+    if (!connectionId) return null;
+    const connection = aiAgentConnections.find(item => item.id === connectionId);
+    const models = connection ? aiAgentModels(connection).filter(item => item.purpose === "generation") : [];
+    return { connectionId, model: selectedModel || models.find(item => item.model === connection?.model)?.model || models[0]?.model || "" };
+  }
   const settingsBaseHref = `/courses/${course.id}?tab=settings&section=`;
   const navigationItems = [
     {
@@ -157,22 +174,10 @@ export function CourseSettingsPanel({
             </div>
 
             <form className="form" id="course-ai-settings-form" onSubmit={handleAiSubmit}>
-              <div className="field">
-                <label htmlFor="studentSupportAgent">{t("courseDetail.studentSupportAgent")}</label>
-                <select
-                  id="studentSupportAgent"
-                  value={studentSupportAgentId}
-                  onChange={(event) => setStudentSupportAgentId(event.target.value)}
-                >
-                  <option value="">{t("courseDetail.noAiAgentSelected")}</option>
-                  {aiAgentConnections.map((connection) => (
-                    <option key={connection.id} value={connection.id}>
-                      {formatAiAgentOption(connection, t)}
-                    </option>
-                  ))}
-                </select>
-                <p className="muted">{t("courseDetail.studentSupportAgentHelp")}</p>
-              </div>
+              <AiModelPicker connections={aiAgentConnections} purpose="generation" value={pickerValue(studentSupportAgentId, supportModel)}
+                onChange={selection => { setStudentSupportAgentId(selection?.connectionId ?? ""); setSupportModel(selection?.model ?? ""); }}
+                labels={{ connection: t("courseDetail.studentSupportAgent"), model: t("settings.aiAgentModel"), inherit: t("courseDetail.noAiAgentSelected"), unavailable: t("settings.aiModelUnavailable"), noModels: t("settings.aiNoGenerationModels") }} />
+              <p className="muted">{t("courseDetail.studentSupportAgentHelp")}</p>
 
               <label className="checkbox-row">
                 <input
@@ -186,24 +191,10 @@ export function CourseSettingsPanel({
                 </span>
               </label>
 
-              <div className="field">
-                <label htmlFor="assessmentFeedbackAgent">{t("courseDetail.assessmentFeedbackAgent")}</label>
-                <select
-                  disabled={!automaticFeedbackEnabled}
-                  id="assessmentFeedbackAgent"
-                  required={automaticFeedbackEnabled}
-                  value={assessmentFeedbackAgentId}
-                  onChange={(event) => setAssessmentFeedbackAgentId(event.target.value)}
-                >
-                  <option value="">{t("courseDetail.noAiAgentSelected")}</option>
-                  {aiAgentConnections.map((connection) => (
-                    <option key={connection.id} value={connection.id}>
-                      {formatAiAgentOption(connection, t)}
-                    </option>
-                  ))}
-                </select>
-                <p className="muted">{t("courseDetail.assessmentFeedbackAgentHelp")}</p>
-              </div>
+              <AiModelPicker connections={aiAgentConnections} purpose="generation" value={pickerValue(assessmentFeedbackAgentId, feedbackModel)} disabled={!automaticFeedbackEnabled}
+                onChange={selection => { setAssessmentFeedbackAgentId(selection?.connectionId ?? ""); setFeedbackModel(selection?.model ?? ""); }}
+                labels={{ connection: t("courseDetail.assessmentFeedbackAgent"), model: t("settings.aiAgentModel"), inherit: t("courseDetail.noAiAgentSelected"), unavailable: t("settings.aiModelUnavailable"), noModels: t("settings.aiNoGenerationModels") }} />
+              <p className="muted">{t("courseDetail.assessmentFeedbackAgentHelp")}</p>
 
               {aiAgentConnections.length ? null : <p className="muted">{t("courseDetail.noAiAgentsAvailable")}</p>}
 
@@ -231,12 +222,15 @@ function getCourseAiSettings(course: Course) {
   if (!aiSettings || typeof aiSettings !== "object" || Array.isArray(aiSettings)) {
     return {
       studentSupportAiAgentConnectionId: "",
+      studentSupportAiAgentModel: "", assessmentFeedbackAiAgentModel: "",
       automaticFeedbackEnabled: false,
       assessmentFeedbackAiAgentConnectionId: ""
     };
   }
   const record = aiSettings as Record<string, unknown>;
   return {
+    studentSupportAiAgentModel: typeof record.studentSupportAiAgentModel === "string" ? record.studentSupportAiAgentModel : "",
+    assessmentFeedbackAiAgentModel: typeof record.assessmentFeedbackAiAgentModel === "string" ? record.assessmentFeedbackAiAgentModel : "",
     studentSupportAiAgentConnectionId: typeof record.studentSupportAiAgentConnectionId === "string"
       ? record.studentSupportAiAgentConnectionId
       : "",
@@ -245,12 +239,4 @@ function getCourseAiSettings(course: Course) {
       ? record.assessmentFeedbackAiAgentConnectionId
       : ""
   };
-}
-
-function formatAiAgentOption(
-  connection: AiAgentConnection,
-  t: (key: string, vars?: Record<string, string | number>) => string
-) {
-  const scope = connection.scope === "global" ? t("courseDetail.aiAgentScopeGlobal") : t("courseDetail.aiAgentScopePersonal");
-  return `${connection.displayName} · ${t(`aiAgentProviders.${connection.provider}`)} · ${connection.model} · ${scope}`;
 }

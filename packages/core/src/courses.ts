@@ -1,3 +1,4 @@
+import { selectAiAgentModel } from "./ai-agents";
 import { listContentItems } from "./course-content";
 import { CourseInputSchema, CourseSettingsInputSchema, CourseUpdateSchema, EnrollmentInputSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
@@ -264,7 +265,7 @@ export async function updateCourse(user: CurrentUser, courseId: string, input: u
 export async function updateCourseSettings(user: CurrentUser, courseId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
   const data = CourseSettingsInputSchema.parse(input);
-  const [, assessmentConnection] = await Promise.all([
+  const [supportConnection, assessmentConnection] = await Promise.all([
     assertAiAgentConnectionCanBeSelected(user, data.studentSupportAiAgentConnectionId),
     assertAiAgentConnectionCanBeSelected(user, data.assessmentFeedbackAiAgentConnectionId)
   ]);
@@ -279,10 +280,16 @@ export async function updateCourseSettings(user: CurrentUser, courseId: string, 
 
   const metadata = asMetadataRecord(course.metadata);
   const aiSettings = asMetadataRecord(metadata.aiSettings);
+  const supportModel = data.studentSupportAiAgentModel !== undefined ? data.studentSupportAiAgentModel : data.studentSupportAiAgentConnectionId === aiSettings.studentSupportAiAgentConnectionId && typeof aiSettings.studentSupportAiAgentModel === "string" ? aiSettings.studentSupportAiAgentModel : null;
+  const feedbackModel = data.assessmentFeedbackAiAgentModel !== undefined ? data.assessmentFeedbackAiAgentModel : data.assessmentFeedbackAiAgentConnectionId === aiSettings.assessmentFeedbackAiAgentConnectionId && typeof aiSettings.assessmentFeedbackAiAgentModel === "string" ? aiSettings.assessmentFeedbackAiAgentModel : null;
+  if (supportConnection) selectAiAgentModel(supportConnection, "generation", supportModel ?? undefined);
+  if (assessmentConnection) selectAiAgentModel(assessmentConnection, "generation", feedbackModel ?? undefined);
   const nextAiSettings = {
     ...aiSettings,
     studentSupportAiAgentConnectionId: data.studentSupportAiAgentConnectionId ?? null,
     automaticFeedbackEnabled: data.automaticFeedbackEnabled,
+    studentSupportAiAgentModel: data.studentSupportAiAgentConnectionId ? supportModel : null,
+    assessmentFeedbackAiAgentModel: data.assessmentFeedbackAiAgentConnectionId ? feedbackModel : null,
     assessmentFeedbackAiAgentConnectionId: data.assessmentFeedbackAiAgentConnectionId ?? null
   };
 

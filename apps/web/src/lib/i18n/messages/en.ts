@@ -425,6 +425,15 @@ export const enMessages = {
       researchText: "Activities carry configurable metadata from the start."
     },
     settings: {
+      questionAuthoringModel: "Question-authoring model",
+      aiModelUnavailable: "Unavailable model or connection",
+      aiNoGenerationModels: "Add a text-generation model to a connection first.",
+      aiModelCatalogHelp: "Store the token once. The default and additional models below all reuse this connection. Enter one additional model name per line.",
+      aiDefaultModelPurpose: "Default model type",
+      aiGenerationModels: "Text generation",
+      aiEmbeddingModels: "Embedding models",
+      aiAdditionalModels: "Additional text models",
+      aiEmbeddingUnsupported: "Claude supports text generation; choose another embedding-capable connection for indexing.",
       eyebrow: "Settings",
       title: "General settings",
       subtitle: "Manage account-wide preferences that are not tied to a specific course.",
