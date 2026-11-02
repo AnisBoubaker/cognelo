@@ -201,3 +201,11 @@ Coding Homework acceptance is split into `homework-preparation.spec.ts`, `homewo
 `homework-authoring-files.spec.ts` covers private solution ZIP replacement in bank/course editors (including macOS metadata), compact checkboxes, persistent file/function deletion, linked-requirement cleanup with unrelated drafts retained, header-first uploads, invalid-upload rollback, PDF preview/new-tab transport and student file authorization. PDF fixtures are generated in memory.
 
 `homework-editor-tabs.spec.ts` verifies separate Reference materials/Settings tabs, compact choice controls, assignment/reference draft retention across tab switches and saves, concurrency changes without selection loss, visible cancellable embedding progress from Settings, activation/reload persistence and mobile containment. Existing homework UI acceptance selects Settings before generating/opening submissions.
+
+## Optional imported-course acceptance
+
+`imported-course.spec.ts` checks a privately prepared local course copy without creating activities, generating AI output, grading, or deleting records. It verifies teacher content access, original uploaded file bytes, retained compound-test review evidence, the extra test participant login, and a sampled learner's retained submission history. It also checks that review leaves attempt/grade counts unchanged.
+
+Set `E2E_IMPORTED_COURSE_ID` and `E2E_IMPORTED_STUDENT_EMAIL` privately, then run `npm run test:e2e -- tests/e2e/imported-course.spec.ts`. `E2E_IMPORTED_STUDENT_PASSWORD` defaults to the ordinary dev student password; copied sample learners must use the same local test credential. The tests skip when the private configuration is absent and reject non-loopback web/API/database targets before fixture setup.
+
+Course exports, rosters, source submissions, credentials, storage archives and instance-specific import instructions stay outside tracked files. Retain only an explicitly authorized student subset, preserve their academic evidence and scheduling/release settings, use dev credentials, and disable outbound mail before testing copied real addresses. Existing synthetic fixtures remain independent. Actual embedding generation remains an explicit teacher action with the configured provider.
