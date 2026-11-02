@@ -1,6 +1,7 @@
-import { prisma } from "@cognelo/db";
+import { prisma, Prisma } from "@cognelo/db";
 import {
   WEB_BASE_URL,
+  credentialsFor,
   confirmSharedDialog,
   createAuthenticatedApi,
   expect,
@@ -140,30 +141,35 @@ test.describe.serial("administrator settings integrations", () => {
   });
 
   test("creates, edits, selects, and deletes an AI model connection", async ({ adminPage: page }) => {
-    await page.goto("/settings/ai-agents");
-    await page.getByLabel("Display name").fill(connectionName);
-    await page.getByLabel("Provider").selectOption("ollama");
-    await page.getByLabel("Model").fill("e2e-model");
-    await page.getByLabel("Base URL").fill("http://127.0.0.1:11434");
-    await page.getByLabel("Scope").selectOption("global");
-    await page.getByRole("button", { name: "Save model" }).click();
-    const row = page.locator(".ai-agent-row").filter({ hasText: connectionName });
-    await expect(row).toBeVisible();
+    const administrator = await prisma.user.findUniqueOrThrow({ where: { email: credentialsFor("admin").email } });
+    try {
+      await page.goto("/settings/ai-agents");
+      await page.getByLabel("Display name").fill(connectionName);
+      await page.getByLabel("Provider").selectOption("ollama");
+      await page.getByLabel("Model", { exact: true }).fill("e2e-model");
+      await page.getByLabel("Base URL").fill("http://127.0.0.1:11434");
+      await page.getByLabel("Scope").selectOption("global");
+      await page.getByRole("button", { name: "Save model" }).click();
+      const row = page.locator(".ai-agent-row").filter({ hasText: connectionName });
+      await expect(row).toBeVisible();
 
-    await page.getByLabel("AI agent for question authoring").selectOption({
-      label: `${connectionName} · Ollama · e2e-model · Global`
-    });
-    await page.getByRole("button", { name: "Save AI preferences" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "AI preferences saved." })).toBeVisible();
+      await page.getByLabel("AI agent for question authoring").selectOption({
+        label: `${connectionName} · ollama`
+      });
+      await page.getByRole("button", { name: "Save AI preferences" }).click();
+      await expect(page.getByRole("status").filter({ hasText: "AI preferences saved." })).toBeVisible();
 
-    await row.getByRole("button", { name: "Edit" }).click();
-    await page.getByLabel("Display name").fill(`${connectionName} updated`);
-    await page.getByRole("button", { name: "Save model" }).click();
-    const updatedRow = page.locator(".ai-agent-row").filter({ hasText: `${connectionName} updated` });
-    await expect(updatedRow).toBeVisible();
-    await updatedRow.getByRole("button", { name: "Remove" }).click();
-    await confirmSharedDialog(page, "Remove");
-    await expect(updatedRow).toHaveCount(0);
+      await row.getByRole("button", { name: "Edit" }).click();
+      await page.getByLabel("Display name").fill(`${connectionName} updated`);
+      await page.getByRole("button", { name: "Save model" }).click();
+      const updatedRow = page.locator(".ai-agent-row").filter({ hasText: `${connectionName} updated` });
+      await expect(updatedRow).toBeVisible();
+      await updatedRow.getByRole("button", { name: "Remove" }).click();
+      await confirmSharedDialog(page, "Remove");
+      await expect(updatedRow).toHaveCount(0);
+    } finally {
+      await prisma.user.update({ where: { id: administrator.id }, data: { metadata: administrator.metadata ?? Prisma.JsonNull } });
+    }
   });
 
   test("captures a real test-email request to cognelo.local in the local outbox", async () => {

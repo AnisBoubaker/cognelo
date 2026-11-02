@@ -6,7 +6,7 @@
 
 - [x] Private C teacher solution; manual/AI function selection; normalized argument/return signatures; explicit incomplete-work acknowledgement.
 - [x] Persistent file/folder preparation, confirmed replacements, whole-collection ZIP replacement, read-only preview and frozen final hand-in.
-- [x] Plugin-owned material indexing dispatched through core; actual PDF, text, linked-slide and public GitHub extraction; reusable OpenAI embeddings and immutable snapshots.
+- [x] Plugin-owned material indexing dispatched through core; actual PDF, text, linked-slide and public GitHub extraction; reusable configured embeddings and immutable snapshots.
 - [x] Default preceding-material selection, recursive folder toggles, readiness invalidation, GitHub freshness settings and manual submission opening.
 - [x] Atomic enqueueing, FIFO admission, teacher concurrency 1–4/default 2, queue-wide cap 4, heartbeats/retries/stale-worker recovery and cancellation protection.
 - [x] Explicit SEB-verified answering start, core timing/attempts, saved-answer autosave, offline deadline finalization including blanks and continued read-only source access.
@@ -68,3 +68,7 @@ Assignment PDF/file transport now preserves native Response bytes/headers/status
 The follow-up also separates course authoring into Reference materials (selection/readiness) and Settings (concurrency, Generate embeddings, final-submission switch). The shared checkbox/radio base now excludes text-field sizing. Eight local E2E scenarios passed across authoring/PDF recovery, tab draft retention, concurrency-selection preservation, cancellation from Settings, complete homework submission and existing Programming Exercise editor tabs. Reference/Settings mobile screenshots and the native PDF preview were inspected. The file-response fix is committed as `8cbd0d2`; the remaining authoring changes are recorded in the subsequent commit.
 
 Final follow-up verification also passed full workspace typecheck and API/web production builds. Focused lint has no errors (two pre-existing unused-local warnings remain in the shared editor-tabs component). No database migration or production operation was needed. Runtime and test fixtures remain local; generated build declarations were restored instead of committed.
+
+## Model-choice follow-up — November 2, 2026
+
+Connections now reuse one encrypted credential across purpose-tagged model catalogues. Homework Reference materials selects the embedding model; Settings selects question generation. Question-model edits preserve indexes and frozen jobs. OpenAI-compatible/Codex and Ollama embeddings are supported; generation supports all existing providers. See the [AI selection checkpoint](AI_MODEL_SELECTION_IMPLEMENTATION_PROGRESS.md) for validation and assumptions.

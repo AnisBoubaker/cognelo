@@ -15,6 +15,7 @@ const coreMocks = vi.hoisted(() => ({
   canManageCourse: vi.fn(),
   generateAiAgentText: vi.fn(),
   getCourseTeacherQuestionAuthoringAiAgentConnection: vi.fn(),
+  getCourseAiAgentConnection: vi.fn(),
   getQuestionAuthoringAiAgentConnection: vi.fn()
 }));
 
@@ -190,7 +191,17 @@ describe("coding homework challenge generation", () => {
     expect(result.submission.status).toBe("challenge_ready");
   });
 
-  it("rejects local AI connections for challenge question generation", async () => {
+  it("honors an explicit activity model on legacy teacher generation too", async () => {
+    const selected = { connectionId: "chosen-connection", model: "chosen-model" };
+    dbMocks.pluginCodingHomeworkAssignment.findUnique.mockResolvedValue({ questionCount: 1, settings: { questionGenerationAi: selected } });
+    coreMocks.getCourseAiAgentConnection.mockResolvedValue({ ...testAiConnection(), model: "chosen-model" });
+    await generateCodingHomeworkChallengeQuestions({ activityId: "activity-1", courseId: "course-1", groupId: "group-1", user: testUser() }, { submissionId: "submission-1" });
+    expect(coreMocks.getCourseAiAgentConnection).toHaveBeenCalledWith(testUser(), "course-1", selected, "generation");
+    expect(coreMocks.getQuestionAuthoringAiAgentConnection).not.toHaveBeenCalled();
+    expect(coreMocks.generateAiAgentText).toHaveBeenCalledWith(expect.objectContaining({ model: "chosen-model" }), expect.anything());
+  });
+
+  it("accepts configured Ollama connections for challenge question generation", async () => {
     coreMocks.getQuestionAuthoringAiAgentConnection.mockResolvedValue({
       ...testAiConnection(),
       provider: "ollama",
@@ -208,9 +219,9 @@ describe("coding homework challenge generation", () => {
         },
         { submissionId: "submission-1" }
       )
-    ).rejects.toMatchObject({ status: 400, code: "AI_AGENT_LOCAL_MODEL_NOT_ALLOWED" });
+    ).resolves.toMatchObject({ submission: { status: "challenge_ready" } });
 
-    expect(coreMocks.generateAiAgentText).not.toHaveBeenCalled();
+    expect(coreMocks.generateAiAgentText).toHaveBeenCalledWith(expect.objectContaining({ provider: "ollama", model: "llama3.1" }), expect.anything());
   });
 
   it("returns a student-safe challenge generation payload", async () => {

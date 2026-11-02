@@ -1,3 +1,4 @@
+import { getHomeworkQuestionConnection } from "./ai-selection";
 import { lockHomeworkUploadBudget } from "./upload-budget";
 import { scheduleHomeworkDeadline } from "./deadline";
 import { createHash, randomUUID } from "node:crypto";
@@ -5,7 +6,7 @@ import { mkdir, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { prisma as coreDb } from "@cognelo/db";
-import { AppError, getActivityAttemptAvailability, enqueueBackgroundJob, startActivityAttempt, assignmentTimeLimitMinutes, assignmentAttemptExpiresAt, getTimedActivityRuntime, openStoredMaterial } from "@cognelo/core";
+import { AppError, snapshotAiModelSelection, getActivityAttemptAvailability, enqueueBackgroundJob, startActivityAttempt, assignmentTimeLimitMinutes, assignmentAttemptExpiresAt, getTimedActivityRuntime, openStoredMaterial } from "@cognelo/core";
 import { prisma } from "./db-client";
 import { assertHomeworkStudentScope, lockHomeworkWorkflow, assertHomeworkDraftWritable, getHomeworkRequirements, readHomeworkDraftEntries, homeworkStorageRoot, json, record, type HomeworkStudentScope } from "./file-preparation";
 import { lockHomeworkSettings } from "./workflow-settings";
@@ -38,8 +39,9 @@ export async function handInHomework(scope: HomeworkStudentScope, input: unknown
       await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, entries.reduce((sum, file) => sum + file.uncompressedSize, 0));
       if (!readiness.canSubmit) throw new AppError(400, "HOMEWORK_FILES_INVALID", "Your work cannot be submitted until the file safety issues are resolved.");
       if (readiness.requiresAcknowledgement && !data.acknowledgeIncomplete) throw new AppError(409, "HOMEWORK_INCOMPLETE_ACKNOWLEDGEMENT_REQUIRED", "Confirm that you are submitting incomplete work.", { issues: readiness.incomplete });
+      const questionGenerationAi = snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings));
       await tx.pluginCodingHomeworkSubmission.create({ data: { id: submissionId, ...activeWhere(scope), status: "uploaded", documentationSnapshotId: settings.preparedSnapshotId,
-        structureValidationSummary: json(validation), metadata: json({ workflowVersion: 2, draftRevision: draft.revision, handInAt: new Date().toISOString(), incompleteAcknowledged: readiness.requiresAcknowledgement, locale: data.locale,
+        structureValidationSummary: json(validation), metadata: json({ workflowVersion: 2, questionGenerationAi, draftRevision: draft.revision, handInAt: new Date().toISOString(), incompleteAcknowledged: readiness.requiresAcknowledgement, locale: data.locale,
           assignment: { candidateLimit: assignment.candidateLimit, languageKey: assignment.languageKey, promptMarkdown: assignment.promptMarkdown, generationInstructions: assignment.generationInstructions, questionCount: assignment.questionCount, retrievedExampleCount: assignment.retrievedExampleCount } }) } });
       await mkdir(path.join(directory, "files"), { recursive: true, mode: 0o750 });
       for (const entry of entries) {

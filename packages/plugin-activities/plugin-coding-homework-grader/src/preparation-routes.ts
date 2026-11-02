@@ -23,5 +23,5 @@ export const homeworkTeacherSolutionRoute: PluginRouteDefinition = {
 };
 export const homeworkSelectFunctionsRoute: PluginRouteDefinition = {
   path: "coding-homework-grader/select-functions", activityTypeKeys: ["coding-homework-grader"],
-  methods: { POST: async ({ context }) => selectHomeworkFunctionsWithAi(context.user, await resolveOwner(context)) }
+  methods: { POST: async ({ context }) => selectHomeworkFunctionsWithAi(context.user, await resolveOwner(context), context.courseId) }
 };

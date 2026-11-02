@@ -39,7 +39,7 @@ Current delivery tracks (implemented; acceptance recorded separately):
 - [x] Explicit Answer challenge questions start, phase-appropriate SEB verification, answering-only timing, read-only submitted-code consultation and accessible course material.
 - [x] Local/preprod acceptance for the complete workflow and expected class load; no production E2E or synthetic data.
 
-Open details and expressly deferred deadline behavior are listed in the [approved workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#remaining-details-and-deferred-work). Do not substitute the older phase-completion statements for these acceptance checks. OpenAI is selected; changing the question-generation model does not invalidate compatible indexes. No exact embedding model, parallelism ceiling or additional availability grace period is chosen by this documentation.
+Open details and expressly deferred deadline behavior are listed in the [approved workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#remaining-details-and-deferred-work). Do not substitute the older phase-completion statements for these acceptance checks. The November 1 clarifications approved text-embedding-3-small and concurrency 2 (maximum 4); the November 2 update permits independent configured generation/embedding choices across supported providers. Changing the question-generation model does not invalidate compatible indexes. No additional availability grace period is granted.
 
 ## Implementation Progress
 
@@ -849,7 +849,7 @@ Acceptance:
 Progress:
 
 - The assigned-group student submission route now runs final ZIP validation, submitted-function analysis, and challenge question generation in sequence for valid archives. The response includes only student-safe question fields; nearest examples, prompt metadata, raw model output, and generation provenance remain server-side/teacher-only.
-- Automatic student-path generation uses a course teacher/owner's configured non-local question-authoring AI connection through a core helper, so students do not need personal AI preferences and provider keys stay server-side.
+- Automatic student-path generation uses a course teacher/owner's configured question-authoring AI connection or explicit homework model through a core helper, so students do not need personal AI preferences and provider keys stay server-side.
 - Added `coding-homework-grader/challenge-answers` with `PUT` for draft answer saves and `POST` for final answer submission. Finalization requires every generated question to have a non-empty answer.
 - The student UI now shows generated challenge questions immediately after a valid ZIP submission, locks the ZIP upload once questions are ready, allows draft saves, and marks the submission complete when final answers are submitted.
 - Final answer submission updates the plugin submission status to `ready_for_grading` and submits the reserved mode-tagged core attempt for formative and summative assigned activities; only summative attempts enter grading.
@@ -1028,7 +1028,7 @@ The [approved workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) is authoritative
 - Whether a future deployment needs an external storage backend. Current decision: use hardened webserver-local storage in production and preserve the adapter boundary so this can change later without rewriting plugin workflows.
 - Whether to introduce `pgvector` before cross-course retrieval. Recommended: yes, as the shared Postgres-backed vector capability used by content plugins and activity plugins during development and early production.
 - Whether the vector retrieval service should be platform-wide or packaged as a separate indexing package/app. Recommended: start as a shared platform service with content-plugin extraction/chunking boundaries, then split operationally only if scale requires it.
-- OpenAI is selected for the next delivery. The exact embedding model and dimensions remain unspecified; do not invent them from “same model.” Question-generation model changes must not invalidate indexes.
+- The November 2 approved workflow permits configured generation and embedding models across supported providers. The original OpenAI text-embedding-3-small/1536 choice remains the compatibility default. Question-generation model changes must not invalidate indexes.
 - Shared table design for multiple dimensions/model versions. Pending discussion; likely either model/dimension-specific tables or partitioning by `modelKey`/`dimensions`.
 - Whether submitted homework functions should use the same common vector tables as course content or separate assessment-scoped tables with the same service contract.
 - Whether generated challenge answers should eventually be auto-graded. Recommended: treat answer assessment as advisory until validated.

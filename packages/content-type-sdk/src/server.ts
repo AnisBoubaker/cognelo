@@ -169,6 +169,7 @@ export type ContentTypeEmbeddingSearchHandler = (input: {
 
 export type PreparedContentIndex = {
   embeddingModel?: string;
+  vectorDimensions?: number;
   id: string; sourceId: string; modelKey: string; sourceRevision: string; contentFingerprint: string;
   indexedAt: string; checkedAt: string; documentCount: number; connectionId: string;
 };

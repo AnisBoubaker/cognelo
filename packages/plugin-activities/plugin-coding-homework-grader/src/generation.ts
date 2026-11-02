@@ -5,9 +5,11 @@ import {
   canManageCourse,
   generateAiAgentText,
   getCourseTeacherQuestionAuthoringAiAgentConnection,
+  getCourseAiAgentConnection,
   getQuestionAuthoringAiAgentConnection
 } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
+import { storedHomeworkAiSelection } from "./ai-selection";
 import { codingHomeworkChallengePromptVersion } from "./algorithm";
 import { Prisma, prisma } from "./db-client";
 import { appendProcessingEvent, buildProcessingEvent, buildProcessingOperationId, processingFailureMetadata } from "./processing";
@@ -141,10 +143,8 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
   });
 
   try {
-    const [assignment, aiConnection] = await Promise.all([
-      prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId } }),
-      resolveAiConnection(scope, options.aiConnectionKind)
-    ]);
+    const assignment = await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId } });
+    const aiConnection = await resolveAiConnection(scope, options.aiConnectionKind, assignment?.settings);
     const questionCount = clampQuestionCount(assignment?.questionCount ?? candidates.length, candidates.length);
     const generationCandidates = candidates.slice(0, questionCount) as SubmissionFunctionRow[];
     const generatedAt = new Date().toISOString();
@@ -370,19 +370,13 @@ async function assertCanGenerateQuestions(scope: GenerationScope) {
   throw new AppError(403, "FORBIDDEN", "Only course staff can generate coding homework challenge questions.");
 }
 
-async function resolveAiConnection(scope: GenerationScope, kind: GenerationOptions["aiConnectionKind"]) {
+async function resolveAiConnection(scope: GenerationScope, kind: GenerationOptions["aiConnectionKind"], settings: unknown) {
+  const selected = storedHomeworkAiSelection(normalizeObject(settings).questionGenerationAi);
+  if (selected) return getCourseAiAgentConnection(scope.user, scope.courseId, selected, "generation");
   const connection =
     kind === "course_teacher_question_authoring"
       ? await getCourseTeacherQuestionAuthoringAiAgentConnection(scope.user, scope.courseId)
       : await getQuestionAuthoringAiAgentConnection(scope.user);
-
-  if (connection.provider === "ollama") {
-    throw new AppError(
-      400,
-      "AI_AGENT_LOCAL_MODEL_NOT_ALLOWED",
-      "Coding homework challenge questions must use a teacher-configured non-local AI model."
-    );
-  }
 
   return connection;
 }

@@ -11,12 +11,14 @@ test("atomic Test AI grading supports cancel, keep, discard, failed requests and
   test.setTimeout(180_000);
   let mode: "normal" | "fail-second" | "gate-third" = "normal";
   let calls = 0;
+  const requestedModels: string[] = [];
   let release = () => {};
   let gate: Promise<void> = Promise.resolve();
   const reset = (next: typeof mode) => { mode = next; calls = 0; gate = new Promise<void>(resolve => { release = resolve; }); };
   const provider = createServer(async (request, response) => {
     let body = ""; for await (const chunk of request) body += chunk;
-    const payload = JSON.parse(JSON.parse(body).input);
+    const input = JSON.parse(body); requestedModels.push(input.model);
+    const payload = JSON.parse(input.input);
     const number = ++calls;
     if (mode === "gate-third" && number === 3) await gate;
     if (mode === "fail-second" && number === 2) { response.writeHead(503); response.end("Provider unavailable"); return; }
@@ -31,7 +33,7 @@ test("atomic Test AI grading supports cancel, keep, discard, failed requests and
   });
   await new Promise<void>(resolve => provider.listen(0, "127.0.0.1", resolve));
   const port = (provider.address() as { port: number }).port;
-  const connection = await prisma.aiAgentConnection.create({ data: { displayName: `Atomic AI ${data.token}`, provider: "openai", model: "local-test-model", ownerId: null,
+  const connection = await prisma.aiAgentConnection.create({ data: { displayName: `Atomic AI ${data.token}`, provider: "openai", model: "legacy-default-model", models: [{ model: "legacy-default-model", purpose: "generation" }, { model: "grading-model", purpose: "generation" }], ownerId: null,
     baseUrl: `http://127.0.0.1:${port}/v1`, apiKey: encryptCredential("synthetic-key") } });
   const student = await createAuthenticatedApi("student"), admin = await createAuthenticatedApi("admin");
   let peer: APIRequestContext | undefined, peerId: string | undefined;
@@ -42,7 +44,7 @@ test("atomic Test AI grading supports cancel, keep, discard, failed requests and
     await prisma.user.update({ where: { id: peerId }, data: { emailVerifiedAt: new Date(), mustChangePassword: false } });
     await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/groups/${data.groupId}/participants`, { data: { email: account.email, role: "student" } }));
     peer = await createAuthenticatedApiWithCredentials(account);
-    await prisma.course.update({ where: { id: data.courseId }, data: { metadata: { aiSettings: { automaticFeedbackEnabled: true, assessmentFeedbackAiAgentConnectionId: connection.id } } } });
+    await prisma.course.update({ where: { id: data.courseId }, data: { metadata: { aiSettings: { automaticFeedbackEnabled: true, assessmentFeedbackAiAgentConnectionId: connection.id, assessmentFeedbackAiAgentModel: "grading-model" } } } });
     const base = `/api/courses/${data.courseId}`;
     const { test: created } = await responseJson<{ test: { activity: { id: string; title: string } } }>(await teacherApi.post(`${base}/tests`, { data: {
       title: `Atomic AI ${data.token}`, lifecycle: "published", settings: { allowResume: true }, contentPlacement: { isVisible: true }
@@ -85,6 +87,7 @@ test("atomic Test AI grading supports cancel, keep, discard, failed requests and
     reset("fail-second");
     expect((await teacherApi.post(`${base}/gradebook/attempts/${ids[0]}/ai-feedback`, { data: {} })).ok()).toBe(false);
     expect(calls).toBe(2);
+    expect(requestedModels.every(model => model === "grading-model")).toBe(true);
     expect(await evidence()).toEqual(before);
     const runs = `${base}/gradebook/activities/${activityId}/ai-grading-runs`;
     expect((await student.post(runs, { data: { attemptIds: ids } })).status()).toBe(403);
@@ -176,6 +179,8 @@ test("atomic Test AI grading supports cancel, keep, discard, failed requests and
     expect(JSON.stringify(published.normalizedResult)).toContain("New MCQ explanation");
     expect((await responseJson<{ run: AiGradingRunSummary }>(await teacherApi.patch(mcqPath, { data: { action: "finish" } }))).run.status).toBe("completed");
 
+    expect(requestedModels.length).toBeGreaterThan(2);
+    expect(requestedModels.every(model => model === "grading-model")).toBe(true);
   } finally {
     release(); provider.closeAllConnections();
     await student.dispose(); await admin.dispose(); await peer?.dispose();

@@ -15,7 +15,7 @@ export const contentIndexRevision = (value: unknown) => createHash("sha256").upd
 function canonical(value: unknown): unknown { return Array.isArray(value) ? value.map(canonical) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonical(item)])) : value; }
 type IndexedChunk = ContentEmbeddingDocument & { vectorId: string };
 
-export type MaterialEmbeddingSelection = Partial<StoredAiModelSelection> & { dimensions?: number | null };
+export type MaterialEmbeddingSelection = Partial<StoredAiModelSelection> & { dimensions?: number | null; vectorDimensions?: number };
 function selectionOptions(selection?: string | MaterialEmbeddingSelection): MaterialEmbeddingSelection { return typeof selection === "string" ? { connectionId: selection } : selection ?? {}; }
 export async function createCourseEmbeddingProvider(user: CurrentUser, courseId: string, selection?: string | MaterialEmbeddingSelection, historical = false) {
   await assertCanViewCourse(user, courseId);
@@ -74,7 +74,7 @@ function toResource(resource: Awaited<ReturnType<typeof getContentResourceForPlu
 function descriptor(index: Prisma.ContentMaterialIndexGetPayload<Record<string, never>>): PreparedContentIndex {
   return { id: index.id, sourceId: index.sourceId, modelKey: index.modelKey, sourceRevision: index.sourceRevision,
     contentFingerprint: index.contentFingerprint, indexedAt: index.createdAt.toISOString(), checkedAt: index.checkedAt.toISOString(),
-    documentCount: Array.isArray(index.documents) ? index.documents.length : 0, embeddingModel: typeof indexConfig(index).model === "string" ? indexConfig(index).model : MATERIAL_EMBEDDING_MODEL, connectionId: index.connectionId ?? "" };
+    documentCount: Array.isArray(index.documents) ? index.documents.length : 0, vectorDimensions: indexConfig(index).vectorDimensions ?? indexConfig(index).dimensions ?? MATERIAL_EMBEDDING_DIMENSIONS, embeddingModel: typeof indexConfig(index).model === "string" ? indexConfig(index).model : MATERIAL_EMBEDDING_MODEL, connectionId: index.connectionId ?? "" };
 }
 export async function getMaterialIndexStatus(user: CurrentUser, courseId: string, resourceId: string, selection?: string | MaterialEmbeddingSelection) {
   await assertCanManageCourse(user, courseId);
@@ -118,7 +118,7 @@ export async function prepareMaterialIndex(user: CurrentUser, courseId: string, 
       const stored = documents.map((document, index) => ({ ...document, sourceId: resourceId, vectorId: vectors[index].id }));
       const index = await prisma.contentMaterialIndex.upsert({ where: { sourceId_modelKey_contentFingerprint: { sourceId: resourceId, modelKey: provider.modelKey, contentFingerprint } },
         create: { courseId, resourceId, sourceId: resourceId, connectionId: provider.connectionId, modelKey: provider.modelKey, sourceRevision, contentFingerprint,
-          embeddingConfig: provider.selection as Prisma.InputJsonValue, documents: stored as unknown as Prisma.InputJsonValue }, update: { sourceRevision, checkedAt: new Date() } });
+          embeddingConfig: { ...provider.selection, vectorDimensions: vectors[0].values.length } as Prisma.InputJsonValue, documents: stored as unknown as Prisma.InputJsonValue }, update: { sourceRevision, checkedAt: new Date() } });
       return descriptor(index);
     } });
   } finally { clearInterval(heartbeat); await prisma.contentMaterialIndexBuild.deleteMany({ where: { resourceId, token } }); }

@@ -794,6 +794,6 @@ function normalizeObject(value: unknown) {
 }
 
 function copiedHomeworkSettings(value: unknown) {
-  const { submissionsEnabled: _enabled, preparedSnapshotId: _snapshot, referenceMaterialIds: _materials, embeddingConnectionId: _embeddingConnection, ...settings } = normalizeObject(value);
+  const { submissionsEnabled: _enabled, preparedSnapshotId: _snapshot, referenceMaterialIds: _materials, embeddingConnectionId: _embeddingConnection, embeddingAi: _embeddingAi, questionGenerationAi: _questionAi, ...settings } = normalizeObject(value);
   return { ...settings, submissionsEnabled: false };
 }

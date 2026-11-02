@@ -19,6 +19,10 @@ The user approved these follow-up details before implementation:
 
 Remaining reasonable implementation choices are authorized and must be recorded in the [progress record](CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md) and final report. Validated slices are committed incrementally.
 
+## Model-selection update — November 2, 2026
+
+The user expanded the provider requirement: choose any configured supported model directly in homework, and reuse a saved connection/token across multiple models. Reference materials now has an embedding selector; Settings has a separate question-generation selector. The previously approved OpenAI embedding model remains a backward-compatible default, not a provider restriction. OpenAI-compatible/Codex and Ollama embedding APIs are supported; Claude generation requires a separate embedding-capable connection. Changing the generation model does not invalidate indexes. Changing the embedding model requires preparation again, reusing compatible cached vectors. New hand-ins freeze their chosen generation model so later settings changes do not change queued work. Model catalogues are entered manually rather than fetched from providers. See [AI connections](AI_MODEL_CONNECTIONS.md).
+
 ## Scope
 
 - Support **C** for this delivery, with approximately **30 students submitting at a time**.
@@ -124,11 +128,11 @@ The supplied deck was verified with the real link extractor during local accepta
 
 ### Models and index compatibility
 
-- **OpenAI** is the chosen provider for the initial implementation.
-- The confirmed embedding model is **`text-embedding-3-small`**. Question generation retains its independently configured OpenAI model.
+- **OpenAI** was the initial provider choice; the November 2 update permits any configured supported provider for generation and any configured embedding-capable provider for indexing.
+- **`text-embedding-3-small`** remains the legacy embedding default. Teachers can select another embedding model independently of question generation.
 - **Changing the question-generation model must not invalidate existing indexes.** The indexes provide vector retrieval context to question generation; they do not depend on which generation model consumes that context.
 - Embedding compatibility remains tied to the actual embedding configuration and source revision. Reuse unchanged compatible embeddings; a genuinely different embedding model/dimension configuration cannot be treated as the same index.
-- Dimension/storage details are implementation choices to record and verify; the embedding-model choice is now confirmed.
+- Embedding dimensions are native to the selected model, bounded at 8192; legacy default vectors retain 1536 dimensions. Stored vectors and query configuration must match.
 
 ## Recorded implementation assumptions and deferred work
 

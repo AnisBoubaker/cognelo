@@ -1,6 +1,7 @@
+import { getHomeworkQuestionConnection, storedHomeworkAiSelection } from "./ai-selection";
 import { randomUUID } from "node:crypto";
 import { prisma as coreDb } from "@cognelo/db";
-import { AppError, NonRetryableBackgroundJobError, createPreparedMaterialSearch, generateAiAgentText, getCourseTeacherQuestionAuthoringAiAgentConnection, type BackgroundJobRecord } from "@cognelo/core";
+import { AppError, NonRetryableBackgroundJobError, createPreparedMaterialSearch, generateAiAgentText, getCourseAiAgentConnection, type BackgroundJobRecord } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma } from "./db-client";
 import { readFrozenHomeworkFile } from "./hand-in";
@@ -30,9 +31,9 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
     const candidates = parsed.functions.slice(0, Math.max(1, Math.min(50, Number(settings.candidateLimit ?? 5))));
     const snapshot = record(submission.documentationSnapshot?.metadata);
     const indexes = Array.isArray(snapshot.indexIds) ? snapshot.indexIds.filter((id): id is string => typeof id === "string") : [];
-    const search = await createPreparedMaterialSearch(scope.user, scope.courseId, indexes, scope.groupId);
-    const connection = await getCourseTeacherQuestionAuthoringAiAgentConnection(scope.user, scope.courseId);
-    if (connection.provider === "ollama") throw new NonRetryableBackgroundJobError("Configure a non-local question-authoring AI connection.");
+    const search = await createPreparedMaterialSearch(scope.user, scope.courseId, indexes, scope.groupId, storedHomeworkAiSelection(snapshot.embeddingAi) ? record(snapshot.embeddingAi) : undefined);
+    const pinnedModel = storedHomeworkAiSelection(metadata.questionGenerationAi);
+    const connection = pinnedModel ? await getCourseAiAgentConnection(scope.user, scope.courseId, pinnedModel, "generation", true) : await getHomeworkQuestionConnection(scope);
     const questionCount = Math.max(1, Math.min(20, Number(settings.questionCount ?? 3)));
     const generated: Array<{ text: string; functionIndex: number | null; matches: unknown[] }> = [];
     const locales: Record<string, string> = { en: "English", fr: "French", zh: "Chinese", ar: "Arabic" };

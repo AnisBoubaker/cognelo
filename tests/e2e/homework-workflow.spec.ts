@@ -56,6 +56,7 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
     await studentPage.goto(assigned.replace(/^\/api/, ""));
     await expect(studentPage.getByRole("heading", { name: "Prepare your work", exact: true })).toBeVisible();
     const fileInput = studentPage.locator('input[type="file"][multiple]');
+    await expect(fileInput).toBeEnabled();
     await fileInput.setInputFiles({ name: "main.c", mimeType: "text/plain", buffer: Buffer.from("int add(int x, int y) { return x + y; }") });
     await expect(studentPage.getByText("The file requirements are satisfied.", { exact: true })).toBeVisible();
     await studentPage.reload();
