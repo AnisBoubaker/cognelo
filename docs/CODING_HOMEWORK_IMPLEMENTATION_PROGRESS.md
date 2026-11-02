@@ -72,3 +72,9 @@ Final follow-up verification also passed full workspace typecheck and API/web pr
 ## Model-choice follow-up — November 2, 2026
 
 Connections now reuse one encrypted credential across purpose-tagged model catalogues. Homework Reference materials selects the embedding model; Settings selects question generation. Question-model edits preserve indexes and frozen jobs. OpenAI-compatible/Codex and Ollama embeddings are supported; generation supports all existing providers. See the [AI selection checkpoint](AI_MODEL_SELECTION_IMPLEMENTATION_PROGRESS.md) for validation and assumptions.
+
+## ZIP references and preparation errors
+
+The File material plugin now reads bounded source/text ZIP entries with path/header/size/checksum checks, ignoring executable/generated/macOS content. Binary-only archives produce an actionable failure. Homework preparation identifies the active/failing material, records errors in shared notification history as well as inline state, and retains successful indexes for retry. Cancelled operations do not create error notifications.
+
+Validation: 1,809 unit tests, workspace typechecks, lint on changed code, production build, and three focused material/editor E2E scenarios passed. The actual local course archives also passed extraction and generation through the configured provider; environment-specific evidence remains private. Root/plugin documentation was reviewed; the file and homework README/memory/canonical references are current. No migration or new environment variable is required.

@@ -19,3 +19,5 @@
 - Use shared Markdown, action icons, dialogs, application timezone and content-closure contracts. Autosaves preserve answers across reloads. Preparation/material actions are cancellable; student background question generation deliberately has no Cancel action.
 
 See [reference](docs/REFERENCE.md) for routes/persistence and [historical decisions](docs/DECISIONS.md) for the retained legacy pipeline. Track current work in the [progress record](../../../docs/CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md).
+
+- Workflow errors must go through `useNotifications` as well as the inline state, including save/model/refresh and reference preparation failures. Name the failing material and mark its row; retain successful indexes for retry. Cancellation is not an error notification. Keep the operation owned until the post-action refresh settles, and never overwrite unsaved model choices after a failed/cancelled action. ZIP extraction belongs to the file material plugin through core.
