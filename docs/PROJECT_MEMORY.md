@@ -4,6 +4,8 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- Activity-bank folders share the course expansion hook: collapsed by default, Expand all / Collapse all, and per-user/bank localStorage with the same sliding four-hour expiry. Keep bank/course keys separate and preserve state through data refreshes; folder display never writes to the database. See [frontend decisions](reference/PLATFORM_DECISIONS.md#frontend-platform-decisions).
+
 - [Student course navigation](COURSE_CONTENT_TREE_IMPLEMENTATION_PLAN.md#phase-7-unified-teacher-content-tree---complete) remembers workspace/folder tabs and return scroll position locally, alongside the shared folder-expansion preference. Scope by user/course/section/view, honor explicit URLs and four-hour expiry, and restore after content renders. Never persist this view state in the database or mix it with answers.
 
 - [Action buttons](ACTION_BUTTONS.md) use one compact outlined CSS recipe and the shared Tabler `ActionIcon` registry (`AppIcon` in web pages). Keep ordinary actions consistent across host and plugins, including save bars and dialogs. Choose icons explicitly by action, retain labels, and preserve danger, disabled, focus, navigation, and disclosure semantics.

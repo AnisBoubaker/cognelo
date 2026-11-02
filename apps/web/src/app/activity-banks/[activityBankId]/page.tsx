@@ -27,6 +27,9 @@ import {
   useState
 } from "react";
 import { AppShell } from "@/components/app-shell";
+import { useAuth } from "@/components/auth-provider";
+import { activityBankFolderStorageKey } from "@/lib/course-content-folders";
+import { useContentFolders } from "@/lib/use-content-folders";
 import { ActivityTypeIcon, AppIcon, FolderContentIcon } from "@/components/app-icon";
 import {
   api,
@@ -62,6 +65,7 @@ type I18nTranslate = ReturnType<typeof useI18n>["t"];
 
 export default function ActivityBankDetailPage() {
   const { timeZone } = useApplicationTime();
+  const { user } = useAuth();
   const params = useParams<{ activityBankId: string }>();
   const router = useRouter();
   const activityBankId = params.activityBankId;
@@ -99,7 +103,10 @@ export default function ActivityBankDetailPage() {
   const [versionDiff, setVersionDiff] = useState<ActivityVersionDiff | null>(null);
   const [versionDiffLoading, setVersionDiffLoading] = useState(false);
   const [versionDiffError, setVersionDiffError] = useState("");
-  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(new Set());
+  const { collapsedFolderIds, toggleFolder, openFolder, expandAllFolders, collapseAllFolders } = useContentFolders({
+    storageKey: user?.id ? activityBankFolderStorageKey(user.id, activityBankId) : null,
+    contentItems: bank?.id === activityBankId ? (bank.folders ?? []).map(folder => ({ id: folder.id, kind: "folder" })) : []
+  });
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderTitle, setEditingFolderTitle] = useState("");
   const [editingFolderSelectAll, setEditingFolderSelectAll] = useState(false);
@@ -409,13 +416,7 @@ export default function ActivityBankDetailPage() {
         api.updateActivityBankFolder(bank.id, result.folder.id, { position: 0 }),
         ...siblings.map((item, index) => updateBankTreeItem(item, { parentId, position: index + 1 }))
       ]);
-      if (parentId) {
-        setCollapsedFolderIds((current) => {
-          const next = new Set(current);
-          next.delete(parentId);
-          return next;
-        });
-      }
+      if (parentId) openFolder(parentId);
       startEditingFolder(result.folder, true);
       await loadPage();
     } catch (err) {
@@ -496,15 +497,6 @@ export default function ActivityBankDetailPage() {
     } finally {
       setSavingFolder(false);
     }
-  }
-
-  function toggleFolder(folderId: string) {
-    setCollapsedFolderIds((current) => {
-      const next = new Set(current);
-      if (next.has(folderId)) next.delete(folderId);
-      else next.add(folderId);
-      return next;
-    });
   }
 
   function openFolderContextMenu(folder: ActivityBankFolder, event: ReactMouseEvent<HTMLElement>) {
@@ -660,7 +652,7 @@ export default function ActivityBankDetailPage() {
 
   function applyConceptFilter() {
     setSelectedConceptIds(new Set(draftConceptIds));
-    setCollapsedFolderIds(new Set());
+    expandAllFolders();
     setShowConceptFilter(false);
   }
 
@@ -728,6 +720,12 @@ export default function ActivityBankDetailPage() {
             </div>
             <div className="section-actions activity-bank-tree-actions">
               <Link className="button secondary" href="/activity-banks"><AppIcon name="back" /> {t("activityBankDetail.backToBanks")}</Link>
+              <button className="secondary" disabled={!bank?.folders?.length} type="button" onClick={expandAllFolders}>
+                <AppIcon name="down" /> {t("courseDetail.expandAllFolders")}
+              </button>
+              <button className="secondary" disabled={!bank?.folders?.length} type="button" onClick={collapseAllFolders}>
+                <AppIcon name="up" /> {t("courseDetail.collapseAllFolders")}
+              </button>
               <button className="secondary" type="button" onClick={openConceptFilter}>
                 <AppIcon name="filter" />
                 {selectedConceptIds.size
@@ -793,6 +791,7 @@ export default function ActivityBankDetailPage() {
                       {isFolder ? (
                         <button
                           aria-label={t(isCollapsed ? "activityBankDetail.expandFolder" : "activityBankDetail.collapseFolder", { title: item.title })}
+                          aria-expanded={!isCollapsed}
                           className="content-item-icon-button"
                           type="button"
                           onClick={() => toggleFolder(item.id)}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COURSE_FOLDER_STATE_TTL_MS, courseFolderStorageKey, parseCourseFolderState } from "./course-content-folders";
+import { COURSE_FOLDER_STATE_TTL_MS, activityBankFolderStorageKey, courseFolderStorageKey, parseCourseFolderState } from "./course-content-folders";
 
 describe("course folder preferences", () => {
   const now = Date.UTC(2026, 9, 16, 12);
@@ -29,7 +29,7 @@ describe("course folder preferences", () => {
     expect(parseCourseFolderState(JSON.stringify({ ...state, openFolderIds: ["root", "root"] }), now)?.openFolderIds).toEqual(["root"]);
   });
 
-  it("isolates users, courses, sections, and teaching/learner/preview views", () => {
+  it("isolates users, courses, banks, sections, and teaching/learner/preview views", () => {
     const keys = [
       courseFolderStorageKey("teacher", "course", null, "teacher"),
       courseFolderStorageKey("other-teacher", "course", null, "teacher"),
@@ -37,7 +37,10 @@ describe("course folder preferences", () => {
       courseFolderStorageKey("teacher", "course", "section-a", "teacher"),
       courseFolderStorageKey("teacher", "course", "section-b", "teacher"),
       courseFolderStorageKey("teacher", "course", "section-a", "learner"),
-      courseFolderStorageKey("teacher", "course", "section-a", "preview")
+      courseFolderStorageKey("teacher", "course", "section-a", "preview"),
+      activityBankFolderStorageKey("teacher", "course"),
+      activityBankFolderStorageKey("teacher", "other-bank"),
+      activityBankFolderStorageKey("other-teacher", "course")
     ];
     expect(new Set(keys).size).toBe(keys.length);
   });

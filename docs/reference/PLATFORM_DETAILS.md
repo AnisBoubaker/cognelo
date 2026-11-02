@@ -56,7 +56,7 @@ The development/demo seed composition lives in `scripts/db-seed.ts`, outside the
 - Maintenance: an admin-only `/settings/maintenance` workspace with left-side sections; Media currently exposes deduplicated storage metrics, a read-only garbage-collection preview, retention policy, and explicitly confirmed cleanup, while the navigation is ready for a future Upgrade section
 - Authorization: global roles plus course memberships and activity-bank ownership
 - Subjects: shared curriculum containers with an explicit teaching language, an optional default programming language, subject-level material, activity banks, and subject-scoped knowledge graphs whose concepts own stable skills and misconceptions
-- Activity banks: reusable activity authoring libraries scoped to a subject and owned by an individual, with nested drag-and-drop folders and subject-concept filters
+- Activity banks: reusable activity authoring libraries scoped to a subject and owned by an individual, with nested drag-and-drop folders and subject-concept filters; folders start collapsed, provide Expand all / Collapse all, and remember expansion per user/bank locally for four hours
 - Courses: create, list, read, update, archive; courses belong to a subject and receive activity copies from banks
 - Course settings: separate course-level AI agent selections for student support and assessment feedback/grading, with an assessment-feedback master switch
 - Memberships: basic course membership creation

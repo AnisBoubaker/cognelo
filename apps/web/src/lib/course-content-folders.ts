@@ -25,3 +25,7 @@ export function parseCourseFolderState(value: string | null, now = Date.now()): 
     return null;
   }
 }
+
+export function activityBankFolderStorageKey(userId: string, activityBankId: string) {
+  return `cognelo:bank-folders:${JSON.stringify([userId, activityBankId])}`;
+}
