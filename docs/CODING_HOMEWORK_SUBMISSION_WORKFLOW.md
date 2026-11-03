@@ -10,7 +10,7 @@ The user approved these follow-up details before implementation:
 
 - C matching checks function name, argument count/types and return type, ignoring parameter names and equivalent pointer/array notation.
 - Missing files and signature mismatches, like missing functions, may be submitted after explicit incomplete-work acknowledgement.
-- Individual uploads support destination folders and confirmed replacement at an existing path.
+- Initially, individual uploads supported destination folders and confirmed replacement at an existing path. The November 3 UI simplification below removes manual folder controls while preserving replacement confirmation.
 - Use OpenAI `text-embedding-3-small`; default question-generation concurrency is 2, capped at 4 by the server.
 - Material selection is locked while submissions are enabled.
 - Deadline finalization submits saved answers, including blanks.
@@ -48,7 +48,7 @@ The follow-up clarifications above specify C signature matching and acknowledgem
 
 ## Student file preparation
 
-- Students can upload work **file by file** or as a **ZIP**.
+- Students can upload work **file by file** or as a **ZIP**. As clarified November 3, individual-file uploads use the root and the UI has no destination-folder field or Create folder action. ZIP uploads preserve all valid internal folders.
 - A ZIP upload **replaces the whole prepared file collection**; it does not merge with the existing collection.
 - Before final submission, students can remove uploaded files, upload replacements, leave the page, return later, and continue preparing the collection.
 - **No in-browser editing of file contents.** Changes to code are made locally and uploaded again. “Change the preparation” means managing uploaded files, not an online code editor.
@@ -81,7 +81,7 @@ Teacher cancellation must be coordinated with queued/running work so a late resu
 - If the student is already in SEB with the correct verified configuration for the activity, do not prompt or launch it again. Reuse the platform's verification and activity-scoped authorization, not a browser-name guess.
 - The teacher's activity time limit is optional and governs the answering phase when configured.
 - The existing **activity availability settings remain a hard learner access/start boundary**. A ready question set does not authorize starting an unavailable activity later, such as returning 24 hours afterwards. No additional fixed 24-hour grace period was requested.
-- Students can consult **their submitted files read-only** while answering. **Course material remains accessible**, subject to its normal permissions, including during SEB use.
+- Students can consult **their submitted files read-only** while answering. Use the shared left-tab view, automatically open the first file, and show its contents on the right aligned with the first tab. Keep filenames in the tabs without repeating a filename or file size above the content. **Course material remains accessible**, subject to its normal permissions, including during SEB use.
 - Queue-related grace periods, automatic deadline extensions and special treatment of work becoming ready after closing are deferred. The teacher is responsible for suitable availability and duration settings in this phase. Do not invent an exception to the configured window.
 
 At timeout, finalize the server-saved answers, including blanks. Do not accept new answer content after expiry or invent an availability extension.

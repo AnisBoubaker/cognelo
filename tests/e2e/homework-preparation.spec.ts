@@ -4,7 +4,7 @@ import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
 import { createAuthenticatedApi } from "./fixtures/auth";
 import { createStoredZip } from "./fixtures/zip";
 
-test("homework preparation persists files, replaces ZIPs, validates signatures, and stays outside SEB/timing", async ({ bankCourse: data, teacherApi }) => {
+test("homework preparation persists files, replaces ZIPs, validates signatures, and stays outside SEB/timing", async ({ bankCourse: data, teacherApi, studentPage: page }) => {
   const student = await createAuthenticatedApi("student");
   try {
     const activityId = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Prepared C homework", config: {} });
@@ -41,6 +41,25 @@ test("homework preparation persists files, replaces ZIPs, validates signatures, 
     expect(await responseJson(await student.get(preparation))).toMatchObject({ draft: replacement.draft });
     await responseJson(await student.delete(preparation, { data: { path: "replacement.c", expectedRevision: replacement.draft.revision } }));
     expect(await responseJson(await student.get(preparation))).toMatchObject({ draft: { files: [] } });
+    await page.goto(assigned.replace(/^\/api/, ""));
+    const fileUpload = page.locator('input[type="file"][multiple]');
+    await expect(fileUpload).toBeEnabled();
+    await expect(page.getByLabel("Destination folder (optional)", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Create folder", exact: true })).toHaveCount(0);
+    await fileUpload.setInputFiles({ name: "single.c", mimeType: "text/plain", buffer: Buffer.from("int single(void) { return 1; }") });
+    await expect(page.getByText("single.c", { exact: true })).toBeVisible();
+    expect(await responseJson(await student.get(preparation))).toMatchObject({ draft: { files: [expect.objectContaining({ path: "single.c" })] } });
+    await page.locator('input[type="file"][accept=".zip"]').setInputFiles({ name: "nested.zip", mimeType: "application/zip", buffer: createStoredZip([
+      { path: "starter/src/main.c", contents: "int add(int *data, int length) { return length; }" },
+      { path: "starter/include/api.h", contents: "int add(int *data, int length);" }
+    ]) });
+    await page.getByRole("dialog", { name: "Replace existing files?", exact: true }).getByRole("button", { name: "Confirm", exact: true }).click();
+    await expect(page.getByText("starter/src/main.c", { exact: true })).toBeVisible();
+    await expect(page.getByText("single.c", { exact: true })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText("starter/include/api.h", { exact: true })).toBeVisible();
+    const nested = await responseJson<{ draft: { files: Array<{ path: string }> } }>(await student.get(preparation));
+    expect(nested.draft.files.map(file => file.path).sort()).toEqual(["starter/include/api.h", "starter/src/main.c"]);
     expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(0);
     expect(await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) FROM "PluginCodingHomeworkSubmission" WHERE "activityId"=${activityId}`).toEqual([{ count: 0n }]);
     expect(await responseJson(await student.get(`${assigned}/seb`))).toMatchObject({ access: { requiresSafeExamBrowser: true, preparationAllowed: true, accessGranted: false } });

@@ -13,6 +13,7 @@ test("teacher selects private solution signatures and student explicitly acknowl
     const base = `/api/courses/${data.courseId}/activities/${id}/coding-homework-grader`;
     await teacherPage.goto(`/courses/${data.courseId}/activities/${id}`);
     const solution = teacherPage.locator("section").filter({ has: teacherPage.getByRole("heading", { name: "Private teacher solution", exact: true }) }).last();
+    await expect(solution.locator('input[type="file"][accept=".zip"]')).toBeEnabled();
     await solution.locator('input[type="file"][accept=".zip"]').setInputFiles({ name: "teacher.zip", mimeType: "application/zip", buffer: createStoredZip([{ path: "src/main.c", contents: "int add(int values[], int count) { return count; }" }]) });
     await solution.getByRole("checkbox", { name: "src/main.c", exact: true }).check();
     const fn = solution.getByRole("checkbox", { name: "int add(int*, int) src/main.c", exact: true });
@@ -45,8 +46,8 @@ test("teacher selects private solution signatures and student explicitly acknowl
     await expect(studentPage.locator("textarea")).toHaveCount(0);
     expect(await responseJson(await student.get(`/api${assigned}/coding-homework-grader/workspace`))).toMatchObject({ submission: { incompleteAcknowledged: true, questionCount: 3 } });
     await studentPage.setViewportSize({ width: 390, height: 844 });
-    await studentPage.getByRole("button", { name: "View", exact: true }).click();
-    await expect(studentPage.locator("pre")).toContainText("Work is still incomplete");
+    await expect(studentPage.getByRole("tablist", { name: "Submitted files", exact: true }).getByRole("tab").first()).toHaveAttribute("aria-selected", "true");
+    await expect(studentPage.locator(".homework-submitted-file-content")).toContainText("Work is still incomplete");
     expect(await studentPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   } finally {
     if (id) await prisma.backgroundJob.deleteMany({ where: { payload: { path: ["activityId"], equals: id } } });

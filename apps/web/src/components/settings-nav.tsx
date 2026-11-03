@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SideNavigation } from "@cognelo/activity-ui";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { useI18n } from "@/lib/i18n";
@@ -47,19 +48,7 @@ export function SettingsNav() {
 }
 
 export function SettingsSectionNav({ ariaLabel, items }: { ariaLabel: string; items: SettingsSectionNavItem[] }) {
-  return (
-    <aside className="settings-nav" aria-label={ariaLabel}>
-      {items.map((item) => (
-        <Link
-          key={item.id}
-          aria-current={item.isActive ? "page" : undefined}
-          className={item.isActive ? "is-active" : undefined}
-          href={item.href}
-        >
-          <span>{item.label}</span>
-          <small>{item.text}</small>
-        </Link>
-      ))}
-    </aside>
-  );
+  return <SideNavigation ariaLabel={ariaLabel} items={items} renderLink={(item, children) => (
+    <Link aria-current={item.isActive ? "page" : undefined} className={item.isActive ? "is-active" : undefined} href={item.href!}>{children}</Link>
+  )} />;
 }

@@ -673,7 +673,7 @@ select:focus {
   padding-inline-start: 22px;
 }
 
-[role="tablist"]:has(> button[role="tab"]) {
+[role="tablist"]:not(.settings-nav):has(> button[role="tab"]) {
   align-items: center;
   background: rgba(238, 244, 251, 0.72);
   border: 1px solid rgba(217, 225, 238, 0.95);
@@ -684,7 +684,7 @@ select:focus {
   padding: 4px;
 }
 
-[role="tablist"] > button[role="tab"],
+[role="tablist"]:not(.settings-nav) > button[role="tab"],
 .tab-button {
   align-items: center;
   background: transparent;
@@ -701,7 +701,7 @@ select:focus {
 }
 
 .tab-button:hover,
-[role="tablist"] > button[role="tab"]:hover {
+[role="tablist"]:not(.settings-nav) > button[role="tab"]:hover {
   background: rgba(255, 255, 255, 0.72);
   border-color: rgba(217, 225, 238, 0.92);
   box-shadow: none;
@@ -711,7 +711,7 @@ select:focus {
 
 .tab-button.is-active,
 .tab-button[aria-selected="true"],
-[role="tablist"] > button[role="tab"][aria-selected="true"] {
+[role="tablist"]:not(.settings-nav) > button[role="tab"][aria-selected="true"] {
   background: var(--surface);
   border-color: color-mix(in srgb, var(--brand-blue), white 64%);
   box-shadow: 0 1px 2px rgba(13, 27, 71, 0.06);
@@ -720,7 +720,7 @@ select:focus {
 
 .tab-button.is-active::after,
 .tab-button[aria-selected="true"]::after,
-[role="tablist"] > button[role="tab"][aria-selected="true"]::after {
+[role="tablist"]:not(.settings-nav) > button[role="tab"][aria-selected="true"]::after {
   background: linear-gradient(90deg, var(--brand-teal), var(--brand-blue));
   border-radius: 999px;
   bottom: -5px;
@@ -6145,6 +6145,15 @@ button:hover > .disclosure-indicator {
 .homework-solution-selector [aria-disabled="true"] { opacity: 0.6; cursor: not-allowed; }
 .homework-pdf-preview { margin: 0; display: grid; gap: 8px; }
 .homework-pdf-preview iframe { width: 100%; height: 32rem; border: 1px solid var(--line); border-radius: 8px; }
+
+/* Submitted files reuse the app's shared left navigation, with a compact reading pane. */
+.settings-layout.homework-submitted-files { grid-template-columns: minmax(88px, min(28%, 15rem)) minmax(0, 1fr); gap: 14px; min-width: 0; }
+.homework-submitted-files .settings-nav { min-width: 0; max-height: 34rem; overflow: auto; }
+.homework-submitted-files .settings-nav span { overflow-wrap: anywhere; }
+.homework-submitted-file-panel { min-width: 0; padding-block-start: 7px; }
+.homework-submitted-file-content { min-width: 0; max-width: 100%; max-height: 32rem; min-height: 12rem; overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.homework-submitted-file-content .code-renderer { width: max-content; min-width: 100%; }
+.homework-submitted-file-content .code-renderer-line-content { white-space: pre; word-break: normal; }
 
 .coding-homework-authoring-grid {
   align-items: start;

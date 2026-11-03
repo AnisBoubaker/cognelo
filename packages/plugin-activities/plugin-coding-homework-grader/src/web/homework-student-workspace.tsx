@@ -1,4 +1,5 @@
 "use client";
+import { SubmittedWorkViewer } from "./submitted-work-viewer";
 import { QuestionCodeContext } from "./question-code-context";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActionIcon, MarkdownRenderer, ProgressDialog, useDialogs, isActivityContentClosedError } from "@cognelo/activity-ui";
@@ -14,7 +15,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
 }) {
   const copy = homeworkWorkflowCopy(locale); const dialogs = useDialogs();
   const [workspace, setWorkspace] = useState<HomeworkWorkspace | null>(null), [preparation, setPreparation] = useState<HomeworkPreparation | null>(null);
-  const [assignment, setAssignment] = useState<CodingHomeworkStudentAssignment | null>(null), [folder, setFolder] = useState("");
+  const [assignment, setAssignment] = useState<CodingHomeworkStudentAssignment | null>(null);
   const [questions, setQuestions] = useState<CodingHomeworkStudentChallengeQuestionRecord[]>([]), [answers, setAnswers] = useState<Record<string, string>>({});
   const [acknowledged, setAcknowledged] = useState(false), [error, setError] = useState(""), [busy, setBusy] = useState<string | null>(null), [saved, setSaved] = useState(false);
   const [preview, setPreview] = useState<{ path: string; text: string } | null>(null);
@@ -47,13 +48,14 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     try { await action(pending.signal); } catch (reason) { showError(reason); } finally { if (controller.current === pending) { controller.current = null; setBusy(null); } await refresh().catch(() => {}); }
   }
   async function upload(files: FileList | null, zip: boolean) {
-    if (!files?.length || !preparation) return;
-    const paths = Array.from(files).map(file => folder.trim() ? `${folder.trim().replace(/\/$/, "")}/${file.name}` : file.name);
+    const selectedFiles = Array.from(files ?? []);
+    if (!selectedFiles.length || !preparation) return;
+    const paths = selectedFiles.map(file => file.name);
     const replace = zip ? preparation.draft.files.length > 0 : paths.some(path => preparation.draft.files.some(file => file.path === path));
     if (replace && !await dialogs.confirm({ title: copy.replace, message: copy.replaceDetail, confirmLabel: copy.confirm })) return;
     await run(copy.upload, async signal => {
       let revision = preparation.draft.revision;
-      for (const [index, file] of Array.from(files).entries()) {
+      for (const [index, file] of selectedFiles.entries()) {
         signal.throwIfAborted();
         const data = { kind: zip ? "zip" : "file", fileName: file.name, path: paths[index], base64: await homeworkFileBase64(file), expectedRevision: revision, replace };
         const result = await request<HomeworkPreparation>("preparation", body("POST", data, signal)); revision = result.draft.revision; setPreparation(result); setAcknowledged(false);
@@ -98,20 +100,19 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     {workspace?.previousCancelled && <p role="status">{copy.cancelled}</p>}
     <h3>{active ? copy.readOnly : copy.prepare}</h3>
     {active ? <p>{copy.frozen}</p> : <>
-      <label className="field">{copy.folder}<input value={folder} onChange={event => setFolder(event.target.value)} placeholder="src" list="homework-folders" /></label>
-      <datalist id="homework-folders">{preparation?.draft.folders.map(path => <option key={path} value={path} />)}</datalist>
       <div className="row">
         <label className="button secondary"><ActionIcon name="upload" /> {copy.upload}<input type="file" multiple hidden disabled={!preparation || Boolean(busy)} onChange={event => { void upload(event.target.files, false); event.target.value = ""; }} /></label>
         <label className="button secondary"><ActionIcon name="upload" /> {copy.zip}<input type="file" accept=".zip" hidden disabled={!preparation || Boolean(busy)} onChange={event => { void upload(event.target.files, true); event.target.value = ""; }} /></label>
-        <button type="button" className="secondary" disabled={!folder.trim() || !preparation} onClick={() => void run(copy.addFolder, async signal => { setPreparation(await request("preparation", body("POST", { kind: "folder", path: folder.trim(), expectedRevision: preparation!.draft.revision }, signal))); })}><ActionIcon name="add" /> {copy.addFolder}</button>
       </div>
     </>}
+    {active ? <SubmittedWorkViewer key={active.id} files={active.files} request={request} locale={locale} /> : <>
     {!files.length && <p className="muted">{copy.empty}</p>}
     <ul className="stack">{files.map(file => <li key={file.path} className="row"><code>{file.path}</code><span className="muted">{file.sizeBytes.toLocaleString()} B</span>
-      <button type="button" className="secondary" onClick={() => void request<{ path: string; text: string }>(`${active ? "submitted-file" : "prepared-file"}?path=${encodeURIComponent(file.path)}`).then(setPreview).catch(showError)}><ActionIcon name="visible" /> {copy.view}</button>
+      <button type="button" className="secondary" onClick={() => void request<{ path: string; text: string }>(`prepared-file?path=${encodeURIComponent(file.path)}`).then(setPreview).catch(showError)}><ActionIcon name="visible" /> {copy.view}</button>
       {!active && <button type="button" className="secondary" onClick={() => void run(copy.remove, async signal => { setPreparation(await request("preparation", body("DELETE", { path: file.path, expectedRevision: preparation!.draft.revision }, signal))); setAcknowledged(false); })}><ActionIcon name="remove" /> {copy.remove}</button>}
     </li>)}</ul>
     {preview && <section className="stack"><div className="row"><h4>{preview.path}</h4><button type="button" className="secondary" onClick={() => setPreview(null)}>{copy.close}</button></div><pre style={{ maxHeight: "28rem", overflow: "auto", whiteSpace: "pre-wrap" }}>{preview.text}</pre></section>}
+    </>}
     {!active && preparation && <>
       <h3>{copy.validation}</h3>{preparation.validation.issues.length ? <ul>{preparation.validation.issues.map((issue, index) => <li key={index}>{issue.path ? `${issue.path}: ` : ""}{issue.message}</li>)}</ul> : files.length > 0 && <p>{copy.ready}</p>}
       {preparation.readiness.requiresAcknowledgement && <label className="homework-choice"><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /> {copy.incomplete}</label>}
