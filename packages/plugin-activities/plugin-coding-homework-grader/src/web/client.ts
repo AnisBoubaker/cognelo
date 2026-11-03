@@ -569,6 +569,8 @@ export function createCodingHomeworkGraderClient(request: Requester) {
         attempts: CodingHomeworkGradebookAttemptRecord[];
       }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-homework-grader/gradebook-attempts?${params.toString()}`);
     },
+    groupGradebookFile: (courseId: string, groupId: string, activityId: string, input: { participantId: string; attemptId: string; path: string }, signal?: AbortSignal) =>
+      request<{ path: string; text: string }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-homework-grader/gradebook-file?${new URLSearchParams(input).toString()}`, { signal }),
     getBankAuthoring: (activityBankId: string, bankActivityId: string) =>
       request<CodingHomeworkAuthoringRecord>(
         `/activity-banks/${activityBankId}/activities/${bankActivityId}/coding-homework-grader/authoring`

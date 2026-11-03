@@ -1,4 +1,5 @@
 import { homeworkWorkflowRoutes } from "./workflow-routes";
+import { codingHomeworkGradebookFileRoute } from "./gradebook-file";
 import { finalizeHomeworkSavedAnswers } from "./deadline";
 import { homeworkPreparationRoute, homeworkPreparedFileRoute, homeworkTeacherSolutionRoute, homeworkSelectFunctionsRoute } from "./preparation-routes";
 import { exportHomeworkSubmission } from "./submission-export";
@@ -81,6 +82,7 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
     codingHomeworkChallengeGenerationRoute,
     codingHomeworkChallengeAnswersRoute,
     codingHomeworkGradebookAttemptsRoute,
+    codingHomeworkGradebookFileRoute,
     codingHomeworkReprocessRoute
   ],
   grading: {

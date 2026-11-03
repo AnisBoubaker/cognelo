@@ -6337,6 +6337,22 @@ button:hover > .disclosure-indicator {
 
 .homework-challenge-answer { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .homework-challenge-answer label { font-weight: 700; }
+.homework-reviewed-answer { border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-height: 8rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dialog-panel.homework-review-panel { width: 100%; max-width: 1840px; }
+.homework-review-history { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.homework-review-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 300px); gap: 24px; align-items: start; min-width: 0; }
+.homework-review-content { display: grid; gap: 18px; min-width: 0; }
+.homework-review-grading { position: sticky; top: 0; min-width: 0; }
+.homework-review-grading h3 { margin: 0; }
+.homework-review-grading textarea { min-height: 9rem; resize: vertical; }
+.homework-review-panel .homework-challenge-list { gap: 20px; }
+.review-chat-workspace:has(.homework-review-panel) > .review-chat-toolbar { align-self: stretch; justify-content: flex-end; border-bottom: 0; }
+.review-chat-workspace:has(.homework-review-panel) > .review-chat-toolbar .review-student-navigation { margin-inline-end: auto; }
+.review-chat-workspace > .homework-review-panel { border-start-start-radius: 0; border-start-end-radius: 0; }
+@media (max-width: 1000px) {
+  .homework-review-layout { grid-template-columns: minmax(0, 1fr); }
+  .homework-review-grading { position: static; }
+}
 .homework-challenge-answer textarea {
   flex: 1;
   min-height: 12rem;

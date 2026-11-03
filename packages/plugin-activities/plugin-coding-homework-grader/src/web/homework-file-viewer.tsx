@@ -6,12 +6,12 @@ import { homeworkWorkflowCopy } from "./workflow-copy";
 import type { HomeworkRequest } from "./workflow-types";
 
 type FilePreview = { path: string; revision?: number; text?: string; error?: string };
-export function HomeworkFileViewer({ files, request, locale, submitted, revision, onDelete, busy }: {
+export type HomeworkFileReader = (path: string, signal: AbortSignal) => Promise<{ path: string; text: string }>;
+export function HomeworkFileViewer({ files, request, readFile, locale, submitted, revision, onDelete, busy }: {
   files: Array<{ path: string; sizeBytes: number }>;
-  request: HomeworkRequest;
   locale: CodingHomeworkLocale;
   submitted: boolean; revision?: number; onDelete?: (path: string) => Promise<void>; busy?: boolean;
-}) {
+} & ({ request: HomeworkRequest; readFile?: never } | { request?: never; readFile: HomeworkFileReader })) {
   const copy = homeworkWorkflowCopy(locale);
   const notifications = useNotifications();
   const id = useId();
@@ -26,7 +26,8 @@ export function HomeworkFileViewer({ files, request, locale, submitted, revision
     if (!selectedPath) return;
     const pending = new AbortController();
     setPreview({ path: selectedPath, revision });
-    void request<{ path: string; text: string }>(`${submitted ? "submitted-file" : "prepared-file"}?path=${encodeURIComponent(selectedPath)}`, { signal: pending.signal }).then(result => {
+    const loadingFile = readFile ? readFile(selectedPath, pending.signal) : request<{ path: string; text: string }>(`${submitted ? "submitted-file" : "prepared-file"}?path=${encodeURIComponent(selectedPath)}`, { signal: pending.signal });
+    void loadingFile.then(result => {
       if (!pending.signal.aborted) setPreview({ path: selectedPath, revision, text: result.text });
     }).catch(reason => {
       if (pending.signal.aborted) return;
@@ -35,7 +36,7 @@ export function HomeworkFileViewer({ files, request, locale, submitted, revision
       if (!isActivityContentClosedError(reason)) notifications.error(`${selectedPath}: ${message}`);
     });
     return () => pending.abort();
-  }, [selectedPath, request, retry, copy.error, notifications, revision, submitted]);
+  }, [selectedPath, request, readFile, retry, copy.error, notifications, revision, submitted]);
   if (!selected) return <p className="muted">{copy.empty}</p>;
   const visible = preview?.path === selected.path && preview.revision === revision ? preview : null;
   const loading = !visible || (visible.text === undefined && !visible.error);

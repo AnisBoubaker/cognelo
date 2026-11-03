@@ -39,6 +39,7 @@ describe("coding homework grader plugin manifest", () => {
       "coding-homework-grader/challenge-generation",
       "coding-homework-grader/challenge-answers",
       "coding-homework-grader/gradebook-attempts",
+      "coding-homework-grader/gradebook-file",
       "coding-homework-grader/reprocess"
     ]);
   });

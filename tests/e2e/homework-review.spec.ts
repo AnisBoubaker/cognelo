@@ -1,0 +1,101 @@
+import { prisma } from "@cognelo/db";
+import { test, expect } from "./fixtures/bank-course";
+import { createAuthenticatedApi, credentialsFor } from "./fixtures/auth";
+import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
+import { homeworkModelFixture } from "./fixtures/homework-model";
+import { createStoredZip } from "./fixtures/zip";
+
+test("homework review keeps a wide aligned dialog, tabbed files, clear answers and working grade controls", async ({ bankCourse: data, teacherApi, teacherPage: page }) => {
+  test.setTimeout(120_000);
+  const model = await homeworkModelFixture(data);
+  const student = await createAuthenticatedApi("student");
+  let activityId: string | undefined;
+  try {
+    activityId = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Homework review layout", config: {} });
+    const authoring = `/api/courses/${data.courseId}/activities/${activityId}/coding-homework-grader`;
+    const current = await responseJson<{ assignment: object }>(await teacherApi.get(`${authoring}/authoring`));
+    await responseJson(await teacherApi.put(`${authoring}/authoring`, { data: { assignment: current.assignment, requirements: { allowedExtensions: [".c", ".h", ".txt"] } } }));
+    await responseJson(await teacherApi.put(`${authoring}/workflow-settings`, { data: { selected: [] } }));
+    await responseJson(await teacherApi.post(`${authoring}/prepare-references`, { data: {} }));
+    await responseJson(await teacherApi.put(`${authoring}/workflow-settings`, { data: { enabled: true } }));
+    await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/groups/${data.groupId}/activities`, { data: { activityId, metadata: { assessmentMode: "summative" } } }));
+    const endpoint = `/api/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}/coding-homework-grader`;
+    const source = "int add(int a, int b) { return a + b; }";
+    const zip = createStoredZip([{ path: "a-notes.txt", contents: "Student notes for this submission." }, { path: "src/main.c", contents: source },
+      ...Array.from({ length: 12 }, (_, index) => ({ path: `maps/map-${index}.txt`, contents: `Map ${index}` }))]);
+    await responseJson(await student.post(`${endpoint}/preparation`, { data: { kind: "zip", fileName: "work.zip", expectedRevision: 0, base64: zip.toString("base64") } }));
+    await responseJson(await student.post(`${endpoint}/hand-in`, { data: { expectedRevision: 1 } }));
+    await expect.poll(async () => (await responseJson<{ submission: { status: string } }>(await student.get(`${endpoint}/workspace`))).submission.status, { timeout: 30_000 }).toBe("challenge_ready");
+    const answering = await responseJson<{ submissionId: string; questions: Array<{ id: string }> }>(await student.post(`${endpoint}/answering`, { data: {} }));
+    await responseJson(await student.post(`${endpoint}/challenge-answers`, { data: { submissionId: answering.submissionId, answers: answering.questions.map((q, i) => ({ questionId: q.id, answer: i === 1 ? "" : `Student explanation ${i + 1}: the function adds the two arguments.` })) } }));
+    const attempt = await prisma.activityAttempt.findFirstOrThrow({ where: { activityId } });
+    const params = new URLSearchParams({ participantId: attempt.participantId, attemptId: answering.submissionId, path: "a-notes.txt" });
+    expect((await student.get(`${endpoint}/gradebook-file?${params}`)).status()).toBe(403);
+    expect(await responseJson(await teacherApi.get(`${endpoint}/gradebook-file?${params}`))).toEqual({ path: "a-notes.txt", text: "Student notes for this submission." });
+    const { group } = await responseJson<{ group: { id: string } }>(await teacherApi.post(`/api/courses/${data.courseId}/groups`, { data: { title: "Other review section" } }));
+    await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/groups/${group.id}/participants`, { data: { email: credentialsFor("student").email, role: "student" } }));
+    const other = await prisma.courseGroupParticipant.findFirstOrThrow({ where: { groupId: group.id, userId: attempt.userId } });
+    const badParticipant = new URLSearchParams(params); badParticipant.set("participantId", other.id);
+    expect((await teacherApi.get(`${endpoint}/gradebook-file?${badParticipant}`)).status()).toBe(404);
+    const badSubmission = new URLSearchParams(params); badSubmission.set("attemptId", "unrelated-submission");
+    expect((await teacherApi.get(`${endpoint}/gradebook-file?${badSubmission}`)).status()).toBe(404);
+    const badPath = new URLSearchParams(params); badPath.set("path", "../private.c");
+    expect((await teacherApi.get(`${endpoint}/gradebook-file?${badPath}`)).status()).toBe(404);
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}`);
+    await page.getByRole("button", { name: /^Actions for / }).click();
+    await page.getByRole("menuitem", { name: "Review and grade", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Review and grade", exact: true });
+    await expect(page.getByRole("dialog")).toHaveCount(1);
+    const panel = dialog.locator(".homework-review-panel"), toolbar = dialog.locator(".review-chat-toolbar");
+    await expect(dialog.getByRole("tab", { name: "Questions and answers", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(dialog.locator(".homework-challenge-question")).toHaveCount(3);
+    await expect(dialog.locator(".homework-challenge-question").nth(1)).toContainText("No answer provided.");
+    await expect(dialog.locator(".homework-challenge-question").first()).toContainText("Student explanation 1");
+    await expect(dialog.getByRole("button", { name: "Rerun automatic grading", exact: true })).toHaveCount(0);
+    const panelBox = await panel.boundingBox(), toolbarBox = await toolbar.boundingBox();
+    expect(panelBox!.width).toBeGreaterThan(1750);
+    expect(Math.abs(panelBox!.x - toolbarBox!.x)).toBeLessThan(2);
+    expect(Math.abs(panelBox!.width - toolbarBox!.width)).toBeLessThan(2);
+    expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(1081);
+    await page.screenshot({ path: "tmp/homework-review-questions-desktop.png" });
+
+    const grade = dialog.locator(".homework-review-grading");
+    await grade.getByRole("spinbutton").fill("82.5");
+    await grade.getByLabel("Feedback for the student", { exact: true }).fill("Clear explanation; one question was left unanswered.");
+    await toolbar.getByRole("button", { name: "Close", exact: true }).click();
+    const discard = page.getByRole("dialog", { name: "Please confirm", exact: true });
+    await expect(discard).toBeVisible();
+    await discard.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(grade.getByRole("spinbutton")).toHaveValue("82.5");
+    await dialog.getByRole("tab", { name: "Submitted files", exact: true }).click();
+    const tabs = dialog.getByRole("tablist", { name: "Submitted files", exact: true });
+    await expect(tabs.getByRole("tab", { name: "a-notes.txt", exact: true })).toHaveAttribute("aria-selected", "true");
+    const contents = dialog.locator(".homework-submitted-file-panel");
+    await expect(contents).toContainText("Student notes for this submission.");
+    await tabs.getByRole("tab", { name: "src/main.c", exact: true }).click();
+    await expect(contents).toContainText(source);
+    await expect(grade.getByRole("spinbutton")).toHaveValue("82.5");
+    await expect(contents.locator("textarea, input, [contenteditable=true]")).toHaveCount(0);
+    await page.screenshot({ path: "tmp/homework-review-files-desktop.png" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole("dialog")).toHaveCount(1);
+    await expect(dialog.locator(".review-chat-toolbar")).toHaveCount(1);
+    expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    const mobilePanel = await panel.boundingBox();
+    expect(mobilePanel!.y + mobilePanel!.height).toBeLessThanOrEqual(844);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await page.screenshot({ path: "tmp/homework-review-files-mobile.png" });
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await grade.getByRole("button", { name: "Save", exact: true }).click();
+    await expect.poll(async () => (await prisma.grade.findFirst({ where: { gradebookItemId: attempt.gradebookItemId, participantId: attempt.participantId } }))?.normalizedScore).toBe(82.5);
+    await dialog.locator(".review-chat-toolbar").getByRole("button", { name: "Close", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    expect(model.starts).toHaveLength(3); // Reviewing and saving must not regenerate questions.
+  } finally {
+    if (activityId) await prisma.backgroundJob.deleteMany({ where: { payload: { path: ["activityId"], equals: activityId } } });
+    await student.dispose(); await model.close();
+  }
+});

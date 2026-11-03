@@ -18,6 +18,8 @@ Challenge answering uses distinct numbered cards with the question first, a fram
 
 Students may submit some or all challenge answers blank. Manual submission first confirms that answers cannot be changed and lists unanswered question numbers; Cancel returns to editing. Timeouts finalize saved answers automatically without confirmation. Student operation failures use the shared notifications/history instead of a page-top error banner.
 
+Teacher **Review and grade** uses the shared wide dialog, with an aligned toolbar and separate Questions and answers / Submitted files tabs. Submitted files use the same read-only left-tab viewer and load on demand for the selected learner/submission. Numbered question cards show the submitted code and answer, including an explicit unanswered state. Grade and feedback stay beside the content on wide screens; historical/formative review remains read-only.
+
 ## Read by topic
 
 - [Approved choices and delivery scope](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md)

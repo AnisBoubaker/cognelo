@@ -34,12 +34,17 @@ All routes are under `coding-homework-grader/` and retain the host's course/grou
 | `activity-file` GET | Authorized individual attachment; PDFs are inline unless `download=1`. |
 | `challenge-answers` PUT/POST | Serialized autosave and final submission, including server-saved expiry. |
 | `manage-submissions` GET/DELETE | Scoped staff list/cancellation, including queued work. |
+| `gradebook-attempts` GET; `gradebook-file` GET | Grading-staff review and on-demand retained file text for the exact participant/submission. |
 
 `PluginCodingHomeworkDraft` owns revisions/file hashes/folders. `PluginCodingHomeworkTeacherSolution` owns private files/parsed signatures. Existing submission/file/question tables hold frozen work and derived output; status adds `cancelled`. Assignment settings hold protected workflow keys and the prepared snapshot ID; ordinary authoring saves cannot overwrite these keys. Snapshots retain immutable core material-index IDs. `workflowVersion: 2` distinguishes new records from legacy analysis artifacts.
 
 Generated clients are local artifacts. Apply the additive manifest migration `202611010010_homework_preparation` and core material-index migration using `npm run db:migrate:all`. Material PDF extraction needs Poppler; no new environment variable is required. The API's ordinary background worker must remain enabled. Storage uses the existing private homework filesystem root and SHA-256 integrity checks.
 
 ## Shared contracts
+
+Teacher Review and grade uses the common wide workspace (up to 1840 px), with the embedded panel filling its toolbar width. Questions and answers open first in shared numbered cards; the Submitted files tab uses the shared left navigation with automatic first-file selection and no size table. Markdown prompts, syntax-highlighted submitted code, localized answer labels and explicit blanks remain readable. The grade/feedback form sits alongside on wide screens and below the content on narrow screens. Tab changes preserve the grade draft; unsaved changes use the host's close/student/attempt guards, with a separate confirmation before changing Include attempts. Historical/formative attempts remain read-only, and the unsupported automatic regrade button is omitted.
+
+`gradebook-file` requires grading capability for the routed group plus `participantId`, `attemptId` (the plugin submission ID) and `path`. The participant must belong to that group, the final submission must match its linked user/activity/group, and any core attempt must match course/activity/group/participant/plugin. Deleted submission metadata is rejected. Only a stored file path in that exact submission may be read, with the frozen-file size/hash/path checks and the existing 2-million-character preview bound. The response contains only path/text. It never reads a private teacher solution or chooses a different/latest student submission. The client loads one file at a time through the existing abortable viewer; student use of this staff route is denied.
 
 Local AI acceptance uses the [isolated fixture owner](../../../../tests/e2e/README.md#ai-fixture-isolation) and a private model connection bound only to the synthetic course. Tests never replace shared teacher/admin authoring preferences. Saved `questionGenerationAi`, question model and submission-owned function/file relations distinguish provider misconfiguration from student-data mixing. UI/provider fixture outputs do not validate the quality or language of real AI output; existing real question-generation rules remain independent.
 

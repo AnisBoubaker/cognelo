@@ -5,11 +5,11 @@ import type { CodingHomeworkLocale } from "./messages";
 import { QuestionCodeContext } from "./question-code-context";
 import { homeworkWorkflowCopy } from "./workflow-copy";
 
-export function HomeworkChallengeQuestion({ question, number, total, locale, value, disabled, maxLength, onChange, onBlur }: {
+export function HomeworkChallengeQuestion({ question, number, total, locale, value, disabled, maxLength, onChange, onBlur, review = false }: {
   question: CodingHomeworkStudentChallengeQuestionRecord;
   number: number; total: number; locale: CodingHomeworkLocale;
   value: string; disabled: boolean; maxLength?: number;
-  onChange: (value: string) => void; onBlur?: () => void;
+  onChange?: (value: string) => void; onBlur?: () => void; review?: boolean;
 }) {
   const copy = homeworkWorkflowCopy(locale);
   const titleId = `question-title-${question.id}`, promptId = `question-prompt-${question.id}`;
@@ -23,10 +23,10 @@ export function HomeworkChallengeQuestion({ question, number, total, locale, val
     <div className={`homework-challenge-body${hasContext ? " has-context" : ""}`}>
       <QuestionCodeContext context={question.context} locale={locale} />
       <div className="homework-challenge-answer">
-        <label id={labelId} htmlFor={answerId}>{copy.yourAnswer}</label>
+        {review ? <><strong>{copy.studentAnswer}</strong><div className="homework-reviewed-answer">{value.trim() ? value : <span className="muted">{copy.unanswered}</span>}</div></> : <><label id={labelId} htmlFor={answerId}>{copy.yourAnswer}</label>
         <textarea id={answerId} aria-labelledby={`${labelId} ${titleId}`} aria-describedby={promptId}
           rows={7} maxLength={maxLength} disabled={disabled} value={value}
-          onChange={event => onChange(event.target.value)} onBlur={onBlur} />
+          onChange={event => onChange?.(event.target.value)} onBlur={onBlur} /></>}
       </div>
     </div>
   </section>;

@@ -1,5 +1,5 @@
 import type { ComponentProps, ComponentType, ElementType, ReactNode } from "react";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getActivityDefinition, listActivityDefinitions, validateStudentViewClientContracts, type TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import "@cognelo/plugin-registry/activity";
@@ -1458,14 +1458,21 @@ export const manualGradingRenderers: Record<string, (context: ManualGradingRende
   "mcq-manual-grading": (context) => (
     <McqManualGradingPanel {...context} attempts={context.attempts as McqSubmission[]} selectedAttempt={context.selectedAttempt as McqSubmission | null} />
   ),
-  "coding-homework-grader-manual-grading": (context) => (
-    <CodingHomeworkManualGradingPanel
-      {...context}
-      attempts={context.attempts as CodingHomeworkGradebookAttemptRecord[]}
-      selectedAttempt={context.selectedAttempt as CodingHomeworkGradebookAttemptRecord | null}
-    />
-  )
+  "coding-homework-grader-manual-grading": (context) => <CodingHomeworkReviewRenderer {...context} />
 };
+
+function CodingHomeworkReviewRenderer(context: ManualGradingRendererContext) {
+  const client = useMemo(() => createCodingHomeworkGraderClient(apiRequest), []);
+  const attemptId = context.selectedAttempt?.id;
+  const { courseId, row } = context;
+  const readFile = useCallback((path: string, signal: AbortSignal) => {
+    if (!attemptId) return Promise.reject(new Error("No submission selected."));
+    return client.groupGradebookFile(courseId, row.groupId, row.activityId, { participantId: row.participantId, attemptId, path }, signal);
+  }, [client, courseId, row.groupId, row.activityId, row.participantId, attemptId]);
+  return <CodingHomeworkManualGradingPanel {...context} readFile={readFile}
+    attempts={context.attempts as CodingHomeworkGradebookAttemptRecord[]}
+    selectedAttempt={context.selectedAttempt as CodingHomeworkGradebookAttemptRecord | null} />;
+}
 
 export function getManualGradingRenderer(activityTypeKey: string) {
   const rendererKey = getActivityDefinition(activityTypeKey)?.manualGrading?.rendererKey;

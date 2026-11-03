@@ -10,6 +10,8 @@ The review workspace has one accessible dialog containing both its action bar an
 
 Plugin manual-review panels accept optional `embedded` presentation. Inside the host workspace, they omit a second dialog role and duplicate close control. Standalone panels keep their own sticky header and close cross. The host continues to own unsaved-feedback confirmation and student navigation. Test review has one Save all action; drafts persist between questions, while changing students/submissions or closing still requires the existing unsaved-change confirmation. Navigation and dismissal are disabled during the save. Embedded Class overview content remains ordinary page content, without a sticky dialog heading.
 
+Coding Homework review uses the same wide workspace as programming/Test review (up to 1840 px). Its panel explicitly fills the workspace, avoiding the generic 560 px dialog rule that can leave the toolbar detached. The aligned toolbar owns messages/dismissal; the panel presents Questions and answers / Submitted files tabs with grade/feedback beside the content on wide screens.
+
 ## Dismissal semantics
 
 - Keep explicit Cancel, Save, Confirm, Submit, and other decision actions in their existing forms/footers. Moving dismissal does not imply submitting or discarding a draft without its existing guard.
