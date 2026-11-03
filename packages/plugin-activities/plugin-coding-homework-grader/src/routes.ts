@@ -1,3 +1,4 @@
+import { downloadHomeworkProvidedFiles } from "./provided-files-download";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
@@ -170,11 +171,11 @@ export const codingHomeworkActivityFileRoute: PluginRouteDefinition = {
       const { attachment, filePath } = await getCodingHomeworkActivityAttachment(await resolveReadableActivityOwner(context), attachmentId);
       const fileStat = await stat(filePath);
       const stream = Readable.toWeb(createReadStream(filePath)) as ReadableStream;
-      const disposition = attachment?.mimeType === "application/pdf" ? "inline" : "attachment";
+      const disposition = attachment?.mimeType === "application/pdf" && new URL(request.url).searchParams.get("download") !== "1" ? "inline" : "attachment";
       return new Response(stream, {
         headers: {
           "Cache-Control": "private, no-store, max-age=0",
-          "Content-Disposition": `${disposition}; filename="${encodeURIComponent(attachment?.originalName ?? "activity-file")}"`,
+          "Content-Disposition": `${disposition}; filename="${encodeURIComponent(attachment?.originalName ?? "activity-file")}"; filename*=UTF-8''${encodeURIComponent(attachment?.originalName ?? "activity-file")}`,
           "Content-Length": String(fileStat.size),
           "Content-Type": attachment?.mimeType ?? "application/octet-stream",
           "X-Content-Type-Options": "nosniff"
@@ -182,6 +183,13 @@ export const codingHomeworkActivityFileRoute: PluginRouteDefinition = {
       });
     }
   }
+};
+
+export const codingHomeworkProvidedFilesDownloadRoute: PluginRouteDefinition = {
+  path: "coding-homework-grader/provided-files-download",
+  activityTypeKeys: ["coding-homework-grader"],
+  learnerAccessPhase: "preparation",
+  methods: { GET: async ({ context, request }) => downloadHomeworkProvidedFiles(await resolveReadableActivityOwner(context), request.signal) }
 };
 
 export const codingHomeworkRequirementsUploadRoute: PluginRouteDefinition = {

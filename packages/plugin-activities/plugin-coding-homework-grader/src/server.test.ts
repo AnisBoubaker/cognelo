@@ -24,6 +24,7 @@ vi.mock("./routes", () => ({
   codingHomeworkDocumentationSnapshotRoute: { path: "documentation-snapshot", methods: {} },
   codingHomeworkGradebookAttemptsRoute: { path: "gradebook-attempts", methods: {} },
   codingHomeworkPreflightRoute: { path: "preflight", methods: {} },
+  codingHomeworkProvidedFilesDownloadRoute: { path: "provided-files-download" },
   codingHomeworkProvidedFilesRoute: { path: "provided-files", methods: {} },
   codingHomeworkProcessingJobRoute: { path: "processing-job", methods: {} },
   codingHomeworkReprocessRoute: { path: "reprocess", methods: {} },

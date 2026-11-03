@@ -25,6 +25,7 @@ describe("coding homework grader plugin manifest", () => {
       "coding-homework-grader/assignment-pdf",
       "coding-homework-grader/activity-file",
       "coding-homework-grader/provided-files",
+      "coding-homework-grader/provided-files-download",
       "coding-homework-grader/requirements-upload",
       "coding-homework-grader/documentation-preview",
       "coding-homework-grader/documentation-snapshot",

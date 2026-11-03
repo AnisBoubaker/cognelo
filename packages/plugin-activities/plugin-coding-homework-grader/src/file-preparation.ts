@@ -136,16 +136,23 @@ export async function uploadHomeworkPreparation(scope: HomeworkStudentScope, inp
 }
 export async function removeHomeworkPreparedFile(scope: HomeworkStudentScope, input: unknown) {
   await assertHomeworkStudentScope(scope);
-  const data = z.object({ path: z.string().min(1).max(500), expectedRevision: z.number().int().min(0) }).strict().parse(input);
+  const data = z.union([
+    z.object({ path: z.string().min(1).max(500), expectedRevision: z.number().int().min(0) }).strict(),
+    z.object({ all: z.literal(true), expectedRevision: z.number().int().min(0) }).strict()
+  ]).parse(input);
   const removed = await prisma.$transaction(async tx => {
     await lockHomeworkWorkflow(tx, scope); await assertHomeworkDraftWritable(tx, scope);
     const draft = await tx.pluginCodingHomeworkDraft.findUnique({ where: { activityId_groupId_userId: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id } } });
     if (!draft || draft.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "Your prepared files changed. Reload them first.");
-    const files = draftFiles(draft.files); const target = files.find(file => file.path === data.path);
-    await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { files: json(files.filter(file => file.path !== data.path)), revision: { increment: 1 } } });
-    return target ? draftFilePath(draft.id, target.storedName) : null;
+    const files = draftFiles(draft.files);
+    const clearAll = "all" in data;
+    const targets = clearAll ? files : files.filter(file => file.path === data.path);
+    const removedPaths = targets.map(file => draftFilePath(draft.id, file.storedName));
+    await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { files: json(clearAll ? [] : files.filter(file => file.path !== data.path)),
+      ...(clearAll ? { folders: json([]) } : {}), revision: { increment: 1 } } });
+    return removedPaths;
   });
-  if (removed) await unlink(removed).catch(() => {});
+  await Promise.all(removed.map(file => unlink(file).catch(() => {})));
   return getHomeworkPreparation(scope);
 }
 export async function getHomeworkPreparedFile(scope: HomeworkStudentScope, filePath: string) {

@@ -2,7 +2,7 @@
 
 `@cognelo/plugin-coding-homework-grader` provides C homework preparation, immutable hand-in, queued challenge questions, timed/SEB answering and teacher grading.
 
-Students prepare work by choosing individual files (uploaded at the root) or replacing the whole collection with a ZIP that preserves its folders. The preparation UI has no destination-folder field or Create folder action. Files persist across visits and can be removed/replaced until **Submit my work**. There is no browser code editor. Static filename/function-signature checks distinguish incomplete work requiring acknowledgement from blocking safety failures.
+Students prepare work by choosing individual files (uploaded at the root) or replacing the whole collection with a ZIP that preserves its folders. The preparation UI has no destination-folder field or Create folder action. Files persist across visits in the shared left-tab explorer, with the first file opened automatically. Before **Submit my work**, a tab’s cross removes that file after confirmation, and **Remove all files** clears the draft after confirmation. File contents remain read-only. There is no browser code editor. Students explicitly choose **Check my submission** to see a structural result. Valid structure reveals Submit my work; academic gaps require **I want to submit incomplete work** before showing it. File changes clear the check/acknowledgement. The UI explains that required filenames/function signatures do not prove correctness, and submission requires an immutable-work warning. File safety failures remain blocking.
 
 Teachers upload a private C solution and choose required filenames/functions manually or with AI assistance. ZIPs replace the solution; files and detected functions can be removed individually or cleared together, with linked requirements reconciled. In a course, **Reference materials** holds the embedding connection/model and material selection (defaulting to visible materials before the activity). **Settings** holds the question-generation connection/model, private AI question-generation instructions, generation concurrency, Generate embeddings, and the manual final-submission switch. Both tabs preserve the activity draft and reference selection. Preparation shows the current material; failures name it inline and in the shared notification center, and retry reuses completed indexes. Material plugins own extraction/index refresh through core. GitHub freshness is configured on each repository material and checked when submissions open.
 
@@ -10,7 +10,7 @@ Final hand-in freezes the actual validated files and atomically queues generatio
 
 Teachers can cancel queued, answering or completed submissions from the activity details page (or editor): the old work is retained, associated grades are withdrawn, late generation cannot revive it, and the student may submit again. Students cannot cancel their frozen hand-in or question-generation job.
 
-Assignment PDF previews and View PDF use authorized file responses that preserve the PDF bytes and content type.
+Students see only two conditional download actions: the assignment PDF and one ZIP containing the provided files. A sole uploaded ZIP is returned unchanged; other provided attachments are bundled with safe unique names. Teacher PDF previews/View PDF remain inline. Authorized file responses preserve bytes and content type.
 
 ## Read by topic
 
