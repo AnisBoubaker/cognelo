@@ -35,9 +35,11 @@ test("teacher selects private solution signatures and student explicitly acknowl
     await expect(studentPage.locator('input[type="file"][multiple]')).toBeEnabled();
     await studentPage.locator('input[type="file"][multiple]').setInputFiles({ name: "main.c", mimeType: "text/plain", buffer: Buffer.from("// Work is still incomplete.\n") });
     await expect(studentPage.getByText("main.c", { exact: true })).toBeVisible();
-    const acknowledgement = studentPage.getByRole("checkbox", { name: "I understand that I am submitting incomplete work.", exact: true });
+    await expect(studentPage.getByRole("button", { name: "Submit my work", exact: true })).toHaveCount(0);
+    await studentPage.getByRole("button", { name: "Check my submission", exact: true }).click();
+    const acknowledgement = studentPage.getByRole("checkbox", { name: "I want to submit incomplete work.", exact: true });
     await expect(acknowledgement).toBeVisible();
-    await expect(studentPage.getByRole("button", { name: "Submit my work", exact: true })).toBeDisabled();
+    await expect(studentPage.getByRole("button", { name: "Submit my work", exact: true })).toHaveCount(0);
     expect((await student.post(`/api${assigned}/coding-homework-grader/hand-in`, { data: { expectedRevision: 1 } })).status()).toBe(409);
     expect((await student.get(`/api${assigned}/coding-homework-grader/teacher-solution`)).status()).toBe(403);
     await acknowledgement.check(); await studentPage.getByRole("button", { name: "Submit my work", exact: true }).click();

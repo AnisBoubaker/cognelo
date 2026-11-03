@@ -50,10 +50,12 @@ The follow-up clarifications above specify C signature matching and acknowledgem
 
 - Students can upload work **file by file** or as a **ZIP**. As clarified November 3, individual-file uploads use the root and the UI has no destination-folder field or Create folder action. ZIP uploads preserve all valid internal folders.
 - A ZIP upload **replaces the whole prepared file collection**; it does not merge with the existing collection.
-- Before final submission, students can remove uploaded files, upload replacements, leave the page, return later, and continue preparing the collection.
+- Before final submission, students use the same left-tab explorer as submitted work. Each tab has a delete cross, with confirmation. **Remove all files** clears the whole prepared collection, also after confirmation. Students can upload replacements, leave and return later; the selected file reloads when its bytes change. Confirmed changes invalidate the structural check.
 - **No in-browser editing of file contents.** Changes to code are made locally and uploaded again. “Change the preparation” means managing uploaded files, not an online code editor.
-- Preparing or validating files is separate from **Submit my work** and does not start challenge answering or its countdown.
+- Preparing or validating files is separate from **Submit my work** and does not start challenge answering or its countdown. Students explicitly click **Check my submission**; results are hidden until then. A checkmark means structurally valid filenames/functions, not a correct solution. Missing/mismatched requirements are all listed with an error indicator. Submit is shown after a valid check, or after selecting **I want to submit incomplete work** for academic gaps. File changes invalidate the result/acknowledgement. Confirmation warns that submitted work cannot be changed.
 - Preparation must persist across visits rather than relying on a browser file-input value or a temporary preflight upload.
+
+The student sees only two resource download buttons when available: the assignment statement and one ZIP of the provided files. Individual attachment names are not listed.
 
 ## Final submission and challenge workflow
 

@@ -712,7 +712,8 @@ test.describe.serial("authoring and completing every activity type", () => {
     await openStudentActivity(studentPage, data, title);
     await expect(studentPage.locator('input[type="file"][accept=".zip"]')).toBeEnabled();
     await studentPage.locator('input[type="file"][accept=".zip"]').setInputFiles({ buffer: submissionZip, mimeType: "application/zip", name: "e2e-homework.zip" });
-    await expect(studentPage.getByText("The file requirements are satisfied.", { exact: true })).toBeVisible();
+    await studentPage.getByRole("button", { name: "Check my submission", exact: true }).click();
+    await expect(studentPage.getByText("Structure is valid.", { exact: true })).toBeVisible();
     await studentPage.getByRole("button", { name: "Submit my work", exact: true }).click();
     await studentPage.getByRole("dialog", { name: "Submit my work", exact: true }).getByRole("button", { name: "Submit my work", exact: true }).click();
     await studentPage.getByRole("button", { name: "Answer challenge questions", exact: true }).click({ timeout: 180_000 });

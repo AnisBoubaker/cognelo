@@ -1,5 +1,6 @@
 "use client";
 
+import { HomeworkDownloads } from "./homework-downloads";
 import { QuestionCodeContext } from "./question-code-context";
 import { createPortal } from "react-dom";
 import { HomeworkSubmissionManagement } from "./homework-submission-management";
@@ -89,6 +90,7 @@ type SubmissionClient = {
 type CodingHomeworkGraderActivityViewProps = {
   activity: RenderableActivity;
   activityFileUrl?: (attachmentId: string) => string;
+  providedFilesUrl?: string;
   authoringClient?: AuthoringClient;
   workflowRequest?: HomeworkRequest;
   authoringReferenceMaterialsPortalTarget?: HTMLElement | null;
@@ -161,12 +163,13 @@ function defaultAuthoring(activity: RenderableActivity): CodingHomeworkAuthoring
 }
 
 export function CodingHomeworkGraderActivityView(props: CodingHomeworkGraderActivityViewProps) {
-  if (!props.canManage && props.workflowRequest) return <HomeworkStudentWorkspace request={props.workflowRequest} title={props.activity.title} locale={props.locale ?? "en"} activityFileUrl={props.activityFileUrl} onAssessmentAccessRequested={props.onAssessmentAccessRequested} onAssessmentStarted={props.onAssessmentStarted} onSubmitted={props.onSubmitted} timedAutoSubmit={props.timedAutoSubmit} />;
+  if (!props.canManage && props.workflowRequest) return <HomeworkStudentWorkspace request={props.workflowRequest} title={props.activity.title} locale={props.locale ?? "en"} activityFileUrl={props.activityFileUrl} providedFilesUrl={props.providedFilesUrl} onAssessmentAccessRequested={props.onAssessmentAccessRequested} onAssessmentStarted={props.onAssessmentStarted} onSubmitted={props.onSubmitted} timedAutoSubmit={props.timedAutoSubmit} />;
   return <LegacyCodingHomeworkActivityView {...props} />;
 }
 function LegacyCodingHomeworkActivityView({
   activity,
   activityFileUrl,
+  providedFilesUrl,
   authoringClient,
   workflowRequest,
   authoringReferenceMaterialsPortalTarget,
@@ -743,17 +746,8 @@ function LegacyCodingHomeworkActivityView({
         <section className="section stack" aria-busy={processingSubmission}>
           <h2>{activity.title}</h2>
           {loadingStudentAssignment ? <p>{copy.loading}</p> : <MarkdownRenderer markdown={studentAssignment?.assignment.promptMarkdown || activity.description} />}
-          {studentAssignment?.assignment.promptPdf && activityFileUrl ? (
-            <p><a className="button secondary" href={activityFileUrl(studentAssignment.assignment.promptPdf.id)} target="_blank" rel="noreferrer"><ActionIcon name="open" /> {copy.viewPdf}</a></p>
-          ) : null}
-          {studentAssignment?.assignment.providedFiles.length && activityFileUrl ? (
-            <div className="stack">
-              <h3>{copy.providedFiles}</h3>
-              {studentAssignment.assignment.providedFiles.map((file) => (
-                <a key={file.id} href={activityFileUrl(file.id)} target="_blank" rel="noreferrer">{file.originalName}</a>
-              ))}
-            </div>
-          ) : null}
+          <HomeworkDownloads promptPdfId={studentAssignment?.assignment.promptPdf?.id} hasProvidedFiles={Boolean(studentAssignment?.assignment.providedFiles.length)}
+            activityFileUrl={activityFileUrl} providedFilesUrl={providedFilesUrl} locale={locale} />
           <PreflightPanel copy={copy} disabled={processingSubmission} preflightResult={preflightResult} runningPreflight={runningPreflight} onUpload={runPreflight} />
           {submissionClient ? (
             <>

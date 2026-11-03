@@ -499,6 +499,9 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
             : `/courses/${courseId}/activities/${activityProps.activity.id}/coding-homework-grader/activity-file?attachmentId=${encodeURIComponent(attachmentId)}`
         )
       }
+      providedFilesUrl={apiAbsoluteUrl(groupId
+        ? `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityProps.activity.id}/coding-homework-grader/provided-files-download`
+        : `/courses/${courseId}/activities/${activityProps.activity.id}/coding-homework-grader/provided-files-download`)}
       authoringReferenceMaterialsPortalTarget={authoringReferenceMaterialsPortalTarget}
       authoringSettingsPortalTarget={authoringSettingsPortalTarget}
       workflowRequest={workflowRequest}
@@ -1321,6 +1324,7 @@ function CodingHomeworkGraderBankActivityRenderer(context: BankActivityRendererC
   const solutionRequest = useMemo(() => <T,>(route: string, init?: RequestInit) => apiRequest<T>(`/activity-banks/${context.activityBankId}/activities/${context.activity.id}/coding-homework-grader/${route}`, init), [context.activityBankId, context.activity.id]);
   return (
     <CodingHomeworkGraderActivityView
+      providedFilesUrl={apiAbsoluteUrl(`/activity-banks/${context.activityBankId}/activities/${context.activity.id}/coding-homework-grader/provided-files-download`)}
       solutionRequest={solutionRequest}
       activity={context.activity}
       activityFileUrl={(attachmentId) =>

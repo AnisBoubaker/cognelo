@@ -1,0 +1,55 @@
+import { readFile } from "node:fs/promises";
+import { unzipSync } from "fflate";
+import { prisma } from "@cognelo/db";
+import { test, expect } from "./fixtures/bank-course";
+import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
+import { createAuthenticatedApi } from "./fixtures/auth";
+import { createStoredZip } from "./fixtures/zip";
+import { textPdf } from "./fixtures/pdf";
+
+test("student homework offers conditional assignment and combined provided-file downloads", async ({ bankCourse: data, teacherApi, studentPage: page }) => {
+  const student = await createAuthenticatedApi("student");
+  try {
+    const activityId = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Two homework downloads", config: {} });
+    const teacherBase = `/api/courses/${data.courseId}/activities/${activityId}/coding-homework-grader`;
+    await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/groups/${data.groupId}/activities`, { data: { activityId, metadata: { assessmentMode: "summative", requireSafeExamBrowser: true } } }));
+    const assigned = `/api/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}`;
+    const studentBase = `${assigned}/coding-homework-grader`;
+    await page.goto(assigned.replace(/^\/api/, ""));
+    await expect(page.getByRole("heading", { name: "Prepare your work", exact: true })).toBeVisible();
+    await expect(page.locator(".homework-downloads")).toHaveCount(0);
+    expect((await student.get(`${studentBase}/provided-files-download`)).status()).toBe(404);
+    await responseJson(await teacherApi.put(`${teacherBase}/teacher-solution`, { data: { fileName: "private-solution.c", base64: Buffer.from("int PRIVATE_TEACHER_SOLUTION(void) { return 42; }").toString("base64") } }));
+    for (const [fileName, content] of [["main.c", "int main(void) { return 0; }"], ["grid.txt", "S..\n..E"]]) await responseJson(await teacherApi.post(`${teacherBase}/provided-files`, { data: { fileName, base64: Buffer.from(content).toString("base64"), mimeType: "text/plain" } }));
+    await page.reload();
+    const provided = page.getByRole("link", { name: "Download provided files (ZIP)", exact: true });
+    await expect(provided).toBeVisible();
+    await expect(page.getByRole("link", { name: "Download assignment", exact: true })).toHaveCount(0);
+    const pdf = textPdf("Upload your code and answer the challenge questions.");
+    await responseJson(await teacherApi.post(`${teacherBase}/assignment-pdf`, { data: { fileName: "statement.pdf", mimeType: "application/pdf", base64: pdf.toString("base64") } }));
+    await page.reload();
+    const downloads = page.locator(".homework-downloads");
+    await expect(downloads.getByRole("link")).toHaveCount(2);
+    await downloads.screenshot({ path: "tmp/homework-download-buttons.png" });
+    await expect(page.getByRole("link", { name: "main.c", exact: true })).toHaveCount(0);
+    const pdfDownloaded = page.waitForEvent("download");
+    await page.getByRole("link", { name: "Download assignment", exact: true }).click();
+    const pdfFile = await pdfDownloaded;
+    expect(pdfFile.suggestedFilename()).toBe("statement.pdf"); expect(await readFile((await pdfFile.path())!)).toEqual(pdf);
+    const zipDownloaded = page.waitForEvent("download"); await provided.click();
+    const zipFile = await zipDownloaded;
+    expect(zipFile.suggestedFilename()).toBe("provided-files.zip");
+    const zipped = unzipSync(await readFile((await zipFile.path())!));
+    expect(Object.keys(zipped).sort()).toEqual(["grid.txt", "main.c"]);
+    expect(Buffer.from(zipped["main.c"]).toString()).toBe("int main(void) { return 0; }");
+    expect(Buffer.from(zipped["grid.txt"]).toString()).toBe("S..\n..E");
+    expect((await student.get(`${teacherBase}/provided-files-download`)).status()).toBe(403);
+    const authoring = await responseJson<{ providedFiles: Array<{ id: string }> }>(await teacherApi.get(`${teacherBase}/authoring`));
+    for (const file of authoring.providedFiles) await responseJson(await teacherApi.delete(`${teacherBase}/provided-files?attachmentId=${file.id}`));
+    const originalZip = createStoredZip([{ path: "src/starter.c", contents: "int starter(void);" }]);
+    await responseJson(await teacherApi.post(`${teacherBase}/provided-files`, { data: { fileName: "starter.zip", mimeType: "application/zip", base64: originalZip.toString("base64") } }));
+    const response = await student.get(`${studentBase}/provided-files-download`);
+    expect(response.ok()).toBe(true); expect(await response.body()).toEqual(originalZip);
+    expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(0);
+  } finally { await student.dispose(); }
+});

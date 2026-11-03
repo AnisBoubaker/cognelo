@@ -45,6 +45,8 @@ test("submitted files use shared left tabs, open the first file, and isolate loa
     await expect(panel.getByRole("heading")).toHaveCount(0);
     await expect(panel).not.toContainText(files[0].path);
     await expect(viewer.locator("textarea, input, [contenteditable=true]")).toHaveCount(0);
+    await expect(viewer.getByRole("button", { name: /^Remove file: / })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Remove all files", exact: true })).toHaveCount(0);
     const firstBox = await first.boundingBox(), codeBox = await code.boundingBox();
     expect(codeBox!.x).toBeGreaterThan(firstBox!.x + firstBox!.width);
     expect(Math.abs(codeBox!.y - firstBox!.y)).toBeLessThan(2);

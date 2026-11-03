@@ -31,6 +31,7 @@ test("homework preparation persists files, replaces ZIPs, validates signatures, 
     expect(first.draft.files).toEqual([expect.objectContaining({ path: "src/main.c" })]);
     expect(first.readiness).toMatchObject({ canSubmit: true, requiresAcknowledgement: false });
     expect((await student.post(preparation, { data: { kind: "file", path: "src/main.c", base64: Buffer.from("int main(void) { return 0; }").toString("base64"), expectedRevision: first.draft.revision } })).status()).toBe(409);
+    expect((await student.delete(preparation, { data: { all: true, expectedRevision: 0 } })).status()).toBe(409);
     expect((await student.post(preparation, { data: { kind: "file", path: "../escape.c", base64: "YQ==", expectedRevision: first.draft.revision } })).status()).toBe(400);
     const zip = createStoredZip([{ path: "replacement.c", contents: "int add(double value) { return 0; }" }]);
     const replacement = await responseJson<{ draft: { revision: number; files: Array<{ path: string }> }; readiness: { canSubmit: boolean; requiresAcknowledgement: boolean } }>(await student.post(preparation, { data: {
@@ -58,8 +59,18 @@ test("homework preparation persists files, replaces ZIPs, validates signatures, 
     await expect(page.getByText("single.c", { exact: true })).toHaveCount(0);
     await page.reload();
     await expect(page.getByText("starter/include/api.h", { exact: true })).toBeVisible();
-    const nested = await responseJson<{ draft: { files: Array<{ path: string }> } }>(await student.get(preparation));
+    const nested = await responseJson<{ draft: { revision: number; files: Array<{ path: string }> } }>(await student.get(preparation));
     expect(nested.draft.files.map(file => file.path).sort()).toEqual(["starter/include/api.h", "starter/src/main.c"]);
+    await page.getByRole("button", { name: "Remove all files", exact: true }).click();
+    const clearDialog = page.getByRole("dialog", { name: "Remove all files", exact: true });
+    await clearDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect(await responseJson(await student.get(preparation))).toMatchObject({ draft: nested.draft });
+    await page.getByRole("button", { name: "Remove all files", exact: true }).click();
+    await clearDialog.getByRole("button", { name: "Remove all files", exact: true }).click();
+    await expect(page.getByRole("tablist", { name: "Prepared files", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Remove all files", exact: true })).toBeDisabled();
+    expect(await responseJson(await student.get(preparation))).toMatchObject({ draft: { files: [], folders: [], revision: nested.draft.revision + 1 } });
+
     expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(0);
     expect(await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) FROM "PluginCodingHomeworkSubmission" WHERE "activityId"=${activityId}`).toEqual([{ count: 0n }]);
     expect(await responseJson(await student.get(`${assigned}/seb`))).toMatchObject({ access: { requiresSafeExamBrowser: true, preparationAllowed: true, accessGranted: false } });

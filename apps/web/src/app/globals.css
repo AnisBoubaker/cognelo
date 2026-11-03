@@ -2022,6 +2022,10 @@ a.card:hover,
   transform: none;
 }
 
+.side-navigation-tab-with-action { position: relative; min-width: 0; }
+.settings-nav .side-navigation-tab-with-action > [role="tab"] { padding-inline-end: 36px; }
+.settings-nav .side-navigation-tab-action { position: absolute; inset-inline-end: 5px; top: 7px; display: inline-flex; align-items: center; justify-content: center; width: 26px; min-height: 26px; height: 26px; padding: 4px; }
+
 .settings-nav a span,
 .settings-nav button span {
   font-weight: 800;
@@ -6148,8 +6152,10 @@ button:hover > .disclosure-indicator {
 
 /* Submitted files reuse the app's shared left navigation, with a compact reading pane. */
 .settings-layout.homework-submitted-files { grid-template-columns: minmax(88px, min(28%, 15rem)) minmax(0, 1fr); gap: 14px; min-width: 0; }
+.settings-layout.homework-submitted-files.has-file-actions { grid-template-columns: minmax(120px, min(32%, 16rem)) minmax(0, 1fr); }
 .homework-submitted-files .settings-nav { min-width: 0; max-height: 34rem; overflow: auto; }
 .homework-submitted-files .settings-nav span { overflow-wrap: anywhere; }
+.homework-structure-check li { overflow-wrap: anywhere; }
 .homework-submitted-file-panel { min-width: 0; padding-block-start: 7px; }
 .homework-submitted-file-content { min-width: 0; max-width: 100%; max-height: 32rem; min-height: 12rem; overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .homework-submitted-file-content .code-renderer { width: max-content; min-width: 100%; }

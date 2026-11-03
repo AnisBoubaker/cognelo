@@ -58,9 +58,11 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
     const fileInput = studentPage.locator('input[type="file"][multiple]');
     await expect(fileInput).toBeEnabled();
     await fileInput.setInputFiles({ name: "main.c", mimeType: "text/plain", buffer: Buffer.from("int add(int x, int y) { return x + y; }") });
-    await expect(studentPage.getByText("The file requirements are satisfied.", { exact: true })).toBeVisible();
+    await studentPage.getByRole("button", { name: "Check my submission", exact: true }).click();
+    await expect(studentPage.getByText("Structure is valid.", { exact: true })).toBeVisible();
     await studentPage.reload();
     await expect(studentPage.getByText("main.c", { exact: true })).toBeVisible();
+    await studentPage.getByRole("button", { name: "Check my submission", exact: true }).click();
     await studentPage.getByRole("button", { name: "Submit my work", exact: true }).click();
     await studentPage.getByRole("dialog", { name: "Submit my work", exact: true }).getByRole("button", { name: "Submit my work", exact: true }).click();
     await expect.poll(async () => {
@@ -72,6 +74,7 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
     expect(questionRequests).toBe(5); expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(0);
     const state = await responseJson<{ submission: { id: string } }>(await student.get(`${endpoint}/workspace`));
     expect((await student.post(`${endpoint}/preparation`, { data: { kind: "file", path: "main.c", base64: "YQ==", expectedRevision: 1, replace: true } })).status()).toBe(409);
+    expect((await student.delete(`${endpoint}/preparation`, { data: { all: true, expectedRevision: 1 } })).status()).toBe(409);
     expect((await student.get(`${endpoint}/answering`)).status()).toBe(409);
     expect(JSON.stringify(await responseJson(await student.get(`${endpoint}/assignment`)))).not.toContain("boundary values");
     expect((await student.post(`${endpoint}/hand-in`, { data: { expectedRevision: 1 } })).ok()).toBe(true);
