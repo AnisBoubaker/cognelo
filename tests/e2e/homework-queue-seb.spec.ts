@@ -5,7 +5,7 @@ import { createCourseActivity, responseJson, type ActivitySuiteData } from "./fi
 import { createAuthenticatedApi, createAuthenticatedApiWithCredentials, credentialsFor } from "./fixtures/auth";
 import { homeworkModelFixture } from "./fixtures/homework-model";
 import { buildSafeExamBrowserConfiguration } from "../../apps/api/src/lib/safe-exam-browser";
-import type { APIRequestContext } from "@playwright/test";
+import type { APIRequestContext, BrowserContext } from "@playwright/test";
 
 async function readyHomework(data: ActivitySuiteData, teacher: APIRequestContext, seb = false) {
   const activityId = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Queued homework", config: {} });
@@ -58,10 +58,11 @@ test("homework enters SEB only when answering and recognizes the verified config
   }
 });
 
-test("30 students use a bounded FIFO queue and cancelled running/queued work cannot publish late questions", async ({ bankCourse: data, teacherApi }) => {
+test("30 students use a bounded FIFO queue and cancelled running/queued work cannot publish late questions", async ({ bankCourse: data, teacherApi, browser }) => {
   test.setTimeout(240_000);
   const model = await homeworkModelFixture(data.token, { hold: true });
   const clients: APIRequestContext[] = [], userIds: string[] = []; let id: string | undefined;
+  let studentContext: BrowserContext | undefined;
   try {
     const homework = await readyHomework(data, teacherApi); id = homework.activityId;
     expect((await teacherApi.put(`${homework.teacherPath}/workflow-settings`, { data: { concurrency: 5 } })).status()).toBe(400);
@@ -75,12 +76,32 @@ test("30 students use a bounded FIFO queue and cancelled running/queued work can
       submissions.push((await handIn(client, homework.endpoint, index)).submission.id);
     }
     await expect.poll(() => model.active).toBe(2); expect(model.maximum).toBe(2);
-    expect(model.starts[0]).toContain("student_0("); expect(model.starts[1]).toContain("student_1(");
+    // FIFO admits the oldest two jobs; their concurrent provider requests can arrive in either order.
+    expect(model.starts.slice(0, 2).map(code => code.match(/student_(\d+)\(/)?.[1]).sort()).toEqual(["0", "1"]);
     expect(await prisma.backgroundJob.count({ where: { queue: "coding-homework-grader", status: "queued", payload: { path: ["activityId"], equals: id } } })).toBe(28);
+    studentContext = await browser.newContext({ storageState: await clients[3].storageState(), locale: "en-CA" });
+    const page = await studentContext.newPage();
+    await page.goto(`${process.env.E2E_WEB_URL ?? "http://localhost:3000"}${homework.assigned.replace(/^\/api/, "")}`);
+    const progress = page.locator(".homework-generation-status"), spinner = progress.locator(".homework-generation-spinner");
+    await expect(progress).toContainText("Waiting to generate your questions…");
+    await expect(progress).toContainText("Your position in line: 2");
+    await expect(spinner).toBeVisible();
+    expect(await spinner.evaluate(element => getComputedStyle(element).animationName)).toBe("homework-generation-spin");
+    await expect(progress).not.toContainText(/leave this page|return later/i);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await progress.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: "tmp/homework-generation-queue-mobile.png" });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    expect(await spinner.evaluate(element => getComputedStyle(element).animationName)).toBe("none");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     const interrupted = await prisma.backgroundJob.findUniqueOrThrow({ where: { queue_idempotencyKey: { queue: "coding-homework-grader", idempotencyKey: `submission:${submissions[10]}` } } });
     await prisma.backgroundJob.update({ where: { id: interrupted.id }, data: { status: "running", lockedBy: "stopped-worker-fixture", lockedAt: new Date(Date.now() - 180_000), attempts: 1 } });
     await responseJson(await teacherApi.put(`${homework.teacherPath}/workflow-settings`, { data: { concurrency: 4 } }));
     await expect.poll(() => model.active).toBe(4); expect(model.maximum).toBe(4);
+    await expect(progress).toContainText("Question generation in progress…");
+    await expect(progress).not.toContainText("Your position in line:");
+    await expect(spinner).toBeVisible();
     for (const index of [0, 29]) await responseJson(await teacherApi.delete(`${homework.teacherPath}/manage-submissions`, { data: { submissionId: submissions[index], reason: "Allow a corrected submission." } }));
     model.release();
     await expect.poll(async () => (await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) FROM "PluginCodingHomeworkSubmission" WHERE "activityId"=${id} AND status='challenge_ready'`)[0].count.toString(), { timeout: 90_000 }).toBe("28");
@@ -92,7 +113,10 @@ test("30 students use a bounded FIFO queue and cancelled running/queued work can
     }
     expect(await prisma.activityAttempt.count({ where: { activityId: id } })).toBe(0);
     expect(await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) FROM "PluginCodingHomeworkChallengeQuestion" q JOIN "PluginCodingHomeworkSubmission" s ON s.id=q."submissionId" WHERE s."activityId"=${id}`).toEqual([{ count: 84n }]);
+    await expect(page.getByRole("button", { name: "Answer challenge questions", exact: true })).toBeVisible();
+    await expect(progress).toHaveCount(0);
   } finally {
+    await studentContext?.close();
     model.release(); if (id) await prisma.backgroundJob.deleteMany({ where: { payload: { path: ["activityId"], equals: id } } });
     await Promise.all(clients.map(client => client.dispose()));
     await prisma.user.deleteMany({ where: { id: { in: userIds } } }); await model.close();

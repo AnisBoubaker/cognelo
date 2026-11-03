@@ -64,7 +64,7 @@ The student sees only two resource download buttons when available: the assignme
 | Preparing | The student manages their uploaded collection and reviews validation warnings. |
 | Ready to submit | Required incomplete-work acknowledgement has been given, the teacher has enabled final submissions, and activity availability permits the action. |
 | Submit my work | Freeze the validated file set. The student can no longer change or withdraw it themselves. Queue challenge generation. |
-| Queued/generating | Show **“Question generation in progress…”**. Processing continues if the student leaves the page. Returning shows the retained status/result. |
+| Queued/generating | Show an inline spinner and the student’s live position in line while queued; switch to **“Question generation in progress…”** once processing starts. Do not suggest leaving the page. Processing still continues if the student elects to leave, and returning shows the retained status/result. |
 | Questions ready | Present **Answer challenge questions**. Readiness alone does not start the answering timer. |
 | Answering | Start only after the explicit Answer action and any required SEB handoff/verification. Allow consultation of submitted work read-only and authorized course material. |
 | Completed | Retain submitted work, questions, answers and audit evidence for the normal teacher review/grading workflow. |

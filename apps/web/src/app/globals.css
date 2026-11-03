@@ -6156,6 +6156,21 @@ button:hover > .disclosure-indicator {
 .homework-submitted-files .settings-nav { min-width: 0; max-height: 34rem; overflow: auto; }
 .homework-submitted-files .settings-nav span { overflow-wrap: anywhere; }
 .homework-structure-check li { overflow-wrap: anywhere; }
+.homework-generation-status { display: flex; align-items: center; gap: 16px; min-height: 0; }
+.homework-generation-status p { margin: 6px 0 0; }
+.homework-generation-spinner {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--line);
+  border-top-color: var(--brand-blue);
+  border-radius: 50%;
+  animation: homework-generation-spin 0.9s linear infinite;
+}
+@keyframes homework-generation-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .homework-generation-spinner { animation: none; }
+}
 .homework-submitted-file-panel { min-width: 0; padding-block-start: 7px; }
 .homework-submitted-file-content { min-width: 0; max-width: 100%; max-height: 32rem; min-height: 12rem; overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .homework-submitted-file-content .code-renderer { width: max-content; min-width: 100%; }

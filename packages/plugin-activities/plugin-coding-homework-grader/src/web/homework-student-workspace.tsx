@@ -145,7 +145,13 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
         if (await dialogs.confirm({ title: copy.handIn, message: copy.handInDetail, confirmLabel: copy.handIn })) await run(copy.handIn, async signal => { await request("hand-in", body("POST", { expectedRevision: preparation.draft.revision, acknowledgeIncomplete: acknowledged }, signal)); });
       }}><ActionIcon name="submit" /> {copy.handIn}</button>}
     </section>}
-    {active && !["challenge_ready", "ready_for_grading", "graded"].includes(active.status) && <div role="status" className="preview-panel"><strong>{active.generationIssue === "no_eligible_code" ? copy.noEligibleCode : active.processingStatus === "failed" ? copy.generationFailed : copy.generating}</strong>{active.processingStatus !== "failed" && <>{active.queuePosition && <p>{copy.queue}: {active.queuePosition}</p>}<p>{copy.leave}</p></>}</div>}
+    {active && !["challenge_ready", "ready_for_grading", "graded"].includes(active.status) && <div role="status" aria-live="polite" aria-atomic="true" className="preview-panel homework-generation-status">
+      {active.processingStatus !== "failed" && <span className="homework-generation-spinner" aria-hidden="true" />}
+      <div>
+        <strong>{active.generationIssue === "no_eligible_code" ? copy.noEligibleCode : active.processingStatus === "failed" ? copy.generationFailed : active.processingStatus === "queued" ? copy.waitingGeneration : copy.generating}</strong>
+        {active.processingStatus === "queued" && active.queuePosition !== null && <p>{copy.queuePosition.replace("{position}", String(active.queuePosition))}</p>}
+      </div>
+    </div>}
     {active?.status === "challenge_ready" && !questions.length && <><p>{copy.answerHelp}</p><button type="button" onClick={() => void start()}><ActionIcon name="open" /> {copy.answer}</button></>}
     {questions.length > 0 && <><h3>{copy.answers}</h3><p className="muted">{copy.autoSave}</p>
       <div className="homework-challenge-list">{questions.map((question, index) => <HomeworkChallengeQuestion key={question.id}
