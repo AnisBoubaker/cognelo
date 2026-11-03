@@ -16,6 +16,8 @@ Students see only two conditional download actions: the assignment PDF and one Z
 
 Challenge answering uses distinct numbered cards with the question first, a framed read-only code panel and a labelled answer area. Code and answer sit side by side when space permits and stack on small screens; long code scrolls within its panel. Autosave and submission behavior are preserved.
 
+Students may submit some or all challenge answers blank. Manual submission first confirms that answers cannot be changed and lists unanswered question numbers; Cancel returns to editing. Timeouts finalize saved answers automatically without confirmation. Student operation failures use the shared notifications/history instead of a page-top error banner.
+
 ## Read by topic
 
 - [Approved choices and delivery scope](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md)

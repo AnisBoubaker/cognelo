@@ -88,6 +88,10 @@ Teacher cancellation must be coordinated with queued/running work so a late resu
 
 At timeout, finalize the server-saved answers, including blanks. Do not accept new answer content after expiry or invent an availability extension.
 
+### Answer submission confirmation — November 3, 2026
+
+Students may submit unanswered questions, including an entirely blank set. **Submit answers** first opens the shared confirmation with an explicit warning that answers cannot be changed after submission. If answers are missing or contain only whitespace, list their displayed numbers (for example, “Question 1” and “Question 3”); do not require them to be filled. Cancel returns to editing without submitting. The automatic deadline path bypasses confirmation and closes an open confirmation when the attempt completes. Student operation errors use the notification system and its history instead of a duplicate page-top message.
+
 ## Question content and language — November 2, 2026
 
 Each challenge shows the relevant function code from the student's frozen submission, with its filename and function name, beside the answer area. It is read-only; private reference code and teacher instructions are never included. For incomplete/unparseable work, show the submitted-code context used by generation. Bounded excerpts indicate truncation and the complete submitted files remain available.

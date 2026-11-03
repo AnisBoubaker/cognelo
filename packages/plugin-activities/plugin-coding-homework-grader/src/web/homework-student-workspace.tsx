@@ -2,6 +2,7 @@
 import { HomeworkDownloads } from "./homework-downloads";
 import { HomeworkFileViewer } from "./homework-file-viewer";
 import { HomeworkChallengeQuestion } from "./homework-challenge-question";
+import { HomeworkAnswerConfirmation } from "./homework-answer-confirmation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActionIcon, MarkdownRenderer, ProgressDialog, useDialogs, useNotifications, isActivityContentClosedError } from "@cognelo/activity-ui";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
@@ -18,35 +19,36 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   const [workspace, setWorkspace] = useState<HomeworkWorkspace | null>(null), [preparation, setPreparation] = useState<HomeworkPreparation | null>(null);
   const [assignment, setAssignment] = useState<CodingHomeworkStudentAssignment | null>(null);
   const [questions, setQuestions] = useState<CodingHomeworkStudentChallengeQuestionRecord[]>([]), [answers, setAnswers] = useState<Record<string, string>>({});
-  const [acknowledged, setAcknowledged] = useState(false), [error, setError] = useState(""), [busy, setBusy] = useState<string | null>(null), [saved, setSaved] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false), [busy, setBusy] = useState<string | null>(null), [saved, setSaved] = useState(false);
+  const [confirmingAnswers, setConfirmingAnswers] = useState(false);
   const [checkedPreparation, setCheckedPreparation] = useState<HomeworkPreparation | null>(null);
   const preparationLoad = useRef(0);
   const controller = useRef<AbortController | null>(null), dirty = useRef(false), answersRef = useRef(answers), saveQueue = useRef(Promise.resolve()), timeoutHandled = useRef<number | string | null>(null);
   answersRef.current = answers;
+  const showError = useCallback((reason: unknown) => { if (!isActivityContentClosedError(reason) && !(reason instanceof DOMException && reason.name === "AbortError")) { notifications.error(reason instanceof Error ? reason.message : copy.error); } }, [copy.error, notifications]);
   const refresh = useCallback(async (reloadPreparation = true) => {
     const version = reloadPreparation ? ++preparationLoad.current : null;
     const state = await request<HomeworkWorkspace>("workspace"); setWorkspace(state);
     if (!state.submission && reloadPreparation) { const prepared = await request<HomeworkPreparation>("preparation"); if (preparationLoad.current === version) setPreparation(prepared); }
   }, [request]);
-  useEffect(() => { let mounted = true; void Promise.all([refresh(), request<CodingHomeworkStudentAssignment>("assignment").then(value => { if (mounted) setAssignment(value); })]).catch(reason => { if (mounted) setError(reason.message); }); return () => { mounted = false; controller.current?.abort(); }; }, [request, refresh]);
+  useEffect(() => { let mounted = true; void Promise.all([refresh(), request<CodingHomeworkStudentAssignment>("assignment").then(value => { if (mounted) setAssignment(value); })]).catch(reason => { if (mounted) showError(reason); }); return () => { mounted = false; controller.current?.abort(); }; }, [request, refresh, showError]);
   useEffect(() => { const timer = setInterval(() => { void refresh(false).catch(() => {}); }, 4000); return () => clearInterval(timer); }, [refresh]);
   const active = workspace?.submission;
   const activeId = active?.id;
-  useEffect(() => { setQuestions([]); setAnswers({}); setCheckedPreparation(null); setAcknowledged(false); dirty.current = false; }, [active?.id]);
+  useEffect(() => { setQuestions([]); setAnswers({}); setCheckedPreparation(null); setAcknowledged(false); setConfirmingAnswers(false); dirty.current = false; }, [active?.id]);
   const completed = active?.status === "ready_for_grading" || active?.status === "graded";
-  const showError = useCallback((reason: unknown) => { if (!isActivityContentClosedError(reason) && !(reason instanceof DOMException && reason.name === "AbortError")) { const message = reason instanceof Error ? reason.message : copy.error; setError(message); notifications.error(message); } }, [copy.error, notifications]);
   const loadQuestions = useCallback((result: { questions: CodingHomeworkStudentChallengeQuestionRecord[] }) => { setQuestions(result.questions); setAnswers(Object.fromEntries(result.questions.map(question => [question.id, question.studentAnswer ?? ""]))); dirty.current = false; }, []);
   useEffect(() => {
     if (!active?.started || questions.length) return;
     const pending = new AbortController();
-    void request<{ questions: CodingHomeworkStudentChallengeQuestionRecord[] }>("answering", { signal: pending.signal }).then(result => { if (!pending.signal.aborted) loadQuestions(result); }).catch(() => {});
+    void request<{ questions: CodingHomeworkStudentChallengeQuestionRecord[] }>("answering", { signal: pending.signal }).then(result => { if (!pending.signal.aborted) loadQuestions(result); }).catch(reason => { if (!pending.signal.aborted) showError(reason); });
     return () => pending.abort();
-  }, [active?.started, active?.id, request, questions.length, loadQuestions]);
+  }, [active?.started, active?.id, request, questions.length, loadQuestions, showError]);
 
   async function run(label: string, action: (signal: AbortSignal) => Promise<void>, reloadPreparation = true) {
     if (controller.current) return;
     preparationLoad.current++;
-    const pending = new AbortController(); controller.current = pending; setBusy(label); setError("");
+    const pending = new AbortController(); controller.current = pending; setBusy(label);
     try { await action(pending.signal); } catch (reason) { showError(reason); } finally { if (controller.current === pending) { controller.current = null; setBusy(null); } await refresh(reloadPreparation).catch(() => {}); }
   }
   function invalidateCheck() { setCheckedPreparation(null); setAcknowledged(false); }
@@ -67,7 +69,6 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     });
   }
   async function start() {
-    setError("");
     try { const result = await request<{ questions: CodingHomeworkStudentChallengeQuestionRecord[] }>("answering", body("POST")); loadQuestions(result); onAssessmentStarted?.(); await refresh(); }
     catch (reason) { if (reason && typeof reason === "object" && "code" in reason && String(reason.code).includes("SAFE_EXAM_BROWSER")) onAssessmentAccessRequested?.(); else showError(reason); }
   }
@@ -80,13 +81,13 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   }, [activeId, completed, questions.length, request, showError]);
   useEffect(() => { if (!dirty.current || completed) return; const timer = setTimeout(() => { void saveAnswers(); }, 600); return () => clearTimeout(timer); }, [answers, completed, saveAnswers]);
   const submitAnswers = useCallback(async (expired = false) => {
-    if (!activeId) return false;
+    if (!activeId || completed || controller.current) return false;
     try {
       const pending = new AbortController(); controller.current = pending; setBusy(copy.submitAnswers); await saveQueue.current.catch(() => {});
       await request("challenge-answers", body("POST", { submissionId: activeId, answers: expired ? [] : Object.entries(answersRef.current).map(([questionId, answer]) => ({ questionId, answer })) }, pending.signal));
       dirty.current = false; await refresh(); onSubmitted?.(); return true;
     } catch (reason) { if (isActivityContentClosedError(reason)) { onSubmitted?.(); return true; } showError(reason); return false; } finally { controller.current = null; setBusy(null); }
-  }, [activeId, copy.submitAnswers, request, refresh, onSubmitted, showError]);
+  }, [activeId, completed, copy.submitAnswers, request, refresh, onSubmitted, showError]);
   useEffect(() => {
     if (!timedAutoSubmit || timeoutHandled.current === timedAutoSubmit.requestId) return;
     timeoutHandled.current = timedAutoSubmit.requestId;
@@ -105,7 +106,6 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     <MarkdownRenderer markdown={assignment?.assignment.promptMarkdown ?? ""} />
     <HomeworkDownloads promptPdfId={assignment?.assignment.promptPdf?.id} hasProvidedFiles={Boolean(assignment?.assignment.providedFiles.length)}
       activityFileUrl={activityFileUrl} providedFilesUrl={providedFilesUrl} locale={locale} />
-    {error && <p className="error" role="alert">{error}</p>}
     {!workspace && <p>{copy.loading}</p>}
     {workspace?.previousCancelled && <p role="status">{copy.cancelled}</p>}
     <h3>{active ? copy.readOnly : copy.prepare}</h3>
@@ -153,8 +153,10 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
         maxLength={12000} disabled={completed || Boolean(timedAutoSubmit)}
         onChange={value => { dirty.current = true; setSaved(false); setAnswers(current => ({ ...current, [question.id]: value })); }}
         onBlur={() => void saveAnswers()} />)}</div>
-      {!completed && <div className="row"><button type="button" className="secondary" onClick={() => void saveAnswers()}><ActionIcon name="save" /> {copy.saveAnswers}</button><button type="button" onClick={() => void submitAnswers()}><ActionIcon name="submit" /> {copy.submitAnswers}</button>{saved && <span role="status">{copy.saved}</span>}</div>}
+      {!completed && <div className="row"><button type="button" className="secondary" disabled={Boolean(busy) || Boolean(timedAutoSubmit)} onClick={() => void saveAnswers()}><ActionIcon name="save" /> {copy.saveAnswers}</button><button type="button" disabled={Boolean(busy) || Boolean(timedAutoSubmit)} onClick={() => setConfirmingAnswers(true)}><ActionIcon name="submit" /> {copy.submitAnswers}</button>{saved && <span role="status">{copy.saved}</span>}</div>}
     </>}
+    <HomeworkAnswerConfirmation open={confirmingAnswers && !completed && !timedAutoSubmit && !busy} questions={questions} answers={answers} locale={locale}
+      onCancel={() => setConfirmingAnswers(false)} onConfirm={() => { setConfirmingAnswers(false); void submitAnswers(); }} />
     {completed && <p role="status">{copy.submitted}</p>}
     <ProgressDialog open={busy !== null} title={busy ?? copy.loading} progressLabel={busy ?? copy.loading} onCancel={() => controller.current?.abort()} cancelLabel={copy.cancel} />
   </section>;

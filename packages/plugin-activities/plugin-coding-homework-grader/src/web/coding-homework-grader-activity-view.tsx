@@ -2,6 +2,7 @@
 
 import { HomeworkDownloads } from "./homework-downloads";
 import { HomeworkChallengeQuestion } from "./homework-challenge-question";
+import { HomeworkAnswerConfirmation } from "./homework-answer-confirmation";
 import { createPortal } from "react-dom";
 import { HomeworkSubmissionManagement } from "./homework-submission-management";
 import { reconcileTeacherSolutionRequirements, type TeacherSolutionSelection } from "../teacher-solution-selection";
@@ -767,6 +768,7 @@ function LegacyCodingHomeworkActivityView({
                 saving={savingAnswers}
                 status={latestSubmission?.submission.status ?? null}
                 submitting={submittingAnswers}
+                timedOut={Boolean(timedAutoSubmit)}
                 onAnswerChange={(questionId, answer) => setChallengeAnswers((current) => ({ ...current, [questionId]: answer }))}
                 onSave={() => void saveChallengeAnswers()}
                 onSubmit={() => void submitChallengeAnswers()}
@@ -1324,7 +1326,8 @@ function ChallengeQuestionsPanel({
   questions,
   saving,
   status,
-  submitting
+  submitting,
+  timedOut
 }: {
   locale: CodingHomeworkLocale;
   answers: Record<string, string>;
@@ -1336,13 +1339,14 @@ function ChallengeQuestionsPanel({
   saving: boolean;
   status: string | null;
   submitting: boolean;
+  timedOut: boolean;
 }) {
+  const [confirmingAnswers, setConfirmingAnswers] = useState(false);
   if (!questions.length) {
     return null;
   }
 
   const complete = status === "ready_for_grading" || status === "graded";
-  const allAnswered = questions.every((question) => (answers[question.id] ?? "").trim());
 
   return (
     <section className="stack">
@@ -1356,21 +1360,23 @@ function ChallengeQuestionsPanel({
       <div className="homework-challenge-list">
         {questions.map((question, index) => <HomeworkChallengeQuestion key={question.id}
           question={question} number={index + 1} total={questions.length} locale={locale}
-          disabled={complete} value={answers[question.id] ?? ""}
+          disabled={complete || timedOut} value={answers[question.id] ?? ""}
           onChange={value => onAnswerChange(question.id, value)} />)}
       </div>
       {complete ? null : (
         <div className="inline-actions">
-          <button className="button secondary" disabled={saving || submitting} type="button" onClick={onSave}>
+          <button className="button secondary" disabled={saving || submitting || timedOut} type="button" onClick={onSave}>
             <ActionIcon name="save" />
             {saving ? "..." : copy.saveDraft}
           </button>
-          <button className="button primary" disabled={!allAnswered || saving || submitting} type="button" onClick={onSubmit}>
+          <button className="button primary" disabled={saving || submitting || timedOut} type="button" onClick={() => setConfirmingAnswers(true)}>
             <ActionIcon name="submit" />
             {submitting ? "..." : copy.submitAnswers}
           </button>
         </div>
       )}
+      <HomeworkAnswerConfirmation open={confirmingAnswers && !complete && !timedOut && !submitting} questions={questions} answers={answers} locale={locale}
+        onCancel={() => setConfirmingAnswers(false)} onConfirm={() => { setConfirmingAnswers(false); onSubmit(); }} />
     </section>
   );
 }

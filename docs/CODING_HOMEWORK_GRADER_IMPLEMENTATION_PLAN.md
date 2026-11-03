@@ -39,6 +39,7 @@ Current delivery tracks (implemented; acceptance recorded separately):
 - [x] Explicit Answer challenge questions start, phase-appropriate SEB verification, answering-only timing, read-only submitted-code consultation and accessible course material.
 - [x] Local/preprod acceptance for the complete workflow and expected class load; no production E2E or synthetic data.
 - [x] Exclude unchanged teacher-provided C functions from challenge targets, with compact hand-in hash manifests, ZIP support and a no-eligible-code state; see the [canonical comparison rules](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md#excluding-unchanged-provided-code).
+- [x] Manual answer submission accepts blanks and confirms immutability with a numbered missing-answer list; student operation errors use notifications. Automatic deadline submission remains independent of confirmation.
 
 Open details and expressly deferred deadline behavior are listed in the [approved workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#remaining-details-and-deferred-work). Do not substitute the older phase-completion statements for these acceptance checks. The November 1 clarifications approved text-embedding-3-small and concurrency 2 (maximum 4); the November 2 update permits independent configured generation/embedding choices across supported providers. Changing the question-generation model does not invalidate compatible indexes. No additional availability grace period is granted.
 
@@ -58,7 +59,7 @@ As of August 6, 2026:
 - Phase 9 is complete: students can load the assignment prompt, upload a final ZIP from the assigned activity route, receive structure feedback, and create durable plugin submission/file records for valid archives.
 - Phase 10 is complete: valid final submissions can be analyzed into parsed submitted functions, deterministic dev embeddings, nearest reference examples from the shared content vector dispatcher, divergence scores, and selected candidate rows.
 - Phase 11 is complete: teachers can trigger or retry server-side challenge question generation for analyzed submissions. Generated questions are stored with prompt version, model, selected function provenance, nearest-example audit metadata, and submission status moves to `challenge_ready`.
-- Phase 12 is complete: valid student ZIP submissions now run analysis and challenge generation immediately, return student-safe challenge questions, collect draft/final answers, and mark the plugin submission `ready_for_grading` once every question is answered.
+- Phase 12 is complete: valid student ZIP submissions run analysis and challenge generation, return student-safe challenge questions, collect draft/final answers, and mark the plugin submission `ready_for_grading` on finalization. The current workflow permits blank answers.
 - Phase 13 is complete: valid ZIP upload reserves a core attempt and final answers atomically submit it. Teachers review submissions through the gradebook manual grading surfaces.
 - Activity-owned assignment resources are implemented: teachers can view the assignment PDF inline, manage files provided with the assignment, and those resources are extracted and searched alongside prior course material for challenge generation without creating separate course content resources.
 
@@ -851,7 +852,7 @@ Progress:
 
 - The assigned-group student submission route now runs final ZIP validation, submitted-function analysis, and challenge question generation in sequence for valid archives. The response includes only student-safe question fields; nearest examples, prompt metadata, raw model output, and generation provenance remain server-side/teacher-only.
 - Automatic student-path generation uses a course teacher/owner's configured question-authoring AI connection or explicit homework model through a core helper, so students do not need personal AI preferences and provider keys stay server-side.
-- Added `coding-homework-grader/challenge-answers` with `PUT` for draft answer saves and `POST` for final answer submission. Finalization requires every generated question to have a non-empty answer.
+- Added `coding-homework-grader/challenge-answers` with `PUT` for draft answer saves and `POST` for final answer submission. The November 3 confirmation workflow supersedes the original non-empty-answer requirement: partial/all-blank final answers are accepted.
 - The student UI now shows generated challenge questions immediately after a valid ZIP submission, locks the ZIP upload once questions are ready, allows draft saves, and marks the submission complete when final answers are submitted.
 - Final answer submission updates the plugin submission status to `ready_for_grading` and submits the reserved mode-tagged core attempt for formative and summative assigned activities; only summative attempts enter grading.
 

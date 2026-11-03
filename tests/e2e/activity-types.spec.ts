@@ -724,6 +724,7 @@ test.describe.serial("authoring and completing every activity type", () => {
       response.request().method() === "POST" && response.url().endsWith("/coding-homework-grader/challenge-answers")
     );
     await studentPage.getByRole("button", { name: "Submit answers" }).click();
+    await studentPage.getByRole("dialog", { name: "Submit answers?", exact: true }).getByRole("button", { name: "Submit answers", exact: true }).click();
     expect((await answersSubmitted).ok()).toBeTruthy();
     await expect(studentPage).toHaveURL(`/courses/${data.courseId}/groups/${data.groupId}`);
     const homeworkRow = studentPage
@@ -735,6 +736,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(studentPage.locator('textarea[id^="answer-"]').first()).toHaveValue("The main function prints a greeting and exits successfully.");
     await studentPage.locator('textarea[id^="answer-"]').first().fill("The main function calls puts to print hello, then returns zero.");
     await studentPage.getByRole("button", { name: "Submit answers" }).click();
+    await studentPage.getByRole("dialog", { name: "Submit answers?", exact: true }).getByRole("button", { name: "Submit answers", exact: true }).click();
     await expect(studentPage).toHaveURL(`/courses/${data.courseId}/groups/${data.groupId}`);
     await verifyContinuation();
     } finally { await model.close(); }

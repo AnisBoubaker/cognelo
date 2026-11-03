@@ -125,13 +125,6 @@ export async function saveCodingHomeworkChallengeAnswers(
     nextAnswers.set(questionId, answer);
   }
 
-  if (options.finalize && !expired) {
-    const missingQuestion = submission.questions.find((question) => !nextAnswers.get(question.id)?.trim());
-    if (missingQuestion) {
-      throw new AppError(400, "CODING_HOMEWORK_CHALLENGE_ANSWERS_INCOMPLETE", "Answer every challenge question before submitting.");
-    }
-  }
-
   const submittedAt = options.finalize ? new Date() : null;
   for (const question of submission.questions) {
     const nextAnswer = nextAnswers.get(question.id) ?? "";

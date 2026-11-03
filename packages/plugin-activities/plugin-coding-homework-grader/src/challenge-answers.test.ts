@@ -94,25 +94,11 @@ describe("coding homework challenge answers", () => {
     expect(result.questions[0]).toMatchObject({ id: "question-1", studentAnswer: "The loop accumulates values before returning." });
   });
 
-  it("requires every answer before marking the submission ready for grading", async () => {
-    await expect(
-      saveCodingHomeworkChallengeAnswers(
-        {
-          activityId: "activity-1",
-          courseId: "course-1",
-          groupId: "group-1",
-          user: testUser()
-        },
-        {
-          answers: [{ questionId: "question-1", answer: "Only one answer." }],
-          submissionId: "submission-1"
-        },
-        { finalize: true }
-      )
-    ).rejects.toMatchObject({ status: 400, code: "CODING_HOMEWORK_CHALLENGE_ANSWERS_INCOMPLETE" });
-
-    expect(dbMocks.pluginCodingHomeworkChallengeQuestion.update).not.toHaveBeenCalled();
-
+  it.each([
+    { answers: [{ questionId: "question-1", answer: "Only one answer." }], expected: ["Only one answer.", ""] },
+    { answers: [], expected: ["", ""] },
+    { answers: [{ questionId: "question-1", answer: " \n " }], expected: [" \n ", ""] }
+  ])("finalizes every question, including unanswered questions ($expected)", async ({ answers, expected }) => {
     const result = await saveCodingHomeworkChallengeAnswers(
       {
         activityId: "activity-1",
@@ -121,10 +107,7 @@ describe("coding homework challenge answers", () => {
         user: testUser()
       },
       {
-        answers: [
-          { questionId: "question-1", answer: "The loop accumulates values before returning." },
-          { questionId: "question-2", answer: "The base case decides the edge behavior." }
-        ],
+        answers,
         submissionId: "submission-1"
       },
       { finalize: true }
@@ -132,6 +115,7 @@ describe("coding homework challenge answers", () => {
 
     expect(dbMocks.pluginCodingHomeworkChallengeQuestion.update).toHaveBeenCalledTimes(2);
     expect(result.submission.status).toBe("ready_for_grading");
+    expect(result.questions.map(question => question.studentAnswer)).toEqual(expected);
     expect(result.questions.every((question) => question.answerSubmittedAt)).toBe(true);
   });
 
