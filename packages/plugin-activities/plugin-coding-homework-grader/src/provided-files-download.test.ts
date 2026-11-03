@@ -10,7 +10,7 @@ const owner = { ownerKind: "course_activity" as const, ownerId: "activity" };
 function attachment(name: string, content: Buffer, mimeType = "text/plain") {
   return { originalName: name, storedName: name, sizeBytes: BigInt(content.length), sha256: createHash("sha256").update(content).digest("hex"), mimeType };
 }
-function readableFiles(entries: Array<{ originalName: string; storedName: string; sizeBytes: bigint; sha256: string; mimeType: string }>, contents: Buffer[]) {
+function readableFiles(entries: Array<{ originalName: string; storedName: string; sizeBytes: bigint; sha256: string; mimeType: string | null }>, contents: Buffer[]) {
   mocks.files.mockResolvedValue(entries);
   mocks.open.mockImplementation(async (path: string) => {
     const bytes = contents[entries.findIndex(entry => entry.storedName === path)];
@@ -40,6 +40,13 @@ describe("provided file downloads", () => {
     const response = await downloadHomeworkProvidedFiles(owner);
     expect(Buffer.from(await response.arrayBuffer())).toEqual(original);
     expect(response.headers.get("content-disposition")).toContain("starter.zip");
+  });
+  it("packages legacy provided files whose MIME type is unset", async () => {
+    const bytes = Buffer.from("legacy teaching content");
+    readableFiles([{ ...attachment("notes.txt", bytes), mimeType: null }], [bytes]);
+    const response = await downloadHomeworkProvidedFiles(owner);
+    const archive = unzipSync(new Uint8Array(await response.arrayBuffer()));
+    expect(Buffer.from(archive["notes.txt"])).toEqual(bytes);
   });
   it("uses safe unique filenames without dropping duplicate attachments", () => {
     expect(providedArchiveNames(["../main.c", "main.c", "MAIN.c", "..", "C:\\folder\\data.txt", "C:drive.c"].map(originalName => ({ originalName })))).toEqual(["main.c", "main (2).c", "MAIN (3).c", "provided-file", "data.txt", "C_drive.c"]);
