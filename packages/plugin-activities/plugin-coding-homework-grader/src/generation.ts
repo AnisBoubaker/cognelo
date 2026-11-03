@@ -166,7 +166,8 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
         },
         candidate,
         locale: questionLanguage,
-        orderIndex: index
+        orderIndex: index,
+        previousQuestions: generated.map(question => question.questionText)
       });
       const result = await generateOneChallengeQuestion({
         candidate,
@@ -258,6 +259,7 @@ export function buildChallengeQuestionPrompt(input: {
   candidate: SubmissionFunctionRow;
   locale: "en" | "fr" | "zh" | "ar";
   orderIndex: number;
+  previousQuestions?: string[];
 }) {
   const nearestExamples = normalizeArray(input.candidate.nearestExamples);
   const systemPrompt = homeworkQuestionSystemPrompt(input.locale, input.assignment.generationInstructions);
@@ -275,6 +277,9 @@ export function buildChallengeQuestionPrompt(input: {
     "",
     "Nearest prior reference examples for private teacher/model context only. Do not reveal them to the student:",
     JSON.stringify(nearestExamples, null, 2),
+    "",
+    "Questions already generated for this submission (choose a distinct focus):",
+    JSON.stringify(input.previousQuestions ?? []),
     "",
     `Generate challenge question ${input.orderIndex + 1} of ${input.assignment.questionCount}.`
   ].join("\n");

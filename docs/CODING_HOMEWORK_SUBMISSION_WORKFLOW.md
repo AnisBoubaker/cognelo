@@ -94,6 +94,10 @@ Each challenge shows the relevant function code from the student's frozen submis
 
 Teachers enter private AI question-generation instructions in the homework Settings tab and save them with the activity. These are authoritative generation policy, not ordinary evidence or grading notes. Questions use the course Subject's teaching language, never the student/session UI locale. Language and instructions are frozen for each new hand-in so later settings changes cannot split an existing question set. Existing questions retain their wording and gain available code context without being regenerated.
 
+## Challenge difficulty and expected answers — November 3, 2026
+
+Challenges assess understanding of the student's own submitted code, with a complete answer of about **2–3 sentences**. They must be reasonable for someone who actually wrote that code at the course's level. Use varied focused questions: a small concrete case or relevant valid boundary input and why the result makes sense; why a condition/guard exists; or another local implementation choice. These examples are not the only permitted forms. Avoid obscure traps, long traces, broad multi-part questions and unavailable context. Do not presume incorrect code is correct. This is a question-design target, not an automatic limit on student answers.
+
 ## Queue and load control
 
 - Use a **FIFO dispatch queue** for challenge generation rather than launching every student's AI requests at once.

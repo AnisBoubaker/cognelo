@@ -128,7 +128,7 @@ describe("coding homework challenge generation", () => {
     expect(dbMocks.pluginCodingHomeworkChallengeQuestion.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         generationModel: "gpt-test",
-        generationPromptVersion: "coding-homework-grader.challenge-question.v2",
+        generationPromptVersion: "coding-homework-grader.challenge-question.v3",
         orderIndex: 0,
         questionText: "Explain why this function updates the accumulator before returning the result.",
         submissionFunctionId: "function-1",
@@ -258,6 +258,14 @@ describe("coding homework challenge generation", () => {
     });
     expect(safe.questions[0]).not.toHaveProperty("nearestExamples");
     expect(safe.questions[0]).not.toHaveProperty("metadata");
+  });
+
+  it("includes earlier questions so later legacy questions can choose a different focus", async () => {
+    dbMocks.pluginCodingHomeworkAssignment.findUnique.mockResolvedValue({ generationInstructions: "Focus on code understanding.", languageKey: "c", promptMarkdown: "Implement the required functions.", questionCount: 2 });
+    coreMocks.generateAiAgentText.mockResolvedValueOnce(JSON.stringify({ questionText: "For an empty array, what value is returned and which statement determines that value?" }))
+      .mockResolvedValueOnce(JSON.stringify({ questionText: "Why does the function initialize its accumulator before entering the loop?" }));
+    await generateCodingHomeworkChallengeQuestions({ activityId: "activity-1", courseId: "course-1", groupId: "group-1", user: testUser() }, { submissionId: "submission-1" });
+    expect(coreMocks.generateAiAgentText.mock.calls[1][1].userPrompt).toContain("For an empty array, what value is returned");
   });
 
   it("builds prompts that keep nearest examples private", () => {

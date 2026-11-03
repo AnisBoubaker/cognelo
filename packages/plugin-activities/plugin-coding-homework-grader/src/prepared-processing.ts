@@ -78,7 +78,7 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
         functionIds.push(fn.id);
       }
       for (const [orderIndex, question] of generated.entries()) await tx.pluginCodingHomeworkChallengeQuestion.create({ data: { submissionId, orderIndex, questionText: question.text,
-        submissionFunctionId: question.functionIndex !== null ? functionIds[question.functionIndex] : null, generationModel: connection.model, generationPromptVersion: "prepared-homework-v3", nearestExamples: json(question.matches), metadata: json({ generatedAt: new Date().toISOString(), questionLanguage, studentCodeContext: question.context }) } });
+        submissionFunctionId: question.functionIndex !== null ? functionIds[question.functionIndex] : null, generationModel: connection.model, generationPromptVersion: "prepared-homework-v4", nearestExamples: json(question.matches), metadata: json({ generatedAt: new Date().toISOString(), questionLanguage, studentCodeContext: question.context }) } });
       await tx.pluginCodingHomeworkSubmission.update({ where: { id: submissionId }, data: { status: "challenge_ready", processingError: null,
         metadata: json({ ...record(current.metadata), questionLanguage, challengeGeneration: { questionCount, generatedAt: new Date().toISOString() }, parserDiagnostics: parsed.diagnostics }) } });
     }, { timeout: 30_000 });

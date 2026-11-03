@@ -58,6 +58,8 @@ test("homework questions use course language and teacher policy, and show submit
     for (const prompt of prompts) {
       expect(prompt.systemPrompt).toContain("COURSE TEACHING LANGUAGE: French");
       expect(prompt.systemPrompt).toContain(instruction);
+      expect(prompt.systemPrompt).toContain("complete answer fits in 2–3 sentences");
+      expect(prompt.systemPrompt).toContain("A student who wrote this code should reasonably be able to answer");
       expect(prompt.userPrompt).not.toContain(instruction);
     }
     expect((await student.get(`${endpoint}/answering`)).status()).toBe(409);
