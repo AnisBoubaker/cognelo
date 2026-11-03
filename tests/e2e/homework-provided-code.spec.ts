@@ -7,14 +7,16 @@ import { homeworkModelFixture } from "./fixtures/homework-model";
 
 test("challenge generation excludes unchanged provided functions and retains modified code", async ({ bankCourse: data, teacherApi, studentPage: page }) => {
   test.setTimeout(150_000);
-  const model = await homeworkModelFixture(data, { hold: true, questionText: number => number === 1
+  let rejectAll = false;
+  const model = await homeworkModelFixture(data, { hold: true, questionText: number => rejectAll ? "Too short." : number === 1
     ? "Explain how provided_loader reads its result and why the implementation is correct."
+    : number === 2 ? "In `solve`, why is the result of `provided_loader()` added to `value` before returning?"
     : `Question ${number}: explain the return value of the submitted implementation and the statement that determines it.` });
   const student = await createAuthenticatedApi("student");
   const activities: string[] = [];
   const supplied = "int provided_loader(void) { return 7; }";
   const helper = "int provided_helper(void) { return 2; }";
-  const own = "int solve(int value) { return value + 1; }";
+  const own = "int solve(int value) { return provided_loader() + value; }";
   async function createHomework(title: string, count = 1) {
     const id = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title, config: {} }); activities.push(id);
     const base = `/api/courses/${data.courseId}/activities/${id}/coding-homework-grader`;
@@ -52,10 +54,14 @@ test("challenge generation excludes unchanged provided functions and retains mod
     await expect.poll(async () => (await responseJson<{ submission: { status: string } }>(await student.get(`${first.endpoint}/workspace`))).submission.status, { timeout: 40_000 }).toBe("challenge_ready");
     const questions = await prisma.$queryRaw<Array<{ questionText: string; functionName: string; metadata: unknown }>>`SELECT q."questionText", f."functionName", s.metadata FROM "PluginCodingHomeworkChallengeQuestion" q JOIN "PluginCodingHomeworkSubmissionFunction" f ON f.id=q."submissionFunctionId" JOIN "PluginCodingHomeworkSubmission" s ON s.id=q."submissionId" WHERE s."activityId"=${mixed.id}`;
     expect(questions).toHaveLength(2); expect(questions.every(question => question.functionName === "solve")).toBe(true);
-    expect(questions.every(question => !question.questionText.includes("provided_loader"))).toBe(true);
+    expect(questions.some(question => question.questionText.startsWith("In `solve`"))).toBe(true);
+    expect(questions.every(question => !question.questionText.startsWith("Explain how provided_loader"))).toBe(true);
     expect(questions[0].metadata).toMatchObject({ providedCode: { sourceVersion: frozen.metadata.providedCode.sourceVersion }, excludedProvidedFunctionCount: 2 });
     expect(model.starts).toHaveLength(3); // One rejected question about excluded code was retried.
     expect(model.starts.every(code => code === own)).toBe(true);
+    const correction = JSON.parse(model.requests.filter(request => request.path.endsWith("/responses"))[1].userPrompt!);
+    expect(correction.correction.feedback).toContain("Start by naming");
+    expect(correction.submittedCode).toBe(own);
     const publicWorkspace = JSON.stringify(await responseJson(await student.get(`${first.endpoint}/workspace`)));
     expect(publicWorkspace).not.toContain("providedCode"); expect(publicWorkspace).not.toContain("sourceVersion");
 
@@ -76,6 +82,15 @@ test("challenge generation excludes unchanged provided functions and retains mod
     await page.goto(third.assigned.replace(/^\/api/, ""));
     await expect(page.getByText("No new or modified function could be identified for challenge questions. Contact your teacher to review the submission.", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Answer challenge questions", exact: true })).toHaveCount(0);
+
+    rejectAll = true;
+    const invalid = await createHomework("Invalid output correction limit");
+    const beforeInvalid = model.starts.length;
+    const fourth = await openAndSubmit(invalid, own);
+    await expect.poll(async () => (await responseJson<{ submission: { processingStatus: string } }>(await student.get(`${fourth.endpoint}/workspace`))).submission.processingStatus, { timeout: 30_000 }).toBe("failed");
+    expect(model.starts.length - beforeInvalid).toBe(3);
+    const invalidJob = await prisma.backgroundJob.findFirstOrThrow({ where: { payload: { path: ["activityId"], equals: invalid.id } } });
+    expect(invalidJob).toMatchObject({ attempts: 1, error: { code: "HOMEWORK_QUESTION_INVALID", retryable: false, message: expect.stringContaining("invalid_question") } });
   } finally {
     model.release();
     for (const id of activities) await prisma.backgroundJob.deleteMany({ where: { payload: { path: ["activityId"], equals: id } } });

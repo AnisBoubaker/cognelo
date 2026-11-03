@@ -10,7 +10,7 @@ Final hand-in freezes the actual validated files and atomically queues generatio
 
 Teachers can cancel queued, answering or completed submissions from the activity details page (or editor): the old work is retained, associated grades are withdrawn, late generation cannot revive it, and the student may submit again. Students cannot cancel their frozen hand-in or question-generation job.
 
-Questions exclude unchanged functions from teacher-provided C/H files and ZIP contents. Comments and formatting are ignored; changed implementation tokens remain eligible. Hand-in saves only a compact comparison manifest of hashes and function names, never another copy of the provided files. Private teacher solutions do not participate. See [provided-code comparison](docs/REFERENCE.md#excluding-unchanged-provided-code) for versioning and the no-eligible-code outcome.
+Questions exclude unchanged functions from teacher-provided C/H files and ZIP contents as targets. They may still ask how the student's own function calls a provided helper or uses its result. Comments and formatting are ignored; changed implementation tokens remain eligible. Hand-in saves only a compact comparison manifest of hashes and function names, never another copy of the provided files. Private teacher solutions do not participate. See [provided-code comparison](docs/REFERENCE.md#excluding-unchanged-provided-code) for versioning and the no-eligible-code outcome.
 
 Students see only two conditional download actions: the assignment PDF and one ZIP containing the provided files. A sole uploaded ZIP is returned unchanged; other provided attachments are bundled with safe unique names. Teacher PDF previews/View PDF remain inline. Authorized file responses preserve bytes and content type.
 

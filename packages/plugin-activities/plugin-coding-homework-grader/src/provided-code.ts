@@ -25,14 +25,25 @@ export function selectLearnerFunctions<T extends { functionName: string; functio
   for (const fn of functions) (fingerprints.has(cSourceFingerprint(fn.functionCode)) ? excluded : eligible).push(fn);
   return { eligible, excluded };
 }
-export function excludesProvidedFunction(question: string, names: string[]) {
+function functionMention(question: string, name: string) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Distinctive identifiers can be recognized in prose. Common names such as
+  // "main" need code/call or explicit function context, not "main control flow".
+  if (/[_0-9]|[a-z][A-Z]/.test(name)) return new RegExp(`\\b${escaped}\\b`, "i").exec(question)?.index ?? -1;
+  return new RegExp(`(?:\\b${escaped}\\s*\\(|\\x60${escaped}\\x60|(?:function|fonction|函数|دالة|الدالة)\\s+${escaped}\\b|\\b${escaped}\\s+(?:function|fonction|函数|دالة)|\\b(?:in|inside|within|dans)\\s+(?:(?:your|the|votre|la)\\s+)?${escaped}\\b)`, "i").exec(question)?.index ?? -1;
+}
+export function excludesProvidedFunction(question: string, names: string[], targetFunction?: string | null) {
+  const targetPosition = targetFunction ? functionMention(question, targetFunction) : -1;
+  // A helper name is legitimate when the question first anchors itself in the
+  // eligible student's function. Mentioning a helper is not questioning its body.
   return names.some(name => {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    // Distinctive identifiers can be recognized in prose. Common names such as
-    // "main" need code/call or explicit function context, not "main control flow".
-    if (/[_0-9]|[a-z][A-Z]/.test(name)) return new RegExp(`\\b${escaped}\\b`, "i").test(question);
-    return new RegExp(`(?:\\b${escaped}\\s*\\(|\\x60${escaped}\\x60|(?:function|fonction|函数|دالة|الدالة)\\s+${escaped}\\b|\\b${escaped}\\s+(?:function|fonction|函数|دالة))`, "i").test(question);
+    const providedPosition = functionMention(question, name);
+    return providedPosition >= 0 && (targetPosition < 0 || providedPosition < targetPosition);
   });
+}
+export function unchangedProvidedFunctionNames(baseline: ProvidedCodeBaseline, eligible: Array<{ functionName: string }>) {
+  const eligibleNames = new Set(eligible.map(fn => fn.functionName));
+  return [...new Set(baseline.functions.map(fn => fn.name))].filter(name => !eligibleNames.has(name));
 }
 export async function baselineFromSources(sources: CodingHomeworkSourceFile[], sourceVersion: string): Promise<ProvidedCodeBaseline> {
   const parsed = await parseCodingHomeworkSourceFiles(sources);

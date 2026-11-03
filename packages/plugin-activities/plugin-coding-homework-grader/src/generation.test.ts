@@ -129,7 +129,7 @@ describe("coding homework challenge generation", () => {
     expect(dbMocks.pluginCodingHomeworkChallengeQuestion.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         generationModel: "gpt-test",
-        generationPromptVersion: "coding-homework-grader.challenge-question.v4",
+        generationPromptVersion: "coding-homework-grader.challenge-question.v5",
         orderIndex: 0,
         questionText: "Explain why this function updates the accumulator before returning the result.",
         submissionFunctionId: "function-1",

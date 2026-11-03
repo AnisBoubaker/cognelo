@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ files: vi.fn(), read: vi.fn() }));
 vi.mock("./db-client", () => ({ prisma: { pluginCodingHomeworkAttachment: { findMany: mocks.files } } }));
 vi.mock("./attachment-storage", () => ({ readProvidedAttachmentChunks: mocks.read }));
 import { readCodingHomeworkZip } from "./zip";
-import { baselineFromSources, cSourceFingerprint, excludesProvidedFunction, readProvidedCodeBaseline, selectLearnerFunctions, snapshotProvidedCode } from "./provided-code";
+import { baselineFromSources, cSourceFingerprint, excludesProvidedFunction, readProvidedCodeBaseline, selectLearnerFunctions, snapshotProvidedCode, unchangedProvidedFunctionNames } from "./provided-code";
 const version = "a".repeat(64);
 const source = (content: string, path = "starter.c") => ({ content, path, languageKey: "c" });
 
@@ -28,6 +28,7 @@ describe("provided-code exclusion", () => {
     expect(result.eligible.slice(0, 1).map(fn => fn.functionName)).toEqual(["solve"]);
     expect(result.excluded.map(fn => fn.functionName)).toEqual(["provided_loader", "provided_helper"]);
     expect(selectLearnerFunctions([{ functionName: "provided_loader", functionCode: "int provided_loader(void) { return 8; }" }], baseline).eligible).toHaveLength(1);
+    expect(unchangedProvidedFunctionNames(baseline, [{ functionName: "provided_loader" }])).toEqual(["provided_helper"]);
   });
   it("reads only provided attachments, supports ZIP folders, skips binary/metadata, and reuses the same baseline", async () => {
     const zip = createStoredZip([
@@ -70,6 +71,9 @@ describe("provided-code exclusion", () => {
     expect(excludesProvidedFunction("Explain `main` in this code.", ["main"])).toBe(true);
     expect(excludesProvidedFunction("What does main() do?", ["main"])).toBe(true);
     expect(excludesProvidedFunction("Explain the main control flow of solve.", ["main"])).toBe(false);
+    expect(excludesProvidedFunction("Dans `solve`, pourquoi vérifier le résultat de provided_loader ?", ["provided_loader"], "solve")).toBe(false);
+    expect(excludesProvidedFunction("In solve, why check the result of provided_loader?", ["provided_loader"], "solve")).toBe(false);
+    expect(excludesProvidedFunction("Explain provided_loader as used by `solve`.", ["provided_loader"], "solve")).toBe(true);
   });
   it("never silently replaces an invalid frozen baseline with current files", () => {
     expect(readProvidedCodeBaseline(undefined)).toBeNull();

@@ -1,10 +1,11 @@
-import { snapshotProvidedCode, readProvidedCodeBaseline, selectLearnerFunctions, cSourceFingerprint, excludesProvidedFunction } from "./provided-code";
+import { snapshotProvidedCode, readProvidedCodeBaseline, selectLearnerFunctions, cSourceFingerprint, unchangedProvidedFunctionNames } from "./provided-code";
+import { parseChallengeQuestionResponse } from "./question-response";
 import { getHomeworkQuestionLanguage, homeworkQuestionSystemPrompt } from "./question-generation-policy";
 import { makeStudentQuestionContext, type StudentQuestionContext } from "./question-context";
 import { getHomeworkQuestionConnection, storedHomeworkAiSelection } from "./ai-selection";
 import { randomUUID } from "node:crypto";
 import { prisma as coreDb } from "@cognelo/db";
-import { AppError, NonRetryableBackgroundJobError, createPreparedMaterialSearch, generateAiAgentText, getCourseAiAgentConnection, type BackgroundJobRecord } from "@cognelo/core";
+import { NonRetryableBackgroundJobError, createPreparedMaterialSearch, generateAiAgentText, getCourseAiAgentConnection, type BackgroundJobRecord } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma } from "./db-client";
 import { readFrozenHomeworkFile } from "./hand-in";
@@ -56,20 +57,22 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
       const source = candidate?.functionCode ?? fallbackSource.slice(0, 20_000);
       const matches = indexes.length ? await search.search(source.slice(0, 1800) || String(settings.promptMarkdown).slice(0, 1800), Number(settings.retrievedExampleCount ?? 3)) : [];
       const context = makeStudentQuestionContext({ code: source, filePath: candidate?.sourcePath, functionName: candidate?.functionName, truncated: !candidate && fallbackSource.length > 20_000, languageKey: String(settings.languageKey ?? "c") });
-      const excludedNames = [...new Set(providedCode.functions.map(fn => fn.name))].filter(name => name !== candidate?.functionName);
-      const userPrompt = JSON.stringify({ excludedProvidedFunctionNames: excludedNames.slice(0, 100), assignment: settings.promptMarkdown,
+      const excludedNames = unchangedProvidedFunctionNames(providedCode, comparison.eligible);
+      const questionRequest = { excludedProvidedFunctionNames: excludedNames.slice(0, 100), assignment: settings.promptMarkdown, submittedFunction: candidate?.functionName,
         submittedFile: candidate?.sourcePath, submittedCode: context.code, privateReferenceContext: matches.map(match => ({ title: match.title, text: match.text })),
-        questionNumber: index + 1, totalQuestions: questionCount, previousQuestions: generated.map(question => question.text) });
+        questionNumber: index + 1, totalQuestions: questionCount, previousQuestions: generated.map(question => question.text) };
       let questionText = "";
+      let correction: { previousResponse: string; feedback: string } | undefined;
+      const rejected: string[] = [];
       for (let retry = 0; retry < 3 && !questionText; retry++) {
         await leaseIsCurrent();
+        const userPrompt = JSON.stringify({ ...questionRequest, ...(correction ? { correction } : {}) });
         const output = await generateAiAgentText(connection, { systemPrompt, userPrompt, maxOutputTokens: 1200 });
-        try {
-          const value = JSON.parse(output.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
-          if (typeof value.questionText === "string" && !excludesProvidedFunction(value.questionText, excludedNames) && value.questionText.trim().length >= 20 && value.questionText.length <= 3000 && !generated.some(question => question.text === value.questionText.trim())) questionText = value.questionText.trim();
-        } catch { /* Retry malformed model output within a bounded job. */ }
+        const result = parseChallengeQuestionResponse(output, { excludedNames, targetFunction: candidate?.functionName, previousQuestions: questionRequest.previousQuestions });
+        if (result.ok) questionText = result.text;
+        else { rejected.push(result.reason); correction = { previousResponse: output.slice(0, 4000), feedback: result.feedback }; }
       }
-      if (!questionText) throw new AppError(422, "HOMEWORK_QUESTION_INVALID", "The AI service did not return a valid distinct challenge question.");
+      if (!questionText) throw new NonRetryableBackgroundJobError(`Question ${index + 1} could not be generated after 3 attempts (${rejected.join(", ")}). ${correction?.feedback ?? "The model response was invalid."}`, "HOMEWORK_QUESTION_INVALID");
       generated.push({ text: questionText, functionIndex, matches, context });
     }
     // Publish the complete question set atomically, under the same lock used by teacher cancellation.
@@ -87,7 +90,7 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
         functionIds.push(fn.id);
       }
       for (const [orderIndex, question] of generated.entries()) await tx.pluginCodingHomeworkChallengeQuestion.create({ data: { submissionId, orderIndex, questionText: question.text,
-        submissionFunctionId: question.functionIndex !== null ? functionIds[question.functionIndex] : null, generationModel: connection.model, generationPromptVersion: "prepared-homework-v5", nearestExamples: json(question.matches), metadata: json({ generatedAt: new Date().toISOString(), questionLanguage, studentCodeContext: question.context }) } });
+        submissionFunctionId: question.functionIndex !== null ? functionIds[question.functionIndex] : null, generationModel: connection.model, generationPromptVersion: "prepared-homework-v6", nearestExamples: json(question.matches), metadata: json({ generatedAt: new Date().toISOString(), questionLanguage, studentCodeContext: question.context }) } });
       await tx.pluginCodingHomeworkSubmission.update({ where: { id: submissionId }, data: { status: "challenge_ready", processingError: null,
         metadata: json({ ...record(current.metadata), providedCode, excludedProvidedFunctionCount: comparison.excluded.length, questionLanguage, challengeGeneration: { questionCount, generatedAt: new Date().toISOString() }, parserDiagnostics: parsed.diagnostics }) } });
     }, { timeout: 30_000 });

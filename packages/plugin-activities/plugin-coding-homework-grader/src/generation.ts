@@ -1,4 +1,4 @@
-import { snapshotProvidedCode, readProvidedCodeBaseline, selectLearnerFunctions, excludesProvidedFunction } from "./provided-code";
+import { snapshotProvidedCode, readProvidedCodeBaseline, selectLearnerFunctions, excludesProvidedFunction, unchangedProvidedFunctionNames } from "./provided-code";
 import { getHomeworkQuestionLanguage, homeworkQuestionSystemPrompt } from "./question-generation-policy";
 import { makeStudentQuestionContext, studentQuestionContext } from "./question-context";
 import { createHash } from "node:crypto";
@@ -118,16 +118,16 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
     throw new AppError(400, "CODING_HOMEWORK_SUBMISSION_NOT_READY", "Analyze a valid submission before generating challenge questions.");
   }
 
-  const selectedFunctions = await prisma.pluginCodingHomeworkSubmissionFunction.findMany({
+  const submittedFunctions = await prisma.pluginCodingHomeworkSubmissionFunction.findMany({
     where: {
-      submissionId: submission.id,
-      selectedForQuestion: true
+      submissionId: submission.id
     },
     include: { file: { select: { path: true, languageKey: true } } },
     orderBy: [{ divergenceScore: "desc" }, { functionName: "asc" }]
   });
   const providedCode = readProvidedCodeBaseline(normalizeObject(submission.metadata).providedCode) ?? await snapshotProvidedCode(scope.activityId);
-  const candidates = selectLearnerFunctions(selectedFunctions, providedCode).eligible;
+  const eligible = selectLearnerFunctions(submittedFunctions, providedCode).eligible;
+  const candidates = eligible.filter(fn => fn.selectedForQuestion);
   if (!candidates.length) {
     throw new AppError(400, "CODING_HOMEWORK_CANDIDATES_EMPTY", "No new or modified candidate functions remain after excluding unchanged provided code. Analyze the student’s implementation before generating questions.");
   }
@@ -162,7 +162,7 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
 
     for (let index = 0; index < generationCandidates.length; index += 1) {
       const candidate = generationCandidates[index];
-      const excludedNames = [...new Set(providedCode.functions.map(fn => fn.name))].filter(name => name !== candidate.functionName);
+      const excludedNames = unchangedProvidedFunctionNames(providedCode, eligible);
       const prompt = buildChallengeQuestionPrompt({
         assignment: {
           generationInstructions: assignment?.generationInstructions ?? "",
@@ -334,7 +334,7 @@ async function generateOneChallengeQuestion(input: {
     }
 
     const validated = generatedChallengeQuestionSchema.safeParse(parsed.value);
-    if (validated.success && !excludesProvidedFunction(validated.data.questionText, input.excludedNames ?? [])) {
+    if (validated.success && !excludesProvidedFunction(validated.data.questionText, input.excludedNames ?? [], input.candidate.functionName)) {
       return {
         generationModel: input.model,
         questionText: validated.data.questionText,
@@ -355,7 +355,7 @@ async function generateOneChallengeQuestion(input: {
     }
 
     lastPayload = parsed.value;
-    lastIssues = validated.success ? ["The question refers to unchanged teacher-provided code. Ask about the current eligible submitted function instead."] : validated.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`);
+    lastIssues = validated.success ? [`The question targets unchanged teacher-provided code. Start by naming ${input.candidate.functionName} and focus on its own implementation. You may mention how it uses a helper, but do not ask about the helper's internals.`] : validated.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`);
     userPrompt = `${input.prompt.userPrompt}\n\n${buildCorrectionPrompt(JSON.stringify(parsed.value, null, 2), lastIssues)}`;
   }
 

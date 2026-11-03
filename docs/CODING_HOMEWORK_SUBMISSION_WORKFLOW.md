@@ -108,6 +108,8 @@ Challenges assess understanding of the student's own submitted code, with a comp
 
 Do not ask about unchanged code explicitly provided by the teacher. Compare individual C/H files and C/H entries in provided ZIPs, ignoring folders, formatting and comments. A changed implementation token, including a literal, remains eligible. The private solution is not used for this comparison. Filter before candidate limits so early starter functions cannot crowd out student-written code.
 
+Questions may mention provided helpers when asking how the student's own function calls them or checks their result. The helper's internal implementation remains excluded; mentioning its name alone must not invalidate an otherwise suitable question. Correction retries preserve the code context and explain what was rejected, while retaining the course language and short-answer scope.
+
 Hand-in records a compact manifest of hashes/function names, **not a copy of the provided files per submission**. Cache parsing by attachment version; queued submissions use their frozen manifest after later teacher changes. Older queued work uses current provided files once because no historical manifest exists. Existing completed questions stay unchanged. If no eligible function can be identified in a submission containing provided functions, show a clear teacher-review state without calling AI or falling back to starter-code questions. This is an explicit refinement of the original incomplete-code fallback assumption. See [comparison details](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md#excluding-unchanged-provided-code).
 
 ## Queue and load control
