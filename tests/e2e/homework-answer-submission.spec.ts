@@ -6,7 +6,7 @@ import { homeworkModelFixture } from "./fixtures/homework-model";
 
 test("homework answer submission confirms blanks, reports errors through notifications, and yields to the deadline", async ({ bankCourse: data, teacherApi, studentPage: page }) => {
   test.setTimeout(120_000);
-  const model = await homeworkModelFixture(data.token);
+  const model = await homeworkModelFixture(data);
   const student = await createAuthenticatedApi("student");
   const activities: string[] = [];
   async function readyHomework(title: string, timed = false) {

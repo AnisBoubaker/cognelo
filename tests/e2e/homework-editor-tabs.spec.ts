@@ -6,7 +6,7 @@ import { homeworkModelFixture } from "./fixtures/homework-model";
 test("homework separates references and settings, keeps drafts across tabs, and uses compact checkboxes", async ({ bankCourse: data, teacherApi, teacherPage: page }) => {
   test.setTimeout(120_000);
   await ensureContentTypePluginEnabled("text-content");
-  const model = await homeworkModelFixture(data.token);
+  const model = await homeworkModelFixture(data);
   let releasePreparation: (() => void) | undefined;
   try {
     for (const title of ["Reference A", "Reference B"]) await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/content-resources`, { data: { contentTypeKey: "text", payload: { title, body: `${title}: C function arguments and return values.` }, isVisible: true } }));

@@ -6,7 +6,7 @@ import { homeworkModelFixture } from "./fixtures/homework-model";
 
 test("homework questions use course language and teacher policy, and show submitted code after the answer gate", async ({ bankCourse: data, teacherApi, teacherPage, studentPage }) => {
   test.setTimeout(120_000);
-  const model = await homeworkModelFixture(data.token, { hold: true, questionText: number => `Question ${number} : expliquez le résultat de cette fonction pour les arguments deux et trois.` });
+  const model = await homeworkModelFixture(data, { hold: true, questionText: number => `Question ${number} : expliquez le résultat de cette fonction pour les arguments deux et trois.` });
   const student = await createAuthenticatedApi("student");
   let activityId: string | undefined;
   try {

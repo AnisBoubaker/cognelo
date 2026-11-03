@@ -1,13 +1,14 @@
-import { prisma, Prisma } from "@cognelo/db";
+import { prisma } from "@cognelo/db";
 import { test, expect } from "./fixtures/bank-course";
-import { createAuthenticatedApi, credentialsFor } from "./fixtures/auth";
+import { createAuthenticatedApi } from "./fixtures/auth";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
 import { ensureContentTypePluginEnabled } from "./fixtures/content-plugins";
 import { homeworkModelFixture } from "./fixtures/homework-model";
+import { isolatedAiOwner } from "./fixtures/isolated-ai-owner";
 
-test("one saved credential offers several models in account and course settings", async ({ bankCourse: data, adminPage: page, teacherPage, teacherApi }) => {
-  const admin = await createAuthenticatedApi("admin");
-  const administrator = await prisma.user.findUniqueOrThrow({ where: { email: credentialsFor("admin").email } });
+test("one saved credential offers several models in account and course settings", async ({ bankCourse: data, browser, teacherPage, teacherApi }) => {
+  const owner = await isolatedAiOwner(data);
+  const admin = owner.api, page = await owner.page(browser);
   const name = `Model catalogue ${data.token}`;
   let id: string | undefined;
   try {
@@ -58,18 +59,17 @@ test("one saved credential offers several models in account and course settings"
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await page.screenshot({ path: "tmp/ai-model-connections-mobile.png", fullPage: true });
   } finally {
-    await prisma.user.update({ where: { id: administrator.id }, data: { metadata: administrator.metadata ?? Prisma.JsonNull } });
     if (id) await prisma.aiAgentConnection.delete({ where: { id } });
-    await admin.dispose();
+    await owner.close();
   }
 });
 
-for (const provider of ["codex", "ollama"] as const) test(`homework selects ${provider} embeddings and an independent text model, preserving frozen work`, async ({ bankCourse: data, teacherApi, teacherPage: page }) => {
+for (const provider of ["codex", "ollama"] as const) test(`homework selects ${provider} embeddings and an independent text model, preserving frozen work`, async ({ bankCourse: data, browser }) => {
   test.setTimeout(120_000);
   await ensureContentTypePluginEnabled("text-content");
-  const model = await homeworkModelFixture(data.token, { provider, hold: true });
+  const model = await homeworkModelFixture(data, { provider, hold: true });
   const student = await createAuthenticatedApi("student");
-  const admin = await createAuthenticatedApi("admin");
+  const admin = model.api, teacherApi = model.api, page = await model.page(browser);
   let activityId: string | undefined;
   try {
     await responseJson(await admin.patch(`/api/ai-agents/${model.connection.id}`, { data: { models: [
@@ -127,13 +127,13 @@ for (const provider of ["codex", "ollama"] as const) test(`homework selects ${pr
   } finally {
     model.release();
     if (activityId) await prisma.backgroundJob.deleteMany({ where: { payload: { path: ["activityId"], equals: activityId } } });
-    await student.dispose(); await admin.dispose(); await model.close();
+    await student.dispose(); await model.close();
   }
 });
 
-for (const provider of ["openai", "claude"] as const) test(`rubric authoring uses either ${provider} model with one stored token`, async ({ bankCourse: data, teacherApi }) => {
-  const model = await homeworkModelFixture(data.token, { provider });
-  const admin = await createAuthenticatedApi("admin");
+for (const provider of ["openai", "claude"] as const) test(`rubric authoring uses either ${provider} model with one stored token`, async ({ bankCourse: data }) => {
+  const model = await homeworkModelFixture(data, { provider });
+  const admin = model.api, teacherApi = model.api;
   try {
     await responseJson(await admin.patch(`/api/ai-agents/${model.connection.id}`, { data: { models: [{ model: "synthetic-model", purpose: "generation" }, { model: "rubric-model", purpose: "generation" }] } }));
     const activityId = await createCourseActivity(data, { activityTypeKey: "coding-exercise", title: "Model choice rubric", config: { language: "python", prompt: "Print one.", starterCode: "", sampleTests: [] } });
@@ -146,5 +146,5 @@ for (const provider of ["openai", "claude"] as const) test(`rubric authoring use
     }
     expect(model.requests.map(request => request.model)).toEqual(["synthetic-model", "rubric-model"]);
     expect(model.requests.every(request => request.authenticated)).toBe(true);
-  } finally { await admin.dispose(); await model.close(); }
+  } finally { await model.close(); }
 });

@@ -77,7 +77,7 @@ npm test
 npm run test:e2e
 ```
 
-See [Browser user flows](tests/e2e/README.md) for service prerequisites and environment overrides.
+See [Browser user flows](tests/e2e/README.md) for service prerequisites, environment overrides and [AI fixture isolation](tests/e2e/README.md#ai-fixture-isolation). Test providers must not replace shared account AI defaults.
 
 ## Operations
 

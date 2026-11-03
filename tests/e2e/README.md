@@ -65,6 +65,18 @@ Browser interactions use accessible roles, labels, and visible text. Direct stru
 
 ## Run locally
 
+### AI fixture isolation
+
+Never temporarily replace the shared teacher/admin account's AI preferences to route a test through a mock. Concurrent local/manual submissions can freeze that mock connection at hand-in, and restoring a whole metadata snapshot during cleanup can discard unrelated changes. A provider's generic fixture response also bypasses the actual language/question-design policy; it is not evidence of real-model quality.
+
+`isolatedAiOwner(data)` accepts only the exact disposable activity-suite course, creates a unique account with teacher/admin roles and explicit membership only in that synthetic course, and temporarily makes it the course creator/owner. The existing teacher keeps course access. The admin role permits the private loopback model endpoint through the normal core transport policy. Cleanup restores only that course's creator while it still matches the fixture account, disposes its sessions and deletes its own account/connections; it never writes the shared login's metadata.
+
+`homeworkModelFixture(data, options)` owns a private connection on that account and sets only its preferences. Course-staff fallback therefore resolves the mock exclusively in the fixture course, including embedding and queued challenge requests. Use its `api` and `page(browser)` when a test changes account preferences or explicitly selects the private connection. Normal shared logins cannot list/select it. The standalone homework workflow uses this same helper, and model-catalogue/rubric preference tests use disposable sessions.
+
+`homework-model-isolation.spec.ts` checks shared preferences throughout setup/cleanup, an unaffected control course, two simultaneous fixture courses selecting different endpoints, hidden/unselectable private connections, and course-owner restoration. Normal academic content/prompt settings are never rewritten to repair a mock-fixture incident. Keep any environment-specific inspection evidence outside Git.
+
+### Commands
+
 Never point this suite at production or create test accounts, submissions, grades, or other synthetic data there. Use local or isolated preprod services and storage. A general request to run E2E, prepare a release, or deploy does not authorize production testing; only an explicit user request for browser tests on production can override this standing rule for the requested scope. See the [production validation boundary](../../docs/DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md#production-validation-boundary).
 
 Start from a migrated and seeded development database, then run:

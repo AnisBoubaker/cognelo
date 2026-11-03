@@ -26,7 +26,7 @@ async function handIn(student: APIRequestContext, endpoint: string, index = 0) {
 
 test("homework enters SEB only when answering and recognizes the verified configuration on return", async ({ bankCourse: data, teacherApi, studentPage: page }) => {
   test.setTimeout(120_000);
-  const model = await homeworkModelFixture(data.token, { failFirst: 1 }); const student = await createAuthenticatedApi("student"); let id: string | undefined;
+  const model = await homeworkModelFixture(data, { failFirst: 1 }); const student = await createAuthenticatedApi("student"); let id: string | undefined;
   try {
     const homework = await readyHomework(data, teacherApi, true); id = homework.activityId;
     await handIn(student, homework.endpoint);
@@ -60,7 +60,7 @@ test("homework enters SEB only when answering and recognizes the verified config
 
 test("30 students use a bounded FIFO queue and cancelled running/queued work cannot publish late questions", async ({ bankCourse: data, teacherApi, browser }) => {
   test.setTimeout(240_000);
-  const model = await homeworkModelFixture(data.token, { hold: true });
+  const model = await homeworkModelFixture(data, { hold: true });
   const clients: APIRequestContext[] = [], userIds: string[] = []; let id: string | undefined;
   let studentContext: BrowserContext | undefined;
   try {

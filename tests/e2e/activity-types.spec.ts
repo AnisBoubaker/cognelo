@@ -668,7 +668,7 @@ test.describe.serial("authoring and completing every activity type", () => {
   test("teacher authors a Coding Homework assignment and the student completes ZIP and challenge stages", async ({ teacherPage, studentPage }) => {
     test.setTimeout(240_000);
     if (!data) throw new Error("The activity suite was not provisioned.");
-    const model = await homeworkModelFixture(data.token);
+    const model = await homeworkModelFixture(data);
     try {
     const title = `E2E authored coding homework ${data.token}`;
     const bankActivityId = await createBankActivityThroughUi(teacherPage, data, {

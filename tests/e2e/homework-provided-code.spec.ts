@@ -7,7 +7,7 @@ import { homeworkModelFixture } from "./fixtures/homework-model";
 
 test("challenge generation excludes unchanged provided functions and retains modified code", async ({ bankCourse: data, teacherApi, studentPage: page }) => {
   test.setTimeout(150_000);
-  const model = await homeworkModelFixture(data.token, { hold: true, questionText: number => number === 1
+  const model = await homeworkModelFixture(data, { hold: true, questionText: number => number === 1
     ? "Explain how provided_loader reads its result and why the implementation is correct."
     : `Question ${number}: explain the return value of the submitted implementation and the statement that determines it.` });
   const student = await createAuthenticatedApi("student");

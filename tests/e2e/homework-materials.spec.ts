@@ -10,7 +10,7 @@ import { githubMaterialIndexing } from "../../packages/plugin-content-types/plug
 test("PDF text is embedded once across homework and GitHub freshness gates enablement only", async ({ bankCourse: data, teacherApi }) => {
   test.setTimeout(120_000);
   for (const plugin of ["file-content", "github-repo-content"]) await ensureContentTypePluginEnabled(plugin);
-  const model = await homeworkModelFixture(data.token);
+  const model = await homeworkModelFixture(data);
   try {
     const { resource: file } = await responseJson<{ resource: { id: string } }>(await teacherApi.post(`/api/courses/${data.courseId}/content-resources`, { data: { contentTypeKey: "file", payload: { title: "PDF lecture" }, isVisible: true } }));
     await responseJson(await teacherApi.put(`/api/courses/${data.courseId}/content-resources/${file.id}/upload`, { multipart: { file: { name: "lecture.pdf", mimeType: "application/pdf", buffer: textPdf("POINTER_SENTINEL: C arrays decay to pointers in function parameters.") } } }));

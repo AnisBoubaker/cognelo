@@ -8,7 +8,7 @@ import { createStoredZip } from "./fixtures/zip";
 test("ZIP reference extraction reports named failures in notification history and reuses successful indexes on retry", async ({ bankCourse: data, teacherApi, teacherPage: page }) => {
   test.setTimeout(120_000);
   await ensureContentTypePluginEnabled("file-content");
-  const model = await homeworkModelFixture(data.token);
+  const model = await homeworkModelFixture(data);
   try {
     async function material(title: string, entries: Parameters<typeof createStoredZip>[0]) {
       const { resource } = await responseJson<{ resource: { id: string } }>(await teacherApi.post(`/api/courses/${data.courseId}/content-resources`, { data: { contentTypeKey: "file", payload: { title }, isVisible: true } }));

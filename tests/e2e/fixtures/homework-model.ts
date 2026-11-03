@@ -1,11 +1,12 @@
 import { createServer } from "node:http";
-import { prisma, Prisma } from "@cognelo/db";
+import { prisma } from "@cognelo/db";
 import { encryptCredential } from "@cognelo/core";
-import { credentialsFor } from "./auth";
+import { isolatedAiOwner } from "./isolated-ai-owner";
+import type { ActivitySuiteData } from "./activity-suite";
 
 /** Local-only OpenAI boundary stand-in; all homework/core APIs and storage remain real. */
-export async function homeworkModelFixture(token: string, options: { hold?: boolean; failFirst?: number; provider?: "openai" | "codex" | "claude" | "ollama"; questionText?: (number: number) => string } = {}) {
-  const teacher = await prisma.user.findUniqueOrThrow({ where: { email: credentialsFor("teacher").email } });
+export async function homeworkModelFixture(data: Pick<ActivitySuiteData, "courseId" | "token">, options: { hold?: boolean; failFirst?: number; provider?: "openai" | "codex" | "claude" | "ollama"; questionText?: (number: number) => string } = {}) {
+  const owner = await isolatedAiOwner(data);
   let sequence = 0, active = 0, maximum = 0, hold = options.hold ?? false, failures = options.failFirst ?? 0;
   const embeddingTexts: string[] = [];
   const requests: Array<{ path: string; model: string; authenticated: boolean; systemPrompt?: string; userPrompt?: string }> = [];
@@ -32,11 +33,13 @@ export async function homeworkModelFixture(token: string, options: { hold?: bool
     } catch { if (!response.headersSent) response.writeHead(500); response.end(); }
     finally { if (counted) active--; }
   });
-  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  const connection = await prisma.aiAgentConnection.create({ data: { displayName: `Homework fixture ${token}`, provider: options.provider ?? "openai", model: "synthetic-model", ownerId: null, baseUrl: `http://127.0.0.1:${(server.address() as { port: number }).port}/v1`, apiKey: encryptCredential("synthetic-test-key") } });
-  await prisma.user.update({ where: { id: teacher.id }, data: { metadata: { ...teacher.metadata as object, aiPreferences: { questionAuthoringAiAgentConnectionId: connection.id } } } });
-  const release = () => { hold = false; waiting.splice(0).forEach(resolve => resolve()); };
-  return { connection, requests, starts, embeddingTexts, get active() { return active; }, get maximum() { return maximum; }, release,
-    async close() { release(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await prisma.user.update({ where: { id: teacher.id }, data: { metadata: teacher.metadata ?? Prisma.JsonNull } }); await prisma.aiAgentConnection.delete({ where: { id: connection.id } }); }
-  };
+  try {
+    await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+    const connection = await prisma.aiAgentConnection.create({ data: { displayName: `Homework fixture ${data.token}`, provider: options.provider ?? "openai", model: "synthetic-model", ownerId: owner.user.id, baseUrl: `http://127.0.0.1:${(server.address() as { port: number }).port}/v1`, apiKey: encryptCredential("synthetic-test-key") } });
+    await prisma.user.update({ where: { id: owner.user.id }, data: { metadata: { e2e: true, aiPreferences: { questionAuthoringAiAgentConnectionId: connection.id } } } });
+    const release = () => { hold = false; waiting.splice(0).forEach(resolve => resolve()); };
+    return { connection, api: owner.api, page: owner.page, requests, starts, embeddingTexts, get active() { return active; }, get maximum() { return maximum; }, release,
+      async close() { release(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await owner.close(); }
+    };
+  } catch (error) { server.closeAllConnections(); server.close(); await owner.close(); throw error; }
 }

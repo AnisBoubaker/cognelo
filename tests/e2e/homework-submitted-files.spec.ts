@@ -6,7 +6,7 @@ import { homeworkModelFixture } from "./fixtures/homework-model";
 
 test("submitted files use shared left tabs, open the first file, and isolate loading and late responses", async ({ bankCourse: data, teacherApi, studentPage: page }) => {
   test.setTimeout(120_000);
-  const model = await homeworkModelFixture(data.token, { hold: true });
+  const model = await homeworkModelFixture(data, { hold: true });
   const student = await createAuthenticatedApi("student");
   let activityId: string | undefined;
   let releaseSlow = () => {};

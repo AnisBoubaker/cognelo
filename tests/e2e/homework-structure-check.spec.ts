@@ -4,7 +4,7 @@ import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
 import { homeworkModelFixture } from "./fixtures/homework-model";
 
 test("students explicitly check structure, acknowledge gaps, and recheck after changing files", async ({ bankCourse: data, teacherApi, studentPage: page }) => {
-  const model = await homeworkModelFixture(data.token);
+  const model = await homeworkModelFixture(data);
   try {
     const activityId = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Explicit structural check", config: {} });
     const base = `/api/courses/${data.courseId}/activities/${activityId}/coding-homework-grader`;

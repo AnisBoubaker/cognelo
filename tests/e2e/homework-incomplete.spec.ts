@@ -7,7 +7,7 @@ import { homeworkModelFixture } from "./fixtures/homework-model";
 
 test("teacher selects private solution signatures and student explicitly acknowledges incomplete work", async ({ bankCourse: data, teacherApi, teacherPage, studentPage }) => {
   test.setTimeout(120_000);
-  const model = await homeworkModelFixture(data.token), student = await createAuthenticatedApi("student"); let id: string | undefined;
+  const model = await homeworkModelFixture(data), student = await createAuthenticatedApi("student"); let id: string | undefined;
   try {
     id = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Incomplete C homework", config: {} });
     const base = `/api/courses/${data.courseId}/activities/${id}/coding-homework-grader`;

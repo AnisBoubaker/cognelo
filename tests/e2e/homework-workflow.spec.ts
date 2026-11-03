@@ -1,6 +1,5 @@
-import { createServer } from "node:http";
-import { prisma, Prisma } from "@cognelo/db";
-import { encryptCredential } from "@cognelo/core";
+import { prisma } from "@cognelo/db";
+import { homeworkModelFixture } from "./fixtures/homework-model";
 import { test, expect } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
 import { createAuthenticatedApi } from "./fixtures/auth";
@@ -9,24 +8,11 @@ import { ensureContentTypePluginEnabled } from "./fixtures/content-plugins";
 test("prepared homework: reusable embeddings, frozen files, explicit answering, timeout and teacher cancellation", async ({ bankCourse: data, teacherApi, teacherPage, studentPage }) => {
   test.setTimeout(180_000);
   await ensureContentTypePluginEnabled("text-content");
-  let embeddingRequests = 0, questionRequests = 0;
-  const provider = createServer(async (request, response) => {
-    try {
-      let raw = ""; for await (const chunk of request) raw += chunk;
-      const input = JSON.parse(raw); response.writeHead(200, { "Content-Type": "application/json" });
-      if (request.url?.endsWith("/embeddings")) { embeddingRequests++; response.end(JSON.stringify({ data: input.input.map((_: string, index: number) => ({ index, embedding: Array.from({ length: 1536 }, (_, i) => i === 0 ? 1 : 0) })) })); }
-      else { questionRequests++; response.end(JSON.stringify({ output_text: JSON.stringify({ questionText: `Question ${questionRequests}: explain how your submitted function handles the input and its boundary values.` }) })); }
-    } catch { response.writeHead(500); response.end(); }
-  });
-  await new Promise<void>(resolve => provider.listen(0, "127.0.0.1", resolve));
-  const connection = await prisma.aiAgentConnection.create({ data: { displayName: `Homework model fixture ${data.token}`, provider: "openai", model: "homework-model", ownerId: null,
-    baseUrl: `http://127.0.0.1:${(provider.address() as { port: number }).port}/v1`, apiKey: encryptCredential("synthetic-homework-key") } });
-  const teacher = await prisma.user.findUniqueOrThrow({ where: { email: "teacher@cognelo.local" } });
-  const priorMetadata = teacher.metadata;
+  const model = await homeworkModelFixture(data, { questionText: number => `Question ${number}: explain how your submitted function handles the input and its boundary values.` });
+  const connection = model.connection;
   const student = await createAuthenticatedApi("student");
   let activityId: string | undefined;
   try {
-    await prisma.user.update({ where: { id: teacher.id }, data: { metadata: { ...priorMetadata as object, aiPreferences: { questionAuthoringAiAgentConnectionId: connection.id } } } });
     const { resource } = await responseJson<{ resource: { id: string } }>(await teacherApi.post(`/api/courses/${data.courseId}/content-resources`, { data: { contentTypeKey: "text", payload: { title: "C reference", body: "# C functions\nFunctions have typed parameters and return values. Explain pointer and array parameters using boundary cases." }, isVisible: true } }));
     activityId = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Ready C homework", config: {} });
     await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/content/activities`, { data: { activityId, parentId: null, titleSnapshot: "Ready C homework", isVisible: true, position: 10, metadata: {} } }));
@@ -44,10 +30,10 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
     await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Generate embeddings", exact: true }).click();
     await expect(teacherPage.getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
-    expect(embeddingRequests).toBe(1);
+    expect(model.embeddingTexts.length).toBe(1);
     await teacherPage.getByRole("button", { name: "Generate embeddings", exact: true }).click();
     await expect(teacherPage.getByRole("dialog", { name: "Preparing reference materials…", exact: true })).toBeHidden();
-    expect(embeddingRequests).toBe(1);
+    expect(model.embeddingTexts.length).toBe(1);
     await prisma.aiAgentConnection.update({ where: { id: connection.id }, data: { model: "new-question-model" } });
     expect(await responseJson(await teacherApi.get(`${authoring}/workflow-settings`))).toMatchObject({ statuses: { [resource.id]: { state: "ready" } } });
     await teacherPage.getByRole("button", { name: "Enable final submissions", exact: true }).click();
@@ -71,7 +57,7 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
       return rows[0]?.status;
     }, { timeout: 45_000 }).toBe("challenge_ready");
     await expect(studentPage.getByRole("button", { name: "Answer challenge questions", exact: true })).toBeVisible();
-    expect(questionRequests).toBe(5); expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(0);
+    expect(model.starts.length).toBe(5); expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(0);
     const state = await responseJson<{ submission: { id: string } }>(await student.get(`${endpoint}/workspace`));
     expect((await student.post(`${endpoint}/preparation`, { data: { kind: "file", path: "main.c", base64: "YQ==", expectedRevision: 1, replace: true } })).status()).toBe(409);
     expect((await student.delete(`${endpoint}/preparation`, { data: { all: true, expectedRevision: 1 } })).status()).toBe(409);
@@ -108,14 +94,12 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
     expect((await prisma.gradebookItem.findUniqueOrThrow({ where: { id: attempt.gradebookItemId } })).gradesReleased).toBe(true);
     await responseJson(await student.post(`${endpoint}/hand-in`, { data: { expectedRevision: 1 } }));
     await expect.poll(async () => (await responseJson<{ submission: { status: string } }>(await student.get(`${endpoint}/workspace`))).submission.status, { timeout: 45_000 }).toBe("challenge_ready");
-    expect(questionRequests).toBe(10);
+    expect(model.starts.length).toBe(10);
     const replacement = await responseJson<{ submissionId: string; questions: Array<{ id: string }> }>(await student.post(`${endpoint}/answering`, { data: {} }));
     await responseJson(await student.post(`${endpoint}/challenge-answers`, { data: { submissionId: replacement.submissionId, answers: replacement.questions.map(question => ({ questionId: question.id, answer: "The function adds two arguments." })) } }));
     expect(await prisma.activityAttempt.count({ where: { activityId, lifecycle: "submitted" } })).toBe(1);
   } finally {
     if (activityId) await prisma.backgroundJob.deleteMany({ where: { OR: [{ metadata: { path: ["activityId"], equals: activityId } }, { payload: { path: ["activityId"], equals: activityId } }] } });
-    await prisma.user.update({ where: { id: teacher.id }, data: { metadata: priorMetadata ?? Prisma.JsonNull } });
-    await student.dispose(); await prisma.aiAgentConnection.delete({ where: { id: connection.id } });
-    provider.closeAllConnections(); await new Promise<void>(resolve => provider.close(() => resolve()));
+    await student.dispose(); await model.close();
   }
 });

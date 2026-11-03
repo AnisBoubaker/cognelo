@@ -43,7 +43,7 @@ test("hidden placements, files and other sections cannot be enumerated through a
 test("homework reserves one workflow and finalizes answers atomically", async ({ bankCourse: data, teacherApi }) => {
   test.setTimeout(120_000);
   const student = await createAuthenticatedApi("student");
-  const model = await homeworkModelFixture(data.token);
+  const model = await homeworkModelFixture(data);
   let activityId: string | undefined;
   try {
     activityId = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Atomic homework", config: { gradingMode: "manual", maxAttempts: 1 } });

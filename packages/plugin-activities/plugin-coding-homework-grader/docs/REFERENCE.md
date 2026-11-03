@@ -41,6 +41,8 @@ Generated clients are local artifacts. Apply the additive manifest migration `20
 
 ## Shared contracts
 
+Local AI acceptance uses the [isolated fixture owner](../../../../tests/e2e/README.md#ai-fixture-isolation) and a private model connection bound only to the synthetic course. Tests never replace shared teacher/admin authoring preferences. Saved `questionGenerationAi`, question model and submission-owned function/file relations distinguish provider misconfiguration from student-data mixing. UI/provider fixture outputs do not validate the quality or language of real AI output; existing real question-generation rules remain independent.
+
 Core resolves assignment exceptions, current answering deadlines, attempt limits, grades and content closure. Student view stays inspection-only. Private solutions are not the shared released-student-solution feature. UI labels cover English, French, Chinese and Arabic; timestamps use the effective course timezone. Teacher assignment edits use the guarded action bar; independently persisted uploads/reference actions do not pretend to be part of its draft.
 
 ## Seed Fixture
