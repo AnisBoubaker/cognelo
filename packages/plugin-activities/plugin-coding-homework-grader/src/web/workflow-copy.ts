@@ -1,5 +1,6 @@
 import type { CodingHomeworkLocale } from "./messages";
 const en = {
+  noEligibleCode: "No new or modified function could be identified for challenge questions. Contact your teacher to review the submission.",
   removeAllFiles: "Remove all files", removeAllFilesConfirm: "Remove all files from your prepared work? You will need to upload your files again before submitting.",
   preparedFiles: "Prepared files", removePreparedFileConfirm: "Remove {path} from your prepared work?",
   checkSubmission: "Check my submission", checkingSubmission: "Checking submission…", structuralHelp: "This is a structural check only: it checks required filenames and function signatures. It does not run your code or prove that your solution is correct.", structureValid: "Structure is valid.", structureInvalid: "Some structural requirements are missing or do not match.",
@@ -15,6 +16,7 @@ const en = {
   solution: "Private teacher solution", solutionHelp: "Upload C/H files or a ZIP, then choose the required files and functions. Students never receive this solution.", selectAi: "Select functions with AI", requiredFiles: "Required filenames", requiredFunctions: "Required functions and signatures", materials: "Reference materials", materialHelp: "By default, materials before this activity are selected. Selecting a folder includes all its materials.", embeddings: "Generate embeddings", preparing: "Preparing reference materials…", enabled: "Enable final submissions", disable: "Disable final submissions", enabledHelp: "Reference selection is locked while submissions are enabled.", prepared: "Reference selection is prepared.", needsPreparation: "Prepare the reference selection before enabling submissions.", concurrency: "Students processed at once (1–4)", noMaterials: "No reference materials selected. Questions will use the assignment and submitted work.", readyIndex: "Ready — reused", missingIndex: "Needs generation", staleIndex: "Needs refresh", unsupportedIndex: "Unavailable", freshness: "Freshness (hours)", management: "Student submissions", cancelSubmission: "Cancel submission", cancelReason: "Reason for cancellation", cancelDetail: "Keep the old record, withdraw its associated grade, and let this student submit again with new questions.", noSubmissions: "No submissions yet.", saveFirst: "Save assignment changes before enabling final submissions.", error: "The action could not be completed."
 };
 const fr: typeof en = {
+  noEligibleCode: "Aucune fonction nouvelle ou modifiée n’a pu être identifiée pour les questions de vérification. Contactez votre enseignant pour examiner la remise.",
   removeAllFiles: "Retirer tous les fichiers", removeAllFilesConfirm: "Retirer tous les fichiers de votre remise en préparation ? Vous devrez téléverser vos fichiers de nouveau avant de remettre le travail.",
   preparedFiles: "Fichiers préparés", removePreparedFileConfirm: "Retirer {path} de votre remise en préparation ?",
   checkSubmission: "Vérifier ma remise", checkingSubmission: "Vérification de la remise…", structuralHelp: "Cette vérification est uniquement structurelle : elle vérifie les noms de fichiers et les signatures des fonctions exigées. Elle n’exécute pas votre code et ne garantit pas que votre solution est correcte.", structureValid: "La structure est valide.", structureInvalid: "Certaines exigences structurelles sont manquantes ou ne correspondent pas.",
@@ -31,6 +33,7 @@ const fr: typeof en = {
 };
 
 const zh: typeof en = {
+  noEligibleCode: "未能识别可用于验证问题的新增或修改函数。请联系教师检查此次提交。",
   removeAllFiles: "移除所有文件", removeAllFilesConfirm: "从准备中的作业移除所有文件？提交前需要重新上传文件。",
   preparedFiles: "准备的文件", removePreparedFileConfirm: "从准备中的作业移除 {path}？",
   checkSubmission: "检查我的提交", checkingSubmission: "正在检查提交…", structuralHelp: "这仅检查结构：必需的文件名和函数签名。不会运行代码，也不能证明解决方案正确。", structureValid: "结构有效。", structureInvalid: "部分结构要求缺失或不匹配。",
@@ -46,6 +49,7 @@ const zh: typeof en = {
   solution: "教师私有参考解答", solutionHelp: "上传 C/H 文件或 ZIP，然后选择必需的文件和函数。学生无法访问此解答。", selectAi: "使用 AI 选择函数", requiredFiles: "必需的文件名", requiredFunctions: "必需的函数及签名", materials: "参考资料", materialHelp: "默认选择此活动之前的资料。选择文件夹将包含其中的所有资料。", embeddings: "生成向量索引", preparing: "正在准备参考资料…", enabled: "开放最终提交", disable: "关闭最终提交", enabledHelp: "开放提交期间，资料选择将被锁定。", prepared: "参考资料已准备好。", needsPreparation: "开放提交前，请准备参考资料。", concurrency: "同时处理的学生数（1–4）", noMaterials: "未选择参考资料。问题将依据作业说明和提交的内容生成。", readyIndex: "就绪 — 重用", missingIndex: "需要生成", staleIndex: "需要刷新", unsupportedIndex: "不可用", freshness: "有效期（小时）", management: "学生提交", cancelSubmission: "取消提交", cancelReason: "取消原因", cancelDetail: "保留原记录，撤回关联成绩，并允许该学生重新提交并生成新问题。", noSubmissions: "暂无提交。", saveFirst: "开放最终提交前，请保存作业更改。", error: "无法完成操作。"
 };
 const ar: typeof en = {
+  noEligibleCode: "لم يتم تحديد دالة جديدة أو معدّلة لإنشاء أسئلة التحقق. تواصل مع المدرّس لمراجعة التسليم.",
   removeAllFiles: "إزالة كل الملفات", removeAllFilesConfirm: "هل تريد إزالة كل الملفات من العمل المحضّر؟ ستحتاج إلى رفع ملفاتك مجدداً قبل التسليم.",
   preparedFiles: "الملفات المحضّرة", removePreparedFileConfirm: "هل تريد إزالة {path} من العمل المحضّر؟",
   checkSubmission: "التحقق من تسليمي", checkingSubmission: "جارٍ التحقق من التسليم…", structuralHelp: "هذا فحص بنيوي فقط: يتحقق من أسماء الملفات وتوقيعات الدوال المطلوبة. لا يشغّل الكود ولا يثبت صحة الحل.", structureValid: "البنية صالحة.", structureInvalid: "بعض المتطلبات البنيوية مفقودة أو غير مطابقة.",

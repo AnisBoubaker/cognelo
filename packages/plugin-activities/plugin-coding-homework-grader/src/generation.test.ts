@@ -38,6 +38,7 @@ const dbMocks = vi.hoisted(() => ({
 
 vi.mock("@cognelo/core", () => coreMocks);
 vi.mock("./question-generation-policy", async importOriginal => ({ ...await importOriginal<typeof import("./question-generation-policy")>(), getHomeworkQuestionLanguage: vi.fn().mockResolvedValue("fr") }));
+vi.mock("./provided-code", async importOriginal => ({ ...await importOriginal<typeof import("./provided-code")>(), snapshotProvidedCode: vi.fn().mockResolvedValue({ version: 1, sourceVersion: "0".repeat(64), files: [], functions: [] }) }));
 vi.mock("./db-client", () => ({
   Prisma: {},
   prisma: dbMocks
@@ -128,7 +129,7 @@ describe("coding homework challenge generation", () => {
     expect(dbMocks.pluginCodingHomeworkChallengeQuestion.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         generationModel: "gpt-test",
-        generationPromptVersion: "coding-homework-grader.challenge-question.v3",
+        generationPromptVersion: "coding-homework-grader.challenge-question.v4",
         orderIndex: 0,
         questionText: "Explain why this function updates the accumulator before returning the result.",
         submissionFunctionId: "function-1",
@@ -194,6 +195,26 @@ describe("coding homework challenge generation", () => {
       orderBy: { createdAt: "desc" }
     });
     expect(result.submission.status).toBe("challenge_ready");
+  });
+
+  it("filters legacy candidates against the pinned hashes and retries questions about provided code", async () => {
+    const { baselineFromSources, snapshotProvidedCode } = await import("./provided-code");
+    const supplied = "int supplied_loader(void) { return 7; }";
+    const providedCode = await baselineFromSources([{ path: "starter.c", content: supplied, languageKey: "c" }], "a".repeat(64));
+    dbMocks.pluginCodingHomeworkSubmission.findFirst.mockResolvedValue({ ...testSubmission({ status: "structure_valid" }), metadata: { providedCode } });
+    dbMocks.pluginCodingHomeworkSubmissionFunction.findMany.mockResolvedValue([
+      { ...testFunction({ id: "supplied", functionName: "supplied_loader" }), functionCode: supplied },
+      testFunction({ id: "own", functionName: "sum_values" })
+    ]);
+    coreMocks.generateAiAgentText.mockResolvedValueOnce(JSON.stringify({ questionText: "Explain why supplied_loader returns seven in this implementation." }));
+    await generateCodingHomeworkChallengeQuestions({ activityId: "activity-1", courseId: "course-1", groupId: "group-1", user: testUser() }, { submissionId: "submission-1" });
+    expect(snapshotProvidedCode).not.toHaveBeenCalled();
+    expect(coreMocks.generateAiAgentText).toHaveBeenCalledTimes(2);
+    const retry = coreMocks.generateAiAgentText.mock.calls[1][1].userPrompt;
+    expect(retry).toContain("unchanged teacher-provided code");
+    expect(retry).toContain("int sum_values");
+    expect(dbMocks.pluginCodingHomeworkChallengeQuestion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ submissionFunctionId: "own" }) });
+    expect(dbMocks.pluginCodingHomeworkSubmission.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ metadata: expect.objectContaining({ providedCode }) }) }));
   });
 
   it("honors an explicit activity model on legacy teacher generation too", async () => {

@@ -23,7 +23,7 @@ const CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
 const LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
 const MAX_EOCD_SEARCH_BYTES = 65_557;
 
-export function readCodingHomeworkZip(bytes: Buffer, limits: { maxArchiveBytes?: number; maxFileCount?: number; ignoredPaths?: string[] } = {}): CodingHomeworkZipReadResult {
+export function readCodingHomeworkZip(bytes: Buffer, limits: { maxArchiveBytes?: number; maxFileCount?: number; ignoredPaths?: string[]; includeContent?: (path: string) => boolean } = {}): CodingHomeworkZipReadResult {
   const fail = (code: string, message: string): CodingHomeworkZipReadResult => ({ entries: [], diagnostics: [{ code, message, severity: "error" }] });
   if (bytes.length > Math.min(limits.maxArchiveBytes ?? 25 * 1024 * 1024, 25 * 1024 * 1024)) return fail("ZIP_ARCHIVE_LIMIT", "The archive exceeds the upload limit.");
   const pending: Array<{ compressedSize: number; localHeaderOffset: number; method: number; path: string; uncompressedSize: number }> = [];
@@ -73,11 +73,18 @@ export function readCodingHomeworkZip(bytes: Buffer, limits: { maxArchiveBytes?:
     const externalAttributes = bytes.readUInt32LE(offset + 38);
     const localHeaderOffset = bytes.readUInt32LE(offset + 42);
     if (offset + 46 + fileNameLength + extraLength + commentLength > directoryEnd) return fail("ZIP_DIRECTORY_INVALID", "The archive directory is truncated.");
-    expandedBytes += uncompressedSize;
-    if (uncompressedSize > 8 * 1024 * 1024 || expandedBytes > 64 * 1024 * 1024 || (uncompressedSize > 32768 && uncompressedSize > Math.max(1, compressedSize) * 200)) return fail("ZIP_EXPANSION_LIMIT", "The archive exceeds expanded-size or compression limits.");
     const rawPath = bytes.slice(offset + 46, offset + 46 + fileNameLength).toString("utf8");
     const path = normalizeZipPath(rawPath);
     const isDirectory = rawPath.endsWith("/");
+    // Read-only consumers may inspect source entries without inflating unrelated binaries.
+    // Ordinary student ZIP uploads retain validation of every entry.
+    if (limits.includeContent && !isDirectory && !limits.includeContent(path ?? rawPath)) {
+      offset += 46 + fileNameLength + extraLength + commentLength;
+      continue;
+    }
+    expandedBytes += uncompressedSize;
+    if (uncompressedSize > 8 * 1024 * 1024 || expandedBytes > 64 * 1024 * 1024 || (uncompressedSize > 32768 && uncompressedSize > Math.max(1, compressedSize) * 200)) return fail("ZIP_EXPANSION_LIMIT", "The archive exceeds expanded-size or compression limits.");
+
     const ignored = path && (limits.ignoredPaths ?? []).some((value) => {
       const ignoredPath = value.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
       return path === ignoredPath || path.startsWith(`${ignoredPath}/`);

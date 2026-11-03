@@ -1,4 +1,4 @@
-export const codingHomeworkChallengePromptVersion = "coding-homework-grader.challenge-question.v3";
+export const codingHomeworkChallengePromptVersion = "coding-homework-grader.challenge-question.v4";
 
 export const prototypePipelineSteps = [
   {

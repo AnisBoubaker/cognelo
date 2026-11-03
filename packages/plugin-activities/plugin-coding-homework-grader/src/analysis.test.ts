@@ -38,6 +38,7 @@ const activityDocumentMocks = vi.hoisted(() => ({ getCodingHomeworkActivityRefer
 
 vi.mock("node:fs/promises", () => fsMocks);
 vi.mock("@cognelo/core", () => coreMocks);
+vi.mock("./provided-code", async importOriginal => ({ ...await importOriginal<typeof import("./provided-code")>(), snapshotProvidedCode: vi.fn().mockResolvedValue({ version: 1, sourceVersion: "0".repeat(64), files: [], functions: [] }) }));
 vi.mock("./db-client", () => ({
   Prisma: {},
   prisma: dbMocks

@@ -98,6 +98,12 @@ Teachers enter private AI question-generation instructions in the homework Setti
 
 Challenges assess understanding of the student's own submitted code, with a complete answer of about **2–3 sentences**. They must be reasonable for someone who actually wrote that code at the course's level. Use varied focused questions: a small concrete case or relevant valid boundary input and why the result makes sense; why a condition/guard exists; or another local implementation choice. These examples are not the only permitted forms. Avoid obscure traps, long traces, broad multi-part questions and unavailable context. Do not presume incorrect code is correct. This is a question-design target, not an automatic limit on student answers.
 
+## Provided-code exclusion — November 3, 2026
+
+Do not ask about unchanged code explicitly provided by the teacher. Compare individual C/H files and C/H entries in provided ZIPs, ignoring folders, formatting and comments. A changed implementation token, including a literal, remains eligible. The private solution is not used for this comparison. Filter before candidate limits so early starter functions cannot crowd out student-written code.
+
+Hand-in records a compact manifest of hashes/function names, **not a copy of the provided files per submission**. Cache parsing by attachment version; queued submissions use their frozen manifest after later teacher changes. Older queued work uses current provided files once because no historical manifest exists. Existing completed questions stay unchanged. If no eligible function can be identified in a submission containing provided functions, show a clear teacher-review state without calling AI or falling back to starter-code questions. This is an explicit refinement of the original incomplete-code fallback assumption. See [comparison details](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md#excluding-unchanged-provided-code).
+
 ## Queue and load control
 
 - Use a **FIFO dispatch queue** for challenge generation rather than launching every student's AI requests at once.
@@ -149,7 +155,7 @@ The supplied deck was verified with the real link extractor during local accepta
 ## Recorded implementation assumptions and deferred work
 
 - Static matching uses a bounded C scanner, without preprocessing or compilation. Typedef spelling remains significant; syntax incompleteness can be acknowledged, while parser resource limits block.
-- The teacher can configure 1–20 questions (default 3). Reuse candidate functions for distinct questions if fewer functions exist; if none can be parsed, use submitted source and the assignment text. This is not an automatic correctness score.
+- The teacher can configure 1–20 questions (default 3). Reuse eligible functions for distinct questions if fewer functions exist. Incomplete-source fallback is limited to cases without parsed submitted/provided functions and must omit unchanged provided sources. This is not an automatic correctness score.
 - Individual files are limited to 8 MB; the prepared collection obeys the configured archive-size/file-count ceilings. ZIP replacement and same-path overwrites require confirmation. Empty reference selection must be explicitly prepared and uses assignment/submitted work for generation.
 - Reference selection contains visible, shared course material resources. Hidden/section-only materials and activity prompts that are not material resources are excluded from the chooser. A folder selects its current recursive material descendants. Private teacher solutions are never automatically embedded.
 - Use OpenAI 1536-dimensional vectors in PostgreSQL Float32 storage and bounded exact cosine search, without a new database image/extension. Reuse vectors/indexes across homework. See [material services](MATERIAL_EMBEDDING_SERVICES.md) for compatibility and limits.

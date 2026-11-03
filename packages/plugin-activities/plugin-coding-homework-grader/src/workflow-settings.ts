@@ -1,3 +1,4 @@
+import { snapshotProvidedCode } from "./provided-code";
 import { getHomeworkQuestionConnection, homeworkEmbeddingSelection, storedHomeworkAiSelection } from "./ai-selection";
 import { z } from "zod";
 import { AiModelSelectionSchema, type CurrentUser } from "@cognelo/contracts";
@@ -98,6 +99,7 @@ export async function updateHomeworkWorkflowSettings(scope: HomeworkTeacherScope
       const statuses = [];
       for (const id of next.referenceMaterialIds as string[]) statuses.push(await getMaterialIndexStatus(scope.user, scope.courseId, id, homeworkEmbeddingSelection(next)));
       if (statuses.some(status => status.state !== "ready" || !(pinned.indexIds as string[]).includes(status.index?.id ?? ""))) throw new AppError(409, "HOMEWORK_EMBEDDINGS_STALE", "Some selected materials need embedding generation or refresh before submissions can open.");
+      await snapshotProvidedCode(scope.activityId, tx);
       next.submissionsEnabled = true;
     } else if (data.enabled === false) next.submissionsEnabled = false;
     await tx.pluginCodingHomeworkAssignment.update({ where: { activityId: scope.activityId }, data: { settings: json(next) } });

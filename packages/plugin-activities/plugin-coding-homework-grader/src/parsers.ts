@@ -274,7 +274,9 @@ function serializeCFunctionAst(signature: ParsedCSignature, body: string) {
   ].join("\n");
 }
 
-function tokenizeC(source: string) {
+export function tokenizeCSourceIdentity(source: string) { return tokenizeC(source, true); }
+
+function tokenizeC(source: string, preserveValues = false) {
   const tokens: string[] = [];
   let index = 0;
   while (index < source.length) {
@@ -296,7 +298,7 @@ function tokenizeC(source: string) {
     }
     if (char === "\"" || char === "'") {
       const result = readCStringLiteral(source, index, char);
-      tokens.push(char === "\"" ? "<string>" : "<char>");
+      tokens.push(preserveValues ? source.slice(index, result.endIndex) : char === "\"" ? "<string>" : "<char>");
       index = result.endIndex;
       continue;
     }
@@ -308,7 +310,7 @@ function tokenizeC(source: string) {
     }
     const number = source.slice(index).match(/^(?:0[xX][0-9A-Fa-f]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)[uUlLfF]*/)?.[0];
     if (number) {
-      tokens.push("<number>");
+      tokens.push(preserveValues ? number : "<number>");
       index += number.length;
       continue;
     }

@@ -1,3 +1,5 @@
+import { codingHomeworkAttachmentPath } from "./attachment-storage";
+export { codingHomeworkAttachmentPath } from "./attachment-storage";
 import { lockHomeworkSettings, workflowSettingKeys } from "./workflow-settings";
 import { copyHomeworkTeacherSolution, lockHomeworkTeacherSolution } from "./teacher-solution";
 import { createHash, randomUUID } from "node:crypto";
@@ -241,28 +243,29 @@ export async function uploadCodingHomeworkAssignmentPdf(owner: OwnerContext, inp
 export async function uploadCodingHomeworkProvidedFile(owner: OwnerContext, input: unknown) {
   const parsed = codingHomeworkFileUploadInputSchema.parse(input);
   const bytes = decodeUploadBytes(parsed.base64, MAX_PROVIDED_FILE_BYTES);
-  await createAttachment(owner, {
-    bytes,
-    kind: "provided_file",
-    mimeType: parsed.mimeType || "application/octet-stream",
-    originalName: parsed.fileName
+  await prisma.$transaction(async tx => {
+    if (owner.ownerKind === "course_activity") await lockHomeworkSettings(tx, owner.ownerId);
+    await createAttachment(owner, { bytes, kind: "provided_file", mimeType: parsed.mimeType || "application/octet-stream", originalName: parsed.fileName }, tx);
   });
   return getCodingHomeworkAuthoring(owner);
 }
 
 export async function deleteCodingHomeworkProvidedFile(owner: OwnerContext, attachmentId: string) {
-  const attachment = await prisma.pluginCodingHomeworkAttachment.findFirst({
-    where: {
-      id: attachmentId,
-      ownerKind: owner.ownerKind,
-      ownerId: owner.ownerId,
-      kind: "provided_file"
+  await prisma.$transaction(async tx => {
+    if (owner.ownerKind === "course_activity") await lockHomeworkSettings(tx, owner.ownerId);
+    const attachment = await tx.pluginCodingHomeworkAttachment.findFirst({
+      where: {
+        id: attachmentId,
+        ownerKind: owner.ownerKind,
+        ownerId: owner.ownerId,
+        kind: "provided_file"
+      }
+    });
+    if (!attachment) {
+      throw new AppError(404, "CODING_HOMEWORK_PROVIDED_FILE_NOT_FOUND", "The provided activity file was not found.");
     }
+    await tx.pluginCodingHomeworkAttachment.delete({ where: { id: attachment.id } });
   });
-  if (!attachment) {
-    throw new AppError(404, "CODING_HOMEWORK_PROVIDED_FILE_NOT_FOUND", "The provided activity file was not found.");
-  }
-  await prisma.pluginCodingHomeworkAttachment.delete({ where: { id: attachment.id } });
   return getCodingHomeworkAuthoring(owner);
 }
 
@@ -586,12 +589,6 @@ function fileStorageDir() {
   return path.join(process.cwd(), "../../storage/coding-homework-grader");
 }
 
-export function codingHomeworkAttachmentPath(storedName: string) {
-  if (path.basename(storedName) !== storedName) {
-    throw new AppError(400, "CODING_HOMEWORK_ATTACHMENT_PATH_INVALID", "The stored attachment path is invalid.");
-  }
-  return path.join(fileStorageDir(), storedName);
-}
 
 function decodeUploadBytes(base64: string, maxBytes: number) {
   const bytes = Buffer.from(base64, "base64");
@@ -611,7 +608,8 @@ async function createAttachment(
     kind: "assignment_pdf" | "provided_file" | "requirements_upload";
     mimeType: string;
     originalName: string;
-  }
+  },
+  database: Pick<Prisma.TransactionClient, "pluginCodingHomeworkAttachment"> = prisma
 ) {
   const originalName = input.originalName || "upload";
   const storedName = `${randomUUID()}-${originalName.replace(SAFE_NAME_PATTERN, "_")}`;
@@ -619,7 +617,7 @@ async function createAttachment(
   await writeFile(path.join(fileStorageDir(), storedName), input.bytes);
   const sha256 = createHash("sha256").update(input.bytes).digest("hex");
 
-  return prisma.pluginCodingHomeworkAttachment.create({
+  return database.pluginCodingHomeworkAttachment.create({
     data: {
       ownerKind: owner.ownerKind,
       ownerId: owner.ownerId,

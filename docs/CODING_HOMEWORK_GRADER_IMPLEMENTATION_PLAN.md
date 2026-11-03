@@ -38,6 +38,7 @@ Current delivery tracks (implemented; acceptance recorded separately):
 - [x] Durable FIFO challenge generation with teacher-selected, server-bounded parallelism; students cannot cancel, and teachers can cancel submissions from activity details.
 - [x] Explicit Answer challenge questions start, phase-appropriate SEB verification, answering-only timing, read-only submitted-code consultation and accessible course material.
 - [x] Local/preprod acceptance for the complete workflow and expected class load; no production E2E or synthetic data.
+- [x] Exclude unchanged teacher-provided C functions from challenge targets, with compact hand-in hash manifests, ZIP support and a no-eligible-code state; see the [canonical comparison rules](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md#excluding-unchanged-provided-code).
 
 Open details and expressly deferred deadline behavior are listed in the [approved workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#remaining-details-and-deferred-work). Do not substitute the older phase-completion statements for these acceptance checks. The November 1 clarifications approved text-embedding-3-small and concurrency 2 (maximum 4); the November 2 update permits independent configured generation/embedding choices across supported providers. Changing the question-generation model does not invalidate compatible indexes. No additional availability grace period is granted.
 

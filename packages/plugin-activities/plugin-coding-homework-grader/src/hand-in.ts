@@ -1,3 +1,4 @@
+import { snapshotProvidedCode } from "./provided-code";
 import { studentQuestionContextInclude } from "./question-context";
 import { getHomeworkQuestionLanguage } from "./question-generation-policy";
 import { getHomeworkQuestionConnection } from "./ai-selection";
@@ -41,10 +42,11 @@ export async function handInHomework(scope: HomeworkStudentScope, input: unknown
       await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, entries.reduce((sum, file) => sum + file.uncompressedSize, 0));
       if (!readiness.canSubmit) throw new AppError(400, "HOMEWORK_FILES_INVALID", "Your work cannot be submitted until the file safety issues are resolved.");
       if (readiness.requiresAcknowledgement && !data.acknowledgeIncomplete) throw new AppError(409, "HOMEWORK_INCOMPLETE_ACKNOWLEDGEMENT_REQUIRED", "Confirm that you are submitting incomplete work.", { issues: readiness.incomplete });
+      const providedCode = await snapshotProvidedCode(scope.activityId, tx);
       const questionLanguage = await getHomeworkQuestionLanguage(scope.courseId);
       const questionGenerationAi = snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings));
       await tx.pluginCodingHomeworkSubmission.create({ data: { id: submissionId, ...activeWhere(scope), status: "uploaded", documentationSnapshotId: settings.preparedSnapshotId,
-        structureValidationSummary: json(validation), metadata: json({ workflowVersion: 2, questionGenerationAi, draftRevision: draft.revision, handInAt: new Date().toISOString(), incompleteAcknowledged: readiness.requiresAcknowledgement, questionLanguage,
+        structureValidationSummary: json(validation), metadata: json({ workflowVersion: 2, providedCode, questionGenerationAi, draftRevision: draft.revision, handInAt: new Date().toISOString(), incompleteAcknowledged: readiness.requiresAcknowledgement, questionLanguage,
           assignment: { candidateLimit: assignment.candidateLimit, languageKey: assignment.languageKey, promptMarkdown: assignment.promptMarkdown, generationInstructions: assignment.generationInstructions, questionCount: assignment.questionCount, retrievedExampleCount: assignment.retrievedExampleCount } }) } });
       await mkdir(path.join(directory, "files"), { recursive: true, mode: 0o750 });
       for (const entry of entries) {
@@ -76,7 +78,7 @@ export async function getHomeworkWorkspace(scope: HomeworkStudentScope) {
   const canReadQuestions = Boolean(active && record(active.metadata).assessmentStartedAt);
   return { submissionsEnabled: record(assignment?.settings).submissionsEnabled === true,
     submission: active ? { id: active.id, status: active.status, createdAt: active.createdAt.toISOString(), started: canReadQuestions, coreAttemptId: active.coreAttemptId,
-      processingStatus: job?.status ?? null, queuePosition: position, questionCount: Number(record(record(active.metadata).assignment).questionCount ?? assignment?.questionCount ?? 3),
+      processingStatus: job?.status ?? null, generationIssue: record(job?.error).code === "HOMEWORK_NO_ELIGIBLE_CODE" ? "no_eligible_code" as const : null, queuePosition: position, questionCount: Number(record(record(active.metadata).assignment).questionCount ?? assignment?.questionCount ?? 3),
       files: active.files.map(file => ({ path: file.path, sizeBytes: Number(file.sizeBytes) })),
       incompleteAcknowledged: record(active.metadata).incompleteAcknowledged === true } : null,
     previousCancelled: submission?.status === "cancelled" };

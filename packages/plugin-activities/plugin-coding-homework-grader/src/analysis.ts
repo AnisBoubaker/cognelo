@@ -1,3 +1,4 @@
+import { snapshotProvidedCode, readProvidedCodeBaseline, selectLearnerFunctions } from "./provided-code";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -129,6 +130,8 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
     const provider = createDeterministicContentEmbeddingProvider();
     const sourceFiles = await readStoredSourceFiles(submission.files);
     const parseResult = await parseCodingHomeworkSourceFiles(sourceFiles);
+    const providedCode = readProvidedCodeBaseline(normalizeObject(submission.metadata).providedCode) ?? await snapshotProvidedCode(scope.activityId);
+    const comparison = selectLearnerFunctions(parseResult.functions, providedCode);
     const fileIdsByPath = new Map(submission.files.map((file) => [file.path, file.id]));
     const snapshot = submission.documentationSnapshotId ? await findSnapshot(scope, submission.documentationSnapshotId) : null;
     const contentResourceIds = snapshot ? readSnapshotContentResourceIds(snapshot) : [];
@@ -143,7 +146,7 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
     referenceDiagnostics.push(...activityReferenceDocuments.diagnostics);
 
     const prepared: PreparedFunction[] = [];
-    for (const parsedFunction of parseResult.functions) {
+    for (const parsedFunction of comparison.eligible) {
       const fileId = fileIdsByPath.get(parsedFunction.sourcePath);
       if (!fileId) {
         continue;
@@ -240,6 +243,7 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
       dimensions: provider.dimensions,
       sourceFileCount: sourceFiles.length,
       parsedFunctionCount: parseResult.functions.length,
+      excludedProvidedFunctionCount: comparison.excluded.length,
       storedFunctionCount: created.length,
       selectedCandidateCount: selectedKeys.size,
       referenceResourceCount: contentResourceIds.length,
@@ -263,6 +267,7 @@ export async function analyzeCodingHomeworkSubmission(scope: AnalysisScope, inpu
               status: "completed"
             })
           ),
+          providedCode,
           analysis
         } as Prisma.InputJsonValue,
         processingError: null,

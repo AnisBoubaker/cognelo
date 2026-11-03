@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import path from "node:path";
 import { createHash } from "node:crypto";
 import { unzipSync, zipSync, strToU8 } from "fflate";
 const mocks = vi.hoisted(() => ({ files: vi.fn(), open: vi.fn(), close: vi.fn(), read: vi.fn() }));
@@ -12,8 +13,8 @@ function attachment(name: string, content: Buffer, mimeType = "text/plain") {
 }
 function readableFiles(entries: Array<{ originalName: string; storedName: string; sizeBytes: bigint; sha256: string; mimeType: string | null }>, contents: Buffer[]) {
   mocks.files.mockResolvedValue(entries);
-  mocks.open.mockImplementation(async (path: string) => {
-    const bytes = contents[entries.findIndex(entry => entry.storedName === path)];
+  mocks.open.mockImplementation(async (filePath: string) => {
+    const bytes = contents[entries.findIndex(entry => entry.storedName === path.basename(filePath))];
     return { stat: async () => ({ isFile: () => true, size: bytes.length }), close: mocks.close,
       read: async (target: Buffer, offset: number, length: number, position: number) => { mocks.read(length); const count = bytes.copy(target, offset, position, position + length); return { bytesRead: count }; }
     };

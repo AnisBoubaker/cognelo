@@ -1,3 +1,4 @@
+import { snapshotProvidedCode, readProvidedCodeBaseline, selectLearnerFunctions, excludesProvidedFunction } from "./provided-code";
 import { getHomeworkQuestionLanguage, homeworkQuestionSystemPrompt } from "./question-generation-policy";
 import { makeStudentQuestionContext, studentQuestionContext } from "./question-context";
 import { createHash } from "node:crypto";
@@ -117,7 +118,7 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
     throw new AppError(400, "CODING_HOMEWORK_SUBMISSION_NOT_READY", "Analyze a valid submission before generating challenge questions.");
   }
 
-  const candidates = await prisma.pluginCodingHomeworkSubmissionFunction.findMany({
+  const selectedFunctions = await prisma.pluginCodingHomeworkSubmissionFunction.findMany({
     where: {
       submissionId: submission.id,
       selectedForQuestion: true
@@ -125,9 +126,13 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
     include: { file: { select: { path: true, languageKey: true } } },
     orderBy: [{ divergenceScore: "desc" }, { functionName: "asc" }]
   });
+  const providedCode = readProvidedCodeBaseline(normalizeObject(submission.metadata).providedCode) ?? await snapshotProvidedCode(scope.activityId);
+  const candidates = selectLearnerFunctions(selectedFunctions, providedCode).eligible;
   if (!candidates.length) {
-    throw new AppError(400, "CODING_HOMEWORK_CANDIDATES_EMPTY", "Analyze the submission and select candidate functions before generating questions.");
+    throw new AppError(400, "CODING_HOMEWORK_CANDIDATES_EMPTY", "No new or modified candidate functions remain after excluding unchanged provided code. Analyze the student’s implementation before generating questions.");
   }
+  // Old submissions acquire one compact baseline when first processed, then reuse it.
+  submission.metadata = { ...normalizeObject(submission.metadata), providedCode };
 
   const operationId = buildProcessingOperationId("challenge-generation", submission.id);
   await prisma.pluginCodingHomeworkSubmission.update({
@@ -157,6 +162,7 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
 
     for (let index = 0; index < generationCandidates.length; index += 1) {
       const candidate = generationCandidates[index];
+      const excludedNames = [...new Set(providedCode.functions.map(fn => fn.name))].filter(name => name !== candidate.functionName);
       const prompt = buildChallengeQuestionPrompt({
         assignment: {
           generationInstructions: assignment?.generationInstructions ?? "",
@@ -167,14 +173,16 @@ async function generateChallengeQuestions(scope: GenerationScope, input: unknown
         candidate,
         locale: questionLanguage,
         orderIndex: index,
-        previousQuestions: generated.map(question => question.questionText)
+        previousQuestions: generated.map(question => question.questionText),
+        excludedProvidedFunctionNames: excludedNames.slice(0, 100)
       });
       const result = await generateOneChallengeQuestion({
         candidate,
         generatedAt,
         model: aiConnection.model,
         prompt,
-        aiConnection
+        aiConnection,
+        excludedNames
       });
       generated.push({
         ...result,
@@ -260,6 +268,7 @@ export function buildChallengeQuestionPrompt(input: {
   locale: "en" | "fr" | "zh" | "ar";
   orderIndex: number;
   previousQuestions?: string[];
+  excludedProvidedFunctionNames?: string[];
 }) {
   const nearestExamples = normalizeArray(input.candidate.nearestExamples);
   const systemPrompt = homeworkQuestionSystemPrompt(input.locale, input.assignment.generationInstructions);
@@ -277,6 +286,9 @@ export function buildChallengeQuestionPrompt(input: {
     "",
     "Nearest prior reference examples for private teacher/model context only. Do not reveal them to the student:",
     JSON.stringify(nearestExamples, null, 2),
+    "",
+    "Unchanged provided functions that must not be questioned:",
+    JSON.stringify(input.excludedProvidedFunctionNames ?? []),
     "",
     "Questions already generated for this submission (choose a distinct focus):",
     JSON.stringify(input.previousQuestions ?? []),
@@ -299,6 +311,7 @@ async function generateOneChallengeQuestion(input: {
   };
   candidate: SubmissionFunctionRow;
   generatedAt: string;
+  excludedNames?: string[];
   model: string;
   prompt: { systemPrompt: string; userPrompt: string };
 }) {
@@ -316,12 +329,12 @@ async function generateOneChallengeQuestion(input: {
     if (!parsed.ok) {
       lastPayload = raw;
       lastIssues = [parsed.issue];
-      userPrompt = buildCorrectionPrompt(raw, lastIssues);
+      userPrompt = `${input.prompt.userPrompt}\n\n${buildCorrectionPrompt(raw, lastIssues)}`;
       continue;
     }
 
     const validated = generatedChallengeQuestionSchema.safeParse(parsed.value);
-    if (validated.success) {
+    if (validated.success && !excludesProvidedFunction(validated.data.questionText, input.excludedNames ?? [])) {
       return {
         generationModel: input.model,
         questionText: validated.data.questionText,
@@ -342,8 +355,8 @@ async function generateOneChallengeQuestion(input: {
     }
 
     lastPayload = parsed.value;
-    lastIssues = validated.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`);
-    userPrompt = buildCorrectionPrompt(JSON.stringify(parsed.value, null, 2), lastIssues);
+    lastIssues = validated.success ? ["The question refers to unchanged teacher-provided code. Ask about the current eligible submitted function instead."] : validated.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`);
+    userPrompt = `${input.prompt.userPrompt}\n\n${buildCorrectionPrompt(JSON.stringify(parsed.value, null, 2), lastIssues)}`;
   }
 
   throw new AppError(422, "CODING_HOMEWORK_CHALLENGE_GENERATION_INVALID", "The AI agent could not generate a valid challenge question.", {

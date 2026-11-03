@@ -1,3 +1,4 @@
+import { snapshotProvidedCode, readProvidedCodeBaseline, selectLearnerFunctions, cSourceFingerprint, excludesProvidedFunction } from "./provided-code";
 import { getHomeworkQuestionLanguage, homeworkQuestionSystemPrompt } from "./question-generation-policy";
 import { makeStudentQuestionContext, type StudentQuestionContext } from "./question-context";
 import { getHomeworkQuestionConnection, storedHomeworkAiSelection } from "./ai-selection";
@@ -30,7 +31,14 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
     const sources = [];
     for (const file of submission.files.filter(file => file.languageKey === "c")) sources.push({ path: file.path, languageKey: "c", content: (await readFrozenHomeworkFile(file)).toString("utf8") });
     const parsed = await parseCodingHomeworkSourceFiles(sources);
-    const candidates = parsed.functions.slice(0, Math.max(1, Math.min(50, Number(settings.candidateLimit ?? 5))));
+    const providedCode = readProvidedCodeBaseline(metadata.providedCode) ?? await snapshotProvidedCode(scope.activityId);
+    if (!metadata.providedCode) await prisma.pluginCodingHomeworkSubmission.updateMany({ where: { id: submissionId, status: "processing" }, data: { metadata: json({ ...metadata, providedCode }) } });
+    const comparison = selectLearnerFunctions(parsed.functions, providedCode);
+    const candidates = comparison.eligible.slice(0, Math.max(1, Math.min(50, Number(settings.candidateLimit ?? 5))));
+    const fallbackSources = sources.filter(file => !providedCode.files.includes(cSourceFingerprint(file.content)));
+    if (!candidates.length && (parsed.functions.length > 0 || providedCode.functions.length > 0 || !fallbackSources.length)) {
+      throw new NonRetryableBackgroundJobError("No new or modified function could be identified for challenge questions. Unchanged teacher-provided code is excluded; review the student's implementation before requesting a new submission.", "HOMEWORK_NO_ELIGIBLE_CODE");
+    }
     const snapshot = record(submission.documentationSnapshot?.metadata);
     const indexes = Array.isArray(snapshot.indexIds) ? snapshot.indexIds.filter((id): id is string => typeof id === "string") : [];
     const search = await createPreparedMaterialSearch(scope.user, scope.courseId, indexes, scope.groupId, storedHomeworkAiSelection(snapshot.embeddingAi) ? record(snapshot.embeddingAi) : undefined);
@@ -40,7 +48,7 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
     const generated: Array<{ text: string; functionIndex: number | null; matches: unknown[]; context: StudentQuestionContext }> = [];
     const questionLanguage = await getHomeworkQuestionLanguage(scope.courseId, metadata.questionLanguage);
     const systemPrompt = homeworkQuestionSystemPrompt(questionLanguage, String(settings.generationInstructions ?? ""));
-    const fallbackSource = candidates.length ? "" : sources.map(file => `${file.path}\n${file.content}`).join("\n");
+    const fallbackSource = candidates.length ? "" : fallbackSources.map(file => `${file.path}\n${file.content}`).join("\n");
     for (let index = 0; index < questionCount; index++) {
       await leaseIsCurrent();
       const functionIndex = candidates.length ? index % candidates.length : null;
@@ -48,7 +56,8 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
       const source = candidate?.functionCode ?? fallbackSource.slice(0, 20_000);
       const matches = indexes.length ? await search.search(source.slice(0, 1800) || String(settings.promptMarkdown).slice(0, 1800), Number(settings.retrievedExampleCount ?? 3)) : [];
       const context = makeStudentQuestionContext({ code: source, filePath: candidate?.sourcePath, functionName: candidate?.functionName, truncated: !candidate && fallbackSource.length > 20_000, languageKey: String(settings.languageKey ?? "c") });
-      const userPrompt = JSON.stringify({ assignment: settings.promptMarkdown,
+      const excludedNames = [...new Set(providedCode.functions.map(fn => fn.name))].filter(name => name !== candidate?.functionName);
+      const userPrompt = JSON.stringify({ excludedProvidedFunctionNames: excludedNames.slice(0, 100), assignment: settings.promptMarkdown,
         submittedFile: candidate?.sourcePath, submittedCode: context.code, privateReferenceContext: matches.map(match => ({ title: match.title, text: match.text })),
         questionNumber: index + 1, totalQuestions: questionCount, previousQuestions: generated.map(question => question.text) });
       let questionText = "";
@@ -57,7 +66,7 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
         const output = await generateAiAgentText(connection, { systemPrompt, userPrompt, maxOutputTokens: 1200 });
         try {
           const value = JSON.parse(output.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
-          if (typeof value.questionText === "string" && value.questionText.trim().length >= 20 && value.questionText.length <= 3000 && !generated.some(question => question.text === value.questionText.trim())) questionText = value.questionText.trim();
+          if (typeof value.questionText === "string" && !excludesProvidedFunction(value.questionText, excludedNames) && value.questionText.trim().length >= 20 && value.questionText.length <= 3000 && !generated.some(question => question.text === value.questionText.trim())) questionText = value.questionText.trim();
         } catch { /* Retry malformed model output within a bounded job. */ }
       }
       if (!questionText) throw new AppError(422, "HOMEWORK_QUESTION_INVALID", "The AI service did not return a valid distinct challenge question.");
@@ -78,9 +87,9 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
         functionIds.push(fn.id);
       }
       for (const [orderIndex, question] of generated.entries()) await tx.pluginCodingHomeworkChallengeQuestion.create({ data: { submissionId, orderIndex, questionText: question.text,
-        submissionFunctionId: question.functionIndex !== null ? functionIds[question.functionIndex] : null, generationModel: connection.model, generationPromptVersion: "prepared-homework-v4", nearestExamples: json(question.matches), metadata: json({ generatedAt: new Date().toISOString(), questionLanguage, studentCodeContext: question.context }) } });
+        submissionFunctionId: question.functionIndex !== null ? functionIds[question.functionIndex] : null, generationModel: connection.model, generationPromptVersion: "prepared-homework-v5", nearestExamples: json(question.matches), metadata: json({ generatedAt: new Date().toISOString(), questionLanguage, studentCodeContext: question.context }) } });
       await tx.pluginCodingHomeworkSubmission.update({ where: { id: submissionId }, data: { status: "challenge_ready", processingError: null,
-        metadata: json({ ...record(current.metadata), questionLanguage, challengeGeneration: { questionCount, generatedAt: new Date().toISOString() }, parserDiagnostics: parsed.diagnostics }) } });
+        metadata: json({ ...record(current.metadata), providedCode, excludedProvidedFunctionCount: comparison.excluded.length, questionLanguage, challengeGeneration: { questionCount, generatedAt: new Date().toISOString() }, parserDiagnostics: parsed.diagnostics }) } });
     }, { timeout: 30_000 });
     return { submissionId, generatedQuestionCount: generated.length, submissionStatus: "challenge_ready" };
   } catch (error) {
