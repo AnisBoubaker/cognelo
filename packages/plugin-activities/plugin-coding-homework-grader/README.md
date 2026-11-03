@@ -14,6 +14,8 @@ Questions exclude unchanged functions from teacher-provided C/H files and ZIP co
 
 Students see only two conditional download actions: the assignment PDF and one ZIP containing the provided files. A sole uploaded ZIP is returned unchanged; other provided attachments are bundled with safe unique names. Teacher PDF previews/View PDF remain inline. Authorized file responses preserve bytes and content type.
 
+Challenge answering uses distinct numbered cards with the question first, a framed read-only code panel and a labelled answer area. Code and answer sit side by side when space permits and stack on small screens; long code scrolls within its panel. Autosave and submission behavior are preserved.
+
 ## Read by topic
 
 - [Approved choices and delivery scope](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md)

@@ -6261,17 +6261,80 @@ button:hover > .disclosure-indicator {
   border-top: 1px solid var(--line);
 }
 
-.challenge-question {
-  border: 1px solid var(--line);
-  border-radius: 8px;
+.homework-challenge-list {
   display: grid;
-  gap: 10px;
-  padding: 14px;
+  gap: 28px;
+  min-width: 0;
 }
 
-.challenge-question textarea {
-  min-height: 120px;
+.homework-challenge-question {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-block-start: 3px solid var(--brand-blue);
+  border-radius: 12px;
+  container-type: inline-size;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.homework-challenge-heading {
+  background: var(--surface-3);
+  border-block-end: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  padding: 18px 20px;
+  overflow-wrap: anywhere;
+}
+
+.homework-challenge-heading h4 { margin: 0; font-size: 1rem; color: var(--accent-strong); }
+.homework-challenge-heading .markdown-renderer { font-size: 1.05rem; font-weight: 600; }
+.homework-challenge-heading code { white-space: normal; }
+
+.homework-challenge-body {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  padding: 20px;
+}
+
+.homework-question-context { display: grid; align-content: start; gap: 8px; min-width: 0; }
+.homework-question-context-heading { display: grid; gap: 4px; font-size: 0.875rem; min-width: 0; }
+.homework-question-context-source { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); }
+.homework-question-context-source code { overflow-wrap: anywhere; white-space: normal; }
+.homework-question-context-code {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  direction: ltr;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  max-height: 22rem;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  scrollbar-gutter: stable;
+}
+.homework-question-context-code:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.homework-question-context-code .code-renderer { width: max-content; min-width: 100%; }
+.homework-question-context-code .code-renderer-line-content { white-space: pre; word-break: normal; }
+.homework-question-context > .muted { margin: 0; font-size: 0.875rem; }
+
+.homework-challenge-answer { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.homework-challenge-answer label { font-weight: 700; }
+.homework-challenge-answer textarea {
+  flex: 1;
+  min-height: 12rem;
+  line-height: 1.6;
   resize: vertical;
+}
+
+@container (min-width: 48rem) {
+  .homework-challenge-body.has-context { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .homework-challenge-heading, .homework-challenge-body { padding: 14px; }
 }
 
 .button.is-disabled {

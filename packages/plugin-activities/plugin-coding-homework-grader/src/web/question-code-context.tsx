@@ -7,9 +7,15 @@ import { homeworkWorkflowCopy } from "./workflow-copy";
 export function QuestionCodeContext({ context, locale }: { context?: StudentQuestionContext; locale: CodingHomeworkLocale }) {
   if (!context?.code) return null;
   const copy = homeworkWorkflowCopy(locale);
-  return <section className="stack homework-question-context" aria-label={copy.questionContext} style={{ minWidth: 0 }}>
-    <div><strong>{copy.questionContext}</strong>{context.filePath && <> · <code>{context.filePath}</code></>}{context.functionName && <> · <code>{context.functionName}</code></>}</div>
-    <div style={{ maxHeight: "28rem", overflow: "auto", maxWidth: "100%" }}><CodeRenderer code={context.code} language={context.languageKey} showLineNumbers /></div>
+  return <section className="homework-question-context" aria-label={copy.questionContext}>
+    <div className="homework-question-context-heading">
+      <strong>{copy.questionContext}</strong>
+      {(context.filePath || context.functionName) && <div className="homework-question-context-source">
+        {context.filePath && <code>{context.filePath}</code>}
+        {context.functionName && <code>{context.functionName}</code>}
+      </div>}
+    </div>
+    <div className="homework-question-context-code" tabIndex={0}><CodeRenderer code={context.code} language={context.languageKey} showLineNumbers /></div>
     {context.truncated && <p className="muted">{copy.contextTruncated}</p>}
   </section>;
 }

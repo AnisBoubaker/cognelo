@@ -41,7 +41,13 @@ test("homework questions use course language and teacher policy, and show submit
     await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/groups/${data.groupId}/activities`, { data: { activityId, availableFrom: null, availableUntil: null, metadata: { assessmentMode: "summative" }, config: {}, gradebookSettings: { pointsPossible: 100, maxAttempts: 1, attemptLimitMode: "max_attempts", gradeStrategy: "latest" } } }));
     const assigned = `/api/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}`;
     const endpoint = `${assigned}/coding-homework-grader`;
-    const source = 'int add(int left, int right) { /* <script>alert("code")</script> */ return left + right; }';
+    const source = [
+      "int add(int left, int right)", "{", '    /* <script>alert("code")</script> */',
+      '    const char *description = "This intentionally long source line verifies that code scrolls inside its own panel without widening the question or answer area.";',
+      "    (void)description;", "    int result = left;", "", "    if (right >= 0)", "    {",
+      "        for (int step = 0; step < right; step++)", "        {", "            result++;", "        }", "    }", "    else", "    {",
+      "        for (int step = 0; step > right; step--)", "        {", "            result--;", "        }", "    }", "", "    return result;", "}"
+    ].join("\n");
     await responseJson(await student.post(`${endpoint}/preparation`, { data: { kind: "file", path: "src/main.c", expectedRevision: 0, replace: false, base64: Buffer.from(source).toString("base64") } }));
     // A conflicting browser/session locale must never choose the academic question language.
     await responseJson(await student.post(`${endpoint}/hand-in`, { data: { expectedRevision: 1, locale: "ar" } }));
@@ -70,21 +76,42 @@ test("homework questions use course language and teacher policy, and show submit
     await studentPage.goto(assigned.replace(/^\/api/, ""));
     await studentPage.getByRole("button", { name: "Answer challenge questions", exact: true }).click();
     await expect(studentPage.getByRole("heading", { name: "Challenge questions", exact: true })).toBeVisible();
+    const cards = studentPage.locator(".homework-challenge-question");
+    await expect(cards).toHaveCount(3);
+    await expect(cards.nth(1).getByRole("heading", { name: "Question 2 of 3", exact: true })).toBeVisible();
     const contexts = studentPage.getByRole("region", { name: "Submitted code context", exact: true });
     await expect(contexts).toHaveCount(3);
-    await expect(contexts.first()).toContainText(source);
+    await expect(contexts.first().locator(".code-renderer-line-content")).toHaveText(source.split("\n"));
     await expect(contexts.first()).toContainText("src/main.c");
     await expect(contexts.first().locator("textarea, input, [contenteditable=true], script")).toHaveCount(0);
     await expect(studentPage.getByText("Question 1 : expliquez le résultat de cette fonction pour les arguments deux et trois.", { exact: true })).toBeVisible();
     const publicQuestions = await responseJson<{ questions: Array<{ context: { code: string; functionName: string; filePath: string } }> }>(await student.get(`${endpoint}/answering`));
     expect(publicQuestions.questions[0].context).toMatchObject({ code: source, functionName: "add", filePath: "src/main.c" });
     expect(JSON.stringify(publicQuestions)).not.toMatch(/PRIVATE_TEACHER_POLICY|nearestExamples|astText|storedName|generationModel/);
-    await studentPage.locator('textarea[id^="answer-"]').first().fill("La fonction retourne cinq.");
+    await studentPage.getByRole("textbox", { name: "Your answer Question 1 of 3", exact: true }).fill("La fonction retourne cinq.");
     await expect(studentPage.getByText("Saved", { exact: true })).toBeVisible();
     await studentPage.reload();
-    await expect(contexts.first()).toContainText(source);
+    await expect(contexts.first().locator(".code-renderer-line-content")).toHaveText(source.split("\n"));
     await expect(studentPage.locator('textarea[id^="answer-"]').first()).toHaveValue("La fonction retourne cinq.");
+    const desktop = await cards.first().evaluate(card => {
+      const header = card.querySelector("header")!.getBoundingClientRect();
+      const code = card.querySelector(".homework-question-context")!.getBoundingClientRect();
+      const answer = card.querySelector("textarea")!.getBoundingClientRect();
+      return { promptBeforeCode: header.bottom <= code.top, sideBySide: answer.left >= code.right };
+    });
+    expect(desktop).toEqual({ promptBeforeCode: true, sideBySide: true });
+    await cards.first().scrollIntoViewIfNeeded();
+    await studentPage.screenshot({ path: "tmp/homework-question-cards-desktop.png" });
     await studentPage.setViewportSize({ width: 390, height: 844 });
+    const mobile = await cards.first().evaluate(card => {
+      const code = card.querySelector(".homework-question-context")!.getBoundingClientRect();
+      const answer = card.querySelector("textarea")!.getBoundingClientRect();
+      const scroll = card.querySelector(".homework-question-context-code")!;
+      return { stacked: answer.top >= code.bottom, codeScrolls: scroll.scrollWidth > scroll.clientWidth };
+    });
+    expect(mobile).toEqual({ stacked: true, codeScrolls: true });
+    const firstCard = await cards.first().boundingBox(), secondCard = await cards.nth(1).boundingBox();
+    expect(secondCard!.y - (firstCard!.y + firstCard!.height)).toBeGreaterThanOrEqual(24);
     expect(await studentPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await studentPage.screenshot({ path: "tmp/homework-question-context-mobile.png", fullPage: true });
   } finally {

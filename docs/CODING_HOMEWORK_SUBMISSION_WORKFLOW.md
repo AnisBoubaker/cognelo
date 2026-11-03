@@ -92,6 +92,8 @@ At timeout, finalize the server-saved answers, including blanks. Do not accept n
 
 Each challenge shows the relevant function code from the student's frozen submission, with its filename and function name, beside the answer area. It is read-only; private reference code and teacher instructions are never included. For incomplete/unparseable work, show the submitted-code context used by generation. Bounded excerpts indicate truncation and the complete submitted files remain available.
 
+The November 3 presentation refinement gives each question a separate numbered card. The prompt precedes the code, and code/answer appear side by side where space permits, stacked otherwise. Long code stays inside its own scrollable frame; the next question begins with a clearly separated header. Existing questions and saved answers use the same improved presentation.
+
 Teachers enter private AI question-generation instructions in the homework Settings tab and save them with the activity. These are authoritative generation policy, not ordinary evidence or grading notes. Questions use the course Subject's teaching language, never the student/session UI locale. Language and instructions are frozen for each new hand-in so later settings changes cannot split an existing question set. Existing questions retain their wording and gain available code context without being regenerated.
 
 ## Challenge difficulty and expected answers — November 3, 2026

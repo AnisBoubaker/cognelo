@@ -1,7 +1,7 @@
 "use client";
 
 import { HomeworkDownloads } from "./homework-downloads";
-import { QuestionCodeContext } from "./question-code-context";
+import { HomeworkChallengeQuestion } from "./homework-challenge-question";
 import { createPortal } from "react-dom";
 import { HomeworkSubmissionManagement } from "./homework-submission-management";
 import { reconcileTeacherSolutionRequirements, type TeacherSolutionSelection } from "../teacher-solution-selection";
@@ -1353,22 +1353,11 @@ function ChallengeQuestionsPanel({
         </div>
         <span className={complete ? "status-pill is-enabled" : "status-pill"}>{complete ? copy.submissionComplete : copy.challengesReady}</span>
       </div>
-      <div className="stack">
-        {questions.map((question) => (
-          <div className="challenge-question" key={question.id}>
-            <QuestionCodeContext context={question.context} locale={locale} />
-            <p>
-              <strong>{question.orderIndex + 1}.</strong> {question.questionText}
-            </p>
-            <textarea
-              aria-label={`${copy.answer} ${question.orderIndex + 1}`}
-              disabled={complete}
-              rows={5}
-              value={answers[question.id] ?? ""}
-              onChange={(event) => onAnswerChange(question.id, event.target.value)}
-            />
-          </div>
-        ))}
+      <div className="homework-challenge-list">
+        {questions.map((question, index) => <HomeworkChallengeQuestion key={question.id}
+          question={question} number={index + 1} total={questions.length} locale={locale}
+          disabled={complete} value={answers[question.id] ?? ""}
+          onChange={value => onAnswerChange(question.id, value)} />)}
       </div>
       {complete ? null : (
         <div className="inline-actions">

@@ -1,7 +1,7 @@
 "use client";
 import { HomeworkDownloads } from "./homework-downloads";
 import { HomeworkFileViewer } from "./homework-file-viewer";
-import { QuestionCodeContext } from "./question-code-context";
+import { HomeworkChallengeQuestion } from "./homework-challenge-question";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActionIcon, MarkdownRenderer, ProgressDialog, useDialogs, useNotifications, isActivityContentClosedError } from "@cognelo/activity-ui";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
@@ -147,7 +147,12 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     </section>}
     {active && !["challenge_ready", "ready_for_grading", "graded"].includes(active.status) && <div role="status" className="preview-panel"><strong>{active.generationIssue === "no_eligible_code" ? copy.noEligibleCode : active.processingStatus === "failed" ? copy.generationFailed : copy.generating}</strong>{active.processingStatus !== "failed" && <>{active.queuePosition && <p>{copy.queue}: {active.queuePosition}</p>}<p>{copy.leave}</p></>}</div>}
     {active?.status === "challenge_ready" && !questions.length && <><p>{copy.answerHelp}</p><button type="button" onClick={() => void start()}><ActionIcon name="open" /> {copy.answer}</button></>}
-    {questions.length > 0 && <><h3>{copy.answers}</h3><p className="muted">{copy.autoSave}</p>{questions.map((question, index) => <div key={question.id} className="field"><QuestionCodeContext context={question.context} locale={locale} /><label htmlFor={`answer-${question.id}`}><strong>{index + 1}.</strong><MarkdownRenderer markdown={question.questionText} /></label><textarea id={`answer-${question.id}`} rows={5} maxLength={12000} disabled={completed || Boolean(timedAutoSubmit)} value={answers[question.id] ?? ""} onChange={event => { dirty.current = true; setSaved(false); setAnswers(current => ({ ...current, [question.id]: event.target.value })); }} onBlur={() => void saveAnswers()} /></div>)}
+    {questions.length > 0 && <><h3>{copy.answers}</h3><p className="muted">{copy.autoSave}</p>
+      <div className="homework-challenge-list">{questions.map((question, index) => <HomeworkChallengeQuestion key={question.id}
+        question={question} number={index + 1} total={questions.length} locale={locale} value={answers[question.id] ?? ""}
+        maxLength={12000} disabled={completed || Boolean(timedAutoSubmit)}
+        onChange={value => { dirty.current = true; setSaved(false); setAnswers(current => ({ ...current, [question.id]: value })); }}
+        onBlur={() => void saveAnswers()} />)}</div>
       {!completed && <div className="row"><button type="button" className="secondary" onClick={() => void saveAnswers()}><ActionIcon name="save" /> {copy.saveAnswers}</button><button type="button" onClick={() => void submitAnswers()}><ActionIcon name="submit" /> {copy.submitAnswers}</button>{saved && <span role="status">{copy.saved}</span>}</div>}
     </>}
     {completed && <p role="status">{copy.submitted}</p>}
