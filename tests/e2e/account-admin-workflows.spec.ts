@@ -1,14 +1,14 @@
-import { prisma, Prisma } from "@cognelo/db";
+import { prisma } from "@cognelo/db";
 import {
   WEB_BASE_URL,
-  credentialsFor,
   confirmSharedDialog,
   createAuthenticatedApi,
   expect,
   loginWithCredentialsThroughUi,
   test
 } from "./fixtures/auth";
-import { responseJson } from "./fixtures/activity-suite";
+import { responseJson, provisionActivitySuite, removeActivitySuite } from "./fixtures/activity-suite";
+import { isolatedAiOwner } from "./fixtures/isolated-ai-owner";
 import { capturedEmailsFor, removeCapturedEmailsFor } from "./fixtures/email-outbox";
 
 test.describe.serial("account lifecycle", () => {
@@ -140,8 +140,10 @@ test.describe.serial("administrator settings integrations", () => {
     await prisma.aiAgentConnection.deleteMany({ where: { displayName: { contains: token } } });
   });
 
-  test("creates, edits, selects, and deletes an AI model connection", async ({ adminPage: page }) => {
-    const administrator = await prisma.user.findUniqueOrThrow({ where: { email: credentialsFor("admin").email } });
+  test("creates, edits, selects, and deletes an AI model connection", async ({ browser }) => {
+    const data = await provisionActivitySuite();
+    const owner = await isolatedAiOwner(data);
+    const page = await owner.page(browser);
     try {
       await page.goto("/settings/ai-agents");
       await page.getByLabel("Display name").fill(connectionName);
@@ -168,7 +170,7 @@ test.describe.serial("administrator settings integrations", () => {
       await confirmSharedDialog(page, "Remove");
       await expect(updatedRow).toHaveCount(0);
     } finally {
-      await prisma.user.update({ where: { id: administrator.id }, data: { metadata: administrator.metadata ?? Prisma.JsonNull } });
+      await owner.close(); await removeActivitySuite(data);
     }
   });
 
@@ -193,8 +195,8 @@ test.describe.serial("administrator settings integrations", () => {
     const initialConfiguration = emailConfiguration({ fromName: "Cognelo", fromEmail: "before@example.invalid" });
     const updatedConfiguration = emailConfiguration({ fromName: "Cognelo E2E", fromEmail: "after@example.invalid" });
     let savedBody: Record<string, unknown> | undefined;
-    let markTestStarted = () => undefined;
-    let releaseTest = () => undefined;
+    let markTestStarted: () => void = () => undefined;
+    let releaseTest: () => void = () => undefined;
     const testStarted = new Promise<void>((resolve) => { markTestStarted = resolve; });
     const testGate = new Promise<void>((resolve) => { releaseTest = resolve; });
     await page.route("**/api/settings/email", async (route) => {
@@ -264,8 +266,8 @@ test.describe.serial("administrator settings integrations", () => {
     test.setTimeout(120_000);
     const before = mediaOverview({ candidateAssets: 2, newlyUnreferenced: 1 });
     const after = mediaOverview({ candidateAssets: 0, newlyUnreferenced: 0 });
-    let markCleanupStarted = () => undefined;
-    let releaseCleanup = () => undefined;
+    let markCleanupStarted: () => void = () => undefined;
+    let releaseCleanup: () => void = () => undefined;
     const cleanupStarted = new Promise<void>((resolve) => { markCleanupStarted = resolve; });
     const cleanupGate = new Promise<void>((resolve) => { releaseCleanup = resolve; });
     await page.route("**/api/maintenance/media", async (route) => {

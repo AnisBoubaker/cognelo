@@ -1,3 +1,4 @@
+import { isolatedAiOwner } from "./fixtures/isolated-ai-owner";
 import { prisma } from "@cognelo/db";
 import { getCourseTeacherQuestionAuthoringAiAgentConnection } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -389,7 +390,7 @@ test.describe.serial("explicit course teachers and section-scoped staff", () => 
     const coTeacherApi = await createAuthenticatedApiWithCredentials(current.coTeacher);
     let ownerConnectionId = "";
     let coTeacherConnectionId = "";
-    let ownerPreviousQuestionAgentId: string | null = null;
+    let aiOwner: Awaited<ReturnType<typeof isolatedAiOwner>> | undefined;
     let coTeacherPreviousQuestionAgentId: string | null = null;
     try {
       const sourceDescription = `Owner bank source ${current.data.token}`;
@@ -432,9 +433,11 @@ test.describe.serial("explicit course teachers and section-scoped staff", () => 
       );
       expect(ownerBankView.activity.description).toBe(sourceDescription);
 
+      aiOwner = await isolatedAiOwner(current.data, { keepSharedTeacherAccess: false });
+      const aiOwnerApi = aiOwner.api;
       const ownerSecret = `owner-secret-${current.data.token}`;
       const { connection: ownerConnection } = await responseJson<{ connection: { id: string } }>(
-        await ownerApi.post("/api/ai-agents", {
+        await aiOwnerApi.post("/api/ai-agents", {
           data: {
             displayName: `Owner private model ${current.data.token}`,
             provider: "openai",
@@ -465,9 +468,8 @@ test.describe.serial("explicit course teachers and section-scoped staff", () => 
         connections: Array<{ id: string; hasApiKey: boolean }>;
         preferences: { questionAuthoringAiAgentConnectionId: string | null };
       }>(
-        await ownerApi.get("/api/ai-agents")
+        await aiOwnerApi.get("/api/ai-agents")
       );
-      ownerPreviousQuestionAgentId = ownerConnections.preferences.questionAuthoringAiAgentConnectionId;
       expect(ownerConnections.connections).toContainEqual(expect.objectContaining({ id: ownerConnectionId, hasApiKey: true }));
       expect(JSON.stringify(ownerConnections)).not.toContain(ownerSecret);
       const coTeacherConnections = await responseJson<{
@@ -485,13 +487,13 @@ test.describe.serial("explicit course teachers and section-scoped staff", () => 
         data: { questionAuthoringAiAgentConnectionId: ownerConnectionId }
       })).status()).toBe(404);
 
-      await responseJson(await ownerApi.patch("/api/ai-agents/preferences", {
+      await responseJson(await aiOwnerApi.patch("/api/ai-agents/preferences", {
         data: { questionAuthoringAiAgentConnectionId: ownerConnectionId }
       }));
       await responseJson(await coTeacherApi.patch("/api/ai-agents/preferences", {
         data: { questionAuthoringAiAgentConnectionId: coTeacherConnectionId }
       }));
-      await responseJson(await ownerApi.patch(`/api/courses/${current.data.courseId}/settings`, {
+      await responseJson(await aiOwnerApi.patch(`/api/courses/${current.data.courseId}/settings`, {
         data: {
           studentSupportAiAgentConnectionId: ownerConnectionId,
           automaticFeedbackEnabled: false,
@@ -523,19 +525,16 @@ test.describe.serial("explicit course teachers and section-scoped staff", () => 
       };
       await expect(getCourseTeacherQuestionAuthoringAiAgentConnection(learner, current.data.courseId))
         .resolves.toMatchObject({ id: ownerConnectionId });
-      await responseJson(await ownerApi.patch(`/api/ai-agents/${ownerConnectionId}`, {
+      await responseJson(await aiOwnerApi.patch(`/api/ai-agents/${ownerConnectionId}`, {
         data: { isEnabled: false }
       }));
       await expect(getCourseTeacherQuestionAuthoringAiAgentConnection(learner, current.data.courseId))
         .resolves.toMatchObject({ id: coTeacherConnectionId });
     } finally {
-      await ownerApi.patch("/api/ai-agents/preferences", {
-        data: { questionAuthoringAiAgentConnectionId: ownerPreviousQuestionAgentId }
-      }).catch(() => undefined);
       await coTeacherApi.patch("/api/ai-agents/preferences", {
         data: { questionAuthoringAiAgentConnectionId: coTeacherPreviousQuestionAgentId }
       }).catch(() => undefined);
-      if (ownerConnectionId) await ownerApi.delete(`/api/ai-agents/${ownerConnectionId}`).catch(() => undefined);
+      await aiOwner?.close();
       if (coTeacherConnectionId) await coTeacherApi.delete(`/api/ai-agents/${coTeacherConnectionId}`).catch(() => undefined);
       await coTeacherApi.dispose();
       await ownerApi.dispose();
