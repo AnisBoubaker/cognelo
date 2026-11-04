@@ -36,3 +36,18 @@ it("never stores an incomplete slide index after a required source fails", async
   await expect(linkMaterialIndexing.prepare({ user, resource, store })).rejects.toThrow("HTTP 404");
   expect(store).not.toHaveBeenCalled();
 });
+
+it("never sends navigation/loading-only content to embedding storage", async () => {
+  fetchMaterial.mockResolvedValue({ url: "https://example.org/course/", contentType: "text/html", bytes: Buffer.from('<title>Programming course</title><nav>Home Courses Login</nav><main>Loading…</main>') });
+  const store = vi.fn();
+  await expect(linkMaterialIndexing.prepare({ user, resource, store })).rejects.toMatchObject({ code: "MATERIAL_LINK_TEXT_INCOMPLETE" });
+  expect(store).not.toHaveBeenCalled();
+});
+
+it.each(["", "<html><title>Redirected landing page</title></html>"])("rejects an empty or HTML slide response before storage", async value => {
+  fetchMaterial.mockResolvedValueOnce({ url: "https://example.org/course/", contentType: "text/html", bytes: Buffer.from('<section data-markdown="chapter.md"></section>') });
+  fetchMaterial.mockResolvedValueOnce({ url: "https://example.org/course/chapter.md", contentType: value ? "text/html" : "text/markdown", bytes: Buffer.from(value) });
+  const store = vi.fn();
+  await expect(linkMaterialIndexing.prepare({ user, resource, store })).rejects.toMatchObject({ code: "MATERIAL_SLIDE_UNREADABLE" });
+  expect(store).not.toHaveBeenCalled();
+});

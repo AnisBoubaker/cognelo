@@ -21,3 +21,5 @@ The [Coding Homework workflow](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW
 ## Prepared embedding service
 
 This material provides plugin-owned preparation/refresh through core. See [material embedding services](../../../docs/MATERIAL_EMBEDDING_SERVICES.md) for source extraction, reuse, freshness and limits. The prior deterministic index handlers remain a legacy compatibility path; Coding Homework uses the prepared semantic service.
+
+Prepared HTML extraction excludes page chrome and rejects title/navigation-only pages, common loading/login/JavaScript shells, and unreadable required slide sources before sending text for embeddings. These are failure checks, not a guarantee that every arbitrary website was extracted completely. Sites requiring script execution still need a readable public PDF/text alternative or an upload.
