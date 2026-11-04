@@ -81,6 +81,23 @@ describe("internal link summary generation", () => {
     mocks.generate.mockResolvedValue("  ");
     await expect(generateLinkSummary(user, "course-1", { url: "https://example.org" })).rejects.toMatchObject({ code: "LINK_SUMMARY_EMPTY" });
   });
+
+  it.each([200, 404])("passes actual slide content to AI only after every Markdown source succeeds (HTTP %i)", async status => {
+    const actual = await vi.importActual<typeof import("./fetch-page")>("./fetch-page");
+    const request = vi.fn(async (url: URL) => url.pathname.endsWith(".md")
+      ? { status, headers: { "content-type": "text/markdown" }, body: Buffer.from("# C parameters\nPARAMETER_CONTENT: functions receive arguments from their caller.") }
+      : { status: 200, headers: { "content-type": "text/html" }, body: Buffer.from('<title>A lecture title with sufficient characters to mask missing slides</title><section data-markdown="slides/parameters.md"></section><script>executeNothing()</script>') });
+    mocks.fetchPage.mockImplementation(url => actual.fetchLinkPage(url, { resolve: async () => [{ address: "93.184.215.14", family: 4 }], request }));
+    if (status === 404) {
+      await expect(generateLinkSummary(user, "course-1", { url: "https://example.org/lecture/" })).rejects.toMatchObject({ code: "LINK_HTTP_STATUS" });
+      expect(mocks.generate).not.toHaveBeenCalled();
+    } else {
+      await generateLinkSummary(user, "course-1", { url: "https://example.org/lecture/" });
+      expect(mocks.generate.mock.calls[0]![1].userPrompt).toContain("PARAMETER_CONTENT");
+      expect(mocks.generate.mock.calls[0]![1].userPrompt).not.toContain("executeNothing");
+    }
+    expect(request).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("summary link-following option", () => {

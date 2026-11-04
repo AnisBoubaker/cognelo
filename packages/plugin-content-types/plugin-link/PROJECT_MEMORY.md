@@ -16,6 +16,7 @@
 - Reuse `ActionIcon` from `@cognelo/activity-ui` and the shared [action-button rules](../../../docs/ACTION_BUTTONS.md); keep localized labels and action semantics, without plugin-local SVG/emoji substitutes.
 
 - Prepared reference indexing extracts public static teaching pages, PDFs and Reveal.js inline/same-origin external Markdown. Keep it separate from private summarization and retain the public-network limits; do not execute page scripts.
+- Summary and indexing share plugin-owned slide discovery. A deck's `data-markdown` files are its content, not optional link crawling: load them even when following links is off. Summary slide requests retain the shared 10-second budget, HTTP/DNS/redirect guards and bounded extraction, and reserve text for every chapter. Fail before AI on an unreadable required source; never silently summarize a title-only shell. Embeddings retain full bounded source text independently of the shorter summary context.
 
 
 - Own `indexing.policy` and `indexing.prepare`; core supplies authorized embedding storage and search. Never call a sibling plugin. Prepared semantic indexes remain outside public resource metadata. See [service contract](../../../docs/MATERIAL_EMBEDDING_SERVICES.md).

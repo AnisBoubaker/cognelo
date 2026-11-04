@@ -119,6 +119,8 @@ Outbox assertions require local access to the API’s storage. Use synthetic dom
 
 `link-summary.spec.ts` verifies the internal summary draft, default/custom word limit, explicit Save, failure preservation, mobile controls, private endpoint authorization, absence from learner metadata, duplicate isolation, and private-row cleanup. Only the generated AI response/error is simulated in the browser; persistence and access checks use real services. Server tests prove HTTP 200 gating, network restrictions, no AI call after failed fetches, and course-language/word-limit enforcement. Run `npm run db:migrate:all` first to create the private Link settings table.
 
+Link server regressions also verify that Reveal.js Markdown files reach the summary prompt even with link following disabled, every required source passes its HTTP/public-address gate, failed sources never call AI, later chapters survive bounded summary extraction, and prepared embeddings retain the full source independently of summary limits. Public teaching-page probes run locally without generating paid AI output or writing an index.
+
 ## Focused regression checks
 
 Run the independent authoring-recovery, bank-synchronization, course-loading, student-grouping, activity-exception, and live compound-Test scenarios with:

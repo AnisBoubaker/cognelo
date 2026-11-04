@@ -124,3 +124,77 @@ describe("one-level link extraction", () => {
     expect(request).not.toHaveBeenCalled();
   });
 });
+
+describe("Reveal.js summary content", () => {
+  const deck = '<title>C lecture</title><section data-markdown="slides/intro.md"></section><section data-markdown="slides/last.md#one"></section><section data-markdown="slides/last.md#two"></section><script>executeNothing()</script>';
+  const html = (value: string) => ({ status: 200, headers: { "content-type": "text/html" }, body: Buffer.from(value) });
+  const markdown = (value: string) => ({ status: 200, headers: { "content-type": "text/markdown; charset=utf-8" }, body: Buffer.from(value) });
+
+  it("reads every declared slide file without enabling link crawling or fetching scripts", async () => {
+    const request = vi.fn(async (url: URL) => url.pathname.endsWith(".md")
+      ? markdown(url.pathname.endsWith("intro.md") ? "# Variables\nA variable stores a typed value. [Not a slide source](deeper.md)" : "# Input and output\nprintf displays formatted values.") : html(deck));
+    const page = await fetchLinkPage("https://example.org/course/", { resolve, request });
+    expect(page.text).toContain("A variable stores a typed value");
+    expect(page.text).toContain("printf displays formatted values");
+    expect(page.text).not.toContain("executeNothing");
+    expect(page.links).toEqual([]);
+    expect(request.mock.calls.map(([url]) => url.href)).toEqual(["https://example.org/course/", "https://example.org/course/slides/intro.md", "https://example.org/course/slides/last.md"]);
+  });
+
+  it("reads inert inline Markdown and directly linked Markdown pages", async () => {
+    const page = await fetchLinkPage("https://example.org", { resolve, request: async () => html(`<section data-markdown><script type="text/template"># Pointers\n${pageText}\nint *p;</script></section><script>executeNothing()</script>`) });
+    expect(page.text).toContain("int *p;"); expect(page.text).not.toContain("executeNothing");
+    expect((await fetchLinkPage("https://example.org/lesson.md", { resolve, request: async () => markdown(pageText) })).text).toBe(pageText);
+  });
+
+  it("reserves bounded text for the final chapter instead of filling the summary with early slides", async () => {
+    const page = await fetchLinkPage("https://example.org/", { resolve, request: async url => url.pathname.endsWith(".md")
+      ? markdown(url.pathname.endsWith("intro.md") ? "Early chapter. ".repeat(4000) : "FINAL_CHAPTER: formatted input and output.") : html(deck) });
+    expect(page.shortened).toBe(true);
+    expect(page.text.length).toBeLessThanOrEqual(24_000);
+    expect(page.text).toContain("FINAL_CHAPTER");
+  });
+
+  it("fails when a required slide is unreadable rather than summarizing the page shell", async () => {
+    const request = vi.fn(async (url: URL) => url.pathname.endsWith(".md") ? { status: 404, headers: {}, body: Buffer.alloc(0) } : html(deck));
+    await expect(fetchLinkPage("https://example.org/", { resolve, request })).rejects.toMatchObject({ code: "LINK_HTTP_STATUS", details: { status: 404 } });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["https://elsewhere.example/lesson.md", "https://user:pass@example.org/lesson.md"])("rejects an unrelated or credential-bearing slide source %s", async url => {
+    const request = vi.fn(async () => html(`<section data-markdown="${url}"></section>`));
+    await expect(fetchLinkPage("https://example.org/", { resolve, request })).rejects.toMatchObject({ code: "LINK_SLIDE_ORIGIN" });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks slide DNS and rejects cross-origin redirects before connecting", async () => {
+    const request = vi.fn(async (url: URL) => url.pathname.endsWith(".md")
+      ? { status: 302, headers: { location: "https://example.org:8443/other.md" }, body: Buffer.alloc(0) } : html(deck));
+    await expect(fetchLinkPage("https://example.org/", { resolve, request })).rejects.toMatchObject({ code: "LINK_SLIDE_ORIGIN" });
+    expect(request).toHaveBeenCalledTimes(2);
+    request.mockClear();
+    const dns = vi.fn().mockResolvedValueOnce([publicAddress]).mockResolvedValueOnce([{ address: "127.0.0.1", family: 4 }]);
+    await expect(fetchLinkPage("https://example.org/", { resolve: dns, request })).rejects.toMatchObject({ code: "LINK_URL_NOT_PUBLIC" });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds source count, individual bytes and aggregate slide text", async () => {
+    const many = Array.from({ length: 31 }, (_, i) => `<section data-markdown="${i}.md"></section>`).join("");
+    const request = vi.fn(async () => html(many));
+    await expect(fetchLinkPage("https://example.org/", { resolve, request })).rejects.toMatchObject({ code: "LINK_SLIDE_LIMIT" });
+    expect(request).toHaveBeenCalledTimes(1);
+    await expect(fetchLinkPage("https://example.org/", { resolve, request: async url => url.pathname.endsWith(".md")
+      ? markdown("x".repeat(512 * 1024 + 1)) : html(deck) })).rejects.toMatchObject({ code: "LINK_PAGE_TOO_LARGE" });
+    await expect(fetchLinkPage("https://example.org/", { resolve, request: async url => url.pathname.endsWith(".md")
+      ? markdown("x".repeat(512 * 1024)) : html(many.replace(/<section data-markdown="(?:9|[12]\d|30)\.md"><\/section>/g, "")) })).rejects.toMatchObject({ code: "LINK_SLIDE_LIMIT" });
+  });
+
+  it("shares the existing total deadline with slide requests", async () => {
+    vi.useFakeTimers();
+    const dns = vi.fn().mockResolvedValueOnce([publicAddress]).mockImplementation(() => new Promise(() => {}));
+    const request = vi.fn(async () => html(deck));
+    const pending = expect(fetchLinkPage("https://example.org/", { resolve: dns, request })).rejects.toMatchObject({ code: "LINK_FETCH_TIMEOUT" });
+    await vi.advanceTimersByTimeAsync(10_001);
+    await pending; expect(request).toHaveBeenCalledTimes(1);
+  });
+});
