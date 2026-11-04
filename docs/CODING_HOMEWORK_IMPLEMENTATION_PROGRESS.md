@@ -13,6 +13,7 @@
 - [x] Teacher cancellation from activity details/editor, retained evidence, associated grade withdrawal and one replacement after release without changing class-wide release.
 - [x] English/French/Chinese/Arabic states, course and bank private-solution authoring, migrated existing homework acceptance tests and updated documentation.
 - [x] Local migration, full typecheck/unit/architecture/build validation, eight focused E2E scenarios and public extraction checks.
+- [x] Same-course duplication retains authoring/model/reference configuration and independently owned prepared snapshots without copying student or assignment state. See the November 4 checkpoint below.
 
 ## Validation evidence
 
@@ -155,3 +156,9 @@ Review and grade now fills the shared wide workspace (up to 1840 px), keeping me
 The new staff-only `gradebook-file` route reads one exact retained file on demand after group grading authorization and participant/submission/core-attempt ownership checks. It reuses frozen-file path/size/hash validation and the existing text preview bound. Learners, foreign participants/submissions and unknown paths are denied. No source is eagerly added to review lists, and review never regenerates questions.
 
 Validation: 1,838 unit tests, workspace typechecks, focused lint and three local E2E scenarios passed. Checks cover wide toolbar/panel alignment, one dialog, mobile containment, first-file selection/content, nested paths, file authorization, question/blank-answer rendering, unsaved-grade cancellation and persisted grading. Student file viewing and challenge context/autosave regressions also passed. Desktop/mobile screenshots were inspected. Root/plugin navigation, memory and canonical review/dialog references were reviewed and updated; no migration or documentation verification gap remains.
+
+## Same-course duplication — November 4
+
+The plugin's course-duplication hook now preserves explicit question/embedding model choices and the effective source material selection. It clones the active prepared snapshot while sharing its immutable core index IDs; cached embeddings are not regenerated. Default materials are resolved at the source placement, including unsaved homework. Existing attachment/private-solution/requirement copying stays independent. Submission opening, core assignment/delivery settings, student work and grades are excluded; bank transfers retain their existing context-reset policy.
+
+Validation: 96 focused unit tests across 26 files, API/plugin typechecks, focused lint and plugin-boundary checks passed. Both local Playwright duplication scenarios passed, including real source hand-in/answers/grading, browser duplication, exact PDF bytes, copied private solution/requirements/models, no duplicated academic records, independent snapshots surviving source deletion, opening without new model calls, and default-selection preservation. The initial E2E run exposed a fixture cleanup-order error; cleanup now deletes fixture-owned copies before deleting its temporary teacher. The plugin README/memory/reference, approved workflow, test documentation and root duplication contract were reviewed; no migration or core implementation change was needed.

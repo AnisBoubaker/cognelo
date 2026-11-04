@@ -1,6 +1,6 @@
 import { codingHomeworkAttachmentPath } from "./attachment-storage";
 export { codingHomeworkAttachmentPath } from "./attachment-storage";
-import { lockHomeworkSettings, workflowSettingKeys } from "./workflow-settings";
+import { getHomeworkReferenceSelection, lockHomeworkSettings, workflowSettingKeys, type HomeworkTeacherScope } from "./workflow-settings";
 import { copyHomeworkTeacherSolution, lockHomeworkTeacherSolution } from "./teacher-solution";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -375,7 +375,7 @@ export async function copyBankCodingHomeworkAuthoringToCourseActivity(params: { 
           retrievedExampleCount: assignment.retrievedExampleCount,
           questionCount: assignment.questionCount,
           generationInstructions: assignment.generationInstructions,
-          settings: copiedHomeworkSettings(assignment.settings) as Prisma.InputJsonValue
+          settings: copiedBankHomeworkSettings(assignment.settings) as Prisma.InputJsonValue
         }
       });
     }
@@ -430,7 +430,7 @@ export async function copyBankCodingHomeworkAuthoring(params: { sourceBankActivi
           retrievedExampleCount: assignment.retrievedExampleCount,
           questionCount: assignment.questionCount,
           generationInstructions: assignment.generationInstructions,
-          settings: copiedHomeworkSettings(assignment.settings) as Prisma.InputJsonValue
+          settings: copiedBankHomeworkSettings(assignment.settings) as Prisma.InputJsonValue
         }
       });
     }
@@ -477,7 +477,7 @@ export async function copyCourseCodingHomeworkAuthoringToBankActivity(params: { 
       promptPdfAttachmentId: assignment.promptPdfAttachmentId ? attachmentIdMap.get(assignment.promptPdfAttachmentId) ?? null : null,
       languageKey: assignment.languageKey, candidateLimit: assignment.candidateLimit,
       retrievedExampleCount: assignment.retrievedExampleCount, questionCount: assignment.questionCount,
-      generationInstructions: assignment.generationInstructions, settings: copiedHomeworkSettings(assignment.settings) as Prisma.InputJsonValue
+      generationInstructions: assignment.generationInstructions, settings: copiedBankHomeworkSettings(assignment.settings) as Prisma.InputJsonValue
     } });
     if (requirementSet) await transaction.pluginBankCodingHomeworkSubmissionRequirementSet.create({ data: {
       bankActivityId: params.bankActivityId, languageKey: requirementSet.languageKey,
@@ -488,15 +488,16 @@ export async function copyCourseCodingHomeworkAuthoringToBankActivity(params: { 
   });
 }
 
-export async function copyCourseCodingHomeworkAuthoring(params: { sourceActivityId: string; activityId: string }) {
-  const [assignment, requirementSet, attachments] = await Promise.all([
-    prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: params.sourceActivityId } }),
-    prisma.pluginCodingHomeworkSubmissionRequirementSet.findUnique({ where: { activityId: params.sourceActivityId } }),
-    prisma.pluginCodingHomeworkAttachment.findMany({
-      where: { ownerKind: "course_activity", ownerId: params.sourceActivityId }
-    })
-  ]);
+export async function copyCourseCodingHomeworkAuthoring(params: HomeworkTeacherScope & { sourceActivityId: string }) {
   await prisma.$transaction(async (transaction) => {
+    await lockHomeworkTeacherSolution(transaction, { ownerKind: "course_activity", ownerId: params.sourceActivityId });
+    const [assignment, requirementSet, attachments] = await Promise.all([
+      transaction.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: params.sourceActivityId } }),
+      transaction.pluginCodingHomeworkSubmissionRequirementSet.findUnique({ where: { activityId: params.sourceActivityId } }),
+      transaction.pluginCodingHomeworkAttachment.findMany({
+        where: { ownerKind: "course_activity", ownerId: params.sourceActivityId }
+      })
+    ]);
     await copyHomeworkTeacherSolution({ ownerKind: "course_activity", ownerId: params.sourceActivityId }, { ownerKind: "course_activity", ownerId: params.activityId }, transaction);
     const attachmentIdMap = new Map<string, string>();
     for (const source of attachments) {
@@ -515,21 +516,41 @@ export async function copyCourseCodingHomeworkAuthoring(params: { sourceActivity
       });
       attachmentIdMap.set(source.id, copied.id);
     }
-    if (assignment) {
-      await transaction.pluginCodingHomeworkAssignment.create({
-        data: {
-          activityId: params.activityId,
-          promptMarkdown: assignment.promptMarkdown,
-          promptPdfAttachmentId: assignment.promptPdfAttachmentId ? attachmentIdMap.get(assignment.promptPdfAttachmentId) ?? null : null,
-          languageKey: assignment.languageKey,
-          candidateLimit: assignment.candidateLimit,
-          retrievedExampleCount: assignment.retrievedExampleCount,
-          questionCount: assignment.questionCount,
-          generationInstructions: assignment.generationInstructions,
-          settings: copiedHomeworkSettings(assignment.settings) as Prisma.InputJsonValue
-        }
+    const sourceSettings = normalizeObject(assignment?.settings);
+    const settings: Record<string, unknown> = {
+      ...sourceSettings,
+      submissionsEnabled: false,
+      referenceMaterialIds: await getHomeworkReferenceSelection({ ...params, activityId: params.sourceActivityId }, sourceSettings)
+    };
+    if (typeof sourceSettings.preparedSnapshotId === "string") {
+      const snapshot = await transaction.pluginCodingHomeworkDocumentationSnapshot.findFirst({
+        where: { id: sourceSettings.preparedSnapshotId, activityId: params.sourceActivityId, courseId: params.courseId, groupId: null }
       });
+      if (!snapshot) throw new AppError(409, "HOMEWORK_COPY_REFERENCES_UNAVAILABLE", "The homework's prepared references are unavailable. Prepare its references again before duplicating it.");
+      // Copy only the active authoring snapshot. Immutable core index IDs remain
+      // shared; historical/student snapshots, submissions and jobs are not copied.
+      const copied = await transaction.pluginCodingHomeworkDocumentationSnapshot.create({ data: {
+        activityId: params.activityId,
+        courseId: params.courseId,
+        contentTreeFingerprint: snapshot.contentTreeFingerprint,
+        status: snapshot.status,
+        metadata: normalizeObject(snapshot.metadata) as Prisma.InputJsonValue
+      } });
+      settings.preparedSnapshotId = copied.id;
     }
+    await transaction.pluginCodingHomeworkAssignment.create({
+      data: {
+        activityId: params.activityId,
+        promptMarkdown: assignment?.promptMarkdown,
+        promptPdfAttachmentId: assignment?.promptPdfAttachmentId ? attachmentIdMap.get(assignment.promptPdfAttachmentId) ?? null : null,
+        languageKey: assignment?.languageKey,
+        candidateLimit: assignment?.candidateLimit,
+        retrievedExampleCount: assignment?.retrievedExampleCount,
+        questionCount: assignment?.questionCount,
+        generationInstructions: assignment?.generationInstructions,
+        settings: settings as Prisma.InputJsonValue
+      }
+    });
     if (requirementSet) {
       await transaction.pluginCodingHomeworkSubmissionRequirementSet.create({
         data: {
@@ -541,7 +562,7 @@ export async function copyCourseCodingHomeworkAuthoring(params: { sourceActivity
         }
       });
     }
-  });
+  }, { timeout: 30_000 });
 }
 
 export async function deleteBankCodingHomeworkAuthoring(params: { bankActivityId: string }) {
@@ -791,7 +812,7 @@ function normalizeObject(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-function copiedHomeworkSettings(value: unknown) {
+function copiedBankHomeworkSettings(value: unknown) {
   const { submissionsEnabled: _enabled, preparedSnapshotId: _snapshot, referenceMaterialIds: _materials, embeddingConnectionId: _embeddingConnection, embeddingAi: _embeddingAi, questionGenerationAi: _questionAi, ...settings } = normalizeObject(value);
   return { ...settings, submissionsEnabled: false };
 }

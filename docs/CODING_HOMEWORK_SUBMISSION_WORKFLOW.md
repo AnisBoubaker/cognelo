@@ -172,6 +172,12 @@ The supplied deck was verified with the real link extractor during local accepta
 - Teacher cancellation preserves the original evidence and grants a new workflow rather than changing frozen files. A replacement after released grading is scoped to that student; whole-class release remains unchanged.
 - Native SEB startup is simulated at the OS boundary in Playwright. Real launch-token/configuration proof, session scoping and no-repeat-launch behavior are tested. A final native-client check remains an operator acceptance step.
 
+## Same-course duplication — November 4, 2026
+
+Duplicating a homework within its course preserves its authored content/files/private solution, requirements, AI instructions and model choices, question settings and concurrency. It keeps the same course-reference selection and prepared indexes: the subject/material context is unchanged. The copy owns an independent prepared-reference snapshot and reuses immutable embeddings without regenerating them. An untouched default selection is resolved at the original placement before copying, rather than recalculated from the duplicate's position.
+
+Reset course delivery state: section/student assignments and exceptions, availability, time limits, SEB, attempt policy and submission opening. Do not copy student drafts, submissions, answers, jobs or grades. The Homework Grader plugin owns its data-copy rules behind the generic lifecycle hook; see [duplication details](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md#duplication-within-a-course).
+
 ## Implementation status and acceptance
 
 The current implementation contains the preparation, private solution, static signature acknowledgement, prepared-reference/manual-opening, durable queue, deferred SEB/timer and cancellation workflow described above. The [progress record](CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md) records incremental commits, actual local tests and any remaining final checks.

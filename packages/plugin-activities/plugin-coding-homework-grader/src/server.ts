@@ -121,9 +121,9 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
     onCourseActivityPublishedToBank: async ({ activity, bankActivityId }) => {
       if (activity.activityType.key === "coding-homework-grader") await copyCourseCodingHomeworkAuthoringToBankActivity({ activityId: activity.id, bankActivityId });
     },
-    onCourseActivityDuplicated: async ({ sourceActivityId, activity }) => {
+    onCourseActivityDuplicated: async ({ user, courseId, sourceActivityId, activity }) => {
       if (activity.activityType.key === "coding-homework-grader") {
-        await copyCourseCodingHomeworkAuthoring({ sourceActivityId, activityId: activity.id });
+        await copyCourseCodingHomeworkAuthoring({ user, courseId, sourceActivityId, activityId: activity.id });
       }
     },
     onCourseActivityCreatedFromBankVersion: async ({ activity, bankActivityId }) => {

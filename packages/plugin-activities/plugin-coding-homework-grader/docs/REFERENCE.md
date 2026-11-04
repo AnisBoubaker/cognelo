@@ -50,6 +50,16 @@ Local AI acceptance uses the [isolated fixture owner](../../../../tests/e2e/READ
 
 Core resolves assignment exceptions, current answering deadlines, attempt limits, grades and content closure. Student view stays inspection-only. Private solutions are not the shared released-student-solution feature. UI labels cover English, French, Chinese and Arabic; timestamps use the effective course timezone. Teacher assignment edits use the guarded action bar; independently persisted uploads/reference actions do not pretend to be part of its draft.
 
+## Duplication within a course
+
+The generic course duplicate route creates the unassigned draft/placement and invokes `onCourseActivityDuplicated`. The Homework Grader owns all private copy rules; core never reads homework tables or interprets its reference/model settings.
+
+Copy the assignment text/PDF, provided files, imported requirements, private solution and selected filenames/functions, generation instructions, question count, candidate/retrieval options, concurrency, both model selections and other authored settings. Attachment records and PDF/requirements pointers are remapped to independent rows; immutable stored attachment bytes remain shared. Source settings/solution reads use the existing authoring lock and the private copy is transactional.
+
+Retain the exact selected course materials. If the source still uses automatic preceding-material defaults, resolve those defaults at the source placement and save them explicitly on the duplicate; later materials near the new placement must not enter its selection. Clone only the active prepared-reference snapshot as a new course/activity-owned row, retaining its metadata, preparation timestamp and immutable core index IDs. Do not duplicate vectors, call a model, or copy historical snapshots attached to student submissions. A missing/foreign prepared snapshot fails duplication instead of producing a dangling reference. Deleting or editing the source leaves the copy's private solution, attachments, settings and prepared snapshot usable.
+
+The duplicate starts with final submissions disabled. Core section/student assignments, General availability/time/SEB/attempt policy and exceptions are not copied; neither are student drafts, hand-ins, answers, jobs or grades. Opening submissions uses the normal existing model-access, prepared-selection and freshness checks, including repository freshness, while reusing compatible existing embeddings. Bank duplication, bank/course import and synchronization retain their separate reset behavior because they can cross course boundaries.
+
 ## Seed Fixture
 
 The root Prisma seed creates `Coding homework grader: INF-155 TP1 Labyrinthe` as a complete dev fixture in Programming 101 / Section A. It reads `tmp/INF155-A2023-TP1.pdf` with `pdftotext`, attaches a copied PDF to the activity when the local file exists, uses `tmp/FichiersFournis` to build starter-file documentation, and stores bank/course plugin authoring rows, required ZIP structure/functions, a ready group documentation snapshot, a summative group assignment, and a gradebook item. Challenge question generation uses a course teacher/owner's configured question-authoring AI connection (or explicit homework model override); the seed does not point teacher question authoring at the local Ollama fallback.

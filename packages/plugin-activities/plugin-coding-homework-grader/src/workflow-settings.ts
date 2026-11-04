@@ -30,6 +30,11 @@ async function materialTree(scope: HomeworkTeacherScope) {
   const anchor = rows.findIndex(row => row.activityId === scope.activityId);
   return { rows, defaults: rows.slice(0, anchor < 0 ? 0 : anchor).flatMap(row => row.resourceId ? [row.resourceId] : []) };
 }
+export async function getHomeworkReferenceSelection(scope: HomeworkTeacherScope, settings: Record<string, unknown>) {
+  return Array.isArray(settings.referenceMaterialIds)
+    ? settings.referenceMaterialIds.filter((id): id is string => typeof id === "string")
+    : (await materialTree(scope)).defaults;
+}
 export async function getHomeworkWorkflowSettings(scope: HomeworkTeacherScope) {
   const current = await assignment(scope); const settings = record(current.settings); const tree = await materialTree(scope);
   const selected = Array.isArray(settings.referenceMaterialIds) ? settings.referenceMaterialIds.filter((id): id is string => typeof id === "string") : tree.defaults;
