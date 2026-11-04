@@ -25,6 +25,8 @@ Course content duplication copies the normalized repository metadata and removes
 
 The plugin-owned prepared-index service reads public default-branch source at a pinned commit, without cloning or executing it. Core supplies private shared embedding storage/search. Older document/index/search handlers retain URL-only deterministic behavior for legacy consumers.
 
+Add repositories as **GitHub repository** materials so this plugin reads the actual files; an ordinary Link material does not traverse a repository. Prepared extraction excludes IDE metadata (`.idea`, `.vscode`, `.vs`), generated CMake/build output, dependency/cache folders and macOS sidecars before size/count limits. Authored source, documentation and build definitions such as `CMakeLists.txt` remain eligible. The `teaching-source-v2` extraction policy requires older indexes to be refreshed before new submission opening, while existing pinned homework references remain stable.
+
 ## Prepared repository indexing
 
 The [Coding Homework workflow](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md#github-freshness) uses actual **public** repository content. The material settings form owns freshness: **48 hours by default**, configurable per repository. Homework checks it when opening submissions and retains pinned reference versions while enabled. Compatible vectors are reused; question-model changes do not invalidate indexes. See the service reference below for extraction bounds and supported formats.
