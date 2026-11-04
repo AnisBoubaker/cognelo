@@ -10,7 +10,9 @@ export function extractHtmlMaterialContent(html: string) {
   const parser = new Parser({
     onopentag(name, attrs) {
       const parent = frames.at(-1);
-      const ignored = Boolean(parent?.ignored) || ignoredTags.has(name) || Object.hasOwn(attrs, "hidden") || attrs["aria-hidden"] === "true"
+      // Hidden lesson panels/slides can still contain the pedagogical source.
+      // Exclude known page chrome, not content merely hidden by its presentation.
+      const ignored = Boolean(parent?.ignored) || ignoredTags.has(name)
         || ["navigation", "banner", "contentinfo", "dialog", "progressbar"].includes(attrs.role)
         || (name === "script" && !["text/template", "text/markdown"].includes(attrs.type));
       const inMain = Boolean(parent?.main) || name === "main" || name === "article";

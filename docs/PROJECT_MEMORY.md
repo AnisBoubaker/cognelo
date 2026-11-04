@@ -96,4 +96,4 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 Plugin-specific decisions live in the owning plugin's README, short `PROJECT_MEMORY.md`, and linked detailed references. Do not copy them back into this file unless they establish a platform-wide contract.
 
-- Prepared material embeddings: material plugins own generation/refresh, and consumers call them only through core. Preserve immutable pinned index versions; question-model changes do not invalidate embeddings. See [service contract](MATERIAL_EMBEDDING_SERVICES.md).
+- Prepared material embeddings: material plugins own generation/refresh, and consumers call them only through core. Preserve immutable pinned index versions; question-model changes do not invalidate embeddings. Teacher text previews are course-manager-only, retain the exact prepared index identity, and never expose vectors/private metadata or invoke a model. See [service contract](MATERIAL_EMBEDDING_SERVICES.md).

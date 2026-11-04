@@ -1,7 +1,7 @@
 import type { PluginRouteDefinition, PluginRouteContext } from "@cognelo/activity-sdk/server";
 import { AppError } from "@cognelo/core";
 import { resolveOwner, resolveStudentSubmissionScope } from "./routes";
-import { getHomeworkWorkflowSettings, updateHomeworkWorkflowSettings, prepareHomeworkMaterial, finishHomeworkMaterialPreparation } from "./workflow-settings";
+import { getHomeworkWorkflowSettings, updateHomeworkWorkflowSettings, prepareHomeworkMaterial, finishHomeworkMaterialPreparation, getHomeworkReferencePreview } from "./workflow-settings";
 import { handInHomework, getHomeworkWorkspace, startHomeworkAnswering, getStartedHomeworkQuestions, getFrozenHomeworkFile } from "./hand-in";
 import { listHomeworkSubmissions, cancelHomeworkSubmission } from "./submission-management";
 import { z } from "zod";
@@ -16,6 +16,7 @@ export const homeworkWorkflowRoutes: PluginRouteDefinition[] = [
     GET: async ({ context }) => getHomeworkWorkflowSettings(await teacherScope(context)),
     PUT: async ({ context, readJson }) => updateHomeworkWorkflowSettings(await teacherScope(context), await readJson())
   } }),
+  route("reference-preview", { methods: { GET: async ({ context, request }) => getHomeworkReferencePreview(await teacherScope(context), Object.fromEntries(new URL(request.url).searchParams)) } }),
   route("prepare-material", { methods: { POST: async ({ context, readJson, request }) => {
     const data = z.object({ resourceId: z.string().min(1) }).parse(await readJson());
     return prepareHomeworkMaterial(await teacherScope(context), data.resourceId, request.signal);

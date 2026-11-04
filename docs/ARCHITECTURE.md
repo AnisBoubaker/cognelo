@@ -227,3 +227,5 @@ type ContentEmbeddingSource =
 These descriptors remain a compatibility surface. Activity generation consumes prepared indexing/search services through core instead of importing concrete content type plugins.
 
 Material embedding preparation is a plugin-owned service dispatched through core. Core provides private reusable vector/index storage and authorized snapshot search; material plugins own extraction/revision/freshness policy. See [prepared material services](MATERIAL_EMBEDDING_SERVICES.md).
+
+Core also provides a course-manager-only, paginated projection of saved indexed text. Homework resolves its own prepared snapshot and delegates storage/access to that generic reader, so its preview retains the exact pinned reference version without exposing vectors or invoking AI. Extraction failure checks remain owned by each material plugin; a stored index alone is not proof of complete pedagogical coverage.

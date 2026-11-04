@@ -26,6 +26,7 @@ All routes are under `coding-homework-grader/` and retain the host's course/grou
 | `prepared-file` GET | Read-only preview of a prepared file. |
 | `teacher-solution` GET/PUT/DELETE; `select-functions` POST | Private solution upload/replacement/removal and known-function AI selection. |
 | `workflow-settings` GET/PUT | Reference tree, readiness, bounded concurrency and manual opening. |
+| `reference-preview` GET | Course-manager-only paginated saved text, using the homework's exact prepared reference version when available. |
 | `prepare-material` POST; `prepare-references` POST | Core-dispatched plugin indexing and immutable snapshot completion. |
 | `workspace` GET; `hand-in` POST | Safe persistent state and atomic freezing/enqueueing. |
 | `answering` GET/POST | SEB-guarded question retrieval/explicit attempt start. |
@@ -37,6 +38,8 @@ All routes are under `coding-homework-grader/` and retain the host's course/grou
 | `gradebook-attempts` GET; `gradebook-file` GET | Grading-staff review and on-demand retained file text for the exact participant/submission. |
 
 `PluginCodingHomeworkDraft` owns revisions/file hashes/folders. `PluginCodingHomeworkTeacherSolution` owns private files/parsed signatures. Existing submission/file/question tables hold frozen work and derived output; status adds `cancelled`. Assignment settings hold protected workflow keys and the prepared snapshot ID; ordinary authoring saves cannot overwrite these keys. Snapshots retain immutable core material-index IDs. `workflowVersion: 2` distinguishes new records from legacy analysis artifacts.
+
+Reference materials offers **Preview indexed text** beside indexed sources. `reference-preview` accepts `resourceId`, optional `indexId` for stable pagination and a bounded `offset`. The plugin resolves its activity/course-owned snapshot; for selected prepared sources it delegates only those pinned index IDs to the generic core reader. Other sources use the saved embedding model's current material index. The core reader rechecks manager/course/resource authorization and returns ten exact passages at a time, without vector/private metadata. Changed paging identity fails explicitly. The inline preview aborts departed reads, clears old content, supports retry and keyboard focus, and renders source strings literally. No AI call or academic mutation occurs. It is a content-inspection aid, not automatic proof of full source coverage. Before submissions open, workflow readiness also requires every selected current index to match the saved snapshot and remain ready; a stale/mismatched reference disables opening in the UI as well as failing server validation. Already enabled homework retains its pinned readiness without live refresh.
 
 Generated clients are local artifacts. Apply the additive manifest migration `202611010010_homework_preparation` and core material-index migration using `npm run db:migrate:all`. Material PDF extraction needs Poppler; no new environment variable is required. The API's ordinary background worker must remain enabled. Storage uses the existing private homework filesystem root and SHA-256 integrity checks.
 

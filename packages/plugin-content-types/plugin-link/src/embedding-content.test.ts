@@ -14,13 +14,14 @@ describe("teaching-content extraction", () => {
     expect(() => assertReadableLinkMaterial(extractHtmlMaterialContent(html).evidence)).toThrow(/readable teaching content/);
   });
 
-  it("keeps article prose/code while excluding navigation and hidden/interactive chrome", () => {
+  it("keeps article prose/code and hidden lesson panels while excluding navigation/interactive chrome", () => {
     const html = '<title>Course</title><nav>UNWANTED_MENU</nav><main><h1>Pointers</h1><p>A pointer stores an address.</p><pre>#include &lt;stdio.h&gt;\nint *p;</pre><div hidden>HIDDEN</div><button>BUTTON</button></main><footer>FOOTER</footer>';
     const result = extractHtmlMaterialContent(html);
     expect(result.text).toContain("Pointers");
     expect(result.text).toContain("A pointer stores an address.");
     expect(result.text).toContain("#include <stdio.h>");
-    expect(result.text).not.toMatch(/UNWANTED_MENU|HIDDEN|BUTTON|FOOTER/);
+    expect(result.text).toContain("HIDDEN");
+    expect(result.text).not.toMatch(/UNWANTED_MENU|BUTTON|FOOTER/);
     expect(() => assertReadableLinkMaterial(result.evidence)).not.toThrow();
   });
 

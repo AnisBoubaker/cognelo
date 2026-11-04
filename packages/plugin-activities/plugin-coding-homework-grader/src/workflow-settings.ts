@@ -2,7 +2,7 @@ import { snapshotProvidedCode } from "./provided-code";
 import { getHomeworkQuestionConnection, homeworkEmbeddingSelection, storedHomeworkAiSelection } from "./ai-selection";
 import { z } from "zod";
 import { AiModelSelectionSchema, type CurrentUser } from "@cognelo/contracts";
-import { AppError, updateBackgroundJobConcurrency, getAiAgentConnectionForUser, getCourseAiAgentConnection, snapshotAiModelSelection, listAiAgentConnections, assertCanManageCourse, listContentItems, listContentResources, getMaterialIndexStatus, prepareMaterialIndex, createCourseEmbeddingProvider, contentIndexRevision } from "@cognelo/core";
+import { AppError, updateBackgroundJobConcurrency, getAiAgentConnectionForUser, getCourseAiAgentConnection, snapshotAiModelSelection, listAiAgentConnections, assertCanManageCourse, listContentItems, listContentResources, getMaterialIndexStatus, getMaterialIndexPreview, prepareMaterialIndex, createCourseEmbeddingProvider, contentIndexRevision } from "@cognelo/core";
 import { prisma, type Prisma } from "./db-client";
 import { json, record } from "./file-preparation";
 
@@ -52,12 +52,43 @@ export async function getHomeworkWorkflowSettings(scope: HomeworkTeacherScope) {
     try { statuses[id] = await getMaterialIndexStatus(scope.user, scope.courseId, id, provider.selection); }
     catch (error) { statuses[id] = { state: "unavailable", error: describeError(error) }; }
   }
+  const snapshot = typeof settings.preparedSnapshotId === "string"
+    ? await prisma.pluginCodingHomeworkDocumentationSnapshot.findFirst({ where: { id: settings.preparedSnapshotId, activityId: scope.activityId, courseId: scope.courseId, groupId: null }, select: { status: true, metadata: true } })
+    : null;
+  const pinned = record(snapshot?.metadata);
+  const prepared = snapshot?.status === "ready" && contentIndexRevision(selected) === pinned.selectionFingerprint
+    && (settings.submissionsEnabled === true || selected.every(id => {
+      const status = record(statuses[id]);
+      return status.state === "ready" && Array.isArray(pinned.indexIds) && pinned.indexIds.includes(record(status.index).id);
+    }));
   const publicSelection = (value: ReturnType<typeof storedHomeworkAiSelection>) => value ? { connectionId: value.connectionId, model: value.model } : null;
-  return { rows: tree.rows, selected, statuses, enabled: settings.submissionsEnabled === true, prepared: typeof settings.preparedSnapshotId === "string", concurrency: Number(settings.generationConcurrency ?? 2),
+  return { rows: tree.rows, selected, statuses, enabled: settings.submissionsEnabled === true, prepared: Boolean(prepared), concurrency: Number(settings.generationConcurrency ?? 2),
     ai: { connections,
       question: { selection: publicSelection(storedHomeworkAiSelection(settings.questionGenerationAi)), resolved: questionResolved, error: questionError },
       embedding: { selection: publicSelection(storedHomeworkAiSelection(settings.embeddingAi)), resolved: provider ? { connectionId: provider.connectionId, model: provider.model } : null, error: embeddingError }
     } };
+}
+export async function getHomeworkReferencePreview(scope: HomeworkTeacherScope, input: unknown) {
+  await assertCanManageCourse(scope.user, scope.courseId);
+  const data = z.object({ resourceId: z.string().min(1), indexId: z.string().min(1).optional(), offset: z.coerce.number().int().min(0).max(2000).default(0) }).strict().parse(input);
+  const current = await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId } });
+  const settings = record(current?.settings);
+  let ids: string[] = [], prepared = false;
+  if (typeof settings.preparedSnapshotId === "string") {
+    const snapshot = await prisma.pluginCodingHomeworkDocumentationSnapshot.findFirst({ where: { id: settings.preparedSnapshotId, activityId: scope.activityId, courseId: scope.courseId, groupId: null } });
+    if (!snapshot) throw new AppError(409, "HOMEWORK_EMBEDDINGS_REQUIRED", "The prepared references are unavailable. Prepare the reference selection again.");
+    const pinned = record(snapshot.metadata);
+    if (Array.isArray(pinned.selected) && pinned.selected.includes(data.resourceId)) {
+      prepared = true;
+      ids = Array.isArray(pinned.indexIds) ? pinned.indexIds.filter((id): id is string => typeof id === "string") : [];
+    }
+  }
+  if (!prepared) {
+    const status = await getMaterialIndexStatus(scope.user, scope.courseId, data.resourceId, homeworkEmbeddingSelection(settings));
+    ids = status.index ? [status.index.id] : [];
+  }
+  if (data.indexId && !ids.includes(data.indexId)) throw new AppError(409, "MATERIAL_PREVIEW_CHANGED", "The saved reference selection changed. Open the preview again.");
+  return { ...await getMaterialIndexPreview(scope.user, scope.courseId, data.resourceId, data.indexId ? [data.indexId] : ids, data.offset), prepared };
 }
 export async function updateHomeworkWorkflowSettings(scope: HomeworkTeacherScope, input: unknown) {
   await assignment(scope);

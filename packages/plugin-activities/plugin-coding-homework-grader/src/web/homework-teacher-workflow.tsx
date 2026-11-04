@@ -6,16 +6,18 @@ import type { AiModelSelection } from "@cognelo/contracts";
 import type { CodingHomeworkLocale } from "./messages";
 import { homeworkWorkflowCopy } from "./workflow-copy";
 import { body, type HomeworkRequest } from "./workflow-types";
+import { HomeworkReferencePreview } from "./homework-reference-preview";
 
 export { HomeworkSolutionSelector } from "./homework-solution-selector";
 
 type AiChoice = { selection: AiModelSelection | null; resolved: { connectionId: string; model: string; displayName?: string; provider?: string } | null; error: string | null };
-type Settings = { ai: { connections: AiModelConnectionOption[]; question: AiChoice; embedding: AiChoice }; rows: Array<{ id: string; parentId: string | null; kind: string; title: string; depth: number; resourceId: string | null }>; selected: string[]; statuses: Record<string, { state: string; maxAgeHours?: number | null; error?: string }>; enabled: boolean; prepared: boolean; concurrency: number };
+type Settings = { ai: { connections: AiModelConnectionOption[]; question: AiChoice; embedding: AiChoice }; rows: Array<{ id: string; parentId: string | null; kind: string; title: string; depth: number; resourceId: string | null }>; selected: string[]; statuses: Record<string, { state: string; maxAgeHours?: number | null; error?: string; index?: { id: string } | null }>; enabled: boolean; prepared: boolean; concurrency: number };
 export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, settingsPortalTarget, generationSettings }: { request: HomeworkRequest; locale: CodingHomeworkLocale; hasUnsavedChanges: boolean; settingsPortalTarget?: HTMLElement | null; generationSettings?: ReactNode }) {
   const copy = homeworkWorkflowCopy(locale);
   const notifications = useNotifications();
   const [materialErrors, setMaterialErrors] = useState<Record<string, string>>({});
   const [currentMaterial, setCurrentMaterial] = useState("");
+  const [preview, setPreview] = useState<string | null>(null);
   const reportError = useCallback((reason: unknown) => {
     const message = reason instanceof Error ? reason.message : copy.error;
     setError(message); notifications.error(message);
@@ -39,7 +41,7 @@ export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, se
   async function run(label: string, action: (signal: AbortSignal) => Promise<void>, adoptModels: boolean | "embedding" | "question" = false) {
     if (controller.current) return;
     const pending = new AbortController(); controller.current = pending;
-    setBusy(label); setProgress(null); setError(""); setCurrentMaterial("");
+    setBusy(label); setProgress(null); setError(""); setCurrentMaterial(""); setPreview(null);
     let failed = false;
     try { await action(pending.signal); }
     catch (reason) { failed = true; if (!pending.signal.aborted) reportError(reason); }
@@ -92,7 +94,13 @@ export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, se
       const ids = idsForRow(row); const status = row.resourceId ? settings.statuses[row.resourceId] : null;
       const materialError = row.resourceId ? materialErrors[row.resourceId] : undefined;
       const statusText = materialError ? copy.unsupportedIndex : status?.state === "ready" ? copy.readyIndex : status?.state === "stale" ? copy.staleIndex : status?.state === "missing" ? copy.missingIndex : status?.state === "needs_model" ? copy.aiChooseEmbedding : copy.unsupportedIndex;
-      return <div key={row.id} style={{ marginInlineStart: `${Math.min(10, row.depth) * 1.25}rem` }}><label className="homework-choice"><input type="checkbox" disabled={settings.enabled || !ids.length} checked={ids.length > 0 && ids.every(id => selected.includes(id))} ref={input => { if (input) input.indeterminate = ids.some(id => selected.includes(id)) && !ids.every(id => selected.includes(id)); }} onChange={event => setSelected(current => event.target.checked ? [...new Set([...current, ...ids])] : current.filter(id => !ids.includes(id)))} /> {row.title}</label>{status && <span className="muted"> — {statusText}{status.maxAgeHours ? ` · ${copy.freshness}: ${status.maxAgeHours}` : ""}{materialError || status.error ? ` · ${materialError ?? status.error}` : ""}</span>}</div>;
+      const previewId = `homework-reference-preview-${row.id}`;
+      return <div key={row.id} style={{ marginInlineStart: `${Math.min(10, row.depth) * 1.25}rem` }}>
+        <label className="homework-choice"><input type="checkbox" disabled={settings.enabled || !ids.length} checked={ids.length > 0 && ids.every(id => selected.includes(id))} ref={input => { if (input) input.indeterminate = ids.some(id => selected.includes(id)) && !ids.every(id => selected.includes(id)); }} onChange={event => setSelected(current => event.target.checked ? [...new Set([...current, ...ids])] : current.filter(id => !ids.includes(id)))} /> {row.title}</label>
+        {status && <span className="muted"> — {statusText}{status.maxAgeHours ? ` · ${copy.freshness}: ${status.maxAgeHours}` : ""}{materialError || status.error ? ` · ${materialError ?? status.error}` : ""}</span>}
+        {row.resourceId && (status?.index || (settings.prepared && settings.selected.includes(row.resourceId))) && <button type="button" className="secondary" aria-expanded={preview === row.resourceId} aria-controls={previewId} onClick={() => setPreview(current => current === row.resourceId ? null : row.resourceId)}><ActionIcon name="visible" /> {copy.indexedText}</button>}
+        {row.resourceId && preview === row.resourceId && <HomeworkReferencePreview id={previewId} resourceId={row.resourceId} request={request} locale={locale} onClose={() => setPreview(null)} />}
+      </div>;
     })}
     {!selected.length && <p className="muted">{copy.noMaterials}</p>}
     <p className="muted">{copy.referenceSettingsHelp}</p>

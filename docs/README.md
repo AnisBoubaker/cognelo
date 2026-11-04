@@ -19,7 +19,7 @@ This is the routing page for repository-maintained documentation. Read the small
 - [Email delivery and test recipients](EMAIL_DELIVERY.md): outbound mail boundary and private local capture for synthetic recipients.
 - [Durable background jobs](BACKGROUND_JOBS.md): atomic enqueue, concurrency, heartbeat/recovery and cancellation ownership.
 - [AI connections and model selection](AI_MODEL_CONNECTIONS.md): shared credentials, model catalogues, consumer preferences and compatibility.
-- [Prepared material embedding services](MATERIAL_EMBEDDING_SERVICES.md): plugin ownership, configured embedding reuse, freshness and extraction limits.
+- [Prepared material embedding services](MATERIAL_EMBEDDING_SERVICES.md): plugin ownership, configured embedding reuse, freshness, extraction limits and teacher previews of indexed text.
 - [Text material editor and display](../packages/plugin-content-types/plugin-text/docs/REFERENCE.md): full Markdown authoring, display modes, and material image access.
 - [Rich-text media](MEDIA_ASSETS.md): media assets, references, lifecycle, and garbage collection.
 - [Browser user flows](../tests/e2e/README.md): E2E coverage, prerequisites, and failure policy.

@@ -10,6 +10,7 @@ describe("coding homework grader plugin manifest", () => {
     expect(codingHomeworkGraderPlugin.activities[0]?.name).toBe("Coding Homework Grader");
     expect(codingHomeworkGraderServerPlugin.routes?.map((route) => route.path)).toEqual([
       "coding-homework-grader/workflow-settings",
+      "coding-homework-grader/reference-preview",
       "coding-homework-grader/prepare-material",
       "coding-homework-grader/prepare-references",
       "coding-homework-grader/workspace",

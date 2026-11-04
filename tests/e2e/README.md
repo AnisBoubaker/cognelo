@@ -218,6 +218,8 @@ Coding Homework acceptance is split into `homework-preparation.spec.ts`, `homewo
 
 `homework-duplication.spec.ts` duplicates a configured homework through the course-content menu. It verifies independent attachment/private-solution records, requirements, retained model choices/concurrency, an independently owned prepared snapshot reusing identical index IDs without model calls, no copied assignments/student work/grades, and continued file/reference use after deleting the original. An unprepared copy retains the source placement's default material selection. Model connections belong only to the disposable fixture owner; copied activities are deleted before that account during cleanup.
 
+`homework-reference-preview.spec.ts` inspects saved text through real APIs/UI: stable pinned content after another homework updates the same material, latest-index behavior before preparation, source-string escaping, passage pagination/focus/mobile containment, close/reopen, no model calls or attempts, and student/index-identity rejection. Link-plugin unit regressions separately verify that recognizable navigation/loading/login shells and unreadable slide sources never reach embedding storage.
+
 ## Optional imported-course acceptance
 
 `imported-course.spec.ts` checks a privately prepared local course copy without creating activities, generating AI output, grading, or deleting records. It verifies teacher content access, original uploaded file bytes, retained compound-test review evidence, the extra test participant login, and a sampled learner's retained submission history. It also checks that review leaves attempt/grade counts unchanged.

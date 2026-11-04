@@ -88,6 +88,29 @@ export async function getMaterialIndexStatus(user: CurrentUser, courseId: string
   return { state: !index ? "missing" as const : expired || index.sourceRevision !== policy.revision ? "stale" as const : "ready" as const,
     sourceId: resourceId, title: resource.title, index: index ? descriptor(index) : null, maxAgeHours: policy.maxAgeHours ?? null };
 }
+
+/** Teacher-only inspection of saved embedding inputs; no vectors, credentials or model requests. */
+export async function getMaterialIndexPreview(user: CurrentUser, courseId: string, resourceId: string, indexIds: string[], offset = 0) {
+  await assertCanManageCourse(user, courseId);
+  const resource = await getContentResourceForPluginRoute(user, courseId, resourceId);
+  if (!Number.isInteger(offset) || offset < 0 || offset > MAX_INDEX_CHUNKS || indexIds.length > MAX_INDEX_CHUNKS) {
+    throw new AppError(400, "MATERIAL_PREVIEW_PAGE_INVALID", "Choose a valid page of indexed text.");
+  }
+  const index = await prisma.contentMaterialIndex.findFirst({
+    where: { courseId, resourceId, id: { in: indexIds } }, orderBy: { checkedAt: "desc" },
+    select: { id: true, documents: true, createdAt: true }
+  });
+  if (!index) throw new AppError(404, "MATERIAL_PREVIEW_UNAVAILABLE", "No saved indexed text is available for this material. Prepare its references first.");
+  const documents = index.documents as unknown as IndexedChunk[];
+  if (!Array.isArray(documents) || !documents.length) throw new AppError(409, "MATERIAL_PREVIEW_UNAVAILABLE", "The saved index contains no readable text. Prepare its references again.");
+  if (offset && offset >= documents.length) throw new AppError(400, "MATERIAL_PREVIEW_PAGE_INVALID", "This page of indexed text no longer exists. Open the preview again.");
+  const pageSize = 10;
+  return {
+    indexId: index.id, resourceId, title: resource.title, indexedAt: index.createdAt.toISOString(),
+    offset, total: documents.length, nextOffset: offset + pageSize < documents.length ? offset + pageSize : null,
+    passages: documents.slice(offset, offset + pageSize).map((document, position) => ({ number: offset + position + 1, title: document.title, text: document.text }))
+  };
+}
 export async function prepareMaterialIndex(user: CurrentUser, courseId: string, resourceId: string, options: MaterialEmbeddingSelection & { force?: boolean; signal?: AbortSignal } = {}) {
   const status = await getMaterialIndexStatus(user, courseId, resourceId, options);
   if (status.state === "ready" && !options.force) return status.index!;

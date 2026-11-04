@@ -17,6 +17,14 @@ External fetches validate and pin public DNS addresses, reject credentials/priva
 
 Teacher solution files are independent private activity records and are never automatically embedded as course materials.
 
+## Inspecting indexed teaching content
+
+Course managers can inspect saved indexed passages through the generic core `getMaterialIndexPreview` service. It authorizes the course/resource, restricts the query to the caller-supplied candidate index IDs in that same course/resource, and returns at most ten exact passages per page. Its explicit projection contains text/title/position and index identity/date only: no numeric vectors, private metadata, connection credentials or model requests. Students and section-only staff have no authoring-preview access.
+
+Homework exposes **Preview indexed text** beside indexed Reference materials. For a prepared selection it resolves the pinned snapshot and shows that exact reference version, even when another homework has created a newer index for the material. Otherwise it shows the latest index for the saved embedding selection. Paging retains the selected index identity and rejects a changed selection; failed/late/closed reads cannot overwrite the active preview. The UI explains that indexing alone does not prove complete pedagogical coverage, and presents source strings as plain text rather than executing/rendering embedded HTML.
+
+The Link plugin rejects recognizable page shells and missing required slide sources before calling core storage. Its extraction policy version requires older link indexes to be revalidated before new submission opening; active immutable snapshots remain stable. Static content hidden in lesson panels/slides is retained. These checks do not render arbitrary JavaScript applications or establish semantic completeness; use a public PDF/text alternative or upload material when extraction is unavailable, and inspect the saved content for coverage.
+
 GitHub owns `embeddingFreshnessHours`: default 48, configurable from 1 to 8760 per repository in material settings. Freshness measures the last successful check, even when unchanged vectors were reused. Other material types become stale when their saved source changes; a teacher can request an explicit forced refresh through core. Homework checks freshness before enabling submissions and then uses its pinned prepared snapshot. Student generation never refreshes reference materials.
 
 ## Model configuration and retained work

@@ -20,6 +20,8 @@ Students may submit some or all challenge answers blank. Manual submission first
 
 Teacher **Review and grade** uses the shared wide dialog, with an aligned toolbar and separate Questions and answers / Submitted files tabs. Submitted files use the same read-only left-tab viewer and load on demand for the selected learner/submission. Numbered question cards show the submitted code and answer, including an explicit unanswered state. Grade and feedback stay beside the content on wide screens; historical/formative review remains read-only.
 
+**Preview indexed text** in Reference materials lets teachers inspect the saved passages used for question generation. Prepared homework shows its pinned reference version; unprepared material shows its latest saved index. The preview is read-only, paginated, private to course managers and makes no AI calls. Check that the expected teaching content is present; extraction does not guarantee completeness for every website.
+
 ## Read by topic
 
 - [Approved choices and delivery scope](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md)
