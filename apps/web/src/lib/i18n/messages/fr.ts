@@ -1011,6 +1011,13 @@ export const frMessages = {
       loadError: "Impossible de charger le cours."
     },
     courseDetail: {
+    teamworkEnabled: "Travail en équipe",
+    teamworkHelp: "Une remise commune par équipe. Choisissez le regroupement et la permission de remise individuelle de chaque section dans Affectation.",
+    teamworkGrouping: "Regroupement des équipes",
+    teamworkSelectGrouping: "Choisir un regroupement",
+    teamworkAllowIndividual: "Permettre aux étudiants sans équipe de remettre individuellement",
+    teamworkLocked: "Annulez les remises actives avant de modifier les paramètres d’équipe.",
+
       reopenSubmission: "Rouvrir la dernière remise",
       reopenSubmissionConfirm: "Rouvrir la tentative {number} de {name} ? Les réponses enregistrées seront modifiables et la note de cette remise sera retirée. L’heure de début initiale est conservée et les paramètres et exceptions actuels s’appliquent, y compris toute prolongation accordée depuis la remise. La réouverture n’ajoute ni temps ni tentative. Les échéances dépassées restent applicables.",
       submissionReopened: "La dernière remise a été rouverte.",

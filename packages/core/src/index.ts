@@ -1,4 +1,5 @@
 export * from "./material-embeddings";
+export * from "./activity-teamwork";
 export * from "./test-grading-instructions";
 export * from "./ai-grading-runs";
 export * from "./ai-grading-preparation";

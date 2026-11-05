@@ -1011,6 +1011,13 @@ export const enMessages = {
       loadError: "Unable to load course."
     },
     courseDetail: {
+    teamworkEnabled: "Team work",
+    teamworkHelp: "One shared hand-in per team. Choose the grouping and individual-submission policy for each section in Assignment.",
+    teamworkGrouping: "Team grouping",
+    teamworkSelectGrouping: "Select a grouping",
+    teamworkAllowIndividual: "Allow students without a team to submit individually",
+    teamworkLocked: "Cancel active submissions before changing team settings.",
+
       reopenSubmission: "Reopen last submission",
       reopenSubmissionConfirm: "Reopen attempt {number} for {name}? Their saved answers will become editable and this submission’s grade will be withdrawn. The original start time is kept, and current settings and exceptions apply, including any time extensions made since submission. Reopening does not add time or another attempt. Expired deadlines still apply.",
       submissionReopened: "The last submission has been reopened.",

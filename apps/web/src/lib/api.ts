@@ -960,6 +960,8 @@ export type ActivityAssignmentGradebookSettings = {
 
 export type CourseActivityAssignmentSettings = {
   general: {
+    teamworkEnabled?: boolean;
+    teamworkLocked?: boolean;
     messagingEnabled: boolean;
     twoWayMessagingEnabled: boolean;
     releaseSolution: boolean;
@@ -980,6 +982,10 @@ export type CourseActivityAssignmentSettings = {
   };
   groups: Array<{
     groupId: string;
+    groupings?: Array<{ id: string; title: string }>;
+    teamGroupingId?: string | null;
+    allowIndividualSubmission?: boolean;
+    teamworkLocked?: boolean;
     title: string;
     assigned: boolean;
     assignmentId: string | null;

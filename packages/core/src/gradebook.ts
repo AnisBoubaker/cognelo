@@ -6,6 +6,7 @@ import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import {
   assertCanGradeGroup,
+  assertCanManageGroupRoster,
   assertCanReleaseCourseGrades,
   assertCanViewCourse,
   assertCanViewCourseGradebook,
@@ -660,15 +661,19 @@ export async function reopenActivitySubmission(user: CurrentUser, courseId: stri
   }
 }
 
-export async function deleteActivitySubmission(user: CurrentUser, courseId: string, input: DeleteActivitySubmissionInput, internal: { allowStartedReplacement?: boolean; transaction?: Prisma.TransactionClient } = {}) {
-  await assertCanViewCourseGradebook(user, courseId);
+export async function deleteActivitySubmission(user: CurrentUser, courseId: string, input: DeleteActivitySubmissionInput, internal: {
+  allowStartedReplacement?: boolean; transaction?: Prisma.TransactionClient;
+  /** Only core's authorized membership mutation supplies this; never accepted from an HTTP body. */
+  membershipChange?: { groupId: string; participantIds: string[] };
+} = {}) {
+  if (!internal.membershipChange) await assertCanViewCourseGradebook(user, courseId);
   const reason = input.reason.trim();
   if (!reason) {
     throw new AppError(400, "SUBMISSION_DELETE_REASON_REQUIRED", "A deletion reason is required.");
   }
 
   const now = input.now ?? new Date();
-  const attempt = await prisma.activityAttempt.findFirst({
+  const attempt = await (internal.membershipChange ? internal.transaction ?? prisma : prisma).activityAttempt.findFirst({
     where: { id: input.attemptId, courseId },
     include: {
       participant: true,
@@ -679,7 +684,10 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
   if (!attempt) {
     throw notFound("Activity attempt");
   }
-  await assertCanGradeGroup(user, courseId, attempt.groupId);
+  if (internal.membershipChange) {
+    if (!internal.transaction || internal.membershipChange.groupId !== attempt.groupId || !internal.membershipChange.participantIds.includes(attempt.participantId)) throw forbidden();
+    if (attempt.userId !== user.id) await assertCanManageGroupRoster(user, courseId, attempt.groupId);
+  } else await assertCanGradeGroup(user, courseId, attempt.groupId);
   if (attempt.lifecycle === "deleted") {
     throw new AppError(400, "SUBMISSION_ALREADY_DELETED", "This submission has already been deleted.");
   }

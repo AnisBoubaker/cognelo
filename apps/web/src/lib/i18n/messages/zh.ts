@@ -1010,6 +1010,13 @@ export const zhMessages = {
       loadError: "无法加载课程。"
     },
     courseDetail: {
+    teamworkEnabled: "团队作业",
+    teamworkHelp: "每个团队共用一份提交。在分配中为每个班级选择分组和个人提交规则。",
+    teamworkGrouping: "团队分组",
+    teamworkSelectGrouping: "选择分组",
+    teamworkAllowIndividual: "允许未加入团队的学生单独提交",
+    teamworkLocked: "更改团队设置前，请先取消相关的现有提交。",
+
       reopenSubmission: "重新开放最后一次提交",
       reopenSubmissionConfirm: "重新开放 {name} 的第 {number} 次作答？已保存的答案将恢复为可编辑状态，此次提交的成绩将撤回。保留原始开始时间，并应用当前设置和例外，包括提交后授予的延时。重新开放本身不会增加时间或作答次数。已过期的截止时间仍然有效。",
       submissionReopened: "最后一次提交已重新开放。",

@@ -967,6 +967,8 @@ export type ActivityAssignmentExceptionInput = z.infer<typeof ActivityAssignment
 export const CourseActivityGroupAssignmentSettingsSchema = ActivityAssignmentOverrideValuesSchema.extend({
   groupId: RecordIdSchema,
   assigned: z.boolean(),
+  teamGroupingId: RecordIdSchema.nullable().optional(),
+  allowIndividualSubmission: z.boolean().optional(),
   exceptions: z.array(ActivityAssignmentExceptionSchema).max(5000).refine(
     (values) => new Set(values.map((value) => value.teamId ? `team:${value.teamId}` : `student:${value.participantId}`)).size === values.length,
     { message: "Each team or student can have only one exception per activity." }
@@ -975,6 +977,7 @@ export const CourseActivityGroupAssignmentSettingsSchema = ActivityAssignmentOve
 export type CourseActivityGroupAssignmentSettings = z.infer<typeof CourseActivityGroupAssignmentSettingsSchema>;
 
 export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
+  teamworkEnabled: z.boolean().optional(),
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),
   timeLimitMinutes: z.number().int().positive().max(1440).nullable().optional().default(null),

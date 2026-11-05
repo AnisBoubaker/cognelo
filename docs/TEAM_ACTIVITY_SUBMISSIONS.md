@@ -22,6 +22,10 @@ Keep one physical frozen file collection per shared hand-in, with independent st
 
 Resetting one student's challenges reuses the team's shared question set when common questions are selected, and generates a fresh set when separate questions are selected. It starts a new individual answering participation; previous active grades are withdrawn and audit evidence retained. Grouping visibility continues to govern roster/name disclosure. Students without an activated account are considered covered by the team's hand-in; individual answering becomes available after activation. Unteamed submissions use an independent personal workspace when the section permits them.
 
+## Core extension
+
+`ActivityDefinition.supportsTeamwork` is an explicit opt-in. The `ServerActivityPlugin.teamwork` service reports active hand-ins and handles grouping membership changes using the host’s neutral SQL transaction. It may enqueue durable plugin jobs and identify scoped attempts to withdraw; it must not call AI or remote services inside the transaction. Core resolves actual enrollment/team membership and validates assignment groupings against the section. Private plugin table names never enter core. The initial contract/settings foundation is implemented; Homework opt-in and end-to-end workspace behavior remain pending.
+
 ## Delivery checkpoints
 
 - [ ] Core capability, assignment contracts/UI, grouping validation and active-hand-in locks.

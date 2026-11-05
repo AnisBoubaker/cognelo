@@ -114,6 +114,8 @@ export type ActivityProvider =
 export type ActivityCreationScope = "bank" | "course";
 
 export type ActivityDefinition = {
+  /** Core may assign a shared team workspace; the plugin owns submission behavior. */
+  supportsTeamwork?: boolean;
   /** Preparation is available before the explicit, plugin-owned assessment start. */
   assessmentFlow?: "deferred";
   /** Allowlisted learner config. Omission fails closed to an empty config. */

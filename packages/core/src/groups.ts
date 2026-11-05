@@ -33,6 +33,7 @@ import { AppError, notFound } from "./errors";
 import { confirmLiveActivitySettings } from "./activity-settings-live";
 import { assignmentAllowsGradeChallenges, assignmentAssessmentPolicyMode, assignmentTimeLimitMinutes, courseActivitySolutionReleased, courseActivityMessagingEnabled, courseActivityTwoWayMessagingEnabled, courseActivityHidesAfterAttempts } from "./activity-assignment-policy";
 import { applyAssignmentExceptions, assignmentExceptionsForUser, exceptionsForParticipant, loadAssignmentExceptions, resolveAssignmentExceptions, saveAssignmentExceptions } from "./activity-assignment-exceptions";
+import { activityTeamAssignment, activityTeamworkEnabled, hasActiveTeamworkSubmissions, validateActivityTeamworkChange } from "./activity-teamwork";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
 type GradebookItemDb = Pick<typeof prisma, "gradebookItem">;
@@ -40,6 +41,7 @@ type GradebookItemSettingsInput = ReturnType<typeof normalizeGradebookItemSettin
 type GroupActivityInput = ReturnType<typeof CourseGroupActivityInputSchema.parse>;
 type CourseWideContentPlacement = NonNullable<ReturnType<typeof CourseAllGroupsActivityAssignmentInputSchema.parse>["contentPlacement"]>;
 type CourseWideAssignmentMetadata = {
+  teamworkEnabled?: boolean;
   enabled?: boolean;
   availableFrom?: string | null;
   availableUntil?: string | null;
@@ -209,7 +211,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
       where: { courseId },
       include: {
         participants: { where: { role: "student" }, select: { id: true, firstName: true, lastName: true, email: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] },
-        studentGroupings: { select: { title: true, teams: { select: { id: true, title: true }, orderBy: [{ title: "asc" }] } }, orderBy: [{ title: "asc" }] },
+        studentGroupings: { select: { id: true, title: true, teams: { select: { id: true, title: true }, orderBy: [{ title: "asc" }] } }, orderBy: [{ title: "asc" }] },
         activities: {
           where: { activityId },
           include: {
@@ -238,6 +240,10 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
     : [];
   const visibilityByGroupId = new Map(visibilityOverrides.map((override) => [override.groupId, override.isVisible]));
   const rule = getCourseWideAssignmentMetadata(activity.metadata);
+  const supportsTeamwork = getActivityDefinition(activity.activityType?.key ?? "")?.supportsTeamwork === true;
+  const lockedTeamGroups = new Set(supportsTeamwork ? (await Promise.all(groups.map(async group =>
+    await hasActiveTeamworkSubmissions(activity.activityType?.key ?? "", activityId, group.id) ? group.id : null
+  ))).filter((id): id is string => id !== null) : []);
   const assessmentMode = activity.activityType?.key === "test" ? "summative" : rule?.assessmentMode ?? "formative";
   const generalGradebookSettings = normalizeGradebookItemSettings(rule?.gradebookSettings);
   const generalContentPlacement = {
@@ -247,6 +253,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
     metadata: rule?.contentPlacement?.metadata ?? asMetadataRecord(coursePlacement?.metadata)
   };
   const general = {
+    ...(supportsTeamwork ? { teamworkEnabled: rule?.teamworkEnabled === true, teamworkLocked: lockedTeamGroups.size > 0 } : {}),
     messagingEnabled: courseActivityMessagingEnabled(activity.metadata),
     twoWayMessagingEnabled: courseActivityTwoWayMessagingEnabled(activity.metadata),
     releaseSolution: courseActivitySolutionReleased(activity.metadata),
@@ -292,6 +299,12 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
 
       return {
         groupId: group.id,
+        ...(supportsTeamwork ? {
+          groupings: (group.studentGroupings ?? []).map(grouping => ({ id: grouping.id, title: grouping.title })),
+          teamGroupingId: activityTeamAssignment(assignment?.metadata)?.groupingId ?? null,
+          allowIndividualSubmission: activityTeamAssignment(assignment?.metadata)?.allowIndividualSubmission ?? false,
+          teamworkLocked: lockedTeamGroups.has(group.id)
+        } : {}),
         title: group.title,
         assigned,
         students: group.participants ?? [],
@@ -326,6 +339,9 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   const data = CourseAllGroupsActivityAssignmentInputSchema.parse(input);
   validateAvailability(data.availableFrom, data.availableUntil);
   const activity = await assertActivityBelongsToCourse(courseId, activityId);
+  const supportsTeamwork = getActivityDefinition(activity.activityType?.key ?? "")?.supportsTeamwork === true;
+  if (data.teamworkEnabled === true && !supportsTeamwork) throw new AppError(400, "ACTIVITY_TEAMWORK_UNSUPPORTED", "This activity does not support team submissions.");
+  const teamworkEnabled = supportsTeamwork && (data.teamworkEnabled ?? activityTeamworkEnabled(activity.metadata));
   assertTestAssignmentIsSummative(activity, data.assessmentMode);
   assertActivitySupportsAssessmentMode(activity, data.assessmentMode);
   assertSafeExamBrowserIsSummative(data.assessmentMode, data.requireSafeExamBrowser);
@@ -334,6 +350,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   const gradebookSettings = normalizeGradebookItemSettings(data.gradebookSettings);
 
   return prisma.$transaction(async (tx) => {
+    await validateActivityTeamworkChange(tx, { activityId, activityTypeKey: activity.activityType?.key ?? "", previousEnabled: supportsTeamwork && activityTeamworkEnabled(activity.metadata), enabled: teamworkEnabled });
     await confirmLiveActivitySettings(tx, user, courseId, activityId, data);
     const [groups, coursePlacement] = await Promise.all([
       tx.courseGroup.findMany({
@@ -385,6 +402,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
         metadata: {
           ...activityMetadata,
           [COURSE_WIDE_ASSIGNMENT_METADATA_KEY]: {
+            ...(supportsTeamwork ? { teamworkEnabled } : {}),
             enabled: assignedGroupIds.length > 0 && assignedGroupIds.length === groups.length,
             availableFrom: data.availableFrom ?? null,
             availableUntil: data.availableUntil ?? null,
@@ -417,6 +435,16 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
       groups.map(async (group) => {
         const existingAssignment = group.activities.find((assignment) => assignment.activityId === activityId);
         const requested = requestedByGroupId.get(group.id);
+        const previousTeamPolicy = activityTeamAssignment(existingAssignment?.metadata);
+        const nextTeamPolicy = teamworkEnabled && requested?.assigned ? {
+          groupingId: requested.teamGroupingId ?? previousTeamPolicy?.groupingId ?? "",
+          allowIndividualSubmission: requested.allowIndividualSubmission ?? previousTeamPolicy?.allowIndividualSubmission ?? false
+        } : null;
+        await validateActivityTeamworkChange(tx, {
+          activityId, activityTypeKey: activity.activityType?.key ?? "", groupId: group.id,
+          previousEnabled: supportsTeamwork && activityTeamworkEnabled(activity.metadata) && Boolean(existingAssignment),
+          enabled: teamworkEnabled && requested?.assigned === true, previous: previousTeamPolicy, next: nextTeamPolicy
+        });
         if (!requested?.assigned) {
           if (coursePlacement) {
             await tx.courseGroupContentVisibilityOverride.deleteMany({
@@ -492,6 +520,8 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
           gradeChallengesEnabled,
           groupTimeLimitMinutes
         );
+        if (nextTeamPolicy) groupAssignmentMetadata.teamwork = nextTeamPolicy;
+        else delete groupAssignmentMetadata.teamwork;
         if (existingAssignment) {
           await applyAssignmentAssessmentModeTransition(tx, {
             assignmentId: existingAssignment.id,
@@ -1737,7 +1767,7 @@ function buildCourseActivitySettingsMetadata(
   requireSafeExamBrowser: boolean,
   gradeChallengesEnabled: boolean,
   timeLimitMinutes: number | null
-): Prisma.InputJsonValue {
+): Record<string, Prisma.JsonValue> {
   const current = asMetadataRecord(currentValue);
   const {
     assignmentScope: _assignmentScope,

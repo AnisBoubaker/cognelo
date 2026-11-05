@@ -41,6 +41,10 @@ type AssignmentValueDraft = GradebookDraft & {
   gradeChallengesEnabled: boolean;
 };
 type GroupAssignmentDraft = AssignmentValueDraft & {
+  groupings: Array<{ id: string; title: string }>;
+  teamGroupingId: string;
+  allowIndividualSubmission: boolean;
+  teamworkLocked: boolean;
   groupId: string;
   title: string;
   assigned: boolean;
@@ -51,6 +55,8 @@ type GroupAssignmentDraft = AssignmentValueDraft & {
 };
 type ExceptionDraft = AssignmentValueDraft & { key: string; teamId: string | null; participantId: string | null; overrideFields: ActivityAssignmentOverrideField[] };
 type ActivitySettingsDraft = {
+  teamworkEnabled: boolean;
+  teamworkLocked: boolean;
   assessmentMode: AssignedActivityAssessmentMode;
   messagingEnabled: boolean;
   twoWayMessagingEnabled: boolean;
@@ -108,6 +114,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
   const [error, setError] = useState("");
   const [savedAssessmentMode, setSavedAssessmentMode] = useState<AssignedActivityAssessmentMode | null>(null);
   const isTest = activity.activityType.key === "test";
+  const supportsTeamwork = getActivityDefinition(activity.activityType.key)?.supportsTeamwork === true;
   const supportsAiFeedback = getActivityDefinition(activity.activityType.key)?.grading?.supportsAiFeedback === true;
 
   useEffect(() => {
@@ -215,6 +222,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         timeLimitMinutes: buildTimeLimitMinutes(draft.general),
         enablePerGroupSettings: true,
         assessmentMode: draft.assessmentMode,
+        ...(supportsTeamwork ? { teamworkEnabled: draft.teamworkEnabled } : {}),
         messagingEnabled: draft.messagingEnabled,
         twoWayMessagingEnabled: draft.twoWayMessagingEnabled,
         releaseSolution: draft.releaseSolution,
@@ -231,6 +239,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         },
         groupAssignments: draft.groups.map((group) => ({
           groupId: group.groupId,
+          ...(supportsTeamwork ? { teamGroupingId: group.teamGroupingId || null, allowIndividualSubmission: group.allowIndividualSubmission } : {}),
           assigned: group.assigned,
           exceptions: group.assigned ? group.exceptions.map((exception) => ({
             teamId: exception.teamId, participantId: exception.participantId,
@@ -324,6 +333,10 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                     <h3>{t("courseDetail.activitySettingsGeneralTitle")}</h3>
                     <p className="muted">{t("courseDetail.activitySettingsGeneralText")}</p>
                   </div>
+                  {supportsTeamwork ? <div className="stack">
+                    <label className="checkbox-row"><input type="checkbox" checked={draft.teamworkEnabled} disabled={saving || draft.teamworkLocked} onChange={event => { const enabled = event.target.checked; setDraft(current => current ? { ...current, teamworkEnabled: enabled } : current); }} /> {t("courseDetail.teamworkEnabled")}</label>
+                    <p className="muted">{draft.teamworkLocked ? t("courseDetail.teamworkLocked") : t("courseDetail.teamworkHelp")}</p>
+                  </div> : null}
                   <div className="settings-grid">
                     <div className="field">
                       <label htmlFor={`activity-settings-mode-${activity.id}`}>{t("groupPage.assessmentMode")}</label>
@@ -480,6 +493,14 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                       </label>
                       {selectedGroup.assigned ? (
                         <div className="activity-group-overrides stack">
+                          {supportsTeamwork && draft.teamworkEnabled ? <div className="stack">
+                            <label className="field">{t("courseDetail.teamworkGrouping")}<select disabled={saving || selectedGroup.teamworkLocked} value={selectedGroup.teamGroupingId} onChange={event => updateGroup(selectedGroup.groupId, { teamGroupingId: event.target.value })}>
+                              <option value="">{t("courseDetail.teamworkSelectGrouping")}</option>
+                              {selectedGroup.groupings.map(grouping => <option key={grouping.id} value={grouping.id}>{grouping.title}</option>)}
+                            </select></label>
+                            <label className="checkbox-row"><input type="checkbox" checked={selectedGroup.allowIndividualSubmission} disabled={saving || selectedGroup.teamworkLocked} onChange={event => updateGroup(selectedGroup.groupId, { allowIndividualSubmission: event.target.checked })} /> {t("courseDetail.teamworkAllowIndividual")}</label>
+                            {selectedGroup.teamworkLocked ? <p className="muted">{t("courseDetail.teamworkLocked")}</p> : null}
+                          </div> : null}
                           <p className="muted">{t("courseDetail.activitySettingsOverridesText")}</p>
                           <AssignmentOverrideFields group={selectedGroup} summative={draft.assessmentMode === "summative"} disabled={saving} onChange={(update) => updateGroup(selectedGroup.groupId, update)} onToggle={(field, checked) => toggleGroupOverride(selectedGroup.groupId, field, checked)} />
                         </div>
@@ -999,6 +1020,8 @@ function OverrideField({
 function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean, timeZone: string = "UTC"): ActivitySettingsDraft {
   const assessmentMode = isTest ? "summative" : settings.general.assessmentMode;
   return {
+    teamworkEnabled: settings.general.teamworkEnabled ?? false,
+    teamworkLocked: settings.general.teamworkLocked ?? false,
     assessmentMode,
     messagingEnabled: settings.general.messagingEnabled,
     twoWayMessagingEnabled: settings.general.twoWayMessagingEnabled,
@@ -1009,6 +1032,10 @@ function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean,
     groups: settings.groups.map((group) => ({
       ...assignmentValueDraft(group, timeZone),
       groupId: group.groupId,
+      groupings: group.groupings ?? [],
+      teamGroupingId: group.teamGroupingId ?? "",
+      allowIndividualSubmission: group.allowIndividualSubmission ?? false,
+      teamworkLocked: group.teamworkLocked ?? false,
       title: group.title,
       assigned: group.assigned,
       students: group.students,

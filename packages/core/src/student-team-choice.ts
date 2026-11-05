@@ -1,6 +1,7 @@
 import { StudentTeamChoiceSchema, type CurrentUser, type MyStudentGroupingDto, type StudentTeamChoiceState } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { AppError, forbidden, notFound } from "./errors";
+import { lockStudentGroupingWorkspaces, notifyActivityTeamMembershipChanges } from "./activity-teamwork";
 
 type ChoicePolicy = { studentChoiceEnabled: boolean; choiceOpensAt: Date | null; choiceClosesAt: Date | null; allowChoiceChanges: boolean };
 
@@ -60,6 +61,7 @@ export async function chooseStudentTeam(user: CurrentUser, courseId: string, gro
   try {
     return await prisma.$transaction(async (tx) => {
       const student = await requireStudent(tx, user, courseId, groupId);
+      await lockStudentGroupingWorkspaces(tx, groupingId);
       const grouping = await tx.studentGrouping.findFirst({
         where: { id: groupingId, groupId, visibleToStudents: true }, include: { teams: { include: { members: { select: { participantId: true } } } } }
       });
@@ -84,6 +86,9 @@ export async function chooseStudentTeam(user: CurrentUser, courseId: string, gro
         where: { groupingId_participantId: { groupingId, participantId: student.id } },
         create: { groupingId, participantId: student.id, teamId }, update: { teamId }
       });
+      const previous = grouping.teams.map(value => ({ teamId: value.id, participantIds: value.members.map(member => member.participantId) }));
+      await notifyActivityTeamMembershipChanges(tx, user, courseId, groupId, groupingId, previous,
+        previous.map(value => ({ teamId: value.teamId, participantIds: [...value.participantIds.filter(id => id !== student.id), ...(value.teamId === teamId ? [student.id] : [])] })));
       await tx.courseAuditEvent.create({ data: {
         courseId, actorUserId: user.id, eventType: "student_team_chosen", targetType: "student_grouping", targetId: groupingId,
         previousValue: { participantId: student.id, teamId: previousTeam?.id ?? null },

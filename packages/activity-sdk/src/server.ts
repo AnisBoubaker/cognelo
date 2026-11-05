@@ -347,6 +347,19 @@ export type PluginHostCapabilityHandler<TResult = unknown> = () => Promise<TResu
 
 export type ServerActivityPlugin = {
   key: string;
+  /** Private workspace lifecycle, invoked by core without knowing plugin tables. */
+  teamwork?: {
+    activityTypeKeys: readonly string[];
+    hasActiveSubmissions: (input: { activityId: string; groupId?: string; transaction: PluginTeamworkTransaction }) => Promise<boolean>;
+    membershipChanged: (input: {
+      user: CurrentUser; courseId: string; groupId: string; groupingId: string; activityId: string;
+      changes: Array<{ participantId: string; userId: string | null; previousTeamId: string | null; teamId: string | null; removed?: boolean }>;
+      emptyTeamIds: string[];
+      groupingRemoved?: boolean;
+      transaction: PluginTeamworkTransaction;
+      enqueue: (job: { queue: string; handlerKey: string; payload: Record<string, unknown>; metadata?: Record<string, unknown>; idempotencyKey?: string; maxAttempts?: number }) => Promise<void>;
+    }) => Promise<{ withdrawAttemptIds?: string[] }>;
+  };
   /** Read-only projection of a host-authorized submitted attempt. */
   submissionExport?: { activityTypeKeys: readonly string[]; getContent: SubmissionExportHandler };
   studentSolution?: {
@@ -424,6 +437,15 @@ export type ServerActivityPlugin = {
     onActivityAttemptDeleted?: ActivityAttemptDeletedHook;
   };
 };
+
+export type PluginTeamworkTransaction = {
+  query: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
+  execute: (query: TemplateStringsArray, ...values: unknown[]) => Promise<number>;
+};
+
+export function getActivityTeamworkHandler(activityTypeKey: string) {
+  return currentServerPlugins().find(plugin => plugin.teamwork?.activityTypeKeys.includes(activityTypeKey))?.teamwork ?? null;
+}
 
 export function getAssignedGroupActivityAttemptSource(context: PluginRouteContext) {
   if (!context.courseId || !context.groupId) {

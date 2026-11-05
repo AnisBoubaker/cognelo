@@ -3,6 +3,8 @@ import { Prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const mocks = vi.hoisted(() => ({
+  $queryRaw: vi.fn(),
+  activity: { findMany: vi.fn() },
   authorize: vi.fn(),
   courseGroup: { findFirst: vi.fn() },
   courseGroupParticipant: { findMany: vi.fn() },
@@ -30,6 +32,7 @@ const knownError = (code: string) => new Prisma.PrismaClientKnownRequestError("D
 describe("section student groupings", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.activity.findMany.mockResolvedValue([]);
     mocks.transaction.mockImplementation(async (callback: (tx: typeof mocks) => unknown) => callback(mocks));
     mocks.courseGroup.findFirst.mockResolvedValue({ id: "section" });
     mocks.courseGroupParticipant.findMany.mockResolvedValue([{ id: "student" }]);

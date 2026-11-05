@@ -962,6 +962,13 @@ export const arMessages = {
       pluginsAdminOnly: "إعدادات الإضافات متاحة للمديرين."
     },
     courseDetail: {
+    teamworkEnabled: "العمل الجماعي",
+    teamworkHelp: "تسليم مشترك لكل فريق. اختر التجميع وسياسة التسليم الفردي لكل شعبة في تبويب التكليف.",
+    teamworkGrouping: "تجميع الفرق",
+    teamworkSelectGrouping: "اختر تجميعاً",
+    teamworkAllowIndividual: "السماح للطلاب دون فريق بالتسليم الفردي",
+    teamworkLocked: "ألغِ التسليمات النشطة قبل تغيير إعدادات الفريق.",
+
       deleteSubmission: "حذف التسليم",
       deleteSubmissionPrompt: "أدخل سبب حذف هذا التسليم. سيظهر السبب للطالب.",
       deleteSubmissionConfirm: "هل تريد حذف التسليم رقم {number} للطالب {name}؟",

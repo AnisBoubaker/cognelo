@@ -6,6 +6,7 @@ import {
 import { Prisma, prisma } from "@cognelo/db";
 import { assertCanManageGroupRoster } from "./authorization";
 import { AppError, notFound } from "./errors";
+import { lockStudentGroupingWorkspaces, notifyActivityTeamMembershipChanges } from "./activity-teamwork";
 
 const includeTeams = { teams: {
   orderBy: [{ title: "asc" as const }, { id: "asc" as const }],
@@ -118,6 +119,7 @@ export async function updateStudentGrouping(user: CurrentUser, courseId: string,
   await authorize(user, courseId, groupId);
   const data = StudentGroupingUpdateSchema.parse(input);
   return transaction(async (tx) => {
+    await lockStudentGroupingWorkspaces(tx, groupingId);
     const previous = await tx.studentGrouping.findFirst({ where: { id: groupingId, groupId }, include: includeTeams });
     if (!previous) throw notFound("Student grouping");
     if (previous.revision !== data.revision) throw conflict();
@@ -140,6 +142,9 @@ export async function updateStudentGrouping(user: CurrentUser, courseId: string,
       await tx.studentTeamMember.createMany({ data: team.participantIds.map((participantId) => ({ groupingId, teamId: saved.id, participantId })) });
     }
     const grouping = await tx.studentGrouping.findUniqueOrThrow({ where: { id: groupingId }, include: includeTeams });
+    await notifyActivityTeamMembershipChanges(tx, user, courseId, groupId, groupingId,
+      previous.teams.map(team => ({ teamId: team.id, participantIds: team.members.map(member => member.participantId) })),
+      grouping.teams.map(team => ({ teamId: team.id, participantIds: team.members.map(member => member.participantId) })));
     await tx.courseAuditEvent.create({ data: {
       courseId, actorUserId: user.id, eventType: "student_grouping_updated", targetType: "student_grouping",
       targetId: groupingId, previousValue: toDto(previous), nextValue: toDto(grouping)
@@ -152,10 +157,13 @@ export async function deleteStudentGrouping(user: CurrentUser, courseId: string,
   await authorize(user, courseId, groupId);
   const data = StudentGroupingDeleteSchema.parse(input);
   return transaction(async (tx) => {
+    await lockStudentGroupingWorkspaces(tx, groupingId);
     const grouping = await tx.studentGrouping.findFirst({ where: { id: groupingId, groupId }, include: includeTeams });
     if (!grouping) throw notFound("Student grouping");
     const removed = await tx.studentGrouping.deleteMany({ where: { id: groupingId, groupId, revision: data.revision } });
     if (removed.count !== 1) throw conflict();
+    await notifyActivityTeamMembershipChanges(tx, user, courseId, groupId, groupingId,
+      grouping.teams.map(team => ({ teamId: team.id, participantIds: team.members.map(member => member.participantId) })), [], { groupingRemoved: true });
     await tx.courseAuditEvent.create({ data: {
       courseId, actorUserId: user.id, eventType: "student_grouping_deleted", targetType: "student_grouping",
       targetId: groupingId, previousValue: toDto(grouping)

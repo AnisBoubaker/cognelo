@@ -3,7 +3,9 @@ import { Prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const mocks = vi.hoisted(() => ({
-  courseGroupParticipant: { findFirst: vi.fn() },
+  $queryRaw: vi.fn(),
+  activity: { findMany: vi.fn() },
+  courseGroupParticipant: { findFirst: vi.fn(), findMany: vi.fn() },
   studentGrouping: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
   studentTeamMember: { upsert: vi.fn() }, courseAuditEvent: { create: vi.fn() }, transaction: vi.fn()
 }));
@@ -39,6 +41,7 @@ describe("student selection window", () => {
 describe("student team choice authorization and atomicity", () => {
   beforeEach(() => {
     vi.resetAllMocks(); vi.useFakeTimers(); vi.setSystemTime(now);
+    mocks.activity.findMany.mockResolvedValue([]);
     mocks.transaction.mockImplementation(async (callback: (tx: typeof mocks) => unknown) => callback(mocks));
     mocks.courseGroupParticipant.findFirst.mockResolvedValue({ id: "student", group: { status: "published", availableFrom: null, availableUntil: null } });
     mocks.studentGrouping.findFirst.mockResolvedValue(grouping());
