@@ -1,3 +1,4 @@
+import { homeworkTeamworkService } from "./team-workspaces";
 import { homeworkWorkflowRoutes } from "./workflow-routes";
 import { codingHomeworkGradebookFileRoute } from "./gradebook-file";
 import { finalizeHomeworkSavedAnswers } from "./deadline";
@@ -41,6 +42,7 @@ import { markCodingHomeworkSubmissionDeleted } from "./submission-deletion";
 registerCodingHomeworkBackgroundJobs();
 
 export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
+  teamwork: homeworkTeamworkService,
   submissionExport: { activityTypeKeys: ["coding-homework-grader"], getContent: exportHomeworkSubmission },
   key: "coding-homework-grader",
   timedFinalization: { activityTypeKeys: ["coding-homework-grader"], finalize: finalizeHomeworkSavedAnswers },

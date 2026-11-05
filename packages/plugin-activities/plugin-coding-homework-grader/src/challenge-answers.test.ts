@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const coreMocks = vi.hoisted(() => ({
+  activityTeamworkEnabled: () => false,
   AppError: class AppError extends Error {
     status: number;
     code: string;

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   active: vi.fn(), changed: vi.fn(), withdraw: vi.fn(), enqueue: vi.fn(),
-  tx: { $queryRaw: vi.fn(), $executeRaw: vi.fn(), $queryRawUnsafe: vi.fn(), studentGrouping: { findFirst: vi.fn() }, activity: { findMany: vi.fn() }, courseGroupParticipant: { findMany: vi.fn() }, activityAttempt: { findFirst: vi.fn(), findMany: vi.fn() }, courseAuditEvent: { create: vi.fn() } }
+  tx: { $queryRaw: vi.fn(), $executeRaw: vi.fn(), $queryRawUnsafe: vi.fn(), studentGrouping: { findFirst: vi.fn() }, activity: { findMany: vi.fn() }, courseGroupParticipant: { findMany: vi.fn() }, activityAttempt: { findFirst: vi.fn(), findMany: vi.fn() }, courseAuditEvent: { create: vi.fn() }, grade: { findMany: vi.fn(), findUnique: vi.fn(), delete: vi.fn() }, gradeEvent: { create: vi.fn() } }
 }));
 vi.mock("@cognelo/activity-sdk", () => ({ getActivityDefinition: (key: string) => ({ supportsTeamwork: key === "team-capable" }) }));
 vi.mock("@cognelo/activity-sdk/server", () => ({ getActivityTeamworkHandler: () => ({ hasActiveSubmissions: mocks.active, membershipChanged: mocks.changed }) }));
@@ -41,6 +41,14 @@ describe("core team activity policy", () => {
     const members = [{ teamId: "team", participantIds: ["student"] }];
     await notifyActivityTeamMembershipChanges(tx, user, "course", "section", "grouping", members, members);
     expect(mocks.changed).not.toHaveBeenCalled(); expect(mocks.tx.activity.findMany).not.toHaveBeenCalled();
+  });
+  it("withdraws a manual grade even when challenge answering has not created an attempt", async () => {
+    mocks.tx.activity.findMany.mockResolvedValue([{ id: "activity", activityType: { key: "team-capable" }, metadata: { allGroupsAssignment: { teamworkEnabled: true } }, groupAssignments: [{ metadata: { teamwork: { groupingId: "grouping" } } }] }]);
+    mocks.tx.grade.findMany.mockResolvedValue([{ gradebookItemId: "item", participantId: "student" }]);
+    mocks.tx.grade.findUnique.mockResolvedValue({ id: "grade", normalizedScore: 75 });
+    await notifyActivityTeamMembershipChanges(tx, user, "course", "section", "grouping", [{ teamId: "old", participantIds: ["student"] }], []);
+    expect(mocks.tx.gradeEvent.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ previousValue: { id: "grade", normalizedScore: 75 }, nextValue: { grade: null } }) }));
+    expect(mocks.tx.grade.delete).toHaveBeenCalledWith({ where: { id: "grade" } });
   });
   it("delegates the exact membership move/empty team and withdraws only scoped attempts", async () => {
     mocks.changed.mockResolvedValue({ withdrawAttemptIds: ["old-attempt", "old-attempt", "foreign"] });

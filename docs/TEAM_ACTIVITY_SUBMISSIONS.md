@@ -30,10 +30,10 @@ Resetting one student's challenges reuses the team's shared question set when co
 
 - [x] Core capability, assignment contracts/UI, grouping validation and active-hand-in locks.
 - [x] Transactional membership lifecycle and current-workspace authorization.
-- [ ] Shared preparation, file audit, frozen hand-in and late-join handling.
-- [ ] Shared/separate questions with private answers, individual timers/grades and reset behavior.
-- [ ] Whole-team cancellation, empty-team erasure and recoverable file cleanup.
-- [ ] Frozen-work ZIP download and read-only structural checks.
+- [x] Shared preparation, file audit, frozen hand-in and late-join handling.
+- [x] Shared/separate questions with private answers, individual timers/grades and reset behavior.
+- [x] Whole-team cancellation, empty-team erasure and recoverable file cleanup.
+- [x] Frozen-work ZIP download and read-only structural checks.
 - [ ] Local migration validation, focused unit/integration/E2E checks and individual-workflow regression.
 - [ ] Updated canonical documentation and validated incremental commits.
 

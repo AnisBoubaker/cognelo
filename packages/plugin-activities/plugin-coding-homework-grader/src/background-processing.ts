@@ -13,8 +13,8 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { analyzeCodingHomeworkSubmission } from "./analysis";
 import { generateCodingHomeworkChallengeQuestions, generateCodingHomeworkChallengeQuestionsForStudentSubmission } from "./generation";
 
-export const codingHomeworkProcessingQueue = "coding-homework-grader";
-export const codingHomeworkSubmissionProcessingHandlerKey = "coding-homework-grader.process-submission";
+import { codingHomeworkProcessingQueue, codingHomeworkSubmissionProcessingHandlerKey, homeworkWorkspaceCleanupHandler } from "./processing-constants";
+export { codingHomeworkProcessingQueue, codingHomeworkSubmissionProcessingHandlerKey } from "./processing-constants";
 
 type CodingHomeworkProcessingScope = {
   activityId: string;
@@ -33,6 +33,7 @@ let unregisterCodingHomeworkProcessingHandler: (() => void) | null = null;
 
 export function registerCodingHomeworkBackgroundJobs() {
   registerBackgroundJobQueueLimit(codingHomeworkProcessingQueue, 4);
+  if (!isBackgroundJobHandlerRegistered(homeworkWorkspaceCleanupHandler)) registerBackgroundJobHandler(homeworkWorkspaceCleanupHandler, async ({ job }) => (await import("./team-workspaces")).cleanupHomeworkWorkspace(job));
   if (!isBackgroundJobHandlerRegistered(homeworkDeadlineHandler)) registerBackgroundJobHandler(homeworkDeadlineHandler, ({ job }) => processHomeworkDeadline(job));
   if (unregisterCodingHomeworkProcessingHandler) {
     return unregisterCodingHomeworkProcessingHandler;

@@ -143,6 +143,10 @@ export async function getLatestCodingHomeworkSubmission(scope: SubmissionScope) 
     return null;
   }
 
+  if (submission.workspaceId) {
+    try { await (await import("./team-submissions")).assertCurrentTeamSubmissionAccess(scope, submission); }
+    catch (error) { if (error instanceof AppError && [403, 409].includes(error.status)) return null; throw error; }
+  }
   return {
     files: submission.files.map(toSubmissionFileRecord),
     questions: normalizeObject(submission.metadata).workflowVersion === 2 && !normalizeObject(submission.metadata).assessmentStartedAt ? [] : submission.questions.map(toStudentChallengeQuestionRecord),
@@ -151,6 +155,8 @@ export async function getLatestCodingHomeworkSubmission(scope: SubmissionScope) 
 }
 
 export async function runCodingHomeworkSubmission(scope: SubmissionScope, input: unknown) {
+  const [activity] = await corePrisma.$queryRaw<Array<{ metadata: unknown }>>`SELECT metadata FROM "Activity" WHERE id=${scope.activityId}`;
+  if (normalizeObject(normalizeObject(activity?.metadata).allGroupsAssignment).teamworkEnabled === true) throw new AppError(409, "HOMEWORK_TEAM_PREPARATION_REQUIRED", "Use your team's prepared workspace to submit this homework.");
   const releaseUploadSlot = acquireHomeworkUploadSlot();
   try {
   await limitHomeworkUploads(scope.activityId, scope.user.id);

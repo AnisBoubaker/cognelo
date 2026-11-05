@@ -8,7 +8,7 @@ import { json, record } from "./file-preparation";
 
 export type HomeworkTeacherScope = { user: CurrentUser; courseId: string; activityId: string };
 export const workflowSettingKeys = ["workflowVersion", "submissionsEnabled", "preparedSnapshotId", "referenceMaterialIds", "embeddingConnectionId", "generationConcurrency", "embeddingAi", "questionGenerationAi"] as const;
-export async function lockHomeworkSettings(tx: Prisma.TransactionClient, activityId: string) {
+export async function lockHomeworkSettings(tx: Pick<Prisma.TransactionClient, "$queryRaw">, activityId: string) {
   await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${`homework-settings:${activityId}`}, 0))`;
 }
 async function assignment(scope: HomeworkTeacherScope) {
@@ -62,7 +62,10 @@ export async function getHomeworkWorkflowSettings(scope: HomeworkTeacherScope) {
       return status.state === "ready" && Array.isArray(pinned.indexIds) && pinned.indexIds.includes(record(status.index).id);
     }));
   const publicSelection = (value: ReturnType<typeof storedHomeworkAiSelection>) => value ? { connectionId: value.connectionId, model: value.model } : null;
-  return { rows: tree.rows, selected, statuses, enabled: settings.submissionsEnabled === true, prepared: Boolean(prepared), concurrency: Number(settings.generationConcurrency ?? 2),
+  const { homeworkTeamworkService } = await import("./team-workspaces");
+  const { teamworkTransaction } = await import("@cognelo/core");
+  const questionPolicyLocked = await homeworkTeamworkService.hasActiveSubmissions({ activityId: scope.activityId, transaction: teamworkTransaction(prisma) });
+  return { rows: tree.rows, selected, statuses, questionPolicyLocked, enabled: settings.submissionsEnabled === true, prepared: Boolean(prepared), concurrency: Number(settings.generationConcurrency ?? 2),
     ai: { connections,
       question: { selection: publicSelection(storedHomeworkAiSelection(settings.questionGenerationAi)), resolved: questionResolved, error: questionError },
       embedding: { selection: publicSelection(storedHomeworkAiSelection(settings.embeddingAi)), resolved: provider ? { connectionId: provider.connectionId, model: provider.model } : null, error: embeddingError }

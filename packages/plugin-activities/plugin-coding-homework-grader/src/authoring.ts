@@ -6,7 +6,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { AppError, contentIndexRevision } from "@cognelo/core";
+import { AppError, contentIndexRevision, lockActivityTeamwork, teamworkTransaction } from "@cognelo/core";
 import { Prisma, prisma } from "./db-client";
 
 const MAX_ASSIGNMENT_PDF_BYTES = 25 * 1024 * 1024;
@@ -150,13 +150,19 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
   const parsed = codingHomeworkAuthoringInputSchema.parse(input);
   const assignment = parsed.assignment;
   const requirements = parsed.requirements;
+  if (assignment.settings.separateTeamQuestions !== undefined && typeof assignment.settings.separateTeamQuestions !== "boolean") throw new AppError(400, "HOMEWORK_QUESTION_POLICY_INVALID", "Choose whether team members receive separate challenge questions.");
 
   await prisma.$transaction(async (transaction) => {
+    if (owner.ownerKind === "course_activity") await lockActivityTeamwork(transaction, owner.ownerId);
     await lockHomeworkTeacherSolution(transaction, owner);
     if (owner.ownerKind === "course_activity") {
       await lockHomeworkSettings(transaction, owner.ownerId);
       const current = await transaction.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: owner.ownerId } });
       const protectedSettings = normalizeObject(current?.settings);
+      if ((assignment.settings.separateTeamQuestions === true) !== (protectedSettings.separateTeamQuestions === true)) {
+        const { homeworkTeamworkService } = await import("./team-workspaces");
+        if (await homeworkTeamworkService.hasActiveSubmissions({ activityId: owner.ownerId, transaction: teamworkTransaction(transaction) })) throw new AppError(409, "HOMEWORK_QUESTION_POLICY_LOCKED", "Cancel active submissions before changing whether team members receive separate questions.");
+      }
       for (const key of workflowSettingKeys) { delete assignment.settings[key]; if (protectedSettings[key] !== undefined) assignment.settings[key] = protectedSettings[key]; }
       if (protectedSettings.submissionsEnabled) {
         const currentRequirements = await transaction.pluginCodingHomeworkSubmissionRequirementSet.findUnique({ where: { activityId: owner.ownerId } });

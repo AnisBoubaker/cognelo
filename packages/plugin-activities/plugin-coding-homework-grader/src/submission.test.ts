@@ -51,6 +51,7 @@ describe("coding homework final submissions", () => {
     dbMocks.$executeRaw.mockResolvedValue(1);
     dbMocks.$queryRaw.mockImplementation(async (query, ...values) => {
       const sql = query.join("?");
+      if (sql.includes('SELECT metadata FROM "Activity"')) return [{ metadata: {} }];
       if (sql.includes('SELECT id FROM "PluginCodingHomeworkSubmission"')) return [];
       if (sql.includes('INSERT INTO "PluginCodingHomeworkSubmissionFile"')) return [await dbMocks.pluginCodingHomeworkSubmissionFile.create({ data: { id: values[0], submissionId: values[1], path: values[2], languageKey: values[3], sizeBytes: values[4], sha256: values[5], storedName: values[6], metadata: JSON.parse(values[7]) } })];
       return [await dbMocks.pluginCodingHomeworkSubmission.update({ where: { id: values[2] }, data: { zipAttachmentId: values[0], metadata: JSON.parse(values[1]), status: "structure_valid", coreAttemptId: "reserved-attempt" } })];

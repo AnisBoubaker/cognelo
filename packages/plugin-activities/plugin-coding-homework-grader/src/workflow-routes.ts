@@ -5,6 +5,7 @@ import { getHomeworkWorkflowSettings, updateHomeworkWorkflowSettings, prepareHom
 import { handInHomework, getHomeworkWorkspace, startHomeworkAnswering, getStartedHomeworkQuestions, getFrozenHomeworkFile } from "./hand-in";
 import { listHomeworkSubmissions, cancelHomeworkSubmission } from "./submission-management";
 import { z } from "zod";
+import { downloadSubmittedHomework, checkSubmittedHomework } from "./submitted-work";
 async function teacherScope(context: PluginRouteContext) {
   const owner = await resolveOwner(context);
   if (owner.ownerKind !== "course_activity" || !context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "Configure reference materials and submissions after adding the homework to a course.");
@@ -25,12 +26,22 @@ export const homeworkWorkflowRoutes: PluginRouteDefinition[] = [
   route("workspace", { learnerAccessPhase: "preparation", methods: { GET: ({ context }) => getHomeworkWorkspace(resolveStudentSubmissionScope(context)) } }),
   route("hand-in", { learnerAccessPhase: "preparation", methods: { POST: async ({ context, readJson }) => handInHomework(resolveStudentSubmissionScope(context), await readJson()) } }),
   route("answering", { learnerAccessPhase: "assessment_start", methods: {
-    POST: ({ context }) => startHomeworkAnswering(resolveStudentSubmissionScope(context)),
+    POST: async ({ context, readJson }) => { const data = z.object({ submissionId: z.string().nullable().optional() }).parse(await readJson()); return startHomeworkAnswering(resolveStudentSubmissionScope(context), data.submissionId); },
     GET: ({ context }) => getStartedHomeworkQuestions(resolveStudentSubmissionScope(context))
   } }),
   route("submitted-file", { learnerAccessPhase: "preparation", methods: { GET: ({ context, request }) => getFrozenHomeworkFile(resolveStudentSubmissionScope(context), new URL(request.url).searchParams.get("path") ?? "") } }),
+  route("submitted-download", { learnerAccessPhase: "preparation", methods: { GET: ({ context, request }) => downloadSubmittedHomework(resolveStudentSubmissionScope(context), new URL(request.url).searchParams.get("submissionId"), request.signal) } }),
+  route("submitted-check", { learnerAccessPhase: "preparation", methods: { POST: async ({ context, readJson }) => {
+    const data = z.object({ submissionId: z.string().optional() }).parse(await readJson());
+    return checkSubmittedHomework(resolveStudentSubmissionScope(context), data.submissionId);
+  } } }),
   route("manage-submissions", { methods: {
     GET: async ({ context }) => { if (!context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "A course is required."); return listHomeworkSubmissions({ user: context.user, courseId: context.courseId, activityId: context.activity.id }, context.groupId); },
-    DELETE: async ({ context, readJson }) => { if (!context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "A course is required."); return cancelHomeworkSubmission({ user: context.user, courseId: context.courseId, activityId: context.activity.id }, await readJson()); }
+    DELETE: async ({ context, readJson }) => { if (!context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "A course is required."); return cancelHomeworkSubmission({ user: context.user, courseId: context.courseId, activityId: context.activity.id }, await readJson()); },
+    POST: async ({ context, readJson }) => {
+      if (!context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "A course is required.");
+      const data = z.object({ submissionId: z.string().min(1), reason: z.string().trim().min(1).max(2000), action: z.literal("reset-challenges") }).strict().parse(await readJson());
+      return (await import("./team-management")).resetHomeworkStudentChallenges({ user: context.user, courseId: context.courseId, activityId: context.activity.id }, data.submissionId, data.reason);
+    }
   } })
 ];

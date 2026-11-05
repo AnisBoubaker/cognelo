@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { AppError, getGroupAssignedActivity, openStoredMaterial } from "@cognelo/core";
+import { AppError, activityTeamworkEnabled, getGroupAssignedActivity, openStoredMaterial } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma, type Prisma } from "./db-client";
 import { acquireHomeworkUploadSlot, limitHomeworkUploads, lockHomeworkUploadBudget, type UploadTransaction } from "./upload-budget";
@@ -13,7 +13,7 @@ export type HomeworkStudentScope = { user: CurrentUser; courseId: string; groupI
 export type PreparedHomeworkFile = { path: string; storedName: string; sizeBytes: number; sha256: string };
 export const homeworkUploadSchema = z.object({
   kind: z.enum(["file", "zip", "folder"]), fileName: z.string().max(240).optional(), base64: z.string().optional(),
-  path: z.string().max(500).optional(), expectedRevision: z.number().int().min(0), replace: z.boolean().default(false)
+  path: z.string().max(500).optional(), contextKey: z.string().max(200).optional(), expectedRevision: z.number().int().min(0), replace: z.boolean().default(false)
 }).strict();
 export const record = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 export const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
@@ -70,7 +70,8 @@ export async function getHomeworkRequirements(activityId: string) {
   return normalizeCodingHomeworkSubmissionRequirements(value?.requirements);
 }
 export async function getHomeworkPreparation(scope: HomeworkStudentScope) {
-  await assertHomeworkStudentScope(scope);
+  const activity = await assertHomeworkStudentScope(scope);
+  if (activityTeamworkEnabled(activity.metadata)) return (await import("./team-preparation")).getTeamHomeworkPreparation(scope);
   const draft = await prisma.pluginCodingHomeworkDraft.findUnique({ where: { activityId_groupId_userId: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id } } });
   const entries = draft ? await readHomeworkDraftEntries(draft) : [];
   const requirements = await getHomeworkRequirements(scope.activityId);
@@ -79,7 +80,8 @@ export async function getHomeworkPreparation(scope: HomeworkStudentScope) {
     validation, readiness: codingHomeworkSubmissionReadiness(validation), requirements };
 }
 export async function uploadHomeworkPreparation(scope: HomeworkStudentScope, input: unknown) {
-  await assertHomeworkStudentScope(scope);
+  const activity = await assertHomeworkStudentScope(scope);
+  if (activityTeamworkEnabled(activity.metadata)) return (await import("./team-preparation")).uploadTeamHomeworkPreparation(scope, input);
   const data = homeworkUploadSchema.parse(input);
   await limitHomeworkUploads(scope.activityId, scope.user.id);
   const release = acquireHomeworkUploadSlot();
@@ -101,32 +103,9 @@ export async function uploadHomeworkPreparation(scope: HomeworkStudentScope, inp
       const draft = await tx.pluginCodingHomeworkDraft.upsert({ where: { activityId_groupId_userId: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id } },
         create: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id }, update: {} });
       if (draft.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "Your prepared files changed. Reload them before uploading.");
-      const previous = draftFiles(draft.files);
-      if (!data.replace && (data.kind === "zip" ? previous.length > 0 : previous.some(file => incoming.some(next => next.path === file.path)))) {
-        throw new AppError(409, "HOMEWORK_REPLACE_CONFIRMATION_REQUIRED", "Confirm replacement of existing prepared files.");
-      }
-      let next = data.kind === "zip" ? [] : [...previous];
-      let folders = data.kind === "zip" ? [] : (Array.isArray(draft.folders) ? draft.folders.filter((folder): folder is string => typeof folder === "string") : []);
-      for (const entry of incoming) {
-        const entryPath = normalizeHomeworkPath(entry.path);
-        if (entry.isDirectory) { folders.push(entryPath); continue; }
-        if (!entry.content) continue;
-        if (requirements.ignoredPaths.some(ignored => entryPath === ignored || entryPath.startsWith(`${ignored}/`))) continue;
-        const sha256 = createHash("sha256").update(entry.content).digest("hex");
-        const storedName = `${randomUUID()}-${sha256}`;
-        const filename = draftFilePath(draft.id, storedName);
-        await mkdir(path.dirname(filename), { recursive: true, mode: 0o750 });
-        await writeFile(filename, entry.content, { mode: 0o640, flag: "wx" }); written.push(filename);
-        next = [...next.filter(file => file.path !== entryPath), { path: entryPath, storedName, sha256, sizeBytes: entry.content.length }];
-        const segments = entryPath.split("/"); for (let i = 1; i < segments.length; i++) folders.push(segments.slice(0, i).join("/"));
-      }
-      next.sort((a, b) => a.path.localeCompare(b.path)); folders = [...new Set(folders)].sort();
-      if (next.length > requirements.maxFileCount || folders.length > 1000 || next.reduce((sum, file) => sum + file.sizeBytes, 0) > requirements.maxArchiveBytes) throw new AppError(413, "HOMEWORK_COLLECTION_LIMIT", "The prepared collection exceeds the configured file-count or size limit.");
-      const testEntries = await readHomeworkDraftEntries({ ...draft, files: next, folders });
-      const report = await validateCodingHomeworkArchive({ entries: testEntries, requirements, archiveSizeBytes: next.reduce((sum, file) => sum + file.sizeBytes, 0) });
-      if (codingHomeworkSubmissionReadiness(report).blocking.length) throw new AppError(400, "HOMEWORK_FILES_INVALID", "The uploaded files violate the file requirements or safety limits.", { issues: codingHomeworkSubmissionReadiness(report).blocking });
-      await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { files: json(next), folders: json(folders), revision: { increment: 1 } } });
-      for (const file of previous) if (!next.some(next => next.storedName === file.storedName)) obsolete.push(draftFilePath(draft.id, file.storedName));
+      const next = await applyHomeworkPreparedUpload(draft, data, incoming, requirements, written);
+      await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { files: json(next.files), folders: json(next.folders), revision: { increment: 1 } } });
+      obsolete.push(...next.obsolete);
     }, { timeout: 30_000, maxWait: 30_000 });
     committed = true;
     await Promise.all(obsolete.map(file => unlink(file).catch(() => {})));
@@ -135,7 +114,8 @@ export async function uploadHomeworkPreparation(scope: HomeworkStudentScope, inp
   finally { release(); }
 }
 export async function removeHomeworkPreparedFile(scope: HomeworkStudentScope, input: unknown) {
-  await assertHomeworkStudentScope(scope);
+  const activity = await assertHomeworkStudentScope(scope);
+  if (activityTeamworkEnabled(activity.metadata)) return (await import("./team-preparation")).removeTeamHomeworkPreparedFile(scope, input);
   const data = z.union([
     z.object({ path: z.string().min(1).max(500), expectedRevision: z.number().int().min(0) }).strict(),
     z.object({ all: z.literal(true), expectedRevision: z.number().int().min(0) }).strict()
@@ -156,7 +136,8 @@ export async function removeHomeworkPreparedFile(scope: HomeworkStudentScope, in
   return getHomeworkPreparation(scope);
 }
 export async function getHomeworkPreparedFile(scope: HomeworkStudentScope, filePath: string) {
-  await assertHomeworkStudentScope(scope);
+  const activity = await assertHomeworkStudentScope(scope);
+  if (activityTeamworkEnabled(activity.metadata)) return (await import("./team-preparation")).getTeamHomeworkPreparedFile(scope, filePath);
   const draft = await prisma.pluginCodingHomeworkDraft.findUnique({ where: { activityId_groupId_userId: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id } } });
   const file = draftFiles(draft?.files).find(file => file.path === normalizeHomeworkPath(filePath));
   if (!draft || !file) throw new AppError(404, "HOMEWORK_FILE_NOT_FOUND", "The file was not found.");
@@ -164,7 +145,7 @@ export async function getHomeworkPreparedFile(scope: HomeworkStudentScope, fileP
   return { path: file.path, text: bytes.toString("utf8").slice(0, 2_000_000), truncated: bytes.length > 2_000_000 };
 }
 
-async function readPreparedBytes(draftId: string, file: PreparedHomeworkFile) {
+export async function readPreparedBytes(draftId: string, file: PreparedHomeworkFile) {
   draftFilePath(draftId, file.storedName);
   const handle = await openStoredMaterial(path.join(homeworkStorageRoot(), "drafts"), [draftId], file.storedName);
   try {
@@ -172,4 +153,43 @@ async function readPreparedBytes(draftId: string, file: PreparedHomeworkFile) {
     if (stat.size > 8 * 1024 * 1024 || stat.size !== file.sizeBytes) throw new AppError(409, "HOMEWORK_FILE_CHANGED", "A saved file could not be verified. Upload it again.");
     return await handle.readFile();
   } finally { await handle.close(); }
+}
+
+
+export async function applyHomeworkPreparedUpload(
+  draft: { id: string; files: unknown; folders: unknown },
+  data: Pick<z.infer<typeof homeworkUploadSchema>, "kind" | "replace">,
+  incoming: CodingHomeworkZipEntry[], requirements: Awaited<ReturnType<typeof getHomeworkRequirements>>, written: string[]
+) {
+  const previous = draftFiles(draft.files);
+  if (!data.replace && (data.kind === "zip" ? previous.length > 0 : previous.some(file => incoming.some(next => next.path === file.path)))) {
+    throw new AppError(409, "HOMEWORK_REPLACE_CONFIRMATION_REQUIRED", "Confirm replacement of existing prepared files.");
+  }
+  let next = data.kind === "zip" ? [] : [...previous];
+  let folders = data.kind === "zip" ? [] : (Array.isArray(draft.folders) ? draft.folders.filter((folder): folder is string => typeof folder === "string") : []);
+  for (const entry of incoming) {
+    const entryPath = normalizeHomeworkPath(entry.path);
+    if (entry.isDirectory) { folders.push(entryPath); continue; }
+    if (!entry.content) continue;
+    if (requirements.ignoredPaths.some(ignored => entryPath === ignored || entryPath.startsWith(`${ignored}/`))) continue;
+    const sha256 = createHash("sha256").update(entry.content).digest("hex");
+    const storedName = `${randomUUID()}-${sha256}`;
+    const filename = draftFilePath(draft.id, storedName);
+    await mkdir(path.dirname(filename), { recursive: true, mode: 0o750 });
+    await writeFile(filename, entry.content, { mode: 0o640, flag: "wx" }); written.push(filename);
+    next = [...next.filter(file => file.path !== entryPath), { path: entryPath, storedName, sha256, sizeBytes: entry.content.length }];
+    const segments = entryPath.split("/"); for (let i = 1; i < segments.length; i++) folders.push(segments.slice(0, i).join("/"));
+  }
+  next.sort((a, b) => a.path.localeCompare(b.path)); folders = [...new Set(folders)].sort();
+  if (next.length > requirements.maxFileCount || folders.length > 1000 || next.reduce((sum, file) => sum + file.sizeBytes, 0) > requirements.maxArchiveBytes) throw new AppError(413, "HOMEWORK_COLLECTION_LIMIT", "The prepared collection exceeds the configured file-count or size limit.");
+  const testEntries = await readHomeworkDraftEntries({ ...draft, files: next, folders });
+  const report = await validateCodingHomeworkArchive({ entries: testEntries, requirements, archiveSizeBytes: next.reduce((sum, file) => sum + file.sizeBytes, 0) });
+  if (codingHomeworkSubmissionReadiness(report).blocking.length) throw new AppError(400, "HOMEWORK_FILES_INVALID", "The uploaded files violate the file requirements or safety limits.", { issues: codingHomeworkSubmissionReadiness(report).blocking });
+  const changes: Array<{ operation: string; path: string; previousHash?: string; nextHash?: string }> = [];
+  for (const file of next) {
+    const old = previous.find(value => value.path === file.path);
+    if (!old || old.storedName !== file.storedName) changes.push({ operation: old ? "file_replaced" : "file_added", path: file.path, previousHash: old?.sha256, nextHash: file.sha256 });
+  }
+  for (const old of previous) if (!next.some(value => value.path === old.path)) changes.push({ operation: "file_deleted", path: old.path, previousHash: old.sha256 });
+  return { files: next, folders, changes, obsolete: previous.filter(file => !next.some(value => value.storedName === file.storedName)).map(file => draftFilePath(draft.id, file.storedName)) };
 }

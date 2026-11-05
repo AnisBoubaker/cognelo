@@ -8,8 +8,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { prisma as coreDb } from "@cognelo/db";
-import { AppError, snapshotAiModelSelection, getActivityAttemptAvailability, enqueueBackgroundJob, startActivityAttempt, assignmentTimeLimitMinutes, assignmentAttemptExpiresAt, getTimedActivityRuntime, openStoredMaterial } from "@cognelo/core";
+import { prisma as coreDb, type Prisma as CorePrisma } from "@cognelo/db";
+import { AppError, activityTeamworkEnabled, lockActivityTeamwork, snapshotAiModelSelection, getActivityAttemptAvailability, enqueueBackgroundJob, startActivityAttempt, assignmentTimeLimitMinutes, assignmentAttemptExpiresAt, getTimedActivityRuntime, openStoredMaterial } from "@cognelo/core";
 import { prisma } from "./db-client";
 import { assertHomeworkStudentScope, lockHomeworkWorkflow, assertHomeworkDraftWritable, getHomeworkRequirements, readHomeworkDraftEntries, homeworkStorageRoot, json, record, type HomeworkStudentScope } from "./file-preparation";
 import { lockHomeworkSettings } from "./workflow-settings";
@@ -19,7 +19,8 @@ import { toStudentChallengeQuestionRecord } from "./generation";
 
 const activeWhere = (scope: HomeworkStudentScope) => ({ activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id, kind: "final" as const });
 export async function handInHomework(scope: HomeworkStudentScope, input: unknown) {
-  await assertHomeworkStudentScope(scope);
+  const activity = await assertHomeworkStudentScope(scope);
+  if (activityTeamworkEnabled(activity.metadata)) return (await import("./team-submissions")).handInTeamHomework(scope, input);
   const data = z.object({ expectedRevision: z.number().int().min(0), acknowledgeIncomplete: z.boolean().default(false), locale: z.enum(["en", "fr", "zh", "ar"]).default("en") }).strict().parse(input);
   const availability = await getActivityAttemptAvailability(scope.user, scope);
   if (!availability.canStart) throw new AppError(409, availability.reason ?? "HOMEWORK_ATTEMPT_UNAVAILABLE", "A new submission is not currently available.");
@@ -27,6 +28,9 @@ export async function handInHomework(scope: HomeworkStudentScope, input: unknown
   const directory = path.join(homeworkStorageRoot(), "submissions", submissionId);
   try {
     await prisma.$transaction(async tx => {
+      await lockActivityTeamwork(tx, scope.activityId);
+      const [currentActivity] = await tx.$queryRaw<Array<{ metadata: unknown }>>`SELECT metadata FROM "Activity" WHERE id=${scope.activityId}`;
+      if (activityTeamworkEnabled(currentActivity?.metadata)) throw new AppError(409, "HOMEWORK_TEAM_MODE_CHANGED", "The team settings changed. Reload this activity.");
       await lockHomeworkSettings(tx, scope.activityId); await lockHomeworkWorkflow(tx, scope);
       const latest = await tx.pluginCodingHomeworkSubmission.findFirst({ where: activeWhere(scope), orderBy: { createdAt: "desc" } });
       if (latest && latest.status !== "cancelled" && !record(latest.metadata).deletion && record(latest.metadata).draftRevision === data.expectedRevision) return;
@@ -46,7 +50,7 @@ export async function handInHomework(scope: HomeworkStudentScope, input: unknown
       const questionLanguage = await getHomeworkQuestionLanguage(scope.courseId);
       const questionGenerationAi = snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings));
       await tx.pluginCodingHomeworkSubmission.create({ data: { id: submissionId, ...activeWhere(scope), status: "uploaded", documentationSnapshotId: settings.preparedSnapshotId,
-        structureValidationSummary: json(validation), metadata: json({ workflowVersion: 2, providedCode, questionGenerationAi, draftRevision: draft.revision, handInAt: new Date().toISOString(), incompleteAcknowledged: readiness.requiresAcknowledgement, questionLanguage,
+        structureValidationSummary: json(validation), metadata: json({ workflowVersion: 2, providedCode, questionGenerationAi, draftRevision: draft.revision, handInAt: new Date().toISOString(), incompleteAcknowledged: readiness.requiresAcknowledgement, questionLanguage, requirements, folders: draft.folders,
           assignment: { candidateLimit: assignment.candidateLimit, languageKey: assignment.languageKey, promptMarkdown: assignment.promptMarkdown, generationInstructions: assignment.generationInstructions, questionCount: assignment.questionCount, retrievedExampleCount: assignment.retrievedExampleCount } }) } });
       await mkdir(path.join(directory, "files"), { recursive: true, mode: 0o750 });
       for (const entry of entries) {
@@ -67,7 +71,8 @@ export async function handInHomework(scope: HomeworkStudentScope, input: unknown
   } finally { if (!committed) await rm(directory, { recursive: true, force: true }); }
 }
 export async function getHomeworkWorkspace(scope: HomeworkStudentScope) {
-  await assertHomeworkStudentScope(scope);
+  const activity = await assertHomeworkStudentScope(scope);
+  if (activityTeamworkEnabled(activity.metadata)) return (await import("./team-submissions")).getTeamHomeworkWorkspace(scope);
   const [assignment, submission] = await Promise.all([
     prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId } }),
     prisma.pluginCodingHomeworkSubmission.findFirst({ where: activeWhere(scope), orderBy: { createdAt: "desc" }, include: { files: { orderBy: { path: "asc" } } } })
@@ -85,29 +90,43 @@ export async function getHomeworkWorkspace(scope: HomeworkStudentScope) {
 }
 /** This route remains SEB-guarded; the public workspace never returns challenge text. */
 export async function getStartedHomeworkQuestions(scope: HomeworkStudentScope) {
-  await assertHomeworkStudentScope(scope);
-  const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({ where: activeWhere(scope), orderBy: { createdAt: "desc" }, include: { questions: { orderBy: { orderIndex: "asc" }, include: studentQuestionContextInclude } } });
+  const activity = await assertHomeworkStudentScope(scope);
+  const teamSubmission = activityTeamworkEnabled(activity.metadata) ? await (await import("./team-submissions")).getCurrentTeamHomeworkSubmission(scope) : null;
+  if (activityTeamworkEnabled(activity.metadata) && !teamSubmission) throw new AppError(409, "HOMEWORK_ASSESSMENT_NOT_STARTED", "Click Answer challenge questions to begin.");
+  const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({ where: { ...activeWhere(scope), ...(teamSubmission ? { id: teamSubmission.id } : {}) }, orderBy: { createdAt: "desc" }, include: { questions: { orderBy: { orderIndex: "asc" }, include: studentQuestionContextInclude } } });
   if (!submission || submission.status === "cancelled" || record(submission.metadata).deletion || !submission.coreAttemptId || !record(submission.metadata).assessmentStartedAt) throw new AppError(409, "HOMEWORK_ASSESSMENT_NOT_STARTED", "Click Answer challenge questions to begin.");
+  if (teamSubmission) await (await import("./team-submissions")).assertCurrentTeamSubmissionAccess(scope, submission);
   return { questions: submission.questions.map(toStudentChallengeQuestionRecord), status: submission.status, submissionId: submission.id };
 }
-export async function startHomeworkAnswering(scope: HomeworkStudentScope) {
+export async function startHomeworkAnswering(scope: HomeworkStudentScope, expectedSubmissionId?: string | null) {
   const activity = await assertHomeworkStudentScope(scope);
-  await coreDb.$transaction(async tx => {
+  const start = async (tx: CorePrisma.TransactionClient, teamSubmissionId: string | null = null) => {
     await lockHomeworkWorkflow(tx, scope);
     const [submission] = await tx.$queryRaw<Array<{ id: string; status: string; metadata: unknown; coreAttemptId: string | null }>>`SELECT id, status, metadata, "coreAttemptId" FROM "PluginCodingHomeworkSubmission"
-      WHERE "activityId"=${scope.activityId} AND "groupId"=${scope.groupId} AND "userId"=${scope.user.id} AND kind='final' ORDER BY "createdAt" DESC LIMIT 1 FOR UPDATE`;
+      WHERE "activityId"=${scope.activityId} AND "groupId"=${scope.groupId} AND "userId"=${scope.user.id} AND kind='final' AND (${teamSubmissionId}::text IS NULL OR id=${teamSubmissionId}) ORDER BY "createdAt" DESC LIMIT 1 FOR UPDATE`;
     if (!submission || record(submission.metadata).deletion || submission.status !== "challenge_ready") throw new AppError(409, "HOMEWORK_QUESTIONS_NOT_READY", "Wait until your challenge questions are ready.");
     if (record(submission.metadata).assessmentStartedAt) return;
     const startedAt = new Date().toISOString();
     const attempt = submission.coreAttemptId ? await tx.activityAttempt.findUniqueOrThrow({ where: { id: submission.coreAttemptId } }) : await startActivityAttempt(scope.user, { ...scope,
       pluginKey: "coding-homework-grader", pluginVersion: "0.1.0", pluginAttemptRef: submission.id,
-      metadata: { assessmentStartedAt: startedAt, submissionId: submission.id, timeLimitSnapshotMinutes: assignmentTimeLimitMinutes(activity.assignment.metadata) } }, tx);
+      metadata: json({ ...(record(submission.metadata).workspaceId ? { teamwork: { workspaceId: record(submission.metadata).workspaceId, groupingId: record(submission.metadata).groupingId, teamId: record(submission.metadata).teamId, sharedSourceId: record(submission.metadata).sharedSourceId } } : {}), assessmentStartedAt: startedAt, submissionId: submission.id, timeLimitSnapshotMinutes: assignmentTimeLimitMinutes(activity.assignment.metadata) }) }, tx);
     if (attempt.lifecycle !== "started") throw new AppError(409, "HOMEWORK_ATTEMPT_CLOSED", "This answering attempt is already closed.");
     const deadline = assignmentAttemptExpiresAt(attempt.startedAt, assignmentTimeLimitMinutes(activity.assignment.metadata), activity.assignment.availableUntil) ?? activity.assignment.availableUntil;
     if (deadline) await scheduleHomeworkDeadline(scope, attempt.id, deadline, tx);
     const metadata = json({ ...record(submission.metadata), assessmentStartedAt: attempt.startedAt.toISOString() });
     await tx.$executeRaw`UPDATE "PluginCodingHomeworkSubmission" SET "coreAttemptId"=${attempt.id}, metadata=${JSON.stringify(metadata)}::jsonb, "updatedAt"=NOW() WHERE id=${submission.id}`;
-  });
+  };
+  if (activityTeamworkEnabled(activity.metadata)) {
+    const { withHomeworkTeamWorkspace } = await import("./team-workspaces");
+    const { currentTeamSubmission } = await import("./team-submissions");
+    const { teamworkTransaction } = await import("@cognelo/core");
+    await withHomeworkTeamWorkspace(scope, async (tx, access) => {
+      const submission = await currentTeamSubmission(teamworkTransaction(tx), access);
+      if (!submission) throw new AppError(409, "HOMEWORK_NOT_SUBMITTED", "Your team has not submitted its work.");
+      if (submission.id !== expectedSubmissionId) throw new AppError(409, "HOMEWORK_MEMBERSHIP_CHANGED", "Your answering participation changed. Reload before starting.");
+      await start(tx, submission.id);
+    });
+  } else await coreDb.$transaction(tx => start(tx));
   return { ...await getStartedHomeworkQuestions(scope), runtime: await getTimedActivityRuntime(scope.user, scope.courseId, scope.groupId, scope.activityId) };
 }
 export async function readFrozenHomeworkFile(file: { storedName: string; sizeBytes: bigint; sha256: string }) {
@@ -122,10 +141,12 @@ export async function readFrozenHomeworkFile(file: { storedName: string; sizeByt
   } finally { await handle.close(); }
 }
 export async function getFrozenHomeworkFile(scope: HomeworkStudentScope, filePath: string) {
-  await assertHomeworkStudentScope(scope);
-  const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({ where: activeWhere(scope), orderBy: { createdAt: "desc" } });
+  const activity = await assertHomeworkStudentScope(scope);
+  const submission = activityTeamworkEnabled(activity.metadata) ? await (await import("./team-submissions")).getCurrentTeamHomeworkSubmission(scope) : await prisma.pluginCodingHomeworkSubmission.findFirst({ where: activeWhere(scope), orderBy: { createdAt: "desc" } });
   if (!submission) throw new AppError(404, "HOMEWORK_NOT_SUBMITTED", "No submitted work was found.");
   const file = await prisma.pluginCodingHomeworkSubmissionFile.findUnique({ where: { submissionId_path: { submissionId: submission.id, path: filePath } } });
   if (!file) throw new AppError(404, "HOMEWORK_FILE_NOT_FOUND", "The file was not found.");
-  return { path: file.path, text: (await readFrozenHomeworkFile(file)).toString("utf8").slice(0, 2_000_000) };
+  const bytes = await readFrozenHomeworkFile(file);
+  if (submission.workspaceId) await (await import("./team-submissions")).assertCurrentTeamSubmissionAccess(scope, submission);
+  return { path: file.path, text: bytes.toString("utf8").slice(0, 2_000_000) };
 }

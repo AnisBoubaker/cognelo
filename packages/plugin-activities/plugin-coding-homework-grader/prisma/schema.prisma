@@ -32,6 +32,7 @@ enum PluginCodingHomeworkSnapshotStatus {
 enum PluginCodingHomeworkSubmissionKind {
   preflight
   final
+  team_source
 }
 
 enum PluginCodingHomeworkSubmissionStatus {
@@ -163,6 +164,9 @@ model PluginCodingHomeworkSubmission {
   groupId                    String
   userId                     String
   coreAttemptId              String?
+  workspaceId                String?
+  workspaceMemberId          String?
+  sharedSourceId             String?
   documentationSnapshotId    String?
   zipAttachmentId            String?
   kind                       PluginCodingHomeworkSubmissionKind         @default(final)
@@ -177,10 +181,15 @@ model PluginCodingHomeworkSubmission {
   functions                  PluginCodingHomeworkSubmissionFunction[]
   questions                  PluginCodingHomeworkChallengeQuestion[]
   reviews                    PluginCodingHomeworkReview[]
+  workspace                  PluginCodingHomeworkWorkspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceMember            PluginCodingHomeworkWorkspaceMember? @relation(fields: [workspaceMemberId], references: [id], onDelete: SetNull)
 
   @@index([activityId, groupId, userId, createdAt], map: "PluginCodingHomeworkSubmission_activity_user_idx")
   @@index([activityId, status, createdAt], map: "PluginCodingHomeworkSubmission_status_idx")
   @@index([coreAttemptId], map: "PluginCodingHomeworkSubmission_coreAttempt_idx")
+  @@index([workspaceId, kind, createdAt], map: "PluginCodingHomeworkSubmission_workspace_kind_created_idx")
+  @@index([workspaceMemberId, kind, createdAt], map: "PluginCodingHomeworkSubmission_member_kind_created_idx")
+  @@index([sharedSourceId], map: "PluginCodingHomeworkSubmission_shared_source_idx")
 }
 
 model PluginCodingHomeworkSubmissionFile {
@@ -281,4 +290,62 @@ model PluginCodingHomeworkTeacherSolution {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@unique([ownerKind, ownerId])
+}
+
+model PluginCodingHomeworkWorkspace {
+  id String @id @default(uuid())
+  courseId String
+  activityId String
+  groupId String
+  groupingId String
+  teamId String?
+  ownerParticipantId String?
+  ownerKey String
+  revision Int @default(0)
+  files Json @default("[]")
+  folders Json @default("[]")
+  currentSubmissionId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members PluginCodingHomeworkWorkspaceMember[]
+  submissions PluginCodingHomeworkSubmission[]
+  events PluginCodingHomeworkWorkspaceEvent[]
+  @@unique([activityId, groupId, ownerKey])
+  @@index([activityId, groupId, groupingId, teamId], map: "PluginCodingHomeworkWorkspace_activity_group_grouping_team_idx")
+}
+
+model PluginCodingHomeworkWorkspaceMember {
+  id String @id @default(uuid())
+  workspaceId String
+  activityId String
+  groupId String
+  participantId String
+  userId String?
+  membershipToken String @default("initial")
+  currentSubmissionId String?
+  createdAt DateTime @default(now())
+  workspace PluginCodingHomeworkWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  submissions PluginCodingHomeworkSubmission[]
+  @@unique([activityId, groupId, participantId], map: "PluginCodingHomeworkWorkspaceMember_activity_group_participant_")
+  @@index([workspaceId], map: "PluginCodingHomeworkWorkspaceMember_workspace_idx")
+}
+
+model PluginCodingHomeworkWorkspaceEvent {
+  id String @id @default(uuid())
+  courseId String
+  activityId String
+  groupId String
+  workspaceId String?
+  teamId String?
+  actorUserId String?
+  actorName String
+  operation String
+  filePath String?
+  previousHash String?
+  nextHash String?
+  metadata Json @default("{}")
+  createdAt DateTime @default(now())
+  workspace PluginCodingHomeworkWorkspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  @@index([activityId, groupId, createdAt], map: "PluginCodingHomeworkWorkspaceEvent_activity_group_created_idx")
+  @@index([workspaceId, createdAt], map: "PluginCodingHomeworkWorkspaceEvent_workspace_created_idx")
 }

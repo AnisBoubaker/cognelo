@@ -5,7 +5,7 @@ import { makeStudentQuestionContext, type StudentQuestionContext } from "./quest
 import { getHomeworkQuestionConnection, storedHomeworkAiSelection } from "./ai-selection";
 import { randomUUID } from "node:crypto";
 import { prisma as coreDb } from "@cognelo/db";
-import { NonRetryableBackgroundJobError, createPreparedMaterialSearch, generateAiAgentText, getCourseAiAgentConnection, type BackgroundJobRecord } from "@cognelo/core";
+import { NonRetryableBackgroundJobError, createPreparedMaterialSearch, generateAiAgentText, getCourseAiAgentConnection, lockActivityTeamwork, lockStudentGroupingWorkspaces, teamworkTransaction, type BackgroundJobRecord } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma } from "./db-client";
 import { readFrozenHomeworkFile } from "./hand-in";
@@ -19,6 +19,11 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
   if (!submission || submission.status === "cancelled" || record(submission.metadata).deletion) return { cancelled: true };
   if (["challenge_ready", "ready_for_grading", "graded"].includes(submission.status)) return { submissionId, alreadyReady: true };
   const metadata = record(submission.metadata), settings = record(metadata.assignment);
+  const team = submission.workspaceId ? await import("./team-submissions") : null;
+  if (team) {
+    await team.assertTeamGenerationCurrent(teamworkTransaction(prisma), submission);
+    scope.user = { ...scope.user, id: await team.currentTeamGenerationActor(submission) };
+  }
   const current = await coreDb.user.findUnique({ where: { id: scope.user.id }, select: { isActive: true, email: true, name: true, firstName: true, lastName: true, roles: { include: { role: true } } } });
   if (!current?.isActive) throw new NonRetryableBackgroundJobError("The submitting account is no longer active.");
   scope.user = { id: scope.user.id, email: current.email, name: current.name, firstName: current.firstName, lastName: current.lastName, roles: current.roles.map(entry => entry.role.key) as CurrentUser["roles"] };
@@ -77,6 +82,13 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
     }
     // Publish the complete question set atomically, under the same lock used by teacher cancellation.
     await prisma.$transaction(async tx => {
+      if (submission.workspaceId) {
+        await lockActivityTeamwork(tx, scope.activityId);
+        const workspace = await tx.pluginCodingHomeworkWorkspace.findUnique({ where: { id: submission.workspaceId } });
+        if (!workspace) throw new NonRetryableBackgroundJobError("The shared submission was erased.", "HOMEWORK_JOB_REPLACED");
+        await lockStudentGroupingWorkspaces(tx, workspace.groupingId);
+        await team!.assertTeamGenerationCurrent(teamworkTransaction(tx), submission);
+      }
       await lockHomeworkWorkflow(tx, scope);
       const [lease] = await tx.$queryRaw<Array<{ status: string; lockedBy: string | null }>>`SELECT status, "lockedBy" FROM "BackgroundJob" WHERE id=${job.id} FOR UPDATE`;
       const current = await tx.pluginCodingHomeworkSubmission.findUniqueOrThrow({ where: { id: submissionId } });
@@ -93,6 +105,7 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
         submissionFunctionId: question.functionIndex !== null ? functionIds[question.functionIndex] : null, generationModel: connection.model, generationPromptVersion: "prepared-homework-v6", nearestExamples: json(question.matches), metadata: json({ generatedAt: new Date().toISOString(), questionLanguage, studentCodeContext: question.context }) } });
       await tx.pluginCodingHomeworkSubmission.update({ where: { id: submissionId }, data: { status: "challenge_ready", processingError: null,
         metadata: json({ ...record(current.metadata), providedCode, excludedProvidedFunctionCount: comparison.excluded.length, questionLanguage, challengeGeneration: { questionCount, generatedAt: new Date().toISOString() }, parserDiagnostics: parsed.diagnostics }) } });
+      if (submission.kind === "team_source") await team!.publishSharedTeamQuestions(teamworkTransaction(tx), submission);
     }, { timeout: 30_000 });
     return { submissionId, generatedQuestionCount: generated.length, submissionStatus: "challenge_ready" };
   } catch (error) {

@@ -39,12 +39,14 @@ export async function lockHomeworkUploadBudget(tx: UploadTransaction, activityId
     SELECT (
       COALESCE((SELECT SUM((file->>'sizeBytes')::bigint) FROM "PluginCodingHomeworkDraft" d, jsonb_array_elements(d.files) file
         WHERE d."activityId"=${activityId} AND d."userId"=${userId}), 0)
+      + COALESCE((SELECT SUM((file->>'sizeBytes')::bigint) FROM "PluginCodingHomeworkWorkspace" w, jsonb_array_elements(w.files) file
+        WHERE w."activityId"=${activityId} AND EXISTS(SELECT 1 FROM "PluginCodingHomeworkWorkspaceMember" m WHERE m."workspaceId"=w.id AND m."userId"=${userId})), 0)
       + COALESCE((SELECT SUM(a."sizeBytes") FROM "PluginCodingHomeworkAttachment" a
         JOIN "PluginCodingHomeworkSubmission" s ON a."ownerId" = s.id AND a."ownerKind" = 'submission'
         WHERE s."activityId" = ${activityId} AND s."userId" = ${userId}), 0)
-      + COALESCE((SELECT SUM(f."sizeBytes") FROM "PluginCodingHomeworkSubmissionFile" f
+      + COALESCE((SELECT SUM(files."sizeBytes") FROM (SELECT DISTINCT f."storedName",f."sizeBytes" FROM "PluginCodingHomeworkSubmissionFile" f
         JOIN "PluginCodingHomeworkSubmission" s ON f."submissionId" = s.id
-        WHERE s."activityId" = ${activityId} AND s."userId" = ${userId}), 0)
+        WHERE s."activityId" = ${activityId} AND s."userId" = ${userId}) files), 0)
       + COALESCE((SELECT SUM(octet_length(s.metadata::text) + octet_length(s."structureValidationSummary"::text)) FROM "PluginCodingHomeworkSubmission" s
         WHERE s."activityId" = ${activityId} AND s."userId" = ${userId}), 0)
       + COALESCE((SELECT SUM(octet_length(f."functionCode") + octet_length(f."astText") + octet_length(f.embedding::text) + octet_length(f."nearestExamples"::text)) FROM "PluginCodingHomeworkSubmissionFunction" f

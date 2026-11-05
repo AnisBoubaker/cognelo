@@ -31,17 +31,18 @@ All routes are under `coding-homework-grader/` and retain the host's course/grou
 | `workspace` GET; `hand-in` POST | Safe persistent state and atomic freezing/enqueueing. |
 | `answering` GET/POST | SEB-guarded question retrieval/explicit attempt start. |
 | `submitted-file` GET | Read-only frozen source. |
+| `submitted-download` GET; `submitted-check` POST | Current frozen collection as a ZIP, and read-only validation against frozen requirements; optional expected `submissionId`. |
 | `provided-files-download` GET | One owner-authorized ZIP of provided attachments, available during preparation. |
 | `activity-file` GET | Authorized individual attachment; PDFs are inline unless `download=1`. |
 | `challenge-answers` PUT/POST | Serialized autosave and final submission, including server-saved expiry. |
-| `manage-submissions` GET/DELETE | Scoped staff list/cancellation, including queued work. |
+| `manage-submissions` GET/DELETE/POST | Scoped staff list, whole-hand-in cancellation and `{ action: "reset-challenges", submissionId, reason }` individual reset, including queued work. |
 | `gradebook-attempts` GET; `gradebook-file` GET | Grading-staff review and on-demand retained file text for the exact participant/submission. |
 
 `PluginCodingHomeworkDraft` owns revisions/file hashes/folders. `PluginCodingHomeworkTeacherSolution` owns private files/parsed signatures. Existing submission/file/question tables hold frozen work and derived output; status adds `cancelled`. Assignment settings hold protected workflow keys and the prepared snapshot ID; ordinary authoring saves cannot overwrite these keys. Snapshots retain immutable core material-index IDs. `workflowVersion: 2` distinguishes new records from legacy analysis artifacts.
 
 Reference materials offers **Preview indexed text** beside indexed sources. `reference-preview` accepts `resourceId`, optional `indexId` for stable pagination and a bounded `offset`. The plugin resolves its activity/course-owned snapshot; for selected prepared sources it delegates only those pinned index IDs to the generic core reader. Other sources use the saved embedding model's current material index. The core reader rechecks manager/course/resource authorization and returns ten exact passages at a time, without vector/private metadata. Changed paging identity fails explicitly. The inline preview aborts departed reads, clears old content, supports retry and keyboard focus, and renders source strings literally. No AI call or academic mutation occurs. It is a content-inspection aid, not automatic proof of full source coverage. Before submissions open, workflow readiness also requires every selected current index to match the saved snapshot and remain ready; a stale/mismatched reference disables opening in the UI as well as failing server validation. Already enabled homework retains its pinned readiness without live refresh.
 
-Generated clients are local artifacts. Apply the additive manifest migration `202611010010_homework_preparation` and core material-index migration using `npm run db:migrate:all`. Material PDF extraction needs Poppler; no new environment variable is required. The API's ordinary background worker must remain enabled. Storage uses the existing private homework filesystem root and SHA-256 integrity checks.
+Generated clients are local artifacts. Apply the additive manifest migrations `202611010010_homework_preparation` and `202611050010_team_workspaces`, plus the core material-index migration using `npm run db:migrate:all`. Material PDF extraction needs Poppler; no new environment variable is required. The API's ordinary background worker must remain enabled. Storage uses the existing private homework filesystem root and SHA-256 integrity checks.
 
 ## Shared contracts
 
@@ -107,8 +108,13 @@ Phase 14 added operational hardening on top of the shared core background job se
 
 Assignment PDFs and teacher-provided files are activity-owned attachments, not course content resources. Teachers can view the PDF inline and add, open, or remove provided files from the authoring screen; students can open the same assigned files. Bank-to-course copying preserves these attachment records. Documentation extraction adds the assignment Markdown, extractable PDF text, and provided text/source files to the snapshot alongside prior visible course resources. C functions from provided files are parsed into function-level reference documents, and submission analysis merges their similarity matches with course-content matches before selecting challenge candidates.
 
-Current plugin-owned tables:
+Plugin-owned tables (including current preparation/team state):
 
+- `PluginCodingHomeworkDraft`
+- `PluginCodingHomeworkTeacherSolution`
+- `PluginCodingHomeworkWorkspace`
+- `PluginCodingHomeworkWorkspaceMember`
+- `PluginCodingHomeworkWorkspaceEvent`
 - `PluginCodingHomeworkAssignment`
 - `PluginBankCodingHomeworkAssignment`
 - `PluginCodingHomeworkSubmissionRequirementSet`
@@ -205,7 +211,7 @@ The C parser now supplies normalized argument and return types alongside its exi
 
 The preparation API stores a revisioned, plugin-owned file collection without creating a core attempt. Individual files may target relative folders; same-path replacement requires confirmation. ZIP replaces the complete collection. Optimistic revisions and an advisory workflow lock protect concurrent tabs; immutable physical objects are validated against recorded size/hash. Final workflows freeze preparation until teacher cancellation. Collection size is conservatively bounded by the configured archive-byte limit, in addition to ZIP expansion and parser limits.
 
-Private teacher solutions accept C/H files or ZIPs, retain parsed function signatures, and support an AI selector constrained to known candidate keys. Header-only or definition-free files may be uploaded first. Only authorized authoring owners can access them. Duplication copies independent solution records and clears operational submission/reference readiness settings.
+Private teacher solutions accept C/H files or ZIPs, retain parsed function signatures, and support an AI selector constrained to known candidate keys. Header-only or definition-free files may be uploaded first. Only authorized authoring owners can access them. Duplication copies independent solution records; same-course copies retain prepared references but start with submissions disabled, as detailed above.
 
 A ZIP explicitly replaces the complete private solution and preserves its relative paths (there is no automatic wrapper-folder stripping). Individual files merge/replace their normalized path and refresh only their own detected functions. Finder `__MACOSX` and AppleDouble `._*` metadata files are excluded. UTF-8 and BOM-marked UTF-16 are decoded before persistence; binary/control-NUL and malformed source produce actionable validation errors without overwriting the previous solution. C source remains within the bounded analysis limits.
 
@@ -260,3 +266,17 @@ If parsed functions are all excluded, generation must not fall back to the full 
 Prompts constrain questions to the eligible code context and list excluded provided targets, omitting names of all modified submitted functions. Mentioning a provided helper is permitted when asking about the student's guard, call or handling of its result. When a question mentions an excluded helper, it must first name the eligible target function so its focus is explicit; an excluded function named as the initial target is rejected. Common names accept code/call or natural function context, without mistaking “main control flow” for `main()`. This bounded name-order check supplements deterministic candidate exclusion and prompt guidance; it does not claim semantic validation of every model sentence or ban helper names.
 
 Prepared response validation distinguishes malformed JSON, absent/invalid-length question text, duplicates and excluded function targets. A correction request retains the original function, references, course language and previous questions, adding specific feedback and at most 4000 characters of the rejected response. After three invalid outputs for one question, `HOMEWORK_QUESTION_INVALID` is non-retryable; the private processing error identifies the question number and rejection reasons instead of rerunning the complete set without new feedback. Ordinary provider/network failures still use queue retries. The complete question set continues to publish atomically; no partial questions become visible. Baseline hashes, excluded counts and raw diagnostics remain private.
+
+## Team delivery
+
+The plugin advertises `supportsTeamwork` and implements the core transactional teamwork service. Core owns the General toggle and section Assignment choices (grouping and unteamed permission). The plugin’s `settings.separateTeamQuestions` is author-owned and defaults to false. Changes to team policies or shared/separate questions require cancellation of affected active hand-ins. Core mode locks also cover active individual hand-ins before switching modes.
+
+`PluginCodingHomeworkWorkspace` owns shared draft files/folders/revision and its current frozen source ID. A team key includes core’s latest empty-team epoch; a personal fallback key includes the participant’s membership token. `WorkspaceMember` binds the current section enrollment and token to its private final submission. Membership is resolved server-side on every action. POST/DELETE preparation and hand-in require `contextKey` from workspace/preparation plus `expectedRevision`; Answer POST requires the current `submissionId` for team mode. Returning to a former team starts a new participation. Client polling clears old files/questions/answers/timer state and rejects late results when participation changes. Hidden groupings omit team/roster names.
+
+Hand-in freezes one physical file collection and a hidden `team_source` parent, owned by the activity creator while retaining actual submitter metadata. Individual final records reference those same stored objects. In common mode one queue job generates the complete question set, then fans out independent question rows with safe code context, fresh IDs and private answers. In separate mode each activated member gets their own job; question uniqueness applies only within each set. Pending enrollments are included and acquire their child on activation/access. Late joins attach to the frozen source; question readiness never starts a timer. Queue and SEB/timing bounds are unchanged.
+
+Core membership mutations call the plugin under the grouping transaction. Departing members lose their binding; old private submissions cancel and core withdraws associated attempts/grades. Empty teams erase all workspace/submission rows, with a durable cleanup job for draft/frozen bytes. Workspace events survive with a null workspace pointer, actor/action/path/hash/revision metadata and no source text. File add/replace/delete, ZIP replacement, clearing, joining/leaving, submitting, cancellation, reset and erasure are recorded. No historical student-data backfill is needed for this delivery.
+
+Teacher cancellation reopens the shared preparation for everyone and withdraws associated active grades. It validates the expected frozen source to prevent an old dialog cancelling a newer hand-in. Individual reset retains the shared source, cancels only that member’s answering participation and creates a replacement; common mode reuses its question set, separate mode generates anew. Generic gradebook deletion directs team attempts to these explicit management actions. Grades remain individual and whole-class release flags are preserved.
+
+Submitted downloads reauthorize the current workspace/submission, preserve nested and empty folders, stream bounded chunks and verify size/hash without storing another ZIP. Read-only rechecks use hand-in requirements and bytes. These routes also support ordinary individual submissions. Stale IDs, peer submission IDs, teacher-only data and former-team files remain inaccessible to learners.

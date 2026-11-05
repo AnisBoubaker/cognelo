@@ -6,6 +6,9 @@ export const codingHomeworkGraderTables = [
   "PluginCodingHomeworkAttachment",
   "PluginCodingHomeworkDocumentationSnapshot",
   "PluginCodingHomeworkReferenceFunction",
+  "PluginCodingHomeworkWorkspace",
+  "PluginCodingHomeworkWorkspaceMember",
+  "PluginCodingHomeworkWorkspaceEvent",
   "PluginCodingHomeworkSubmission",
   "PluginCodingHomeworkSubmissionFile",
   "PluginCodingHomeworkSubmissionFunction",
@@ -332,6 +335,40 @@ WHERE (requirements->>'maxArchiveBytes')::bigint > 26214400 OR (requirements->>'
           files JSONB NOT NULL DEFAULT '[]', functions JSONB NOT NULL DEFAULT '[]',
           "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
         `CREATE UNIQUE INDEX IF NOT EXISTS "PluginCodingHomeworkTeacherSolution_ownerKind_ownerId_key" ON "PluginCodingHomeworkTeacherSolution"("ownerKind", "ownerId")`
+      ]
+    }
+    ,{
+      id: "202611050010_team_workspaces",
+      statements: [
+        `ALTER TYPE "PluginCodingHomeworkSubmissionKind" ADD VALUE IF NOT EXISTS 'team_source'`,
+        `CREATE TABLE IF NOT EXISTS "PluginCodingHomeworkWorkspace" (
+          id TEXT PRIMARY KEY, "courseId" TEXT NOT NULL REFERENCES "Course"(id) ON DELETE CASCADE,
+          "activityId" TEXT NOT NULL REFERENCES "Activity"(id) ON DELETE CASCADE, "groupId" TEXT NOT NULL REFERENCES "CourseGroup"(id) ON DELETE CASCADE,
+          "groupingId" TEXT NOT NULL, "teamId" TEXT, "ownerParticipantId" TEXT, "ownerKey" TEXT NOT NULL,
+          revision INTEGER NOT NULL DEFAULT 0, files JSONB NOT NULL DEFAULT '[]', folders JSONB NOT NULL DEFAULT '[]', "currentSubmissionId" TEXT,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS "PluginCodingHomeworkWorkspace_activityId_groupId_ownerKey_key" ON "PluginCodingHomeworkWorkspace"("activityId", "groupId", "ownerKey")`,
+        `CREATE INDEX IF NOT EXISTS "PluginCodingHomeworkWorkspace_activity_group_grouping_team_idx" ON "PluginCodingHomeworkWorkspace"("activityId", "groupId", "groupingId", "teamId")`,
+        `CREATE TABLE IF NOT EXISTS "PluginCodingHomeworkWorkspaceMember" (
+          id TEXT PRIMARY KEY, "workspaceId" TEXT NOT NULL REFERENCES "PluginCodingHomeworkWorkspace"(id) ON DELETE CASCADE,
+          "activityId" TEXT NOT NULL REFERENCES "Activity"(id) ON DELETE CASCADE, "groupId" TEXT NOT NULL REFERENCES "CourseGroup"(id) ON DELETE CASCADE,
+          "participantId" TEXT NOT NULL, "userId" TEXT, "currentSubmissionId" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS "PluginCodingHomeworkWorkspaceMember_activity_group_participant_" ON "PluginCodingHomeworkWorkspaceMember"("activityId", "groupId", "participantId")`,
+        `ALTER TABLE "PluginCodingHomeworkWorkspaceMember" ADD COLUMN IF NOT EXISTS "membershipToken" TEXT NOT NULL DEFAULT 'initial'`,
+        `CREATE INDEX IF NOT EXISTS "PluginCodingHomeworkWorkspaceMember_workspace_idx" ON "PluginCodingHomeworkWorkspaceMember"("workspaceId")`,
+        `CREATE TABLE IF NOT EXISTS "PluginCodingHomeworkWorkspaceEvent" (
+          id TEXT PRIMARY KEY, "courseId" TEXT NOT NULL REFERENCES "Course"(id) ON DELETE CASCADE, "activityId" TEXT NOT NULL REFERENCES "Activity"(id) ON DELETE CASCADE,
+          "groupId" TEXT NOT NULL, "workspaceId" TEXT REFERENCES "PluginCodingHomeworkWorkspace"(id) ON DELETE SET NULL, "teamId" TEXT,
+          "actorUserId" TEXT, "actorName" TEXT NOT NULL, operation TEXT NOT NULL, "filePath" TEXT, "previousHash" TEXT, "nextHash" TEXT,
+          metadata JSONB NOT NULL DEFAULT '{}', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+        `CREATE INDEX IF NOT EXISTS "PluginCodingHomeworkWorkspaceEvent_activity_group_created_idx" ON "PluginCodingHomeworkWorkspaceEvent"("activityId", "groupId", "createdAt")`,
+        `CREATE INDEX IF NOT EXISTS "PluginCodingHomeworkWorkspaceEvent_workspace_created_idx" ON "PluginCodingHomeworkWorkspaceEvent"("workspaceId", "createdAt")`,
+        `ALTER TABLE "PluginCodingHomeworkSubmission" ADD COLUMN IF NOT EXISTS "workspaceId" TEXT REFERENCES "PluginCodingHomeworkWorkspace"(id) ON DELETE CASCADE`,
+        `ALTER TABLE "PluginCodingHomeworkSubmission" ADD COLUMN IF NOT EXISTS "workspaceMemberId" TEXT REFERENCES "PluginCodingHomeworkWorkspaceMember"(id) ON DELETE SET NULL`,
+        `ALTER TABLE "PluginCodingHomeworkSubmission" ADD COLUMN IF NOT EXISTS "sharedSourceId" TEXT`,
+        `CREATE INDEX IF NOT EXISTS "PluginCodingHomeworkSubmission_workspace_kind_created_idx" ON "PluginCodingHomeworkSubmission"("workspaceId", kind, "createdAt")`,
+        `CREATE INDEX IF NOT EXISTS "PluginCodingHomeworkSubmission_member_kind_created_idx" ON "PluginCodingHomeworkSubmission"("workspaceMemberId", kind, "createdAt")`,
+        `CREATE INDEX IF NOT EXISTS "PluginCodingHomeworkSubmission_shared_source_idx" ON "PluginCodingHomeworkSubmission"("sharedSourceId")`
       ]
     }
   ],

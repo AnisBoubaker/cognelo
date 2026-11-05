@@ -1,6 +1,6 @@
 import { prisma as corePrisma, type Prisma as CorePrisma } from "@cognelo/db";
 import { z } from "zod";
-import { AppError, startActivityAttempt, submitActivityAttempt, getGroupAssignedActivity, assignmentTimeLimitMinutes, assignmentAttemptExpiresAt } from "@cognelo/core";
+import { AppError, activityTeamworkEnabled, startActivityAttempt, submitActivityAttempt, getGroupAssignedActivity, assignmentTimeLimitMinutes, assignmentAttemptExpiresAt } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma } from "./db-client";
 import { toStudentChallengeQuestionRecord } from "./generation";
@@ -79,6 +79,12 @@ export async function saveCodingHomeworkChallengeAnswers(
   const parsed = challengeAnswersInputSchema.parse(input ?? {});
   const activity = await getGroupAssignedActivity(scope.user, scope.courseId, scope.groupId, scope.activityId);
   return corePrisma.$transaction(async (tx) => {
+  if (activityTeamworkEnabled(activity.metadata)) {
+    const { getHomeworkTeamAccessInTransaction } = await import("./team-workspaces");
+    const access = await getHomeworkTeamAccessInTransaction(tx, scope);
+    if (!access.member.currentSubmissionId || (parsed.submissionId && parsed.submissionId !== access.member.currentSubmissionId)) throw new AppError(403, "HOMEWORK_TEAM_ACCESS_CHANGED", "You no longer have access to this team's answering session.");
+    parsed.submissionId = access.member.currentSubmissionId;
+  }
   const candidates = await tx.$queryRaw<SubmissionRow[]>`SELECT * FROM "PluginCodingHomeworkSubmission"
     WHERE "activityId" = ${scope.activityId} AND "groupId" = ${scope.groupId} AND "userId" = ${scope.user.id}
       AND kind = 'final' AND (${parsed.submissionId ?? null}::text IS NULL OR id = ${parsed.submissionId ?? null})

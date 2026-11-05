@@ -121,6 +121,19 @@ export async function notifyActivityTeamMembershipChanges(tx: Prisma.Transaction
         if (attempt) await deleteActivitySubmission(user, courseId, { attemptId, reason: "Team membership changed; previous workspace participation was withdrawn." }, { allowStartedReplacement: true, transaction: tx, membershipChange: { groupId, participantIds: changedIds } });
       }
     }
+    // A teacher may have entered an override before challenge answering created
+    // a core attempt. Such an active grade belongs to the old participation too.
+    if (activityTeamworkEnabled(activity.metadata) && activityTeamAssignment(activity.groupAssignments[0]?.metadata)?.groupingId === groupingId) {
+      const remaining = await tx.grade.findMany({ where: { participantId: { in: changedIds }, gradebookItem: { courseId, groupId, activityId: activity.id } }, select: { gradebookItemId: true, participantId: true } });
+      for (const entry of remaining) {
+        await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${JSON.stringify([entry.gradebookItemId, entry.participantId])}, 0))`;
+        const grade = await tx.grade.findUnique({ where: { gradebookItemId_participantId: entry } });
+        if (!grade) continue;
+        await tx.gradeEvent.create({ data: { gradebookItemId: entry.gradebookItemId, participantId: entry.participantId, actorUserId: user.id, eventType: "overridden",
+          previousValue: JSON.parse(JSON.stringify(grade)) as Prisma.InputJsonValue, nextValue: { grade: null }, reason: "Team membership changed; previous workspace grade was withdrawn.", metadata: { membershipToken, groupingId } } });
+        await tx.grade.delete({ where: { id: grade.id } });
+      }
+    }
   }
 }
 
