@@ -18,18 +18,18 @@ Status: approved November 5, 2026; implementation in progress. This supersedes t
 
 Core remains plugin-neutral. Capability-scoped lifecycle handlers expose private hand-in locks and react to membership changes through the host transaction, using the SDK's neutral query/execute pattern. Core resolves membership and owns assignment/grade effects; the Homework plugin owns its workspace, file audit, frozen artifact and question data. Plugins never import sibling implementations.
 
-Keep one physical frozen file collection per shared hand-in, with independent student question/answer records. Existing individual submissions remain readable and the default individual workflow must pass its current regression suite. Membership changes and hand-in synchronize with grouping/workspace locks; late generation or stale file reads cannot restore access to an old workspace. Filesystem cleanup is idempotent and recoverable after the owning database transaction commits.
+The user confirmed that no real student submissions exist yet; no academic-data backfill is required for this delivery. Keep one physical frozen file collection per shared hand-in, with independent student question/answer records. The default individual workflow must pass its current regression suite. Membership changes and hand-in synchronize with grouping/workspace locks; late generation or stale file reads cannot restore access to an old workspace. Filesystem cleanup is idempotent and recoverable after the owning database transaction commits.
 
 Resetting one student's challenges reuses the team's shared question set when common questions are selected, and generates a fresh set when separate questions are selected. It starts a new individual answering participation; previous active grades are withdrawn and audit evidence retained. Grouping visibility continues to govern roster/name disclosure. Students without an activated account are considered covered by the team's hand-in; individual answering becomes available after activation. Unteamed submissions use an independent personal workspace when the section permits them.
 
 ## Core extension
 
-`ActivityDefinition.supportsTeamwork` is an explicit opt-in. The `ServerActivityPlugin.teamwork` service reports active hand-ins and handles grouping membership changes using the host’s neutral SQL transaction. It may enqueue durable plugin jobs and identify scoped attempts to withdraw; it must not call AI or remote services inside the transaction. Core resolves actual enrollment/team membership and validates assignment groupings against the section. Private plugin table names never enter core. The initial contract/settings foundation is implemented; Homework opt-in and end-to-end workspace behavior remain pending.
+`ActivityDefinition.supportsTeamwork` is an explicit opt-in. The `ServerActivityPlugin.teamwork` service reports active hand-ins and handles grouping membership changes using the host’s neutral SQL transaction. It may enqueue durable plugin jobs and identify scoped attempts to withdraw; it must not call AI or remote services inside the transaction. Core resolves actual enrollment/team membership and validates assignment groupings against the section. Private plugin table names never enter core. Core settings and lifecycle integration are implemented. The Homework service owns shared workspaces, frozen files and per-student participation; local end-to-end validation is in progress. General/Assignment fields cannot be overwritten by the generic activity editor. Direct section assignment endpoints enforce the same policy locks. Roster removal and section deletion/moves dispatch membership cleanup before enrollment cascades. Generic gradebook deletion directs team hand-ins to the explicit reset/cancel actions.
 
 ## Delivery checkpoints
 
-- [ ] Core capability, assignment contracts/UI, grouping validation and active-hand-in locks.
-- [ ] Transactional membership lifecycle and current-workspace authorization.
+- [x] Core capability, assignment contracts/UI, grouping validation and active-hand-in locks.
+- [x] Transactional membership lifecycle and current-workspace authorization.
 - [ ] Shared preparation, file audit, frozen hand-in and late-join handling.
 - [ ] Shared/separate questions with private answers, individual timers/grades and reset behavior.
 - [ ] Whole-team cancellation, empty-team erasure and recoverable file cleanup.
@@ -38,3 +38,5 @@ Resetting one student's challenges reuses the team's shared question set when co
 - [ ] Updated canonical documentation and validated incremental commits.
 
 No production migration or deployment is authorized by this implementation request. Production functional testing remains prohibited; use local or isolated preprod.
+
+Membership changes record a core audit event containing the grouping revision, affected enrollment IDs and newly empty team IDs. Its ID is the participation token; the latest empty-team event defines the workspace generation. Plugins bind private state to those tokens so leaving and rejoining cannot resurrect a prior answering participation or an erased team workspace. No-op team renaming does not change tokens. Team mutations include a workspace/member context key as well as the draft revision, preventing delayed requests from applying to a different team whose draft happens to have the same revision.

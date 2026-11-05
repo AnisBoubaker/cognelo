@@ -1,6 +1,6 @@
 # Student groupings and teams
 
-Status: grouping management, student visibility controls, recorded assignment methods, capacity-aware random assignment, and student team selection implemented. Smart assignment is a disabled placeholder. [Activity-specific exceptions](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) are implemented; collaborative activity execution remains a future integration.
+Status: grouping management, student visibility controls, recorded assignment methods, capacity-aware random assignment, and student team selection implemented. Smart assignment is a disabled placeholder. [Activity-specific exceptions](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) are implemented; team-capable activities integrate through the [core team lifecycle](TEAM_ACTIVITY_SUBMISSIONS.md).
 
 ## Model and behavior
 
@@ -76,3 +76,7 @@ Activity exceptions define precedence and timing snapshots in their [canonical p
 The [2026-10-12 verification record](TEAM_CHOICE_VERIFICATION_2026-10-12.md) includes full-suite results and the pre-existing intermittent content-duplication failure.
 
 Both grouping browser files belong to the independent `@regression` set and use real local API/database integration without AI or execution runners. Synthetic email recipients are captured by the shared email delivery boundary; see [Email delivery](EMAIL_DELIVERY.md).
+
+## Team activity lifecycle
+
+Team-capable plugins receive membership changes in the same transaction as teacher edits or student choices. Roster removal and section deletion/moves revoke participation before cascading enrollment deletion. Actual moves, leaves and newly empty teams are reported; renaming a team or saving unchanged membership does not reset work. Core records participation tokens in course audit events and withdraws affected core attempts/grades; the owning plugin maintains private shared workspaces. Hidden groupings continue to suppress roster/name disclosure in homework. See [team submissions](TEAM_ACTIVITY_SUBMISSIONS.md) for assignment locks, late joining and empty-team erasure.

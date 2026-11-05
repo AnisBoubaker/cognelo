@@ -353,9 +353,12 @@ export type ServerActivityPlugin = {
     hasActiveSubmissions: (input: { activityId: string; groupId?: string; transaction: PluginTeamworkTransaction }) => Promise<boolean>;
     membershipChanged: (input: {
       user: CurrentUser; courseId: string; groupId: string; groupingId: string; activityId: string;
+      assignment?: { groupingId: string; allowIndividualSubmission: boolean } | null;
       changes: Array<{ participantId: string; userId: string | null; previousTeamId: string | null; teamId: string | null; removed?: boolean }>;
       emptyTeamIds: string[];
       groupingRemoved?: boolean;
+      membershipToken: string;
+      teamWorkspaceEpochs: Record<string, string>;
       transaction: PluginTeamworkTransaction;
       enqueue: (job: { queue: string; handlerKey: string; payload: Record<string, unknown>; metadata?: Record<string, unknown>; idempotencyKey?: string; maxAttempts?: number }) => Promise<void>;
     }) => Promise<{ withdrawAttemptIds?: string[] }>;

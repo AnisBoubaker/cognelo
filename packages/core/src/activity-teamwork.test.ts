@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   active: vi.fn(), changed: vi.fn(), withdraw: vi.fn(), enqueue: vi.fn(),
-  tx: { $queryRaw: vi.fn(), $executeRaw: vi.fn(), $queryRawUnsafe: vi.fn(), studentGrouping: { findFirst: vi.fn() }, activity: { findMany: vi.fn() }, courseGroupParticipant: { findMany: vi.fn() }, activityAttempt: { findFirst: vi.fn() } }
+  tx: { $queryRaw: vi.fn(), $executeRaw: vi.fn(), $queryRawUnsafe: vi.fn(), studentGrouping: { findFirst: vi.fn() }, activity: { findMany: vi.fn() }, courseGroupParticipant: { findMany: vi.fn() }, activityAttempt: { findFirst: vi.fn(), findMany: vi.fn() }, courseAuditEvent: { create: vi.fn() } }
 }));
 vi.mock("@cognelo/activity-sdk", () => ({ getActivityDefinition: (key: string) => ({ supportsTeamwork: key === "team-capable" }) }));
 vi.mock("@cognelo/activity-sdk/server", () => ({ getActivityTeamworkHandler: () => ({ hasActiveSubmissions: mocks.active, membershipChanged: mocks.changed }) }));
@@ -11,7 +11,7 @@ const { validateActivityTeamworkChange, notifyActivityTeamMembershipChanges, res
 const user = { id: "user", email: "student@example.test", roles: ["student" as const], name: null, firstName: null, lastName: null };
 const tx = mocks.tx as never;
 beforeEach(() => {
-  vi.resetAllMocks(); mocks.active.mockResolvedValue(false); mocks.changed.mockResolvedValue({});
+  vi.resetAllMocks(); mocks.tx.activityAttempt.findMany.mockResolvedValue([]); mocks.tx.$queryRaw.mockResolvedValue([]); mocks.active.mockResolvedValue(false); mocks.changed.mockResolvedValue({});
   mocks.tx.studentGrouping.findFirst.mockResolvedValue({ id: "grouping" });
   mocks.tx.activity.findMany.mockResolvedValue([{ id: "activity", activityType: { key: "team-capable" } }]);
   mocks.tx.courseGroupParticipant.findMany.mockResolvedValue([{ id: "student", userId: "user" }]);

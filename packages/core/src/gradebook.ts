@@ -688,6 +688,7 @@ export async function deleteActivitySubmission(user: CurrentUser, courseId: stri
     if (!internal.transaction || internal.membershipChange.groupId !== attempt.groupId || !internal.membershipChange.participantIds.includes(attempt.participantId)) throw forbidden();
     if (attempt.userId !== user.id) await assertCanManageGroupRoster(user, courseId, attempt.groupId);
   } else await assertCanGradeGroup(user, courseId, attempt.groupId);
+  if (!internal.allowStartedReplacement && asJsonObject(attempt.metadata)?.teamwork) throw new AppError(409, "TEAM_SUBMISSION_MANAGEMENT_REQUIRED", "Use Reset student challenges or Cancel submission in the activity to manage this team hand-in.");
   if (attempt.lifecycle === "deleted") {
     throw new AppError(400, "SUBMISSION_ALREADY_DELETED", "This submission has already been deleted.");
   }

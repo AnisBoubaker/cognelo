@@ -1,3 +1,4 @@
+import { lockActivityTeamwork } from "./activity-teamwork";
 import { withActivityAuthoringChange } from "./activity-authoring-live";
 import { getActivityDefinition, getActivityPluginForActivityType, isCoreActivityType, listActivityDefinitions } from "@cognelo/activity-sdk";
 import { ActivityInputSchema, ActivityUpdateSchema, CourseActivityBankSyncSchema, CourseActivityDuplicateSchema } from "@cognelo/contracts";
@@ -261,6 +262,17 @@ export async function updateActivity(user: CurrentUser, courseId: string, activi
   }
 
   return withActivityAuthoringChange(user, courseId, activityId, data, async (tx) => {
+    if (getActivityDefinition(activity.activityType.key)?.supportsTeamwork) {
+      await lockActivityTeamwork(tx, activityId);
+      const current = await tx.activity.findUniqueOrThrow({ where: { id: activityId }, select: { metadata: true } });
+      // General/Assignment settings are core-owned and saved through their validated route.
+      if (data.metadata) {
+        const currentMetadata = current.metadata as Record<string, Prisma.JsonValue>;
+        if (currentMetadata?.allGroupsAssignment !== undefined) data.metadata.allGroupsAssignment = currentMetadata.allGroupsAssignment;
+        else delete data.metadata.allGroupsAssignment;
+      }
+      if (activityTypeId && data.activityTypeKey !== activity.activityType.key) throw new AppError(409, "ACTIVITY_TEAM_TYPE_LOCKED", "Create a new activity to use a different activity type.");
+    }
     const updatedActivity = await tx.activity.update({
       where: { id: activityId },
       data: {

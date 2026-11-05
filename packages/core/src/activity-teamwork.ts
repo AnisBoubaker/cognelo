@@ -4,8 +4,9 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { AppError } from "./errors";
 import { enqueueBackgroundJob } from "./background-jobs";
+import { randomUUID } from "node:crypto";
 
-export type TeamworkDatabase = Pick<Prisma.TransactionClient, "$queryRaw" | "$executeRaw">;
+export type TeamworkDatabase = { $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: unknown[]): Promise<T>; $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number> };
 const object = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 export type ActivityTeamAssignment = { groupingId: string; allowIndividualSubmission: boolean };
 export function activityTeamAssignment(metadata: unknown): ActivityTeamAssignment | null {
@@ -49,26 +50,36 @@ export async function validateActivityTeamworkChange(tx: Prisma.TransactionClien
 export type ActivityTeamContext = {
   enabled: boolean; participantId: string; groupingId: string | null; teamId: string | null;
   allowIndividualSubmission: boolean; teamTitle: string | null; visibleToStudents: boolean;
-  members: Array<{ participantId: string; userId: string | null; name: string }>;
+  membershipToken: string; workspaceEpoch: string;
+  members: Array<{ participantId: string; userId: string | null; name: string; membershipToken: string }>;
 };
+export async function getTeamWorkspaceEpoch(tx: TeamworkDatabase, courseId: string, groupingId: string, teamId: string) {
+  const [event] = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "CourseAuditEvent" WHERE "courseId"=${courseId} AND "targetId"=${groupingId} AND "eventType"='activity_team_membership_changed'
+    AND metadata->'emptyTeamIds' ? ${teamId} ORDER BY (metadata->>'groupingRevision')::int DESC,"createdAt" DESC,id DESC LIMIT 1`;
+  return event?.id ?? "initial";
+}
 /** Resolve current membership afresh; callers never supply a trusted team identity. */
 export async function resolveActivityTeamContext(user: CurrentUser, courseId: string, groupId: string, activityId: string, tx: TeamworkDatabase = prisma): Promise<ActivityTeamContext> {
-  const [assignment] = await tx.$queryRaw<Array<{ metadata: unknown; activityMetadata: unknown; activityTypeKey: string; participantId: string }>>`
-    SELECT ga.metadata, a.metadata AS "activityMetadata", typ.key AS "activityTypeKey", p.id AS "participantId"
+  const [assignment] = await tx.$queryRaw<Array<{ metadata: unknown; activityMetadata: unknown; activityTypeKey: string; participantId: string; membershipToken: string }>>`
+    SELECT ga.metadata, a.metadata AS "activityMetadata", typ.key AS "activityTypeKey", p.id AS "participantId",
+      COALESCE((SELECT e.id FROM "CourseAuditEvent" e WHERE e."courseId"=${courseId} AND e."targetId"=ga.metadata->'teamwork'->>'groupingId' AND e."eventType"='activity_team_membership_changed' AND e.metadata->'participantIds' ? p.id ORDER BY (e.metadata->>'groupingRevision')::int DESC,e."createdAt" DESC,e.id DESC LIMIT 1),'initial') AS "membershipToken"
     FROM "CourseGroupActivity" ga JOIN "Activity" a ON a.id=ga."activityId" JOIN "ActivityType" typ ON typ.id=a."activityTypeId"
     JOIN "CourseGroup" g ON g.id=ga."groupId" JOIN "CourseGroupParticipant" p ON p."groupId"=g.id AND p."userId"=${user.id} AND p.role='student'
     WHERE ga."activityId"=${activityId} AND ga."groupId"=${groupId} AND a."courseId"=${courseId} AND g."courseId"=${courseId}`;
   if (!assignment) throw new AppError(403, "ACTIVITY_TEAM_ENROLLMENT_REQUIRED", "Student enrollment is required for this workspace.");
   const enabled = getActivityDefinition(assignment.activityTypeKey)?.supportsTeamwork === true && activityTeamworkEnabled(assignment.activityMetadata);
-  const base = { enabled, participantId: assignment.participantId, groupingId: null, teamId: null, allowIndividualSubmission: true, teamTitle: null, visibleToStudents: true, members: [] };
+  const base = { enabled, participantId: assignment.participantId, groupingId: null, teamId: null, allowIndividualSubmission: true, teamTitle: null, visibleToStudents: true, membershipToken: assignment.membershipToken ?? "initial", workspaceEpoch: "initial", members: [] };
   if (!enabled) return base;
   const policy = activityTeamAssignment(assignment.metadata);
   if (!policy) throw new AppError(409, "ACTIVITY_TEAM_GROUPING_REQUIRED", "Your teacher must select a grouping for this section.");
   const [grouping] = await tx.$queryRaw<Array<{ visibleToStudents: boolean }>>`SELECT "visibleToStudents" FROM "StudentGrouping" WHERE id=${policy.groupingId} AND "groupId"=${groupId}`;
   if (!grouping) throw new AppError(409, "ACTIVITY_TEAM_GROUPING_REQUIRED", "The assigned grouping is unavailable. Contact your teacher.");
   const [team] = await tx.$queryRaw<Array<{ id: string; title: string }>>`SELECT t.id, t.title FROM "StudentTeamMember" m JOIN "StudentTeam" t ON t.id=m."teamId" AND t."groupingId"=m."groupingId" WHERE m."participantId"=${assignment.participantId} AND m."groupingId"=${policy.groupingId}`;
-  const members = team ? await tx.$queryRaw<Array<{ participantId: string; userId: string | null; name: string }>>`SELECT p.id AS "participantId", p."userId", trim(p."firstName" || ' ' || p."lastName") AS name FROM "StudentTeamMember" m JOIN "CourseGroupParticipant" p ON p.id=m."participantId" WHERE m."teamId"=${team.id} AND m."groupingId"=${policy.groupingId} AND p."groupId"=${groupId} AND p.role='student' ORDER BY p.id` : [];
-  return { ...base, enabled: true, ...policy, teamId: team?.id ?? null, teamTitle: team?.title ?? null, visibleToStudents: grouping.visibleToStudents, members };
+  const members = team ? await tx.$queryRaw<Array<{ participantId: string; userId: string | null; name: string; membershipToken: string }>>`SELECT p.id AS "participantId", p."userId", trim(p."firstName" || ' ' || p."lastName") AS name,
+    COALESCE((SELECT e.id FROM "CourseAuditEvent" e WHERE e."courseId"=${courseId} AND e."targetId"=${policy.groupingId} AND e."eventType"='activity_team_membership_changed' AND e.metadata->'participantIds' ? p.id ORDER BY (e.metadata->>'groupingRevision')::int DESC,e."createdAt" DESC,e.id DESC LIMIT 1),'initial') AS "membershipToken"
+    FROM "StudentTeamMember" m JOIN "CourseGroupParticipant" p ON p.id=m."participantId" WHERE m."teamId"=${team.id} AND m."groupingId"=${policy.groupingId} AND p."groupId"=${groupId} AND p.role='student' ORDER BY p.id` : [];
+  return { ...base, enabled: true, ...policy, teamId: team?.id ?? null, teamTitle: team?.title ?? null, visibleToStudents: grouping.visibleToStudents,
+    workspaceEpoch: team ? await getTeamWorkspaceEpoch(tx, courseId, policy.groupingId, team.id) : base.membershipToken, members };
 }
 
 export type TeamMembershipSnapshot = { teamId: string; participantIds: string[] };
@@ -83,19 +94,29 @@ export async function notifyActivityTeamMembershipChanges(tx: Prisma.Transaction
   if (!changedIds.length && !emptyTeamIds.length && !options.groupingRemoved) return;
   // Include retained work from an older assignment/configuration too. Only the
   // owning plugin knows whether it has private work for this grouping/section.
-  const activities = await tx.activity.findMany({ where: { courseId }, include: { activityType: true } });
+  const activities = await tx.activity.findMany({ where: { courseId }, include: { activityType: true, groupAssignments: { where: { groupId }, select: { metadata: true } } } });
   const applicable = activities.filter(value => getActivityDefinition(value.activityType.key)?.supportsTeamwork);
-  if (!applicable.length) return;
+  if (!applicable.length && !activities.some(value => activityTeamworkEnabled(value.metadata))) return;
   const participants = await tx.courseGroupParticipant.findMany({ where: { id: { in: changedIds }, groupId }, select: { id: true, userId: true } });
   const changes = changedIds.map(participantId => ({ participantId, userId: participants.find(p => p.id === participantId)?.userId ?? null, previousTeamId: before.get(participantId) ?? null, teamId: after.get(participantId) ?? null, ...(removed.has(participantId) ? { removed: true } : {}) }));
+  const [revision] = await tx.$queryRaw<Array<{ revision: number }>>`SELECT revision FROM "StudentGrouping" WHERE id=${groupingId}`;
+  const membershipToken = randomUUID();
+  await tx.courseAuditEvent.create({ data: { id: membershipToken, courseId, actorUserId: user.id, eventType: "activity_team_membership_changed", targetType: "student_grouping", targetId: groupingId,
+    nextValue: { changes, emptyTeamIds }, metadata: { groupId, groupingRevision: revision?.revision ?? 0, participantIds: changedIds, emptyTeamIds }, createdAt: new Date() } });
+  const teamWorkspaceEpochs: Record<string, string> = {};
+  for (const teamId of new Set(changes.flatMap(change => change.teamId ? [change.teamId] : []))) teamWorkspaceEpochs[teamId] = await getTeamWorkspaceEpoch(tx, courseId, groupingId, teamId);
   for (const activity of applicable) {
     const handler = getActivityTeamworkHandler(activity.activityType.key);
     if (!handler) throw new AppError(409, "ACTIVITY_TEAMWORK_UNAVAILABLE", "The team workspace service is unavailable. Try again before changing memberships.");
-    const result = await handler.membershipChanged({ user, courseId, groupId, groupingId, activityId: activity.id, changes, emptyTeamIds, ...(options.groupingRemoved ? { groupingRemoved: true } : {}),
+    const result = await handler.membershipChanged({ user, courseId, groupId, groupingId, activityId: activity.id,
+      assignment: activityTeamworkEnabled(activity.metadata) ? activityTeamAssignment(activity.groupAssignments[0]?.metadata) : null,
+      changes, emptyTeamIds, membershipToken, teamWorkspaceEpochs, ...(options.groupingRemoved ? { groupingRemoved: true } : {}),
       transaction: teamworkTransaction(tx), enqueue: async job => { await enqueueBackgroundJob(job, tx); } });
-    if (result.withdrawAttemptIds?.length) {
+    const coreAttempts = await tx.activityAttempt.findMany({ where: { courseId, groupId, activityId: activity.id, participantId: { in: changedIds }, lifecycle: { in: ["started", "submitted", "graded"] }, metadata: { path: ["teamwork", "groupingId"], equals: groupingId } }, select: { id: true } });
+    const withdrawn = [...(result.withdrawAttemptIds ?? []), ...coreAttempts.map(attempt => attempt.id)];
+    if (withdrawn.length) {
       const { deleteActivitySubmission } = await import("./gradebook");
-      for (const attemptId of new Set(result.withdrawAttemptIds)) {
+      for (const attemptId of new Set(withdrawn)) {
         const attempt = await tx.activityAttempt.findFirst({ where: { id: attemptId, courseId, groupId, activityId: activity.id, participantId: { in: changedIds }, lifecycle: { not: "deleted" } }, select: { id: true } });
         if (attempt) await deleteActivitySubmission(user, courseId, { attemptId, reason: "Team membership changed; previous workspace participation was withdrawn." }, { allowStartedReplacement: true, transaction: tx, membershipChange: { groupId, participantIds: changedIds } });
       }
@@ -105,9 +126,11 @@ export async function notifyActivityTeamMembershipChanges(tx: Prisma.Transaction
 
 /** Roster removal/section deletion must revoke private work before FK cascades. */
 export async function removeStudentTeamWorkspaceMemberships(tx: Prisma.TransactionClient, user: CurrentUser, courseId: string, groupId: string, participantIds?: string[]) {
-  const groupings = await tx.studentGrouping.findMany({ where: { groupId }, orderBy: { id: "asc" }, include: { teams: { include: { members: { select: { participantId: true } } } } } });
-  for (const grouping of groupings) {
-    await lockStudentGroupingWorkspaces(tx, grouping.id);
+  const groupings = await tx.studentGrouping.findMany({ where: { groupId }, orderBy: { id: "asc" }, select: { id: true } });
+  for (const entry of groupings) {
+    await lockStudentGroupingWorkspaces(tx, entry.id);
+    const grouping = await tx.studentGrouping.findUnique({ where: { id: entry.id }, include: { teams: { include: { members: { select: { participantId: true } } } } } });
+    if (!grouping) continue;
     const previous = grouping.teams.map(team => ({ teamId: team.id, participantIds: team.members.map(member => member.participantId) }));
     const removed = participantIds ?? [...new Set(previous.flatMap(team => team.participantIds))];
     await tx.studentTeamMember.deleteMany({ where: { groupingId: grouping.id, ...(participantIds ? { participantId: { in: participantIds } } : {}) } });

@@ -66,6 +66,7 @@ const tx = vi.hoisted(() => ({
   gradeEvent: {
     createMany: vi.fn()
   },
+  studentGrouping: { findMany: vi.fn().mockResolvedValue([]) },
   courseGroupParticipant: {
     create: vi.fn(),
     createMany: vi.fn(),

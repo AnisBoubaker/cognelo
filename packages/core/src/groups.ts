@@ -33,7 +33,7 @@ import { AppError, notFound } from "./errors";
 import { confirmLiveActivitySettings } from "./activity-settings-live";
 import { assignmentAllowsGradeChallenges, assignmentAssessmentPolicyMode, assignmentTimeLimitMinutes, courseActivitySolutionReleased, courseActivityMessagingEnabled, courseActivityTwoWayMessagingEnabled, courseActivityHidesAfterAttempts } from "./activity-assignment-policy";
 import { applyAssignmentExceptions, assignmentExceptionsForUser, exceptionsForParticipant, loadAssignmentExceptions, resolveAssignmentExceptions, saveAssignmentExceptions } from "./activity-assignment-exceptions";
-import { activityTeamAssignment, activityTeamworkEnabled, hasActiveTeamworkSubmissions, validateActivityTeamworkChange } from "./activity-teamwork";
+import { activityTeamAssignment, activityTeamworkEnabled, hasActiveTeamworkSubmissions, validateActivityTeamworkChange, lockActivityTeamwork, removeStudentTeamWorkspaceMemberships } from "./activity-teamwork";
 
 type StudentAccessDb = Pick<typeof prisma, "role" | "userRole" | "courseMembership">;
 type GradebookItemDb = Pick<typeof prisma, "gradebookItem">;
@@ -341,7 +341,6 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   const activity = await assertActivityBelongsToCourse(courseId, activityId);
   const supportsTeamwork = getActivityDefinition(activity.activityType?.key ?? "")?.supportsTeamwork === true;
   if (data.teamworkEnabled === true && !supportsTeamwork) throw new AppError(400, "ACTIVITY_TEAMWORK_UNSUPPORTED", "This activity does not support team submissions.");
-  const teamworkEnabled = supportsTeamwork && (data.teamworkEnabled ?? activityTeamworkEnabled(activity.metadata));
   assertTestAssignmentIsSummative(activity, data.assessmentMode);
   assertActivitySupportsAssessmentMode(activity, data.assessmentMode);
   assertSafeExamBrowserIsSummative(data.assessmentMode, data.requireSafeExamBrowser);
@@ -350,6 +349,12 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   const gradebookSettings = normalizeGradebookItemSettings(data.gradebookSettings);
 
   return prisma.$transaction(async (tx) => {
+    if (supportsTeamwork) {
+      await lockActivityTeamwork(tx, activityId);
+      const current = await tx.activity.findUniqueOrThrow({ where: { id: activityId }, select: { metadata: true } });
+      activity.metadata = current.metadata;
+    }
+    const teamworkEnabled = supportsTeamwork && (data.teamworkEnabled ?? activityTeamworkEnabled(activity.metadata));
     await validateActivityTeamworkChange(tx, { activityId, activityTypeKey: activity.activityType?.key ?? "", previousEnabled: supportsTeamwork && activityTeamworkEnabled(activity.metadata), enabled: teamworkEnabled });
     await confirmLiveActivitySettings(tx, user, courseId, activityId, data);
     const [groups, coursePlacement] = await Promise.all([
@@ -690,7 +695,8 @@ export async function deleteCourseGroup(user: CurrentUser, courseId: string, gro
           }))
         });
       }
-      await tx.courseGroup.delete({ where: { id: groupId } });
+      await removeStudentTeamWorkspaceMemberships(tx, user, courseId, groupId);
+    await tx.courseGroup.delete({ where: { id: groupId } });
       await cleanupDerivedStaffMemberships(tx, courseId, participants);
       return { ok: true as const, movedParticipantCount: participantsToCreate.length, skippedDuplicateCount: participants.length - participantsToCreate.length };
     }
@@ -699,6 +705,7 @@ export async function deleteCourseGroup(user: CurrentUser, courseId: string, gro
       throw new AppError(400, "GROUP_PARTICIPANT_DELETE_CONFIRMATION_REQUIRED", "Permanent participant deletion requires explicit confirmation.");
     }
     const studentUserIds = [...new Set(learnerParticipants.map((participant) => participant.userId).filter((id): id is string => Boolean(id)))];
+    await removeStudentTeamWorkspaceMemberships(tx, user, courseId, groupId);
     await tx.courseGroup.delete({ where: { id: groupId } });
     for (const userId of studentUserIds) {
       const otherStudentParticipant = await tx.courseGroupParticipant.findMany({
@@ -1164,6 +1171,7 @@ export async function removeGroupParticipant(user: CurrentUser, courseId: string
         }
       }
     });
+    if (participant.role === "student") await removeStudentTeamWorkspaceMemberships(tx, user, courseId, groupId, [participantId]);
     await tx.courseGroupParticipant.delete({ where: { id: participantId } });
     if (participant.role === "student" && participant.userId) {
       const otherStudentGroups = await tx.courseGroupParticipant.findMany({
@@ -1239,6 +1247,12 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
   }
 
   return prisma.$transaction(async (tx) => {
+    if (getActivityDefinition(activity.activityType?.key ?? "")?.supportsTeamwork) {
+      await lockActivityTeamwork(tx, activity.id);
+      const current = await tx.activity.findUniqueOrThrow({ where: { id: activity.id } });
+      await validateActivityTeamworkChange(tx, { activityId: activity.id, activityTypeKey: activity.activityType.key, groupId,
+        previousEnabled: false, enabled: activityTeamworkEnabled(current.metadata), next: activityTeamAssignment(assignmentMetadata) });
+    }
     const assignment = await tx.courseGroupActivity.create({
       data: {
         groupId,
@@ -1310,6 +1324,15 @@ export async function updateGroupActivityAssignment(
   }
 
   return prisma.$transaction(async (tx) => {
+    if (getActivityDefinition(assignment.activity?.activityType?.key ?? "")?.supportsTeamwork) {
+      await lockActivityTeamwork(tx, assignment.activityId);
+      const current = await tx.courseGroupActivity.findUniqueOrThrow({ where: { id: assignmentId }, include: { activity: true } });
+      // Older callers do not send team fields. Preserve them on unrelated edits.
+      if (data.metadata && !("teamwork" in data.metadata) && activityTeamAssignment(current.metadata)) data.metadata.teamwork = asMetadataRecord(current.metadata).teamwork;
+      await validateActivityTeamworkChange(tx, { activityId: assignment.activityId, activityTypeKey: assignment.activity.activityType.key, groupId,
+        previousEnabled: activityTeamworkEnabled(current.activity.metadata), enabled: activityTeamworkEnabled(current.activity.metadata),
+        previous: activityTeamAssignment(current.metadata), next: activityTeamAssignment(data.metadata ?? current.metadata) });
+    }
     if (data.availableFrom !== undefined || data.availableUntil !== undefined || data.metadata !== undefined) {
       await confirmLiveActivitySettings(tx, user, courseId, assignment.activityId, data, [groupId]);
     }
@@ -1357,7 +1380,13 @@ export async function deleteGroupActivityAssignment(
   if (isCourseWideGroupAssignment(assignment.metadata)) {
     throw new AppError(400, "COURSE_WIDE_GROUP_ACTIVITY_LOCKED", "This activity is assigned to all groups from the course.");
   }
-  await prisma.courseGroupActivity.delete({ where: { id: assignmentId } });
+  await prisma.$transaction(async tx => {
+    await lockActivityTeamwork(tx, assignment.activityId);
+    const activity = await tx.activity.findUniqueOrThrow({ where: { id: assignment.activityId }, include: { activityType: true } });
+    await validateActivityTeamworkChange(tx, { activityId: activity.id, activityTypeKey: activity.activityType.key, groupId,
+      previousEnabled: activityTeamworkEnabled(activity.metadata), enabled: false, previous: activityTeamAssignment(assignment.metadata) });
+    await tx.courseGroupActivity.delete({ where: { id: assignmentId } });
+  });
   return { ok: true };
 }
 
