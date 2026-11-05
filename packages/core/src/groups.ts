@@ -607,6 +607,12 @@ export async function removeActivityFromAllCourseGroupsPolicy(user: CurrentUser,
   const activity = await assertActivityBelongsToCourse(courseId, activityId);
 
   return prisma.$transaction(async (tx) => {
+    if (getActivityDefinition(activity.activityType?.key ?? "")?.supportsTeamwork) {
+      await lockActivityTeamwork(tx, activityId);
+      const current = await tx.activity.findUniqueOrThrow({ where: { id: activityId }, select: { metadata: true } });
+      activity.metadata = current.metadata;
+      await validateActivityTeamworkChange(tx, { activityId, activityTypeKey: activity.activityType.key, previousEnabled: activityTeamworkEnabled(current.metadata), enabled: false });
+    }
     const activityMetadata = asMetadataRecord(activity.metadata);
     const { [COURSE_WIDE_ASSIGNMENT_METADATA_KEY]: _removedRule, ...nextActivityMetadata } = activityMetadata;
     await tx.activity.update({

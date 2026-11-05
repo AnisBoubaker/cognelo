@@ -502,6 +502,7 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
       providedFilesUrl={apiAbsoluteUrl(groupId
         ? `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityProps.activity.id}/coding-homework-grader/provided-files-download`
         : `/courses/${courseId}/activities/${activityProps.activity.id}/coding-homework-grader/provided-files-download`)}
+      submittedFilesUrl={groupId ? apiAbsoluteUrl(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityProps.activity.id}/coding-homework-grader/submitted-download`) : undefined}
       authoringReferenceMaterialsPortalTarget={authoringReferenceMaterialsPortalTarget}
       authoringSettingsPortalTarget={authoringSettingsPortalTarget}
       workflowRequest={workflowRequest}

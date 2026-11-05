@@ -312,3 +312,9 @@ An authorized plugin route may return a native `Response` for files/streams. The
 ### Reference and settings authoring tabs
 
 Course activity definitions may opt into `authoring.referenceMaterialsTab` and `authoring.settingsTab`. The shared editor owns these optional tabs and mounted portal targets; the renderer registry passes the targets to the plugin. Bank editors omit these course-specific panels. One plugin state can render into both targets without losing selection or draft edits during tab changes. Portal progress dialogs to the document body so a hidden source tab cannot hide cancellation/progress. Incidental settings saves must not replace an unsaved material-selection draft.
+
+### Team-capable activities
+
+Advertise `ActivityDefinition.supportsTeamwork` and register `ServerActivityPlugin.teamwork` with matching `activityTypeKeys`. Core supplies the General toggle, per-section grouping/unteamed policy, authorized current-membership resolution and active-hand-in checks. `hasActiveSubmissions` must report pending, answering and completed hand-ins that must lock policy changes, including individual hand-ins before switching modes.
+
+`membershipChanged` runs inside the host’s grouping transaction through a neutral parameterized `query`/`execute` adapter. It receives actual changed enrollments, previous/current teams, newly empty teams, the current section assignment, membership tokens/workspace epochs and a durable enqueue callback. Revoke private old participation, attach late joiners where appropriate, erase empty workspaces and return only related core attempt IDs for core to withdraw. Do not call AI/network services or mutate core grades from the plugin callback. Do physical cleanup after commit through durable jobs. Preserve private individual answers and core timers/grades even when files/questions are shared. See [team delivery](../TEAM_ACTIVITY_SUBMISSIONS.md) for lock order, persistence and lifecycle rules.

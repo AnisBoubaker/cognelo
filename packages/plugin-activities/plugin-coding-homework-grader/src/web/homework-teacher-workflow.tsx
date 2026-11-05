@@ -11,8 +11,8 @@ import { HomeworkReferencePreview } from "./homework-reference-preview";
 export { HomeworkSolutionSelector } from "./homework-solution-selector";
 
 type AiChoice = { selection: AiModelSelection | null; resolved: { connectionId: string; model: string; displayName?: string; provider?: string } | null; error: string | null };
-type Settings = { ai: { connections: AiModelConnectionOption[]; question: AiChoice; embedding: AiChoice }; rows: Array<{ id: string; parentId: string | null; kind: string; title: string; depth: number; resourceId: string | null }>; selected: string[]; statuses: Record<string, { state: string; maxAgeHours?: number | null; error?: string; index?: { id: string } | null }>; enabled: boolean; prepared: boolean; concurrency: number };
-export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, settingsPortalTarget, generationSettings }: { request: HomeworkRequest; locale: CodingHomeworkLocale; hasUnsavedChanges: boolean; settingsPortalTarget?: HTMLElement | null; generationSettings?: ReactNode }) {
+type Settings = { questionPolicyLocked: boolean; ai: { connections: AiModelConnectionOption[]; question: AiChoice; embedding: AiChoice }; rows: Array<{ id: string; parentId: string | null; kind: string; title: string; depth: number; resourceId: string | null }>; selected: string[]; statuses: Record<string, { state: string; maxAgeHours?: number | null; error?: string; index?: { id: string } | null }>; enabled: boolean; prepared: boolean; concurrency: number };
+export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, settingsPortalTarget, generationSettings, managementRevision = 0 }: { request: HomeworkRequest; locale: CodingHomeworkLocale; hasUnsavedChanges: boolean; settingsPortalTarget?: HTMLElement | null; generationSettings?: ReactNode | ((locked: boolean) => ReactNode); managementRevision?: number }) {
   const copy = homeworkWorkflowCopy(locale);
   const notifications = useNotifications();
   const [materialErrors, setMaterialErrors] = useState<Record<string, string>>({});
@@ -38,6 +38,7 @@ export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, se
     setSelected(current => (keepSelection ? current : value.selected).filter(id => available.has(id)));
   }, [request]);
   useEffect(() => { void refresh().catch(reportError); return () => controller.current?.abort(); }, [refresh, reportError]);
+  useEffect(() => { if (managementRevision) void refresh(true, false).catch(reportError); }, [managementRevision, refresh, reportError]);
   async function run(label: string, action: (signal: AbortSignal) => Promise<void>, adoptModels: boolean | "embedding" | "question" = false) {
     if (controller.current) return;
     const pending = new AbortController(); controller.current = pending;
@@ -110,7 +111,7 @@ export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, se
     {error && <p className="error" role="alert">{error}</p>}
     {!settings && <p>{copy.loading}</p>}
     {modelPicker("generation")}
-    {generationSettings}
+    {typeof generationSettings === "function" ? generationSettings(settings?.questionPolicyLocked ?? true) : generationSettings}
     <p>{copy.materials}: {selected.length}</p>
     {settings && <>
       <label className="field">{copy.concurrency}<input type="number" min={1} max={4} value={settings.concurrency} onChange={event => { const concurrency = Number(event.target.value); if (concurrency >= 1 && concurrency <= 4) void run(copy.save, async signal => { await request("workflow-settings", body("PUT", { concurrency }, signal)); }); }} /></label>

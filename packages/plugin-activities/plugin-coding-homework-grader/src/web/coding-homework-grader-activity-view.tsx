@@ -1,4 +1,5 @@
 "use client";
+import { homeworkWorkflowCopy } from "./workflow-copy";
 
 import { HomeworkDownloads } from "./homework-downloads";
 import { HomeworkChallengeQuestion } from "./homework-challenge-question";
@@ -92,6 +93,7 @@ type CodingHomeworkGraderActivityViewProps = {
   activity: RenderableActivity;
   activityFileUrl?: (attachmentId: string) => string;
   providedFilesUrl?: string;
+  submittedFilesUrl?: string;
   authoringClient?: AuthoringClient;
   workflowRequest?: HomeworkRequest;
   authoringReferenceMaterialsPortalTarget?: HTMLElement | null;
@@ -164,7 +166,7 @@ function defaultAuthoring(activity: RenderableActivity): CodingHomeworkAuthoring
 }
 
 export function CodingHomeworkGraderActivityView(props: CodingHomeworkGraderActivityViewProps) {
-  if (!props.canManage && props.workflowRequest) return <HomeworkStudentWorkspace request={props.workflowRequest} title={props.activity.title} locale={props.locale ?? "en"} activityFileUrl={props.activityFileUrl} providedFilesUrl={props.providedFilesUrl} onAssessmentAccessRequested={props.onAssessmentAccessRequested} onAssessmentStarted={props.onAssessmentStarted} onSubmitted={props.onSubmitted} timedAutoSubmit={props.timedAutoSubmit} />;
+  if (!props.canManage && props.workflowRequest) return <HomeworkStudentWorkspace request={props.workflowRequest} title={props.activity.title} locale={props.locale ?? "en"} activityFileUrl={props.activityFileUrl} providedFilesUrl={props.providedFilesUrl} submittedFilesUrl={props.submittedFilesUrl} onAssessmentAccessRequested={props.onAssessmentAccessRequested} onAssessmentStarted={props.onAssessmentStarted} onSubmitted={props.onSubmitted} timedAutoSubmit={props.timedAutoSubmit} />;
   return <LegacyCodingHomeworkActivityView {...props} />;
 }
 function LegacyCodingHomeworkActivityView({
@@ -188,6 +190,8 @@ function LegacyCodingHomeworkActivityView({
   const copy: CodingHomeworkCopy = codingHomeworkMessages[locale] ?? codingHomeworkMessages.en;
   const actionCopy = getEditActionBarCopy(locale);
   const notifications = useNotifications();
+  const [managementRevision, setManagementRevision] = useState(0);
+  const teamCopy = homeworkWorkflowCopy(locale);
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
   const [assignment, setAssignment] = useState<CodingHomeworkAssignmentRecord>(() => defaultAuthoring(activity).assignment);
@@ -794,13 +798,18 @@ function LegacyCodingHomeworkActivityView({
       onChange={event => { const generationInstructions = event.currentTarget.value; setAssignment(current => ({ ...current, generationInstructions })); }} />
     <p className="muted">{copy.generationInstructionsHelp}</p>
   </div>;
-  const generationSettings = <section className="stack">
+  const teamQuestionField = (locked: boolean) => <div className="stack">
+    <label className="homework-choice"><input type="checkbox" checked={assignment.settings.separateTeamQuestions === true} disabled={loading || saving || locked} onChange={event => { const separateTeamQuestions = event.currentTarget.checked; setAssignment(current => ({ ...current, settings: { ...current.settings, separateTeamQuestions } })); }} /> {teamCopy.separateTeamQuestions}</label>
+    <p className="muted">{locked ? teamCopy.questionPolicyLocked : teamCopy.sharedQuestionsHelp}</p>
+  </div>;
+  const generationSettings = (locked: boolean) => <section className="stack">
     {generationInstructionsField}
+    {teamQuestionField(locked)}
     <EditActionBar isDirty={hasUnsavedChanges} isSaving={saving} savedLabel={actionCopy.saved} unsavedLabel={actionCopy.unsaved}
       saveLabel={copy.save} savingLabel={actionCopy.saving} cancelLabel={actionCopy.cancel} onCancel={discardChanges}
       onSave={() => saveHomework()} saveDisabled={!authoringClient || !onSave} />
   </section>;
-  const referenceWorkflow = workflowRequest ? <HomeworkTeacherWorkflow key="homework-references" request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} settingsPortalTarget={authoringSettingsPortalTarget} generationSettings={loading ? null : generationSettings} /> : null;
+  const referenceWorkflow = workflowRequest ? <HomeworkTeacherWorkflow key="homework-references" request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} settingsPortalTarget={authoringSettingsPortalTarget} generationSettings={loading ? null : generationSettings} managementRevision={managementRevision} /> : null;
   const referenceMaterials = authoringReferenceMaterialsPortalTarget === undefined
     ? referenceWorkflow
     : authoringReferenceMaterialsPortalTarget && referenceWorkflow
@@ -965,7 +974,7 @@ function LegacyCodingHomeworkActivityView({
             />
           </div>
 
-          {!workflowRequest && generationInstructionsField}
+          {!workflowRequest && <>{generationInstructionsField}{teamQuestionField(false)}</>}
 
           {(solutionRequest ?? workflowRequest) && <HomeworkSolutionSelector request={(solutionRequest ?? workflowRequest)!} locale={locale} onSolutionChanged={reconcileSolution} requirements={draftToRequirements(requirementDraft, assignment.languageKey)} onChange={requirements => setRequirementDraft(requirementsToDraft(requirements))} />}
           <div className="section-subheading">
@@ -1119,7 +1128,7 @@ function LegacyCodingHomeworkActivityView({
         saveDisabled={!authoringClient || !onSave}
       />
       </form>
-      {workflowRequest && <HomeworkSubmissionManagement request={workflowRequest} locale={locale} />}
+      {workflowRequest && <HomeworkSubmissionManagement request={workflowRequest} locale={locale} onChanged={() => setManagementRevision(value => value + 1)} />}
       {referenceMaterials}
       {authoringSettingsPortalTarget ? createPortal(teacherProgress, authoringSettingsPortalTarget.ownerDocument.body) : teacherProgress}
     </>

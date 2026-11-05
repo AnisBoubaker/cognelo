@@ -1,6 +1,6 @@
 # Team activities and homework hand-in
 
-Status: approved November 5, 2026; implementation in progress. This supersedes the individual-only scope for Coding Homework while preserving individual mode as the default.
+Status: implemented and locally validated November 5, 2026. This supersedes the individual-only scope for Coding Homework while preserving individual mode as the default.
 
 ## Approved behavior
 
@@ -24,7 +24,7 @@ Resetting one student's challenges reuses the team's shared question set when co
 
 ## Core extension
 
-`ActivityDefinition.supportsTeamwork` is an explicit opt-in. The `ServerActivityPlugin.teamwork` service reports active hand-ins and handles grouping membership changes using the host’s neutral SQL transaction. It may enqueue durable plugin jobs and identify scoped attempts to withdraw; it must not call AI or remote services inside the transaction. Core resolves actual enrollment/team membership and validates assignment groupings against the section. Private plugin table names never enter core. Core settings and lifecycle integration are implemented. The Homework service owns shared workspaces, frozen files and per-student participation; local end-to-end validation is in progress. General/Assignment fields cannot be overwritten by the generic activity editor. Direct section assignment endpoints enforce the same policy locks. Roster removal and section deletion/moves dispatch membership cleanup before enrollment cascades. Generic gradebook deletion directs team hand-ins to the explicit reset/cancel actions.
+`ActivityDefinition.supportsTeamwork` is an explicit opt-in. The `ServerActivityPlugin.teamwork` service reports active hand-ins and handles grouping membership changes using the host’s neutral SQL transaction. It may enqueue durable plugin jobs and identify scoped attempts to withdraw; it must not call AI or remote services inside the transaction. Core resolves actual enrollment/team membership and validates assignment groupings against the section. Private plugin table names never enter core. Core settings and lifecycle integration are implemented. The Homework service owns shared workspaces, frozen files and per-student participation; local end-to-end validation is complete. General/Assignment fields cannot be overwritten by the generic activity editor. Direct section assignment endpoints enforce the same policy locks. Roster removal and section deletion/moves dispatch membership cleanup before enrollment cascades. Generic gradebook deletion directs team hand-ins to the explicit reset/cancel actions.
 
 ## Delivery checkpoints
 
@@ -34,9 +34,15 @@ Resetting one student's challenges reuses the team's shared question set when co
 - [x] Shared/separate questions with private answers, individual timers/grades and reset behavior.
 - [x] Whole-team cancellation, empty-team erasure and recoverable file cleanup.
 - [x] Frozen-work ZIP download and read-only structural checks.
-- [ ] Local migration validation, focused unit/integration/E2E checks and individual-workflow regression.
-- [ ] Updated canonical documentation and validated incremental commits.
+- [x] Local migration validation, focused unit/integration/E2E checks and individual-workflow regression.
+- [x] Updated canonical documentation and validated incremental commits.
 
 No production migration or deployment is authorized by this implementation request. Production functional testing remains prohibited; use local or isolated preprod.
 
 Membership changes record a core audit event containing the grouping revision, affected enrollment IDs and newly empty team IDs. Its ID is the participation token; the latest empty-team event defines the workspace generation. Plugins bind private state to those tokens so leaving and rejoining cannot resurrect a prior answering participation or an erased team workspace. No-op team renaming does not change tokens. Team mutations include a workspace/member context key as well as the draft revision, preventing delayed requests from applying to a different team whose draft happens to have the same revision.
+
+## Validation and handoff
+
+Local migration and Prisma schema validation passed. The final focused unit suite passed 250 tests. Workspace-wide type checks and plugin-boundary checks passed. Thirteen distinct local E2E scenarios passed across the regression and settings runs: shared/separate team questions and lifecycle; two-section grouping/unteamed configuration; individual hand-in and timeout; blank answers; prepared/submitted file explorers; SEB activation; the 30-student bounded queue; and student team choice. Team checks also verify delayed old-context uploads are rejected and empty-team physical files are cleaned up. Settings and learner screenshots were inspected. The model boundary is synthetic and privately scoped to disposable test courses; these tests do not claim real-provider generation quality.
+
+The local development schema is ready. No production migration/deployment was performed. The default remains individual delivery; enable Team work and select section groupings to test teams. The plugin exposes common questions by default, with the separate-question checkbox in its Settings tab. Root/plugin navigation, memories, core-services contract and workflow references were reviewed and updated; no affected documentation remains unverified.
