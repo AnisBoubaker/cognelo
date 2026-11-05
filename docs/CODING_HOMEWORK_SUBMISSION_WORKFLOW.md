@@ -26,7 +26,7 @@ The user expanded the provider requirement: choose any configured supported mode
 ## Scope
 
 - Support **C** for this delivery, with approximately **30 students submitting at a time**.
-- Students may work in teams outside the system, but **each student submits the team's work individually** and has an individual challenge workflow. Shared/team submissions are out of scope for now.
+- Individual hand-in remains the default. The [November 5 team workflow](TEAM_ACTIVITY_SUBMISSIONS.md) adds shared team preparation/hand-in with individual challenge answers and grades; it supersedes the original individual-only delivery scope and is being implemented separately.
 - Expect **3–5 challenge questions per student**. The teacher configures the question count; this expected range is not an agreed hard minimum/maximum.
 - Validate statically. Do not compile or run student programs, execute automated correctness tests, or add automatic functional grading in this phase.
 - Final-submission opening is controlled by a **manual teacher switch**. Automatic scheduling of that switch is out of scope for now. The original 9 a.m. example is a teacher-operated workflow, not a universal start time.
