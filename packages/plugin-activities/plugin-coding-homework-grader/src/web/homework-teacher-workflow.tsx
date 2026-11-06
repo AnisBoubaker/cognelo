@@ -1,4 +1,6 @@
 "use client";
+import { HomeworkDeadlineSettings } from "./homework-deadline-settings";
+import { defaultHomeworkSubmissionPolicy, type HomeworkSubmissionPolicy } from "../submission-policy";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionIcon, AiModelPicker, type AiModelConnectionOption, ProgressDialog, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
@@ -11,12 +13,13 @@ import { HomeworkReferencePreview } from "./homework-reference-preview";
 export { HomeworkSolutionSelector } from "./homework-solution-selector";
 
 type AiChoice = { selection: AiModelSelection | null; resolved: { connectionId: string; model: string; displayName?: string; provider?: string } | null; error: string | null };
-type Settings = { questionPolicyLocked: boolean; ai: { connections: AiModelConnectionOption[]; question: AiChoice; embedding: AiChoice }; rows: Array<{ id: string; parentId: string | null; kind: string; title: string; depth: number; resourceId: string | null }>; selected: string[]; statuses: Record<string, { state: string; maxAgeHours?: number | null; error?: string; index?: { id: string } | null }>; enabled: boolean; prepared: boolean; concurrency: number };
+type Settings = { submissionPolicy: HomeworkSubmissionPolicy; questionPolicyLocked: boolean; ai: { connections: AiModelConnectionOption[]; question: AiChoice; embedding: AiChoice }; rows: Array<{ id: string; parentId: string | null; kind: string; title: string; depth: number; resourceId: string | null }>; selected: string[]; statuses: Record<string, { state: string; maxAgeHours?: number | null; error?: string; index?: { id: string } | null }>; enabled: boolean; prepared: boolean; concurrency: number };
 export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, settingsPortalTarget, generationSettings, managementRevision = 0 }: { request: HomeworkRequest; locale: CodingHomeworkLocale; hasUnsavedChanges: boolean; settingsPortalTarget?: HTMLElement | null; generationSettings?: ReactNode | ((locked: boolean) => ReactNode); managementRevision?: number }) {
   const copy = homeworkWorkflowCopy(locale);
   const notifications = useNotifications();
   const [materialErrors, setMaterialErrors] = useState<Record<string, string>>({});
   const [currentMaterial, setCurrentMaterial] = useState("");
+  const [deadlineDirty, setDeadlineDirty] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const reportError = useCallback((reason: unknown) => {
     const message = reason instanceof Error ? reason.message : copy.error;
@@ -114,9 +117,10 @@ export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, se
     {typeof generationSettings === "function" ? generationSettings(settings?.questionPolicyLocked ?? true) : generationSettings}
     <p>{copy.materials}: {selected.length}</p>
     {settings && <>
+      <HomeworkDeadlineSettings policy={settings.submissionPolicy ?? defaultHomeworkSubmissionPolicy} request={request} locale={locale} onDirtyChange={setDeadlineDirty} onSaved={submissionPolicy => setSettings(current => current ? { ...current, submissionPolicy } : current)} />
       <label className="field">{copy.concurrency}<input type="number" min={1} max={4} value={settings.concurrency} onChange={event => { const concurrency = Number(event.target.value); if (concurrency >= 1 && concurrency <= 4) void run(copy.save, async signal => { await request("workflow-settings", body("PUT", { concurrency }, signal)); }); }} /></label>
       <p role="status">{settings.enabled ? copy.enabledHelp : settings.prepared && !selectionChanged ? copy.prepared : copy.needsPreparation}</p>
-      {hasUnsavedChanges && <p className="muted">{copy.saveFirst}</p>}
+      {(hasUnsavedChanges || deadlineDirty) && <p className="muted">{copy.saveFirst}</p>}
       <div className="row">
         <button type="button" className="secondary" disabled={settings.enabled} onClick={() => void run(copy.preparing, async signal => {
           setMaterialErrors({});
@@ -137,7 +141,7 @@ export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, se
           }
           signal.throwIfAborted(); await request("prepare-references", body("POST", undefined, signal));
         }, true)}><ActionIcon name="generate" /> {copy.embeddings}</button>
-        <button type="button" disabled={!settings.enabled && (hasUnsavedChanges || !settings.prepared || selectionChanged || embeddingChanged || questionChanged)} onClick={() => void run(copy.save, async signal => { await request("workflow-settings", body("PUT", { enabled: !settings.enabled }, signal)); })}><ActionIcon name={settings.enabled ? "close" : "check"} /> {settings.enabled ? copy.disable : copy.enabled}</button>
+        <button type="button" disabled={!settings.enabled && (hasUnsavedChanges || deadlineDirty || !settings.prepared || selectionChanged || embeddingChanged || questionChanged)} onClick={() => void run(copy.save, async signal => { await request("workflow-settings", body("PUT", { enabled: !settings.enabled }, signal)); })}><ActionIcon name={settings.enabled ? "close" : "check"} /> {settings.enabled ? copy.disable : copy.enabled}</button>
       </div>
     </>}
   </section>;

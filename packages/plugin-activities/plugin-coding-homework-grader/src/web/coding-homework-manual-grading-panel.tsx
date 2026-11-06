@@ -1,5 +1,7 @@
 "use client";
 
+import { formatHomeworkLateness, readHomeworkSubmissionTiming } from "../submission-policy";
+import { submissionDeadlineCopy } from "./submission-deadline-copy";
 import { ActionIcon, DialogHeader, useApplicationTime, useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { type FormEvent, useEffect, useId, useMemo, useState } from "react";
 import { makeStudentQuestionContext, studentQuestionContext } from "../question-context";
@@ -43,6 +45,7 @@ export function CodingHomeworkManualGradingPanel({ embedded = false, locale, rea
   const [score, setScore] = useState(row.score === null ? "" : formatGradeNumber(row.score));
   const [feedback, setFeedback] = useState("");
   const busy = isSavingOverride || isSavingRegrade || isSavingDelete;
+  const submissionTiming = readHomeworkSubmissionTiming(selectedAttempt?.metadata);
   const functionsById = useMemo(() => new Map((selectedAttempt?.functions ?? []).map(fn => [fn.id, fn])), [selectedAttempt]);
   const savedFeedback = row.feedback?.feedbackText ?? selectedAttempt?.reviews[0]?.feedback ?? "";
   const scoreChanged = score.trim() ? Number(score) !== row.score : row.score !== null;
@@ -72,6 +75,7 @@ export function CodingHomeworkManualGradingPanel({ embedded = false, locale, rea
       <div className="answer-meta">
         {selectedAttempt && <><strong>{t("courseDetail.submissionAnswerLabel", { id: String(selectedAttempt.attemptNumber ?? selectedAttempt.id.slice(-6)) })}</strong>
           <span className="muted">{selectedAttempt.submittedAt ? new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(selectedAttempt.submittedAt)) : ""}</span></>}
+        {submissionTiming?.isLate && <strong>{submissionDeadlineCopy(locale).lateBy.replace("{duration}", formatHomeworkLateness(submissionTiming.lateByMs, locale))}</strong>}
       </div>
       <div className="row">
         <label className="homework-choice"><input checked={includeAttempts} type="checkbox" disabled={busy || loading} onChange={async event => {

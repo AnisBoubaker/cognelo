@@ -1,11 +1,13 @@
 "use client";
+import { formatHomeworkLateness, type HomeworkSubmissionTiming } from "../submission-policy";
+import { submissionDeadlineCopy } from "./submission-deadline-copy";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActionIcon, ProgressDialog, useDialogs, useNotifications } from "@cognelo/activity-ui";
 import { body, type HomeworkRequest } from "./workflow-types";
 import { homeworkWorkflowCopy, homeworkStatusLabel } from "./workflow-copy";
 import type { CodingHomeworkLocale } from "./messages";
 
-type Submission = { id: string; student: string; status: string; cancelled: boolean; processingError: string | null; team?: boolean; teamName?: string | null };
+type Submission = { submissionTiming?: HomeworkSubmissionTiming | null; id: string; student: string; status: string; cancelled: boolean; processingError: string | null; team?: boolean; teamName?: string | null };
 export function HomeworkSubmissionManagement({ request, locale, onChanged }: { request: HomeworkRequest; locale: CodingHomeworkLocale; onChanged?: () => void }) {
   const copy = homeworkWorkflowCopy(locale), dialogs = useDialogs(), notifications = useNotifications();
   const [submissions, setSubmissions] = useState<Submission[]>([]), [error, setError] = useState(""), [busy, setBusy] = useState<string | null>(null);
@@ -34,6 +36,7 @@ export function HomeworkSubmissionManagement({ request, locale, onChanged }: { r
     {error && <p role="alert" className="error">{error}</p>}{!submissions.length && <p>{copy.noSubmissions}</p>}
     <ul className="stack">{submissions.map(submission => <li key={submission.id}>
       <div className="row wrap"><strong>{submission.student}</strong>{submission.teamName && <span>{submission.teamName}</span>}<span>{homeworkStatusLabel(locale, submission.status)}</span>
+        {submission.submissionTiming?.isLate && <strong>{submissionDeadlineCopy(locale).lateBy.replace("{duration}", formatHomeworkLateness(submission.submissionTiming.lateByMs, locale))}</strong>}
         {!submission.cancelled && <>
           <button type="button" className="secondary" onClick={() => void act(submission, false)}><ActionIcon name="close" /> {submission.team ? copy.cancelTeamSubmission : copy.cancelSubmission}</button>
           <button type="button" className="secondary" onClick={() => void act(submission, true)}><ActionIcon name="refresh" /> {copy.resetChallenges}</button>

@@ -1,0 +1,103 @@
+import { prisma } from "@cognelo/db";
+import type { ApplicationTimeSettingsDto } from "@cognelo/contracts";
+import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
+import { test, expect } from "./fixtures/bank-course";
+import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
+import { createAuthenticatedApi, credentialsFor } from "./fixtures/auth";
+import { homeworkModelFixture } from "./fixtures/homework-model";
+
+for (const team of [false, true]) test(`homework deadline and recorded lateness for ${team ? "team" : "individual"} hand-in`, async ({ bankCourse: data, teacherApi, studentPage, browser }) => {
+  test.setTimeout(120_000);
+  const model = await homeworkModelFixture(data), student = await createAuthenticatedApi("student"), admin = await createAuthenticatedApi("admin");
+  const original = await responseJson<ApplicationTimeSettingsDto>(await admin.get("/api/settings/time"));
+  const context = await browser.newContext({ storageState: await teacherApi.storageState(), locale: "en-CA", timezoneId: "Asia/Tokyo" });
+  const page = await context.newPage(); page.setDefaultTimeout(10_000); let activityId: string | undefined;
+  try {
+    if (!original.allowCourseTimeZone) await responseJson(await admin.put("/api/settings/time", { data: { timeZone: original.timeZone, allowCourseTimeZone: true } }));
+    await responseJson(await admin.put(`/api/courses/${data.courseId}/time`, { data: { timeZone: "America/Toronto" } }));
+    activityId = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Deadline homework", config: {} });
+    const teacherPath = `/api/courses/${data.courseId}/activities/${activityId}/coding-homework-grader`;
+    await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/groups/${data.groupId}/activities`, { data: { activityId, metadata: { assessmentMode: "summative", timeLimitMinutes: 10 }, gradebookSettings: { maxAttempts: 3, pointsPossible: 100 } } }));
+    if (team) {
+      const participant = await prisma.courseGroupParticipant.findFirstOrThrow({ where: { groupId: data.groupId, email: credentialsFor("student").email } });
+      const { grouping } = await responseJson<{ grouping: { id: string } }>(await teacherApi.post(`/api/courses/${data.courseId}/groups/${data.groupId}/groupings`, { data: { title: "Deadline teams", teams: [{ title: "Team", participantIds: [participant.id] }] } }));
+      const settingsPath = `/api/courses/${data.courseId}/activities/${activityId}/assign-all-groups`;
+      const { settings } = await responseJson<{ settings: CourseActivityAssignmentSettings }>(await teacherApi.get(settingsPath));
+      await responseJson(await teacherApi.post(settingsPath, { data: { ...settings.general, assessmentMode: "summative", teamworkEnabled: true, groupAssignments: settings.groups.map(group => ({ ...group, teamGroupingId: grouping.id, allowIndividualSubmission: false })) } }));
+    }
+    await page.goto(`/courses/${data.courseId}/activities/${activityId}`);
+    await page.getByRole("tab", { name: "Settings", exact: true }).click();
+    const panel = page.locator(".homework-deadline-settings");
+    const date = panel.getByLabel("Submission deadline (America/Toronto)", { exact: true });
+    await expect(date).toHaveValue("");
+    await date.fill("2030-01-15T09:30");
+    await panel.getByRole("checkbox", { name: "Allow late submissions", exact: true }).check();
+    await panel.getByRole("checkbox", { name: "Limit the late-submission period", exact: true }).check();
+    await panel.getByLabel("Days", { exact: true }).fill("1"); await panel.getByLabel("Hours", { exact: true }).fill("2"); await panel.getByLabel("Minutes", { exact: true }).fill("15");
+    await page.getByRole("tab", { name: "Reference materials", exact: true }).click(); await page.getByRole("tab", { name: "Settings", exact: true }).click();
+    await expect(date).toHaveValue("2030-01-15T09:30");
+    await panel.getByRole("button", { name: "Save deadline settings", exact: true }).click();
+    await expect(panel.getByText("Everything is saved.", { exact: true })).toBeVisible();
+    const saved = await responseJson<{ submissionPolicy: { deadline: string; allowLate: boolean; lateLimitMinutes: number } }>(await teacherApi.get(`${teacherPath}/workflow-settings`));
+    expect(saved.submissionPolicy).toEqual({ deadline: "2030-01-15T14:30:00.000Z", allowLate: true, lateLimitMinutes: 1575 });
+    await page.reload(); await page.getByRole("tab", { name: "Settings", exact: true }).click(); await expect(date).toHaveValue("2030-01-15T09:30");
+    await panel.screenshot({ path: `tmp/homework-deadline-settings-${team}.png` });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await panel.screenshot({ path: `tmp/homework-deadline-settings-mobile-${team}.png` });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await responseJson(await teacherApi.put(`${teacherPath}/workflow-settings`, { data: { selected: [] } }));
+    await responseJson(await teacherApi.post(`${teacherPath}/prepare-references`, { data: {} }));
+    await responseJson(await teacherApi.put(`${teacherPath}/workflow-settings`, { data: { enabled: true } }));
+    const endpoint = `/api/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}/coding-homework-grader`;
+    const readState = async () => responseJson<{ teamwork?: { contextKey: string }; submissionPolicy: unknown; submission: null | { id: string; status: string; submissionTiming: { deadline: string; submittedAt: string; isLate: boolean; lateByMs: number } } }>(await student.get(`${endpoint}/workspace`));
+    const state = await readState(), scope = state.teamwork ? { contextKey: state.teamwork.contextKey } : {};
+    await responseJson(await student.post(`${endpoint}/preparation`, { data: { ...scope, kind: "file", path: "main.c", expectedRevision: 0, base64: Buffer.from("int add(int a, int b) { return a + b; }").toString("base64") } }));
+    const deadline = new Date(Date.now() - 1575 * 60_000).toISOString();
+    const policy = async (allowLate: boolean, lateLimitMinutes: number | null, value = deadline) => responseJson(await teacherApi.put(`${teacherPath}/workflow-settings`, { data: { submissionPolicy: { deadline: value, allowLate, lateLimitMinutes } } }));
+    await policy(false, null);
+    let rejected = await student.post(`${endpoint}/hand-in`, { data: { ...scope, expectedRevision: 1 } }); expect(rejected.status()).toBe(409); expect(await rejected.json()).toMatchObject({ error: { code: "HOMEWORK_SUBMISSION_DEADLINE_PASSED" } });
+    expect((await readState()).submission).toBeNull();
+    await studentPage.goto(endpoint.replace(/^\/api/, "").replace(/\/coding-homework-grader$/, ""));
+    await expect(studentPage.getByText("The deadline for submitting your work has passed.", { exact: true })).toBeVisible();
+    await studentPage.getByRole("button", { name: "Check my submission", exact: true }).click();
+    await expect(studentPage.getByRole("button", { name: "Submit my work", exact: true })).toBeDisabled();
+    await policy(true, 60);
+    rejected = await student.post(`${endpoint}/hand-in`, { data: { ...scope, expectedRevision: 1 } }); expect(rejected.status()).toBe(409);
+    await policy(true, 2880);
+    const submitted = await responseJson<{ submission: NonNullable<Awaited<ReturnType<typeof readState>>["submission"]> }>(await student.post(`${endpoint}/hand-in`, { data: { ...scope, expectedRevision: 1 } }));
+    const timing = submitted.submission.submissionTiming;
+    expect(timing.isLate).toBe(true); expect(timing.lateByMs).toBe(Date.parse(timing.submittedAt) - Date.parse(deadline)); expect(timing.lateByMs).toBeGreaterThanOrEqual(1575 * 60_000);
+    await expect.poll(async () => (await readState()).submission?.status, { timeout: 45_000 }).toBe("challenge_ready");
+    await studentPage.reload(); await expect(studentPage.getByText("Late by 1 day, 2 hours, 15 minutes", { exact: true })).toBeVisible();
+    const managed = await responseJson<{ submissions: Array<{ id: string; submissionTiming: unknown }> }>(await teacherApi.get(`${teacherPath}/manage-submissions`));
+    expect(managed.submissions.find(value => value.id === submitted.submission.id)?.submissionTiming).toEqual(timing);
+    await page.reload(); await page.getByRole("tab", { name: "Activity", exact: true }).click();
+    await expect(page.getByText("Late by 1 day, 2 hours, 15 minutes", { exact: true })).toBeVisible();
+    // Changing policy cannot reclassify a frozen hand-in, nor prevent its challenge phase.
+    await policy(false, null);
+    expect((await readState()).submission?.submissionTiming).toEqual(timing);
+    expect((await student.post(`${endpoint}/hand-in`, { data: { ...scope, expectedRevision: 1 } })).ok()).toBe(true);
+    const started = await responseJson<{ submissionId: string }>(await student.post(`${endpoint}/answering`, { data: { submissionId: submitted.submission.id } })); expect(started.submissionId).toBe(submitted.submission.id);
+    await responseJson(await student.post(`${endpoint}/challenge-answers`, { data: { submissionId: started.submissionId, answers: [] } }));
+    await page.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}`);
+    await page.getByRole("button", { name: /^Actions for / }).click();
+    await page.getByRole("menuitem", { name: "Review and grade", exact: true }).click();
+    const review = page.getByRole("dialog", { name: "Review and grade", exact: true });
+    await expect(review.getByText("Late by 1 day, 2 hours, 15 minutes", { exact: true })).toBeVisible();
+    await review.locator(".review-chat-toolbar").getByRole("button", { name: "Close", exact: true }).click();
+    await responseJson(await teacherApi.delete(`${teacherPath}/manage-submissions`, { data: { submissionId: submitted.submission.id, reason: "Test an unlimited late period." } }));
+    await policy(true, null);
+    const prepared = await responseJson<{ draft: { revision: number }; teamwork?: { contextKey: string } }>(await student.get(`${endpoint}/preparation`));
+    const replacement = await responseJson<{ submission: { submissionTiming: { isLate: boolean } } }>(await student.post(`${endpoint}/hand-in`, { data: { expectedRevision: prepared.draft.revision, ...(prepared.teamwork ? { contextKey: prepared.teamwork.contextKey } : {}) } })); expect(replacement.submission.submissionTiming.isLate).toBe(true);
+    await expect.poll(async () => (await readState()).submission?.status, { timeout: 45_000 }).toBe("challenge_ready");
+    // Malformed duration is rejected and preserves the previous policy.
+    expect((await teacherApi.put(`${teacherPath}/workflow-settings`, { data: { submissionPolicy: { deadline, allowLate: true, lateLimitMinutes: 0 } } })).status()).toBe(400);
+    expect((await readState()).submission?.submissionTiming.isLate).toBe(true);
+  } finally {
+    await context.close();
+    if (activityId) await prisma.backgroundJob.deleteMany({ where: { payload: { path: ["activityId"], equals: activityId } } });
+    if (!original.allowCourseTimeZone) await responseJson(await admin.put("/api/settings/time", { data: { timeZone: original.timeZone, allowCourseTimeZone: original.allowCourseTimeZone } }));
+    await student.dispose(); await admin.dispose(); await model.close();
+  }
+});

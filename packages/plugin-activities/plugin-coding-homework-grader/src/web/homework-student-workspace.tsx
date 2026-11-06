@@ -1,10 +1,12 @@
 "use client";
+import { defaultHomeworkSubmissionPolicy, formatHomeworkLateness, homeworkSubmissionWindow } from "../submission-policy";
+import { submissionDeadlineCopy } from "./submission-deadline-copy";
 import { HomeworkDownloads } from "./homework-downloads";
 import { HomeworkFileViewer } from "./homework-file-viewer";
 import { HomeworkChallengeQuestion } from "./homework-challenge-question";
 import { HomeworkAnswerConfirmation } from "./homework-answer-confirmation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActionIcon, MarkdownRenderer, ProgressDialog, useDialogs, useNotifications, isActivityContentClosedError } from "@cognelo/activity-ui";
+import { ActionIcon, MarkdownRenderer, ProgressDialog, AppDateTime, useApplicationTime, useServerNow, useDialogs, useNotifications, isActivityContentClosedError } from "@cognelo/activity-ui";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import type { CodingHomeworkLocale } from "./messages";
 import type { CodingHomeworkStudentAssignment, CodingHomeworkStudentChallengeQuestionRecord } from "./client";
@@ -15,6 +17,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   request: HomeworkRequest; title: string; locale: CodingHomeworkLocale; activityFileUrl?: (id: string) => string; providedFilesUrl?: string; submittedFilesUrl?: string;
   onAssessmentAccessRequested?: () => void; onAssessmentStarted?: () => void; onSubmitted?: () => void; timedAutoSubmit?: TimedActivityAutoSubmit;
 }) {
+  const clock = useServerNow(); const { timeZone } = useApplicationTime(); const deadlineCopy = submissionDeadlineCopy(locale);
   const copy = homeworkWorkflowCopy(locale); const dialogs = useDialogs(); const notifications = useNotifications();
   const [workspace, setWorkspace] = useState<HomeworkWorkspace | null>(null), [preparation, setPreparation] = useState<HomeworkPreparation | null>(null);
   const [assignment, setAssignment] = useState<CodingHomeworkStudentAssignment | null>(null);
@@ -114,6 +117,8 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     if (completed) { timedAutoSubmit.onSettled(true); return; }
     void submitAnswers(true).then(timedAutoSubmit.onSettled);
   }, [timedAutoSubmit, completed, submitAnswers]);
+  const policy = workspace?.submissionPolicy ?? defaultHomeworkSubmissionPolicy;
+  const submissionWindow = homeworkSubmissionWindow(policy, clock);
   const files = active?.files ?? preparation?.draft.files ?? [];
   const hasCurrentCheck = Boolean(preparation && checkedPreparation && preparation.draft.revision === checkedPreparation.draft.revision &&
     JSON.stringify(preparation.validation.issues) === JSON.stringify(checkedPreparation.validation.issues) &&
@@ -126,6 +131,13 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     <MarkdownRenderer markdown={assignment?.assignment.promptMarkdown ?? ""} />
     <HomeworkDownloads promptPdfId={assignment?.assignment.promptPdf?.id} hasProvidedFiles={Boolean(assignment?.assignment.providedFiles.length)}
       activityFileUrl={activityFileUrl} providedFilesUrl={providedFilesUrl} locale={locale} />
+    {(active?.submissionTiming?.deadline ?? (!active ? policy.deadline : null)) && <div className="stack" role="status">
+      <p><strong>{deadlineCopy.deadline}: </strong><AppDateTime value={(active?.submissionTiming?.deadline ?? policy.deadline)!} locale={locale} /> ({timeZone})</p>
+      {!active && <p>{policy.allowLate ? submissionWindow.closesAt ? <>{deadlineCopy.closes}: <AppDateTime value={submissionWindow.closesAt} locale={locale} /> ({timeZone})</> : deadlineCopy.unlimited : deadlineCopy.noLate}</p>}
+      {!active && submissionWindow.closed && <p><strong>{deadlineCopy.closed}</strong></p>}
+      {!active && submissionWindow.isLate && !submissionWindow.closed && <p>{deadlineCopy.lateNow}</p>}
+    </div>}
+    {active?.submissionTiming?.isLate && <p role="status"><strong>{deadlineCopy.lateBy.replace("{duration}", formatHomeworkLateness(active.submissionTiming.lateByMs, locale))}</strong></p>}
     {!workspace ? <p>{copy.loading}</p> : workspace.teamwork?.canSubmit === false ? <div className="preview-panel" role="status"><strong>{copy.teamRequired}</strong></div> : <>
     {workspace?.previousCancelled && <p role="status">{copy.cancelled}</p>}
     {workspace?.teamwork && <div className="preview-panel" role="status">
@@ -174,7 +186,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
       </div>}
       {hasCurrentCheck && preparation.readiness.canSubmit && preparation.readiness.requiresAcknowledgement && <label className="homework-choice"><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /> {copy.incomplete}</label>}
       {!workspace?.submissionsEnabled && <p role="status">{copy.closed}</p>}
-      {canShowSubmit && <button type="button" disabled={!workspace.submissionsEnabled || Boolean(busy)} onClick={async () => {
+      {canShowSubmit && <button type="button" disabled={!workspace.submissionsEnabled || submissionWindow.closed || Boolean(busy)} onClick={async () => {
         if (await dialogs.confirm({ title: copy.handIn, message: workspace?.teamwork?.teamId ? copy.teamHandInDetail : copy.handInDetail, confirmLabel: copy.handIn })) await run(copy.handIn, async signal => { await request("hand-in", body("POST", { ...(workspace?.teamwork ? { contextKey: workspace.teamwork.contextKey } : {}), expectedRevision: preparation.draft.revision, acknowledgeIncomplete: acknowledged }, signal)); });
       }}><ActionIcon name="submit" /> {copy.handIn}</button>}
     </section>}
