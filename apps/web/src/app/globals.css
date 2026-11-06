@@ -6210,6 +6210,12 @@ button:hover > .disclosure-indicator {
   padding: 16px;
 }
 
+.homework-not-submitted {
+  background: #fff7df;
+  border-color: #e7c66a;
+  color: #674d00;
+}
+
 .documentation-resource-list {
   border: 1px solid var(--line);
   border-radius: 8px;
