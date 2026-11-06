@@ -125,8 +125,8 @@ Hand-in records a compact manifest of hashes/function names, **not a copy of the
 ## Material selection, indexing and reuse
 
 - The teacher chooses course materials to use as question-generation references.
-- By default select **all course material before the Coding Homework activity in course-content order**.
-- Checking a folder includes **all material within it, recursively**.
+- By default select **visible course material before the Coding Homework activity in course-content order**. Hidden material is offered but unchecked by default, including material inside hidden folders.
+- Checking a folder explicitly includes **all material within it, recursively**, including hidden material.
 - The teacher explicitly runs **Generate embeddings** before being allowed to enable final submissions.
 - Changing the selection requires rebuilding/validating the homework's prepared reference selection before enabling submissions. Reuse existing compatible vectors; generate only missing, changed or stale embeddings.
 - Do not pay to generate another embedding for unchanged, compatible material merely because a different Coding Homework selects that same material.
@@ -166,7 +166,7 @@ The supplied deck was verified with the real link extractor during local accepta
 - Static matching uses a bounded C scanner, without preprocessing or compilation. Typedef spelling remains significant; syntax incompleteness can be acknowledged, while parser resource limits block.
 - The teacher can configure 1–20 questions (default 3). Reuse eligible functions for distinct questions if fewer functions exist. Incomplete-source fallback is limited to cases without parsed submitted/provided functions and must omit unchanged provided sources. This is not an automatic correctness score.
 - Individual files are limited to 8 MB; the prepared collection obeys the configured archive-size/file-count ceilings. ZIP replacement and same-path overwrites require confirmation. Empty reference selection must be explicitly prepared and uses assignment/submitted work for generation.
-- Reference selection contains visible, shared course material resources. Hidden/section-only materials and activity prompts that are not material resources are excluded from the chooser. A folder selects its current recursive material descendants. Private teacher solutions are never automatically embedded.
+- Reference selection contains shared course material resources, including hidden resources labelled as hidden and unchecked by default. Section-only materials and activity prompts that are not material resources are excluded from the chooser. A folder selects its current recursive material descendants. Private teacher solutions are never automatically embedded.
 - Use OpenAI 1536-dimensional vectors in PostgreSQL Float32 storage and bounded exact cosine search, without a new database image/extension. Reuse vectors/indexes across homework. See [material services](MATERIAL_EMBEDDING_SERVICES.md) for compatibility and limits.
 - Public GitHub root repositories use the default branch pinned to a commit; no branch/subdirectory chooser, private credentials, checkout or execution. Extraction is bounded to 200 source/text files, 512 KB each and 4 MB total. Repository freshness allows 1–8760 hours, default 48.
 - Link extraction reads static HTML/plain text and Reveal.js inline/same-origin external Markdown, without executing JavaScript. PDFs must contain extractable text; Poppler is required, and OCR/Word/PowerPoint are deferred.
@@ -216,3 +216,9 @@ Automatic hand-in validates the saved files and accepts academic gaps as an inco
 Use the cutoff as the effective hand-in time and retain the actual recovery time/actor separately. No-late deadline recovery is on time; bounded-grace recovery is late by the grace duration, never by the time until someone opens the page. Concurrent or repeated visits reuse the existing hand-in and queued questions. A teacher cancellation at/after the cutoff is respected until a later deadline is set. If a deadline is backdated before the draft’s last accepted file change, report the mismatch instead of claiming those files existed at that cutoff.
 
 After verification, prominently state **Your work has not been submitted**, explain that verification only checks structure, and name **Submit my work** as the action to submit now. For finite cutoffs, separately explain automatic hand-in of any remaining saved files. A receipt distinguishes automatic hand-in and automatic acceptance of incomplete work.
+
+## Explicit hidden references — November 6, 2026
+
+Teachers may explicitly include hidden course material in the Reference materials picker. Inherited folder visibility counts as hidden; default prior-material selection excludes it, even while a hidden activity is being authored. Explicit folder selection includes all descendant resources. Saved selections persist rather than being reset on reload. Selection does not change course-content visibility.
+
+Preparing references records the exact hidden index subset and the preparing manager. Background question generation searches those indexes through core under that manager’s current authorization, while visible/legacy references retain learner scope. Missing/inactive preparers, revoked management permission or indexes outside the pinned selection fail closed. Hidden text is private AI context, never student document access or question-payload provenance; the prompt prohibits quoting reference excerpts. Same-course duplication retains index IDs and establishes the copying manager as the private-reference preparer. Material extraction remains owned by the material plugins through core.

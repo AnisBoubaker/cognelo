@@ -540,7 +540,7 @@ export async function copyCourseCodingHomeworkAuthoring(params: HomeworkTeacherS
         courseId: params.courseId,
         contentTreeFingerprint: snapshot.contentTreeFingerprint,
         status: snapshot.status,
-        metadata: normalizeObject(snapshot.metadata) as Prisma.InputJsonValue
+        metadata: { ...normalizeObject(snapshot.metadata), preparedByUserId: params.user.id } as Prisma.InputJsonValue
       } });
       settings.preparedSnapshotId = copied.id;
     }

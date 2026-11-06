@@ -43,7 +43,7 @@ describe("same-course homework duplication", () => {
     mocks.snapshots.findFirst.mockResolvedValue({ status: "ready", contentTreeFingerprint: "fingerprint", metadata });
     await copyCourseCodingHomeworkAuthoring(scope);
     expect(mocks.snapshots.findFirst).toHaveBeenCalledWith({ where: { id: "source-snapshot", activityId: "source", courseId: "course", groupId: null } });
-    expect(mocks.snapshots.create).toHaveBeenCalledWith({ data: { activityId: "copy", courseId: "course", status: "ready", contentTreeFingerprint: "fingerprint", metadata } });
+    expect(mocks.snapshots.create).toHaveBeenCalledWith({ data: { activityId: "copy", courseId: "course", status: "ready", contentTreeFingerprint: "fingerprint", metadata: { ...metadata, preparedByUserId: scope.user.id } } });
     expect(mocks.assignment.create).toHaveBeenCalledWith({ data: expect.objectContaining({ activityId: "copy", questionCount: 4, generationInstructions: "Ask about boundary values",
       settings: { ...settings, submissionsEnabled: false, preparedSnapshotId: "copied-snapshot" } }) });
     expect(settings.preparedSnapshotId).toBe("source-snapshot");

@@ -19,6 +19,8 @@ External fetches validate and pin public DNS addresses, reject credentials/priva
 
 Teacher solution files are independent private activity records and are never automatically embedded as course materials.
 
+Homework may explicitly select hidden course resources, unchecked by default. Its prepared snapshot records the hidden index subset and preparing manager; background generation uses that manager’s current authorization only for the selected private subset and preserves learner authorization for other indexes. Core’s generic visibility checks remain unchanged. Retrieved private text is model context, not a student resource/preview permission or a learner payload. See the [homework reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md#hidden-reference-materials).
+
 ## Inspecting indexed teaching content
 
 Course managers can inspect saved indexed passages through the generic core `getMaterialIndexPreview` service. It authorizes the course/resource, restricts the query to the caller-supplied candidate index IDs in that same course/resource, and returns at most ten exact passages per page. Its explicit projection contains text/title/position and index identity/date only: no numeric vectors, private metadata, connection credentials or model requests. Students and section-only staff have no authoring-preview access.

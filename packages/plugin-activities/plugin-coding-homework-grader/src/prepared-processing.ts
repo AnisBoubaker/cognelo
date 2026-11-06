@@ -1,3 +1,4 @@
+import { createHomeworkReferenceSearch } from "./prepared-reference-search";
 import { snapshotProvidedCode, readProvidedCodeBaseline, selectLearnerFunctions, cSourceFingerprint, unchangedProvidedFunctionNames } from "./provided-code";
 import { parseChallengeQuestionResponse } from "./question-response";
 import { getHomeworkQuestionLanguage, homeworkQuestionSystemPrompt } from "./question-generation-policy";
@@ -5,7 +6,7 @@ import { makeStudentQuestionContext, type StudentQuestionContext } from "./quest
 import { getHomeworkQuestionConnection, storedHomeworkAiSelection } from "./ai-selection";
 import { randomUUID } from "node:crypto";
 import { prisma as coreDb } from "@cognelo/db";
-import { NonRetryableBackgroundJobError, createPreparedMaterialSearch, generateAiAgentText, getCourseAiAgentConnection, lockActivityTeamwork, lockStudentGroupingWorkspaces, teamworkTransaction, type BackgroundJobRecord } from "@cognelo/core";
+import { NonRetryableBackgroundJobError, generateAiAgentText, getCourseAiAgentConnection, lockActivityTeamwork, lockStudentGroupingWorkspaces, teamworkTransaction, type BackgroundJobRecord } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma } from "./db-client";
 import { readFrozenHomeworkFile } from "./hand-in";
@@ -47,7 +48,7 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
     }
     const snapshot = record(submission.documentationSnapshot?.metadata);
     const indexes = Array.isArray(snapshot.indexIds) ? snapshot.indexIds.filter((id): id is string => typeof id === "string") : [];
-    const search = await createPreparedMaterialSearch(scope.user, scope.courseId, indexes, scope.groupId, storedHomeworkAiSelection(snapshot.embeddingAi) ? record(snapshot.embeddingAi) : undefined);
+    const search = await createHomeworkReferenceSearch(scope, snapshot);
     const pinnedModel = storedHomeworkAiSelection(metadata.questionGenerationAi);
     const connection = pinnedModel ? await getCourseAiAgentConnection(scope.user, scope.courseId, pinnedModel, "generation", true) : await getHomeworkQuestionConnection(scope);
     const questionCount = Math.max(1, Math.min(20, Number(settings.questionCount ?? 3)));

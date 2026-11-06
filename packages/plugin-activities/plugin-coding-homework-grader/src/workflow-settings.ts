@@ -17,19 +17,19 @@ async function assignment(scope: HomeworkTeacherScope) {
   return prisma.$transaction(async tx => { await lockHomeworkSettings(tx, scope.activityId); return tx.pluginCodingHomeworkAssignment.upsert({ where: { activityId: scope.activityId }, create: { activityId: scope.activityId }, update: {} }); });
 }
 async function materialTree(scope: HomeworkTeacherScope) {
-  const [items, resources] = await Promise.all([listContentItems(scope.user, scope.courseId, { visibleOnly: true }), listContentResources(scope.user, scope.courseId)]);
+  const [items, resources] = await Promise.all([listContentItems(scope.user, scope.courseId), listContentResources(scope.user, scope.courseId)]);
   const byId = new Map(resources.map(resource => [resource.id, resource]));
-  const rows: Array<{ id: string; parentId: string | null; kind: string; title: string; depth: number; resourceId: string | null; activityId: string | null }> = [];
+  const rows: Array<{ id: string; parentId: string | null; kind: string; title: string; depth: number; resourceId: string | null; activityId: string | null; hidden: boolean }> = [];
   const walk = (parentId: string | null, depth: number) => {
     for (const item of items.filter(item => item.parentId === parentId).sort((a, b) => a.position - b.position || a.createdAt.getTime() - b.createdAt.getTime())) {
       const resource = item.contentResourceId ? byId.get(item.contentResourceId) : null;
-      rows.push({ id: item.id, parentId, kind: item.kind, title: item.titleSnapshot ?? resource?.title ?? "Untitled", depth, resourceId: resource?.id ?? null, activityId: item.activityId });
+      rows.push({ id: item.id, parentId, kind: item.kind, title: item.titleSnapshot ?? resource?.title ?? "Untitled", depth, resourceId: resource?.id ?? null, activityId: item.activityId, hidden: item.effectiveVisibility !== "visible" });
       if (depth < 50) walk(item.id, depth + 1);
     }
   };
   walk(null, 0);
   const anchor = rows.findIndex(row => row.activityId === scope.activityId);
-  return { rows, defaults: rows.slice(0, anchor < 0 ? 0 : anchor).flatMap(row => row.resourceId ? [row.resourceId] : []) };
+  return { rows, defaults: rows.slice(0, anchor < 0 ? 0 : anchor).flatMap(row => row.resourceId && !row.hidden ? [row.resourceId] : []) };
 }
 export async function getHomeworkReferenceSelection(scope: HomeworkTeacherScope, settings: Record<string, unknown>) {
   return Array.isArray(settings.referenceMaterialIds)
@@ -98,7 +98,7 @@ export async function updateHomeworkWorkflowSettings(scope: HomeworkTeacherScope
   await assignment(scope);
   const data = z.object({ submissionPolicy: homeworkSubmissionPolicySchema.optional(), selected: z.array(z.string().min(1)).max(100).optional(), concurrency: z.number().int().min(1).max(4).optional(), enabled: z.boolean().optional(), embeddingAi: AiModelSelectionSchema.nullable().optional(), questionGenerationAi: AiModelSelectionSchema.nullable().optional() }).strict().parse(input);
   const tree = await materialTree(scope);
-  if (data.selected?.some(id => !tree.rows.some(row => row.resourceId === id))) throw new AppError(400, "HOMEWORK_MATERIAL_INVALID", "Choose visible course materials from the list.");
+  if (data.selected?.some(id => !tree.rows.some(row => row.resourceId === id))) throw new AppError(400, "HOMEWORK_MATERIAL_INVALID", "Choose course materials from the list.");
   await prisma.$transaction(async tx => {
     await lockHomeworkSettings(tx, scope.activityId);
     const current = await tx.pluginCodingHomeworkAssignment.findUniqueOrThrow({ where: { activityId: scope.activityId } });
@@ -173,7 +173,10 @@ export async function finishHomeworkMaterialPreparation(scope: HomeworkTeacherSc
     const indexes = [];
     for (const id of selected) { const status = await getMaterialIndexStatus(scope.user, scope.courseId, id, homeworkEmbeddingSelection(settings)); if (status.state !== "ready" || !status.index) throw new AppError(409, "HOMEWORK_EMBEDDINGS_REQUIRED", "Generate embeddings for every selected material first."); indexes.push(status.index); }
     if (indexes.reduce((sum, index) => sum + index.documentCount, 0) > 10_000 || indexes.reduce((sum, index) => sum + index.documentCount * (index.vectorDimensions ?? 1536), 0) > 20_000_000) throw new AppError(413, "REFERENCE_SELECTION_TOO_LARGE", "Select fewer reference materials for this homework.");
-    const snapshot = await tx.pluginCodingHomeworkDocumentationSnapshot.create({ data: { activityId: scope.activityId, courseId: scope.courseId, status: "ready", contentTreeFingerprint: contentIndexRevision(selected), metadata: json({ workflowVersion: 2, selectionFingerprint: contentIndexRevision(selected), indexIds: indexes.map(index => index.id), ...(provider ? { embeddingAi: provider.selection } : {}), selected, preparedAt: new Date().toISOString() }) } });
+    const tree = await materialTree(scope);
+    const hiddenResources = new Set(tree.rows.filter(row => row.hidden && row.resourceId).map(row => row.resourceId));
+    const hiddenReferenceIndexIds = indexes.flatMap((index, position) => hiddenResources.has(selected[position]) ? [index.id] : []);
+    const snapshot = await tx.pluginCodingHomeworkDocumentationSnapshot.create({ data: { activityId: scope.activityId, courseId: scope.courseId, status: "ready", contentTreeFingerprint: contentIndexRevision(selected), metadata: json({ workflowVersion: 2, preparedByUserId: scope.user.id, hiddenReferenceIndexIds, selectionFingerprint: contentIndexRevision(selected), indexIds: indexes.map(index => index.id), ...(provider ? { embeddingAi: provider.selection } : {}), selected, preparedAt: new Date().toISOString() }) } });
     await tx.pluginCodingHomeworkAssignment.update({ where: { activityId: scope.activityId }, data: { settings: json({ ...settings, workflowVersion: 2, referenceMaterialIds: selected, ...(provider ? { embeddingAi: provider.selection, embeddingConnectionId: provider.connectionId } : {}), preparedSnapshotId: snapshot.id }) } });
     return { prepared: true, snapshotId: snapshot.id };
   }, { timeout: 30_000 });
