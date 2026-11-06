@@ -1,3 +1,5 @@
+import { readHomeworkSubmissionPolicy, readHomeworkSubmissionTiming } from "./submission-policy";
+import { acceptHomeworkSubmissionTiming } from "./submission-window";
 import { snapshotProvidedCode } from "./provided-code";
 import { studentQuestionContextInclude } from "./question-context";
 import { getHomeworkQuestionLanguage } from "./question-generation-policy";
@@ -38,6 +40,7 @@ export async function handInHomework(scope: HomeworkStudentScope, input: unknown
       const assignment = await tx.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId } });
       const settings = record(assignment?.settings);
       if (!assignment || settings.submissionsEnabled !== true || typeof settings.preparedSnapshotId !== "string") throw new AppError(409, "HOMEWORK_SUBMISSIONS_CLOSED", "Your teacher has not enabled final submissions yet.");
+      acceptHomeworkSubmissionTiming(settings);
       const draft = await tx.pluginCodingHomeworkDraft.findUnique({ where: { activityId_groupId_userId: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id } } });
       if (!draft || draft.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "Your prepared files changed. Reload them before submitting.");
       const entries = await readHomeworkDraftEntries(draft); const requirements = await getHomeworkRequirements(scope.activityId);
@@ -49,8 +52,9 @@ export async function handInHomework(scope: HomeworkStudentScope, input: unknown
       const providedCode = await snapshotProvidedCode(scope.activityId, tx);
       const questionLanguage = await getHomeworkQuestionLanguage(scope.courseId);
       const questionGenerationAi = snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings));
+      const submissionTiming = acceptHomeworkSubmissionTiming(settings);
       await tx.pluginCodingHomeworkSubmission.create({ data: { id: submissionId, ...activeWhere(scope), status: "uploaded", documentationSnapshotId: settings.preparedSnapshotId,
-        structureValidationSummary: json(validation), metadata: json({ workflowVersion: 2, providedCode, questionGenerationAi, draftRevision: draft.revision, handInAt: new Date().toISOString(), incompleteAcknowledged: readiness.requiresAcknowledgement, questionLanguage, requirements, folders: draft.folders,
+        structureValidationSummary: json(validation), metadata: json({ workflowVersion: 2, providedCode, questionGenerationAi, draftRevision: draft.revision, handInAt: submissionTiming.submittedAt, submissionTiming, incompleteAcknowledged: readiness.requiresAcknowledgement, questionLanguage, requirements, folders: draft.folders,
           assignment: { candidateLimit: assignment.candidateLimit, languageKey: assignment.languageKey, promptMarkdown: assignment.promptMarkdown, generationInstructions: assignment.generationInstructions, questionCount: assignment.questionCount, retrievedExampleCount: assignment.retrievedExampleCount } }) } });
       await mkdir(path.join(directory, "files"), { recursive: true, mode: 0o750 });
       for (const entry of entries) {
@@ -81,8 +85,8 @@ export async function getHomeworkWorkspace(scope: HomeworkStudentScope) {
   const job = active ? await coreDb.backgroundJob.findUnique({ where: { queue_idempotencyKey: { queue: codingHomeworkProcessingQueue, idempotencyKey: `submission:${active.id}` } } }) : null;
   const position = job?.status === "queued" ? 1 + await coreDb.backgroundJob.count({ where: { queue: job.queue, status: "queued", createdAt: { lt: job.createdAt } } }) : null;
   const canReadQuestions = Boolean(active && record(active.metadata).assessmentStartedAt);
-  return { submissionsEnabled: record(assignment?.settings).submissionsEnabled === true,
-    submission: active ? { id: active.id, status: active.status, createdAt: active.createdAt.toISOString(), started: canReadQuestions, coreAttemptId: active.coreAttemptId,
+  return { submissionPolicy: readHomeworkSubmissionPolicy(assignment?.settings), submissionsEnabled: record(assignment?.settings).submissionsEnabled === true,
+    submission: active ? { submissionTiming: readHomeworkSubmissionTiming(active.metadata), id: active.id, status: active.status, createdAt: active.createdAt.toISOString(), started: canReadQuestions, coreAttemptId: active.coreAttemptId,
       processingStatus: job?.status ?? null, generationIssue: record(job?.error).code === "HOMEWORK_NO_ELIGIBLE_CODE" ? "no_eligible_code" as const : null, queuePosition: position, questionCount: Number(record(record(active.metadata).assignment).questionCount ?? assignment?.questionCount ?? 3),
       files: active.files.map(file => ({ path: file.path, sizeBytes: Number(file.sizeBytes) })),
       incompleteAcknowledged: record(active.metadata).incompleteAcknowledged === true } : null,

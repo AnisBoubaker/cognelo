@@ -198,3 +198,11 @@ The [implementation plan](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md#approved
 - Timer start on Answer, enforcement of activity availability, preserved answers and staff review/audit access.
 
 No production browser tests, synthetic production submissions or deployment are authorized by this implementation task.
+
+## File hand-in deadline and lateness — November 5, 2026
+
+Homework Settings has an optional **Submission deadline**, entered as a date/time in the effective course timezone and stored as UTC. No deadline preserves the existing manual-switch workflow. **Allow late submissions** defaults off. When enabled, lateness may be unlimited or bounded by a positive days/hours/minutes duration measured from the deadline. Duration days are elapsed 24-hour periods; the server caps the configurable duration at 3650 days. The late cutoff is exclusive, as is the ordinary deadline when lateness is disallowed.
+
+This is a file hand-in deadline. It does not automatically open submissions or override course/activity availability, SEB, attempt limits, or the challenge answering timer. Draft preparation remains available; students see the deadline/late cutoff and a closed notice with Submit disabled after the cutoff. The server checks its own clock under the homework settings/workflow locks and rechecks after validation before freezing new work. A retry of an already accepted hand-in remains idempotent. Teachers can extend the policy without rewriting existing submissions.
+
+Every new hand-in retains its accepted timestamp, deadline snapshot, late flag and exact delay in milliseconds. Students, the teacher submission list and Review and grade show **Late by …**, formatted as days/hours/minutes (seconds below one minute). Later deadline changes cannot reclassify prior work. A team’s members, including late joiners, inherit the original shared hand-in timing; individual challenge resets retain it. No automatic grade penalty is introduced. Same-course duplication copies this authored policy while leaving submissions disabled; bank transfers clear it with other course workflow settings.

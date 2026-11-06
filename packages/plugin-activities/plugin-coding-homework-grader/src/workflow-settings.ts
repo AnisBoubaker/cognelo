@@ -1,3 +1,4 @@
+import { homeworkSubmissionPolicySchema, readHomeworkSubmissionPolicy } from "./submission-policy";
 import { snapshotProvidedCode } from "./provided-code";
 import { getHomeworkQuestionConnection, homeworkEmbeddingSelection, storedHomeworkAiSelection } from "./ai-selection";
 import { z } from "zod";
@@ -7,7 +8,7 @@ import { prisma, type Prisma } from "./db-client";
 import { json, record } from "./file-preparation";
 
 export type HomeworkTeacherScope = { user: CurrentUser; courseId: string; activityId: string };
-export const workflowSettingKeys = ["workflowVersion", "submissionsEnabled", "preparedSnapshotId", "referenceMaterialIds", "embeddingConnectionId", "generationConcurrency", "embeddingAi", "questionGenerationAi"] as const;
+export const workflowSettingKeys = ["workflowVersion", "submissionsEnabled", "preparedSnapshotId", "referenceMaterialIds", "embeddingConnectionId", "generationConcurrency", "embeddingAi", "questionGenerationAi", "submissionPolicy"] as const;
 export async function lockHomeworkSettings(tx: Pick<Prisma.TransactionClient, "$queryRaw">, activityId: string) {
   await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${`homework-settings:${activityId}`}, 0))`;
 }
@@ -65,7 +66,7 @@ export async function getHomeworkWorkflowSettings(scope: HomeworkTeacherScope) {
   const { homeworkTeamworkService } = await import("./team-workspaces");
   const { teamworkTransaction } = await import("@cognelo/core");
   const questionPolicyLocked = await homeworkTeamworkService.hasActiveSubmissions({ activityId: scope.activityId, transaction: teamworkTransaction(prisma) });
-  return { rows: tree.rows, selected, statuses, questionPolicyLocked, enabled: settings.submissionsEnabled === true, prepared: Boolean(prepared), concurrency: Number(settings.generationConcurrency ?? 2),
+  return { submissionPolicy: readHomeworkSubmissionPolicy(settings), rows: tree.rows, selected, statuses, questionPolicyLocked, enabled: settings.submissionsEnabled === true, prepared: Boolean(prepared), concurrency: Number(settings.generationConcurrency ?? 2),
     ai: { connections,
       question: { selection: publicSelection(storedHomeworkAiSelection(settings.questionGenerationAi)), resolved: questionResolved, error: questionError },
       embedding: { selection: publicSelection(storedHomeworkAiSelection(settings.embeddingAi)), resolved: provider ? { connectionId: provider.connectionId, model: provider.model } : null, error: embeddingError }
@@ -95,7 +96,7 @@ export async function getHomeworkReferencePreview(scope: HomeworkTeacherScope, i
 }
 export async function updateHomeworkWorkflowSettings(scope: HomeworkTeacherScope, input: unknown) {
   await assignment(scope);
-  const data = z.object({ selected: z.array(z.string().min(1)).max(100).optional(), concurrency: z.number().int().min(1).max(4).optional(), enabled: z.boolean().optional(), embeddingAi: AiModelSelectionSchema.nullable().optional(), questionGenerationAi: AiModelSelectionSchema.nullable().optional() }).strict().parse(input);
+  const data = z.object({ submissionPolicy: homeworkSubmissionPolicySchema.optional(), selected: z.array(z.string().min(1)).max(100).optional(), concurrency: z.number().int().min(1).max(4).optional(), enabled: z.boolean().optional(), embeddingAi: AiModelSelectionSchema.nullable().optional(), questionGenerationAi: AiModelSelectionSchema.nullable().optional() }).strict().parse(input);
   const tree = await materialTree(scope);
   if (data.selected?.some(id => !tree.rows.some(row => row.resourceId === id))) throw new AppError(400, "HOMEWORK_MATERIAL_INVALID", "Choose visible course materials from the list.");
   await prisma.$transaction(async tx => {
@@ -104,6 +105,7 @@ export async function updateHomeworkWorkflowSettings(scope: HomeworkTeacherScope
     const settings = record(current.settings);
     if (settings.submissionsEnabled === true && data.selected && contentIndexRevision([...new Set(data.selected)].sort()) !== contentIndexRevision([...(settings.referenceMaterialIds as string[] ?? [])].sort())) throw new AppError(409, "HOMEWORK_SELECTION_LOCKED", "Disable submissions before changing the reference selection.");
     const next: Record<string, unknown> = { ...settings, workflowVersion: 2, ...(data.concurrency ? { generationConcurrency: data.concurrency } : {}) };
+    if (data.submissionPolicy !== undefined) next.submissionPolicy = data.submissionPolicy;
     if (data.selected) {
       if (contentIndexRevision([...new Set(data.selected)].sort()) !== contentIndexRevision([...(settings.referenceMaterialIds as string[] ?? [])].sort())) delete next.preparedSnapshotId;
       next.referenceMaterialIds = [...new Set(data.selected)];

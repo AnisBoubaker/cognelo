@@ -819,6 +819,6 @@ function normalizeObject(value: unknown) {
 }
 
 function copiedBankHomeworkSettings(value: unknown) {
-  const { submissionsEnabled: _enabled, preparedSnapshotId: _snapshot, referenceMaterialIds: _materials, embeddingConnectionId: _embeddingConnection, embeddingAi: _embeddingAi, questionGenerationAi: _questionAi, ...settings } = normalizeObject(value);
+  const { submissionPolicy: _submissionPolicy, submissionsEnabled: _enabled, preparedSnapshotId: _snapshot, referenceMaterialIds: _materials, embeddingConnectionId: _embeddingConnection, embeddingAi: _embeddingAi, questionGenerationAi: _questionAi, ...settings } = normalizeObject(value);
   return { ...settings, submissionsEnabled: false };
 }
