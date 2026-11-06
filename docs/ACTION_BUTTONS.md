@@ -6,6 +6,10 @@ Destructive actions keep the same shape with red text/border and a red hover tin
 
 Tabs, sidebar navigation, accordion rows, menu items, editor keys, and floating status controls have their own semantic layouts. Keep their selection/disclosure states; do not turn a clickable row into an action-button rectangle. Small editor controls may retain their compact dimensions. Ordinary actions within these surfaces still use the shared recipe.
 
+## Shared edit bars
+
+`EditActionBar` sizes to its status and controls instead of spanning the whole form. It stays at the physical left side to leave space for the fixed bottom-right Messages launcher, including in right-to-left layouts. Controls wrap within narrow containers; on narrow screens the sticky bar sits above the launcher and respects safe-area insets. Keep the notification location unchanged. Save/discard state, labels, keyboard focus and navigation guards retain their existing behavior.
+
 ## Semantic icons
 
 `ActionIcon` from `@cognelo/activity-ui` owns the Tabler action-icon registry for core and plugin UI. The web app re-exports it as `AppIcon` from its existing icon layer, which continues to own activity/file-type icons. Pages and plugins must not draw their own interface SVGs or use emoji/text glyphs for common actions.
@@ -31,5 +35,7 @@ Choose icons explicitly from action semantics, never by inspecting translated la
 Dialog dismissal is intentionally icon-only: use the shared persistent [dialog header](DIALOGS.md) with a close cross, localized accessible name, and tooltip. Informational alerts use that cross instead of a second labelled Close button. Review navigation and messaging keep visible labels where space allows and use named icons on narrow screens. Decision actions such as Cancel and Save retain their labels.
 
 ## Verification
+
+`tests/e2e/edit-action-bar-messages.spec.ts` checks compact width, unchanged Messages placement, non-overlapping and clickable Save/Cancel controls, actual discard/save behavior, and no horizontal overflow at desktop/tablet/mobile widths and in right-to-left layout.
 
 `tests/e2e/action-buttons.spec.ts` checks matching computed appearance and semantic icons across core/admin/plugin actions, disabled and keyboard-focus behavior, actual save/cancel flows, and login legibility. `workspace-layout.spec.ts` covers desktop/mobile page layout, while rich-text and activity regressions exercise toolbar, dialog, and learner controls.

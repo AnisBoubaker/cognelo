@@ -23,6 +23,8 @@ This is a planning inventory only. It does not authorize applying one global sav
 | --- | --- | --- | --- |
 | Subject editor | `/subjects/:subjectId/edit` | `apps/web/src/app/subjects/[subjectId]/edit/page.tsx` | Implemented reference: one subject draft, sticky action bar, saved/unsaved status, responsive controls, Save and discard-to-saved-state actions. |
 
+The implemented shared bar now sizes to its content, stays left-aligned and wraps within its container. Narrow-screen sticky spacing clears the fixed Messages launcher without moving notifications; see [shared edit-bar presentation](ACTION_BUTTONS.md#shared-edit-bars).
+
 The reusable implementation should complement `useUnsavedChangesGuard`: the guard protects navigation, while the visible bar communicates and acts on the same draft state.
 
 ## Primary rollout candidates

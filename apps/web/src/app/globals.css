@@ -1234,6 +1234,13 @@ select:focus {
   bottom: 16px;
   z-index: 20;
   display: flex;
+  width: fit-content;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: auto;
+  justify-self: left;
+  align-self: flex-start;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
@@ -1248,8 +1255,16 @@ select:focus {
 .edit-action-bar-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: 10px;
   flex-shrink: 0;
+}
+
+@media (max-width: 960px) {
+  .edit-action-bar {
+    bottom: max(88px, calc(env(safe-area-inset-bottom) + 72px));
+  }
 }
 
 .subject-description-text {
@@ -1610,7 +1625,6 @@ select:focus {
 @media (max-width: 800px) {
   .edit-action-bar {
     align-items: stretch;
-    bottom: max(8px, env(safe-area-inset-bottom));
     flex-direction: column;
   }
 
