@@ -104,7 +104,7 @@ const summativeOverrideFields = new Set<ActivityAssignmentOverrideField>([
 
 export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }: ActivitySettingsDialogProps) {
   const { timeZone } = useApplicationTime();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const dialogs = useDialogs();
   const [activeTab, setActiveTab] = useState<ActivitySettingsTab>("general");
   const [selectedGroupId, setSelectedGroupId] = useState("");
@@ -125,6 +125,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
       .then(({ settings }) => {
         if (cancelled) return;
         const nextDraft = buildDraft(settings, isTest, timeZone);
+        nextDraft.groups.sort((left, right) => left.title.localeCompare(right.title, locale, { numeric: true, sensitivity: "base" }));
         setDraft(nextDraft);
         setSavedAssessmentMode(nextDraft.assessmentMode);
         setSelectedGroupId(nextDraft.groups[0]?.groupId ?? "");
@@ -140,7 +141,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
     return () => {
       cancelled = true;
     };
-  }, [activity.id, courseId, isTest, t, timeZone]);
+  }, [activity.id, courseId, isTest, t, timeZone, locale]);
 
   const selectedGroup = useMemo(
     () => draft?.groups.find((group) => group.groupId === selectedGroupId) ?? draft?.groups[0] ?? null,

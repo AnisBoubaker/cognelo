@@ -48,7 +48,7 @@ Question prompts, answer keys, Test composition, and plugin-private tests can al
 
 ## API and persistence
 
-`GET /api/courses/:courseId/activities/:activityId/assign-all-groups` returns each section's `students`, `teams` (including grouping titles), and ordered `exceptions` alongside the existing assignment settings. It remains course-management-only. Roster permission alone does not grant activity-settings access.
+`GET /api/courses/:courseId/activities/:activityId/assign-all-groups` returns each section's `students`, `teams` (including grouping titles), and ordered `exceptions` alongside the existing assignment settings. It remains course-management-only. The activity-settings UI sorts section tabs and the corresponding section selector in ascending natural alphabetical order using the viewer’s locale (for example Gr01, Gr2, Gr10); the first section in that order opens initially. Sorting never changes group identities or assignment values. Roster permission alone does not grant activity-settings access.
 
 The existing POST accepts `groupAssignments[].exceptions`. Each entry uses `teamId` or `participantId`, `overrideFields`, and the same values as a section override. The array is ordered highest-priority first for teams. Omitting `exceptions` preserves existing rules for older clients; sending `[]` removes them. Values for unchecked fields may be retained for editing, but never affect policy. Formative-mode pruning still applies when an older client omits exceptions.
 

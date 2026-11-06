@@ -45,7 +45,8 @@ const mockPrisma = vi.hoisted(() => ({
     findFirst: vi.fn()
   },
   courseGroup: {
-    findFirst: vi.fn()
+    findFirst: vi.fn(),
+    findMany: vi.fn()
   },
   courseContentItem: {
     findMany: vi.fn()
@@ -168,6 +169,7 @@ describe("gradebook attempt services", () => {
     mockPrisma.activityAttempt.count.mockResolvedValue(0);
     mockPrisma.activityAttempt.findMany.mockResolvedValue([]);
     mockPrisma.activityAttempt.update.mockImplementation(async ({ data }) => ({ id: "attempt-1", ...data }));
+    mockPrisma.courseGroup.findMany.mockResolvedValue([]);
     mockPrisma.courseContentItem.findMany.mockResolvedValue([]);
     mockPrisma.gradebookItem.findMany.mockResolvedValue([]);
     mockPrisma.gradebookItem.upsert.mockResolvedValue({ id: "gradebook-item-1" });
@@ -1167,6 +1169,23 @@ describe("gradebook attempt services", () => {
         }
       ]
     });
+  });
+
+  it("keeps all authorized section choices when a group/activity/status filter has no results", async () => {
+    authMocks.assertCanViewCourseGradebook.mockResolvedValueOnce({ gradingGroupIds: ["group-1", "group-2"] });
+    const groups = [{ id: "group-1", title: "Section A" }, { id: "group-2", title: "Section B" }];
+    mockPrisma.courseGroup.findMany.mockResolvedValue(groups);
+    const result = await getCourseGradebook(teacherUser, "course-1", { groupId: "group-1", activityId: "activity-1", status: "graded" });
+    expect(result.groups).toEqual(groups); expect(result.rows).toEqual([]);
+    expect(mockPrisma.courseGroup.findMany).toHaveBeenCalledWith({ where: { courseId: "course-1", id: { in: ["group-1", "group-2"] } }, select: { id: true, title: true }, orderBy: [{ title: "asc" }, { id: "asc" }] });
+    expect(mockPrisma.gradebookItem.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { courseId: "course-1", groupId: "group-1", activityId: "activity-1" } }));
+  });
+
+  it("does not offer or query another section when a grader selects it without permission", async () => {
+    authMocks.assertCanViewCourseGradebook.mockResolvedValueOnce({ gradingGroupIds: ["group-1"] });
+    await expect(getCourseGradebook(teacherUser, "course-1", { groupId: "foreign" })).rejects.toMatchObject({ status: 403 });
+    expect(mockPrisma.courseGroup.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.gradebookItem.findMany).not.toHaveBeenCalled();
   });
 
   it("lists the latest current-mode in-progress attempt within the grader's group scope", async () => {

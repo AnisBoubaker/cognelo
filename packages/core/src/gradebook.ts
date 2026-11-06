@@ -1369,7 +1369,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
   }, user.id);
   await ensureCourseGradebookItems(courseId);
   const statusFilter = filters.status ?? "all";
-  const [unorderedItems, contentItems] = await Promise.all([
+  const [unorderedItems, contentItems, availableGroups] = await Promise.all([
     prisma.gradebookItem.findMany({
       where: {
         courseId,
@@ -1439,6 +1439,12 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         courseGroupActivityId: true,
         createdAt: true
       }
+    }),
+    // Filter choices follow the grader's scope, not the currently filtered results.
+    prisma.courseGroup.findMany({
+      where: { courseId, ...(capabilities.gradingGroupIds !== null ? { id: { in: capabilities.gradingGroupIds } } : {}) },
+      select: { id: true, title: true },
+      orderBy: [{ title: "asc" }, { id: "asc" }]
     })
   ]);
   const activityOrder = buildGradebookActivityOrder(unorderedItems, contentItems);
@@ -1452,12 +1458,10 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
       || left.groupId.localeCompare(right.groupId);
   });
 
-  const groups = new Map<string, { id: string; title: string }>();
   const activities = new Map<string, { id: string; title: string }>();
 
   const exceptions = await loadAssignmentExceptions(items.map((item) => item.groupActivity.id));
   const rows = items.flatMap((baseItem) => {
-    groups.set(baseItem.group.id, { id: baseItem.group.id, title: baseItem.group.title });
     activities.set(baseItem.activity.id, { id: baseItem.activity.id, title: baseItem.activity.title });
 
     return baseItem.group.participants.flatMap((participant) => {
@@ -1536,7 +1540,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
       activityId: filters.activityId ?? null,
       status: statusFilter
     },
-    groups: [...groups.values()].sort((left, right) => left.title.localeCompare(right.title)),
+    groups: availableGroups,
     activities: [...activities.values()],
     items: items.map((item) => ({
       gradebookItemId: item.id,

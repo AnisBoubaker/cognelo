@@ -169,6 +169,7 @@ Teachers see:
 - individual student history
 - [Compound Test review](TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading) with numbered activity navigation, shared standalone feedback/rubric controls, item grades, and whole-class navigation
 - filters for group, activity, missing, late, and needs grading
+- Group filter options are loaded from the complete course sections within the grader’s authorized scope, independently of the active group/activity/status filters. Keep empty sections selectable and preserve the full list when opening a filtered URL or switching directly between groups. Detailed rows and aggregates remain filtered.
 - CSV or XLSX per-activity final-grade export from content and gradebook surfaces, with optional group scope and an editable identifiable filename
 - later LMS-compatible export
 
