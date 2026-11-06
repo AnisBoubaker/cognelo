@@ -69,7 +69,7 @@ for (const separate of [false, true]) test(`team homework: ${separate ? "individ
     const download = await clients[1].get(`${endpoint}/submitted-download?submissionId=${second.id}`); expect(download.ok()).toBe(true);
     const zip = unzipSync(await download.body()); expect(Buffer.from(zip["src/main.c"]).toString()).toBe(code);
     expect(await responseJson(await clients[1].post(`${endpoint}/submitted-check`, { data: { submissionId: second.id } }))).toMatchObject({ readiness: { canSubmit: true } });
-    expect((await clients[2].get(`${endpoint}/submitted-download?submissionId=${first.id}`)).status()).toBe(404);
+    expect((await clients[2].get(`${endpoint}/submitted-download?submissionId=${first.id}`)).status()).toBe(403);
     const locked = (await responseJson<{ settings: CourseActivityAssignmentSettings }>(await teacherApi.get(settingsPath))).settings;
     expect(locked.general.teamworkLocked).toBe(true);
     expect((await teacherApi.post(settingsPath, { data: { ...assignmentData, teamworkEnabled: false } })).status()).toBe(409);

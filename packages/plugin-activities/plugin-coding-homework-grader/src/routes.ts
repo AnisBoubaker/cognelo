@@ -3,7 +3,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import type { PluginRouteDefinition, PluginRouteContext } from "@cognelo/activity-sdk/server";
-import { AppError, assertCanGradeGroup, assertCanManageActivityBank, assertCanManageCourse, getBackgroundJob } from "@cognelo/core";
+import { activityTeamworkEnabled, AppError, assertCanGradeGroup, assertCanManageActivityBank, assertCanManageCourse, getBackgroundJob } from "@cognelo/core";
 import { prisma as corePrisma } from "@cognelo/db";
 import { analyzeCodingHomeworkSubmission } from "./analysis";
 import { saveCodingHomeworkChallengeAnswers } from "./challenge-answers";
@@ -248,6 +248,7 @@ export const codingHomeworkPreflightRoute: PluginRouteDefinition = {
   methods: {
     POST: async ({ context, readJson }) => {
       const courseId = requireCourseId(context.courseId);
+      if (context.groupId && activityTeamworkEnabled(context.activity.metadata)) throw new AppError(409, "HOMEWORK_TEAM_PREPARATION_REQUIRED", "Use the team preparation workspace to upload and check this homework.");
       return runCodingHomeworkPreflight(
         {
           user: context.user,

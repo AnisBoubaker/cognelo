@@ -78,7 +78,7 @@ export async function handInTeamHomework(scope: HomeworkStudentScope, input: unk
 }
 
 export async function getTeamHomeworkWorkspace(scope: HomeworkStudentScope) {
-  return withHomeworkTeamWorkspace(scope, async (tx, access) => {
+  try { return await withHomeworkTeamWorkspace(scope, async (tx, access) => {
     const sql = teamworkTransaction(tx), submission = await currentTeamSubmission(sql, access);
     const [assignment] = await sql.query<Array<{ settings: unknown; questionCount: number }>>`SELECT settings,"questionCount" FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${scope.activityId}`;
     const generationId = submission ? String(record(submission.metadata).generationSourceId ?? submission.id) : null;
@@ -91,7 +91,13 @@ export async function getTeamHomeworkWorkspace(scope: HomeworkStudentScope) {
       submission: submission ? { id: submission.id, status: submission.status, createdAt: submission.createdAt.toISOString(), started: Boolean(record(submission.metadata).assessmentStartedAt), coreAttemptId: submission.coreAttemptId,
         processingStatus: job?.status ?? null, generationIssue: record(job?.error).code === "HOMEWORK_NO_ELIGIBLE_CODE" ? "no_eligible_code" : null, queuePosition: position,
         questionCount: Number(record(record(submission.metadata).assignment).questionCount ?? assignment?.questionCount ?? 3), files: files.map(file => ({ path: file.path, sizeBytes: Number(file.sizeBytes) })), incompleteAcknowledged: record(submission.metadata).incompleteAcknowledged === true } : null };
-  });
+  }); } catch (error) {
+    if (!(error instanceof AppError) || error.code !== "HOMEWORK_TEAM_REQUIRED") throw error;
+    const [assignment] = await coreDb.$queryRaw<Array<{ settings: unknown }>>`SELECT settings FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${scope.activityId}`;
+    // Assignment resources remain readable without creating a private draft or member binding.
+    return { submissionsEnabled: record(assignment?.settings).submissionsEnabled === true, previousCancelled: false, submission: null,
+      teamwork: { contextKey: "team-required", draftRevision: 0, teamId: null, teamName: null, members: [], canSubmit: false } };
+  }
 }
 
 /** All student read/write paths use the current member pointer, never only userId. */

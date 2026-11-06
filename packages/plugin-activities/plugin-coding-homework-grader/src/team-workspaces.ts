@@ -99,6 +99,7 @@ export async function getHomeworkTeamAccessInTransaction(tx: CorePrisma.Transact
   if (!context.enabled || !context.groupingId) throw new AppError(409, "HOMEWORK_TEAM_MODE_CHANGED", "The assignment settings changed. Reload this activity.");
   await lockStudentGroupingWorkspaces(tx, context.groupingId);
   context = await resolveActivityTeamContext(scope.user, scope.courseId, scope.groupId, scope.activityId, tx);
+  if (!context.teamId && !context.allowIndividualSubmission) throw new AppError(403, "HOMEWORK_TEAM_REQUIRED", "You must belong to a team before you can upload files or submit this homework.");
   const sql = teamworkTransaction(tx);
   const workspace = (await findTeamWorkspace(sql, scope, context))!;
   const enqueue: Enqueue = async job => { await enqueueBackgroundJob(job, tx); };

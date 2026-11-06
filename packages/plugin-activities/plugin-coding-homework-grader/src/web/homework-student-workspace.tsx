@@ -44,7 +44,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
       runtimeRefresh.current?.(); // Refresh the host's runtime; a new team has no old answering timer.
     }
     setWorkspace(state);
-    if (!state.submission && (reloadPreparation || changed || participationChanged || (state.teamwork && preparationRef.current?.draft.revision !== state.teamwork.draftRevision))) {
+    if (state.teamwork?.canSubmit !== false && !state.submission && (reloadPreparation || changed || participationChanged || (state.teamwork && preparationRef.current?.draft.revision !== state.teamwork.draftRevision))) {
       const version = ++preparationLoad.current;
       const prepared = await request<HomeworkPreparation>("preparation");
       if (preparationLoad.current === version && contextKey.current === nextKey) setPreparation(prepared);
@@ -126,12 +126,12 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     <MarkdownRenderer markdown={assignment?.assignment.promptMarkdown ?? ""} />
     <HomeworkDownloads promptPdfId={assignment?.assignment.promptPdf?.id} hasProvidedFiles={Boolean(assignment?.assignment.providedFiles.length)}
       activityFileUrl={activityFileUrl} providedFilesUrl={providedFilesUrl} locale={locale} />
-    {!workspace && <p>{copy.loading}</p>}
+    {!workspace ? <p>{copy.loading}</p> : workspace.teamwork?.canSubmit === false ? <div className="preview-panel" role="status"><strong>{copy.teamRequired}</strong></div> : <>
     {workspace?.previousCancelled && <p role="status">{copy.cancelled}</p>}
     {workspace?.teamwork && <div className="preview-panel" role="status">
       <strong>{workspace.teamwork.teamId ? `${copy.teamWorkspace}${workspace.teamwork.teamName ? ` · ${workspace.teamwork.teamName}` : ""}` : copy.individualWorkspace}</strong>
       {workspace.teamwork.members.length > 0 && <p>{workspace.teamwork.members.map(member => member.name).join(", ")}</p>}
-      <p>{workspace.teamwork.teamId ? copy.teamWorkspaceHelp : workspace.teamwork.canSubmit ? copy.individualAllowed : copy.teamRequired}</p>
+      <p>{workspace.teamwork.teamId ? copy.teamWorkspaceHelp : copy.individualAllowed}</p>
     </div>}
     <h3>{active ? copy.readOnly : copy.prepare}</h3>
     {active ? <><p>{copy.frozen}</p><div className="row wrap">
@@ -174,7 +174,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
       </div>}
       {hasCurrentCheck && preparation.readiness.canSubmit && preparation.readiness.requiresAcknowledgement && <label className="homework-choice"><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /> {copy.incomplete}</label>}
       {!workspace?.submissionsEnabled && <p role="status">{copy.closed}</p>}
-      {canShowSubmit && <button type="button" disabled={!workspace?.submissionsEnabled || workspace?.teamwork?.canSubmit === false || Boolean(busy)} onClick={async () => {
+      {canShowSubmit && <button type="button" disabled={!workspace.submissionsEnabled || Boolean(busy)} onClick={async () => {
         if (await dialogs.confirm({ title: copy.handIn, message: workspace?.teamwork?.teamId ? copy.teamHandInDetail : copy.handInDetail, confirmLabel: copy.handIn })) await run(copy.handIn, async signal => { await request("hand-in", body("POST", { ...(workspace?.teamwork ? { contextKey: workspace.teamwork.contextKey } : {}), expectedRevision: preparation.draft.revision, acknowledgeIncomplete: acknowledged }, signal)); });
       }}><ActionIcon name="submit" /> {copy.handIn}</button>}
     </section>}
@@ -197,6 +197,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     <HomeworkAnswerConfirmation open={confirmingAnswers && !completed && !timedAutoSubmit && !busy} questions={questions} answers={answers} locale={locale}
       onCancel={() => setConfirmingAnswers(false)} onConfirm={() => { setConfirmingAnswers(false); void submitAnswers(); }} />
     {completed && <p role="status">{copy.submitted}</p>}
+    </>}
     <ProgressDialog open={busy !== null} title={busy ?? copy.loading} progressLabel={busy ?? copy.loading} onCancel={() => controller.current?.abort()} cancelLabel={copy.cancel} />
   </section>;
 }

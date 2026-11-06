@@ -1,3 +1,7 @@
+import { readFile } from "node:fs/promises";
+import { unzipSync } from "fflate";
+import type { StudentGroupingDto } from "@cognelo/contracts";
+import { textPdf } from "./fixtures/pdf";
 import { prisma } from "@cognelo/db";
 import { test, expect } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
@@ -46,6 +50,9 @@ test("team configuration uses core section settings and permits independent unte
     await page.goto(`/courses/${data.courseId}/activities/${activityId}`); await page.getByRole("tab", { name: "Settings", exact: true }).click();
     const separate = page.getByRole("checkbox", { name: "Generate separate challenge questions for each team member", exact: true });
     await expect(separate).toBeVisible(); await expect(separate).not.toBeChecked();
+    const pdf = textPdf("Download the assignment before joining your team.");
+    await responseJson(await teacherApi.post(`${authoring}/assignment-pdf`, { data: { fileName: "statement.pdf", mimeType: "application/pdf", base64: pdf.toString("base64") } }));
+    await responseJson(await teacherApi.post(`${authoring}/provided-files`, { data: { fileName: "starter.h", mimeType: "text/plain", base64: Buffer.from("int solve(int x);").toString("base64") } }));
     await responseJson(await teacherApi.put(`${authoring}/workflow-settings`, { data: { selected: [] } }));
     await responseJson(await teacherApi.post(`${authoring}/prepare-references`, { data: {} }));
     await responseJson(await teacherApi.put(`${authoring}/workflow-settings`, { data: { enabled: true } }));
@@ -62,8 +69,48 @@ test("team configuration uses core section settings and permits independent unte
     await studentPage.getByRole("button", { name: "Answer challenge questions", exact: true }).click();
     await expect(studentPage.getByRole("heading", { name: "Challenge questions", exact: true })).toBeVisible();
     await studentPage.screenshot({ path: "tmp/homework-team-answering.png", fullPage: true });
-    const blocked = await responseJson<{ teamwork: { canSubmit: boolean }; submission: unknown }>(await student.get(`${course}/groups/${data.groupId}/activities/assigned/${activityId}/coding-homework-grader/workspace`));
+    const blockedEndpoint = `${course}/groups/${data.groupId}/activities/assigned/${activityId}/coding-homework-grader`;
+    const blocked = await responseJson<{ teamwork: { canSubmit: boolean; contextKey: string }; submission: unknown }>(await student.get(`${blockedEndpoint}/workspace`));
     expect(blocked).toMatchObject({ teamwork: { canSubmit: false }, submission: null });
+    let preparationReads = 0;
+    studentPage.on("request", request => { if (request.url().endsWith(`${blockedEndpoint}/preparation`)) preparationReads++; });
+    await studentPage.goto(blockedEndpoint.replace(/^\/api/, "").replace(/\/coding-homework-grader$/, ""));
+    const notice = studentPage.getByText("You are not a member of a team. You must join a team before you can upload files or submit this homework. You can still download the assignment and provided files.", { exact: true });
+    await expect(notice).toBeVisible();
+    await expect(studentPage.getByRole("heading", { name: "Prepare your work", exact: true })).toHaveCount(0);
+    await expect(studentPage.locator('input[type="file"]')).toHaveCount(0);
+    await expect(studentPage.getByRole("button", { name: /Check my submission|Submit my work|Remove all files/ })).toHaveCount(0);
+    await expect(studentPage.getByText("Individual workspace", { exact: true })).toHaveCount(0);
+    const pdfDownload = studentPage.waitForEvent("download");
+    await studentPage.getByRole("link", { name: "Download assignment", exact: true }).click();
+    expect(await readFile((await (await pdfDownload).path())!)).toEqual(pdf);
+    const zipDownload = studentPage.waitForEvent("download");
+    await studentPage.getByRole("link", { name: "Download provided files (ZIP)", exact: true }).click();
+    const starter = unzipSync(await readFile((await (await zipDownload).path())!));
+    expect(Buffer.from(starter["starter.h"]).toString()).toBe("int solve(int x);");
+    await studentPage.waitForResponse(response => response.url().endsWith(`${blockedEndpoint}/workspace`) && response.ok());
+    expect(preparationReads).toBe(0);
+    const blockedFile = { contextKey: blocked.teamwork.contextKey, kind: "file", path: "main.c", base64: Buffer.from("int solve(int x) { return x; }").toString("base64"), expectedRevision: 0 };
+    for (const response of [await student.get(`${blockedEndpoint}/preparation`), await student.post(`${blockedEndpoint}/preparation`, { data: blockedFile }),
+      await student.delete(`${blockedEndpoint}/preparation`, { data: { all: true, expectedRevision: 0, contextKey: blocked.teamwork.contextKey } }),
+      await student.get(`${blockedEndpoint}/prepared-file?path=main.c`), await student.post(`${blockedEndpoint}/hand-in`, { data: { expectedRevision: 0, contextKey: blocked.teamwork.contextKey } })]) {
+      expect(response.status()).toBe(403); expect(await response.json()).toMatchObject({ error: { code: "HOMEWORK_TEAM_REQUIRED" } });
+    }
+    expect((await student.post(`${blockedEndpoint}/preflight`, { data: {} })).status()).toBe(409);
+    expect(await prisma.$queryRaw`SELECT id FROM "PluginCodingHomeworkWorkspace" WHERE "activityId"=${activityId} AND "groupId"=${data.groupId}`).toEqual([]);
+    await studentPage.screenshot({ path: "tmp/homework-team-required.png", fullPage: true });
+    // Joining unlocks preparation on the open page; leaving closes it and revokes stale uploads.
+    const participant = await prisma.courseGroupParticipant.findFirstOrThrow({ where: { groupId: data.groupId, email: credentialsFor("student").email } });
+    const { groupings } = await responseJson<{ groupings: StudentGroupingDto[] }>(await teacherApi.get(`${course}/groups/${data.groupId}/groupings`));
+    const grouping = groupings.find(grouping => grouping.id === first.id)!;
+    const { grouping: joined } = await responseJson<{ grouping: StudentGroupingDto }>(await teacherApi.patch(`${course}/groups/${data.groupId}/groupings/${first.id}`, { data: { ...grouping, teams: [{ title: "New team", participantIds: [participant.id] }] } }));
+    await expect(studentPage.getByRole("heading", { name: "Prepare your work", exact: true })).toBeVisible();
+    await studentPage.locator('input[type="file"][multiple]').setInputFiles({ name: "main.c", mimeType: "text/plain", buffer: Buffer.from("int solve(int x) { return x; }") });
+    await expect(studentPage.getByRole("tab", { name: /main.c/ })).toBeVisible();
+    const oldWorkspace = await responseJson<{ teamwork: { contextKey: string } }>(await student.get(`${blockedEndpoint}/workspace`));
+    await responseJson(await teacherApi.patch(`${course}/groups/${data.groupId}/groupings/${first.id}`, { data: { ...joined, teams: joined.teams.map(team => ({ ...team, participantIds: [] })) } }));
+    await expect(notice).toBeVisible(); await expect(studentPage.locator('input[type="file"]')).toHaveCount(0);
+    expect((await student.post(`${blockedEndpoint}/preparation`, { data: { ...blockedFile, contextKey: oldWorkspace.teamwork.contextKey, expectedRevision: 1 } })).status()).toBe(403);
     await responseJson(await teacherApi.delete(`${authoring}/manage-submissions`, { data: { submissionId: submission.id, reason: "Complete test" } }));
   } finally {
     if (activityId) await prisma.backgroundJob.deleteMany({ where: { payload: { path: ["activityId"], equals: activityId } } });
