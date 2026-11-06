@@ -75,6 +75,7 @@ export function CodingHomeworkManualGradingPanel({ embedded = false, locale, rea
       <div className="answer-meta">
         {selectedAttempt && <><strong>{t("courseDetail.submissionAnswerLabel", { id: String(selectedAttempt.attemptNumber ?? selectedAttempt.id.slice(-6)) })}</strong>
           <span className="muted">{selectedAttempt.submittedAt ? new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(selectedAttempt.submittedAt)) : ""}</span></>}
+        {Boolean(selectedAttempt?.metadata.automaticHandIn) && <span>{submissionDeadlineCopy(locale).automatic}</span>}
         {submissionTiming?.isLate && <strong>{submissionDeadlineCopy(locale).lateBy.replace("{duration}", formatHomeworkLateness(submissionTiming.lateByMs, locale))}</strong>}
       </div>
       <div className="row">

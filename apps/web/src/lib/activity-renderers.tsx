@@ -1501,7 +1501,7 @@ type SubmissionManagementProps = { activityTypeKey: string; activityId: string; 
 const submissionManagementRenderers: Record<string, ComponentType<SubmissionManagementProps>> = {
   "coding-homework-submission-management": function HomeworkManagementRenderer({ activityId, courseId, groupId, locale, onChanged }) {
     const request = useMemo(() => <T,>(route: string, init?: RequestInit) => apiRequest<T>(`/courses/${courseId}/${groupId ? `groups/${groupId}/activities/assigned` : "activities"}/${activityId}/coding-homework-grader/${route}`, init), [activityId, courseId, groupId]);
-    return <HomeworkSubmissionManagement request={request} locale={locale} onChanged={onChanged} />;
+    return <HomeworkSubmissionManagement request={request} locale={locale} onChanged={onChanged} recoverAutomatic />;
   }
 };
 export function ActivitySubmissionManagement(props: SubmissionManagementProps) {

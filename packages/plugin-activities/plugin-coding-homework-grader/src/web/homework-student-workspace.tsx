@@ -55,6 +55,11 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   }, [request]);
   useEffect(() => { let mounted = true; void Promise.all([refresh(), request<CodingHomeworkStudentAssignment>("assignment").then(value => { if (mounted) setAssignment(value); })]).catch(reason => { if (mounted) showError(reason); }); return () => { mounted = false; controller.current?.abort(); }; }, [request, refresh, showError]);
   useEffect(() => { const timer = setInterval(() => { void refresh(false).catch(() => {}); }, 4000); return () => clearInterval(timer); }, [refresh]);
+  const automaticErrorNotified = useRef(false);
+  useEffect(() => {
+    if (workspace?.automaticSubmissionIssue && !automaticErrorNotified.current) notifications.error(deadlineCopy.autoFailed);
+    automaticErrorNotified.current = Boolean(workspace?.automaticSubmissionIssue);
+  }, [workspace?.automaticSubmissionIssue, notifications, deadlineCopy.autoFailed]);
   const active = workspace?.submission;
   const activeId = active?.id;
   useEffect(() => { setQuestions([]); setAnswers({}); setCheckedPreparation(null); setSubmittedCheck(null); setAcknowledged(false); setConfirmingAnswers(false); dirty.current = false; }, [active?.id]);
@@ -134,9 +139,11 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     {(active?.submissionTiming?.deadline ?? (!active ? policy.deadline : null)) && <div className="stack" role="status">
       <p><strong>{deadlineCopy.deadline}: </strong><AppDateTime value={(active?.submissionTiming?.deadline ?? policy.deadline)!} locale={locale} /> ({timeZone})</p>
       {!active && <p>{policy.allowLate ? submissionWindow.closesAt ? <>{deadlineCopy.closes}: <AppDateTime value={submissionWindow.closesAt} locale={locale} /> ({timeZone})</> : deadlineCopy.unlimited : deadlineCopy.noLate}</p>}
+      {!active && submissionWindow.closesAt && workspace?.submissionsEnabled && workspace?.teamwork?.canSubmit !== false && <p>{deadlineCopy.autoNotice}</p>}
       {!active && submissionWindow.closed && <p><strong>{deadlineCopy.closed}</strong></p>}
       {!active && submissionWindow.isLate && !submissionWindow.closed && <p>{deadlineCopy.lateNow}</p>}
     </div>}
+    {active?.automaticHandIn && <div role="status"><strong>{deadlineCopy.automatic}</strong>{active.incompleteAcknowledged && <p>{deadlineCopy.autoIncomplete}</p>}</div>}
     {active?.submissionTiming?.isLate && <p role="status"><strong>{deadlineCopy.lateBy.replace("{duration}", formatHomeworkLateness(active.submissionTiming.lateByMs, locale))}</strong></p>}
     {!workspace ? <p>{copy.loading}</p> : workspace.teamwork?.canSubmit === false ? <div className="preview-panel" role="status"><strong>{copy.teamRequired}</strong></div> : <>
     {workspace?.previousCancelled && <p role="status">{copy.cancelled}</p>}
@@ -154,7 +161,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
         <p className="row"><ActionIcon name={submittedCheck.readiness.canSubmit && !submittedCheck.readiness.requiresAcknowledgement ? "check" : "alert"} /><strong>{submittedCheck.readiness.canSubmit && !submittedCheck.readiness.requiresAcknowledgement ? copy.structureValid : copy.structureInvalid}</strong></p>
         {submittedCheck.validation.issues.length > 0 && <ul>{submittedCheck.validation.issues.map((issue, index) => <li key={index}>{issue.message}</li>)}</ul>}
       </div>}
-    </> : <>
+    </> : !submissionWindow.closed ? <>
       <div className="row">
         <label className="button secondary"><ActionIcon name="upload" /> {copy.upload}<input type="file" multiple hidden disabled={!preparation || Boolean(busy)} onChange={event => { void upload(event.target.files, false); event.target.value = ""; }} /></label>
         <label className="button secondary"><ActionIcon name="upload" /> {copy.zip}<input type="file" accept=".zip" hidden disabled={!preparation || Boolean(busy)} onChange={event => { void upload(event.target.files, true); event.target.value = ""; }} /></label>
@@ -164,9 +171,9 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
           await run(copy.removeAllFiles, async signal => { setPreparation(await request("preparation", body("DELETE", { ...(workspace?.teamwork ? { contextKey: workspace.teamwork.contextKey } : {}), all: true, expectedRevision: preparation.draft.revision }, signal))); });
         }}><ActionIcon name="remove" /> {copy.removeAllFiles}</button>
       </div>
-    </>}
+    </> : null}
     <HomeworkFileViewer key={`${workspace?.teamwork?.contextKey ?? "individual"}:${active?.id ?? "draft"}`} files={files} request={request} locale={locale} submitted={Boolean(active)} revision={active ? undefined : preparation?.draft.revision} busy={Boolean(busy)}
-      onDelete={!active && preparation ? async path => {
+      onDelete={!active && preparation && !submissionWindow.closed ? async path => {
         if (!await dialogs.confirm({ title: copy.removeFile, message: copy.removePreparedFileConfirm.replace("{path}", path), confirmLabel: copy.remove, confirmVariant: "danger" })) return;
         invalidateCheck();
         await run(copy.remove, async signal => { setPreparation(await request("preparation", body("DELETE", { ...(workspace?.teamwork ? { contextKey: workspace.teamwork.contextKey } : {}), path, expectedRevision: preparation.draft.revision }, signal))); });
@@ -183,6 +190,10 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
       {hasCurrentCheck && <div role={structureValid ? "status" : "alert"} className="stack">
         <p className={`row ${structureValid ? "success-message" : "error"}`}><ActionIcon name={structureValid ? "check" : "alert"} /><strong>{structureValid ? copy.structureValid : copy.structureInvalid}</strong></p>
         {!structureValid && <ul>{preparation.validation.issues.map((issue, index) => <li key={index}>{issue.path && !issue.message.includes(issue.path) ? `${issue.path}: ` : ""}{issue.message}</li>)}</ul>}
+      </div>}
+      {hasCurrentCheck && <div className="preview-panel homework-not-submitted" role="status">
+        <p className="row"><ActionIcon name="alert" /><strong>{deadlineCopy.notSubmitted}</strong></p>
+        <p>{submissionWindow.closed ? workspace?.automaticSubmissionIssue ? deadlineCopy.autoFailed : deadlineCopy.autoNotice : deadlineCopy.submitReminder.replace("{submit}", copy.handIn)}</p>
       </div>}
       {hasCurrentCheck && preparation.readiness.canSubmit && preparation.readiness.requiresAcknowledgement && <label className="homework-choice"><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /> {copy.incomplete}</label>}
       {!workspace?.submissionsEnabled && <p role="status">{copy.closed}</p>}
