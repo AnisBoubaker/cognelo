@@ -1,3 +1,5 @@
+import { acceptHomeworkSubmissionTiming } from "./submission-window";
+import { lockHomeworkSettings } from "./workflow-settings";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -97,6 +99,9 @@ export async function uploadHomeworkPreparation(scope: HomeworkStudentScope, inp
     const incoming = zip ? zip.entries : [{ path: normalizeHomeworkPath(data.path ?? data.fileName ?? ""), isDirectory: data.kind === "folder", content: bytes,
       compressedSize: bytes?.length ?? 0, uncompressedSize: bytes?.length ?? 0 }];
     await prisma.$transaction(async tx => {
+      await lockHomeworkSettings(tx, scope.activityId);
+      const assignment = await tx.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId } });
+      acceptHomeworkSubmissionTiming(assignment?.settings);
       await lockHomeworkWorkflow(tx, scope);
       await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, incoming.reduce((sum, file) => sum + file.uncompressedSize, 0));
       await assertHomeworkDraftWritable(tx, scope);
@@ -104,7 +109,8 @@ export async function uploadHomeworkPreparation(scope: HomeworkStudentScope, inp
         create: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id }, update: {} });
       if (draft.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "Your prepared files changed. Reload them before uploading.");
       const next = await applyHomeworkPreparedUpload(draft, data, incoming, requirements, written);
-      await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { files: json(next.files), folders: json(next.folders), revision: { increment: 1 } } });
+      const preparedAt = acceptHomeworkSubmissionTiming(assignment?.settings).submittedAt;
+      await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { updatedAt: new Date(preparedAt), files: json(next.files), folders: json(next.folders), revision: { increment: 1 } } });
       obsolete.push(...next.obsolete);
     }, { timeout: 30_000, maxWait: 30_000 });
     committed = true;
@@ -121,6 +127,9 @@ export async function removeHomeworkPreparedFile(scope: HomeworkStudentScope, in
     z.object({ all: z.literal(true), expectedRevision: z.number().int().min(0) }).strict()
   ]).parse(input);
   const removed = await prisma.$transaction(async tx => {
+    await lockHomeworkSettings(tx, scope.activityId);
+    const assignment = await tx.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId } });
+    acceptHomeworkSubmissionTiming(assignment?.settings);
     await lockHomeworkWorkflow(tx, scope); await assertHomeworkDraftWritable(tx, scope);
     const draft = await tx.pluginCodingHomeworkDraft.findUnique({ where: { activityId_groupId_userId: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id } } });
     if (!draft || draft.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "Your prepared files changed. Reload them first.");
@@ -128,7 +137,8 @@ export async function removeHomeworkPreparedFile(scope: HomeworkStudentScope, in
     const clearAll = "all" in data;
     const targets = clearAll ? files : files.filter(file => file.path === data.path);
     const removedPaths = targets.map(file => draftFilePath(draft.id, file.storedName));
-    await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { files: json(clearAll ? [] : files.filter(file => file.path !== data.path)),
+    const preparedAt = acceptHomeworkSubmissionTiming(assignment?.settings).submittedAt;
+    await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { updatedAt: new Date(preparedAt), files: json(clearAll ? [] : files.filter(file => file.path !== data.path)),
       ...(clearAll ? { folders: json([]) } : {}), revision: { increment: 1 } } });
     return removedPaths;
   });

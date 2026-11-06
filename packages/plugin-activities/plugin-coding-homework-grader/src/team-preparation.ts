@@ -1,3 +1,5 @@
+import { acceptHomeworkSubmissionTiming } from "./submission-window";
+import { lockHomeworkSettings } from "./workflow-settings";
 import { unlink } from "node:fs/promises";
 import { z } from "zod";
 import { AppError, teamworkTransaction } from "@cognelo/core";
@@ -41,11 +43,15 @@ export async function uploadTeamHomeworkPreparation(scope: HomeworkStudentScope,
     if (zip?.diagnostics.some(issue => issue.severity === "error")) throw new AppError(400, "HOMEWORK_ZIP_INVALID", "The ZIP could not be safely read.", { issues: zip.diagnostics });
     const incoming = zip ? zip.entries : [{ path: normalizeHomeworkPath(data.path ?? data.fileName ?? ""), isDirectory: data.kind === "folder", content: bytes, compressedSize: bytes?.length ?? 0, uncompressedSize: bytes?.length ?? 0 }];
     await withHomeworkTeamWorkspace(scope, async (tx, access) => {
+      await lockHomeworkSettings(tx, scope.activityId);
+      const [assignment] = await tx.$queryRaw<Array<{ settings: unknown }>>`SELECT settings FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${scope.activityId}`;
+      acceptHomeworkSubmissionTiming(assignment?.settings);
       assertWritable(access, data.contextKey);
       if (access.workspace.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "The shared files changed. Reload them before uploading.");
       await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, incoming.reduce((sum, entry) => sum + entry.uncompressedSize, 0));
       const update = await applyHomeworkPreparedUpload(access.workspace, data, incoming, requirements, written);
-      await tx.$executeRaw`UPDATE "PluginCodingHomeworkWorkspace" SET files=${JSON.stringify(update.files)}::jsonb, folders=${JSON.stringify(update.folders)}::jsonb, revision=revision+1,"updatedAt"=NOW() WHERE id=${access.workspace.id}`;
+      const preparedAt = acceptHomeworkSubmissionTiming(assignment?.settings).submittedAt;
+      await tx.$executeRaw`UPDATE "PluginCodingHomeworkWorkspace" SET files=${JSON.stringify(update.files)}::jsonb, folders=${JSON.stringify(update.folders)}::jsonb, revision=revision+1,"updatedAt"=${new Date(preparedAt)} WHERE id=${access.workspace.id}`;
       const sql = teamworkTransaction(tx);
       for (const change of update.changes) await auditHomeworkWorkspace(sql, access.workspace, scope.user, change.operation, { ...change, metadata: { revision: access.workspace.revision + 1 } });
       if (data.kind === "zip" || data.kind === "folder") await auditHomeworkWorkspace(sql, access.workspace, scope.user, data.kind === "zip" ? "zip_replaced" : "folder_added", { path: data.kind === "folder" ? data.path : undefined, metadata: { revision: access.workspace.revision + 1, fileCount: update.files.length } });
@@ -60,12 +66,16 @@ export async function uploadTeamHomeworkPreparation(scope: HomeworkStudentScope,
 export async function removeTeamHomeworkPreparedFile(scope: HomeworkStudentScope, input: unknown) {
   const data = z.union([z.object({ path: z.string().min(1).max(500), expectedRevision: z.number().int().min(0), contextKey: z.string().max(200).optional() }).strict(), z.object({ all: z.literal(true), expectedRevision: z.number().int().min(0), contextKey: z.string().max(200).optional() }).strict()]).parse(input);
   const removed = await withHomeworkTeamWorkspace(scope, async (tx, access) => {
+    await lockHomeworkSettings(tx, scope.activityId);
+    const [assignment] = await tx.$queryRaw<Array<{ settings: unknown }>>`SELECT settings FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${scope.activityId}`;
+    acceptHomeworkSubmissionTiming(assignment?.settings);
     assertWritable(access, data.contextKey);
     if (access.workspace.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "The shared files changed. Reload them before removing files.");
     const files = draftFiles(access.workspace.files), clear = "all" in data;
     const removed = clear ? files : files.filter(file => file.path === data.path);
+    const preparedAt = acceptHomeworkSubmissionTiming(assignment?.settings).submittedAt;
     await tx.$executeRaw`UPDATE "PluginCodingHomeworkWorkspace" SET files=${JSON.stringify(clear ? [] : files.filter(file => file.path !== data.path))}::jsonb,
-      folders=${JSON.stringify(clear ? [] : access.workspace.folders)}::jsonb, revision=revision+1,"updatedAt"=NOW() WHERE id=${access.workspace.id}`;
+      folders=${JSON.stringify(clear ? [] : access.workspace.folders)}::jsonb, revision=revision+1,"updatedAt"=${new Date(preparedAt)} WHERE id=${access.workspace.id}`;
     for (const file of removed) await auditHomeworkWorkspace(teamworkTransaction(tx), access.workspace, scope.user, "file_deleted", { path: file.path, previousHash: file.sha256, metadata: { revision: access.workspace.revision + 1 } });
     if (clear) await auditHomeworkWorkspace(teamworkTransaction(tx), access.workspace, scope.user, "files_cleared", { metadata: { revision: access.workspace.revision + 1, fileCount: removed.length } });
     return removed.map(file => draftFilePath(access.workspace.id, file.storedName));

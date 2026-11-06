@@ -1,5 +1,5 @@
 import { readHomeworkSubmissionPolicy, readHomeworkSubmissionTiming } from "./submission-policy";
-import { acceptHomeworkSubmissionTiming } from "./submission-window";
+import { acceptHomeworkSubmissionTiming, automaticHomeworkTiming, assertAutomaticHomeworkDraft, type AutomaticHomeworkHandIn } from "./submission-window";
 import { randomUUID, createHash } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -24,29 +24,34 @@ export async function currentTeamSubmission(sql: TeamSql, access: TeamHomeworkAc
   return submission ?? null;
 }
 
-export async function handInTeamHomework(scope: HomeworkStudentScope, input: unknown) {
+export async function handInTeamHomework(scope: HomeworkStudentScope, input: unknown, automatic?: AutomaticHomeworkHandIn) {
   const data = z.object({ expectedRevision: z.number().int().min(0), contextKey: z.string().max(200).optional(), acknowledgeIncomplete: z.boolean().default(false), locale: z.enum(["en", "fr", "zh", "ar"]).default("en") }).strict().parse(input);
   const sourceId = randomUUID(), directory = path.join(homeworkStorageRoot(), "submissions", sourceId);
   let committed = false;
   try {
     await withHomeworkTeamWorkspace(scope, async (tx, access) => {
-      assertTeamContext(access, data.contextKey);
+      if (automatic) { if (access.workspace.id !== automatic.workspaceId) throw new AppError(409, "HOMEWORK_MEMBERSHIP_CHANGED", "The student's team workspace changed."); }
+      else assertTeamContext(access, data.contextKey);
       if (access.workspace.currentSubmissionId) return; // A teammate may have just handed in this workspace.
       if (!access.context.teamId && !access.context.allowIndividualSubmission) throw new AppError(403, "HOMEWORK_TEAM_REQUIRED", "Join a team before submitting this homework.");
-      const availability = await getActivityAttemptAvailability(scope.user, scope);
-      if (!availability.canStart) throw new AppError(409, availability.reason ?? "HOMEWORK_ATTEMPT_UNAVAILABLE", "A new submission is not currently available.");
+      const availability = automatic ? null : await getActivityAttemptAvailability(scope.user, scope);
+      if (availability && !availability.canStart) throw new AppError(409, availability.reason ?? "HOMEWORK_ATTEMPT_UNAVAILABLE", "A new submission is not currently available.");
       await lockHomeworkSettings(tx, scope.activityId);
       const sql = teamworkTransaction(tx);
       const [assignment] = await sql.query<Array<{ promptMarkdown: string; candidateLimit: number; questionCount: number; retrievedExampleCount: number; generationInstructions: string; languageKey: string; settings: unknown }>>`SELECT * FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${scope.activityId}`;
       const settings = record(assignment?.settings);
       if (!assignment || settings.submissionsEnabled !== true || typeof settings.preparedSnapshotId !== "string") throw new AppError(409, "HOMEWORK_SUBMISSIONS_CLOSED", "Your teacher has not enabled final submissions yet.");
-      acceptHomeworkSubmissionTiming(settings);
+      if (automatic) automaticHomeworkTiming(settings, automatic); else acceptHomeworkSubmissionTiming(settings);
+      if (automatic) {
+        const [latest] = await sql.query<HomeworkSubmissionRow[]>`SELECT * FROM "PluginCodingHomeworkSubmission" WHERE "workspaceId"=${access.workspace.id} AND kind::text='team_source' ORDER BY "createdAt" DESC LIMIT 1`;
+        assertAutomaticHomeworkDraft(access.workspace, latest ?? null, automatic);
+      }
       if (access.workspace.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "The shared files changed. Check them again before submitting.");
       const entries = await readHomeworkDraftEntries(access.workspace), requirements = await getHomeworkRequirements(scope.activityId);
       const validation = await validateCodingHomeworkArchive({ entries, requirements, archiveSizeBytes: entries.reduce((sum, entry) => sum + entry.uncompressedSize, 0) });
       const readiness = codingHomeworkSubmissionReadiness(validation);
       if (!readiness.canSubmit) throw new AppError(400, "HOMEWORK_FILES_INVALID", "Resolve the file safety issues before submitting.");
-      if (readiness.requiresAcknowledgement && !data.acknowledgeIncomplete) throw new AppError(409, "HOMEWORK_INCOMPLETE_ACKNOWLEDGEMENT_REQUIRED", "Confirm that you are submitting incomplete work for your team.", { issues: readiness.incomplete });
+      if (readiness.requiresAcknowledgement && !data.acknowledgeIncomplete && !automatic) throw new AppError(409, "HOMEWORK_INCOMPLETE_ACKNOWLEDGEMENT_REQUIRED", "Confirm that you are submitting incomplete work for your team.", { issues: readiness.incomplete });
       await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, entries.reduce((sum, entry) => sum + entry.uncompressedSize, 0));
       const separateTeamQuestions = !access.context.teamId || settings.separateTeamQuestions === true;
       const metadata = { workflowVersion: 2, workspaceId: access.workspace.id, teamId: access.context.teamId, teamName: access.context.teamTitle, groupingId: access.context.groupingId,
@@ -56,8 +61,8 @@ export async function handInTeamHomework(scope: HomeworkStudentScope, input: unk
         questionGenerationAi: snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings)),
         requirements, folders: access.workspace.folders,
         assignment: { candidateLimit: assignment.candidateLimit, languageKey: assignment.languageKey, promptMarkdown: assignment.promptMarkdown, generationInstructions: assignment.generationInstructions, questionCount: assignment.questionCount, retrievedExampleCount: assignment.retrievedExampleCount } };
-      const submissionTiming = acceptHomeworkSubmissionTiming(settings);
-      Object.assign(metadata, { handInAt: submissionTiming.submittedAt, submissionTiming });
+      const submissionTiming = automatic ? automaticHomeworkTiming(settings, automatic) : acceptHomeworkSubmissionTiming(settings);
+      Object.assign(metadata, { handInAt: submissionTiming.submittedAt, submissionTiming, ...(automatic ? { automaticHandIn: { cutoff: automatic.cutoff, recoveredAt: new Date().toISOString(), triggeredBy: automatic.triggeredBy, acknowledgementSource: "automatic_deadline" } } : {}) });
       const [owner] = await sql.query<Array<{ createdById: string }>>`SELECT "createdById" FROM "Activity" WHERE id=${scope.activityId}`;
       const [source] = await sql.query<HomeworkSubmissionRow[]>`INSERT INTO "PluginCodingHomeworkSubmission" (id,"activityId","groupId","userId",kind,status,"documentationSnapshotId","structureValidationSummary",metadata,"workspaceId","updatedAt")
         VALUES (${sourceId},${scope.activityId},${scope.groupId},${owner.createdById},'team_source',${separateTeamQuestions ? "structure_valid" : "uploaded"}::"PluginCodingHomeworkSubmissionStatus",${settings.preparedSnapshotId},${JSON.stringify(validation)}::jsonb,${JSON.stringify(metadata)}::jsonb,${access.workspace.id},NOW()) RETURNING *`;
@@ -78,7 +83,7 @@ export async function handInTeamHomework(scope: HomeworkStudentScope, input: unk
       await auditHomeworkWorkspace(sql, workspace, scope.user, "submitted", { metadata: { sourceId, revision: workspace.revision, incompleteAcknowledged: readiness.requiresAcknowledgement, memberCount: participants.length, separateTeamQuestions } });
     });
     committed = true;
-    return getTeamHomeworkWorkspace(scope);
+    return automatic ? null : getTeamHomeworkWorkspace(scope);
   } finally { if (!committed) await rm(directory, { recursive: true, force: true }); }
 }
 
@@ -93,7 +98,7 @@ export async function getTeamHomeworkWorkspace(scope: HomeworkStudentScope) {
     const [cancelled] = await sql.query<Array<{ present: boolean }>>`SELECT EXISTS(SELECT 1 FROM "PluginCodingHomeworkSubmission" WHERE "workspaceMemberId"=${access.member.id} AND status='cancelled') AS present`;
     return { submissionPolicy: readHomeworkSubmissionPolicy(assignment?.settings), submissionsEnabled: record(assignment?.settings).submissionsEnabled === true, teamwork: teamWorkspaceProjection(access),
       previousCancelled: !submission && cancelled.present,
-      submission: submission ? { submissionTiming: readHomeworkSubmissionTiming(submission.metadata), id: submission.id, status: submission.status, createdAt: submission.createdAt.toISOString(), started: Boolean(record(submission.metadata).assessmentStartedAt), coreAttemptId: submission.coreAttemptId,
+      submission: submission ? { automaticHandIn: Boolean(record(submission.metadata).automaticHandIn), submissionTiming: readHomeworkSubmissionTiming(submission.metadata), id: submission.id, status: submission.status, createdAt: submission.createdAt.toISOString(), started: Boolean(record(submission.metadata).assessmentStartedAt), coreAttemptId: submission.coreAttemptId,
         processingStatus: job?.status ?? null, generationIssue: record(job?.error).code === "HOMEWORK_NO_ELIGIBLE_CODE" ? "no_eligible_code" : null, queuePosition: position,
         questionCount: Number(record(record(submission.metadata).assignment).questionCount ?? assignment?.questionCount ?? 3), files: files.map(file => ({ path: file.path, sizeBytes: Number(file.sizeBytes) })), incompleteAcknowledged: record(submission.metadata).incompleteAcknowledged === true } : null };
   }); } catch (error) {

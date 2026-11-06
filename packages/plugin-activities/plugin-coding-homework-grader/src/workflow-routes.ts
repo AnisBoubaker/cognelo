@@ -36,7 +36,7 @@ export const homeworkWorkflowRoutes: PluginRouteDefinition[] = [
     return checkSubmittedHomework(resolveStudentSubmissionScope(context), data.submissionId);
   } } }),
   route("manage-submissions", { methods: {
-    GET: async ({ context }) => { if (!context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "A course is required."); return listHomeworkSubmissions({ user: context.user, courseId: context.courseId, activityId: context.activity.id }, context.groupId); },
+    GET: async ({ context, request }) => { if (!context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "A course is required."); return listHomeworkSubmissions({ user: context.user, courseId: context.courseId, activityId: context.activity.id }, context.groupId, new URL(request.url).searchParams.get("recoverAutomatic") === "1"); },
     DELETE: async ({ context, readJson }) => { if (!context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "A course is required."); return cancelHomeworkSubmission({ user: context.user, courseId: context.courseId, activityId: context.activity.id }, await readJson()); },
     POST: async ({ context, readJson }) => {
       if (!context.courseId) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "A course is required.");
