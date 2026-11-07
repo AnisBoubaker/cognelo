@@ -25,6 +25,7 @@ All routes are under `coding-homework-grader/` and retain the host's course/grou
 | `preparation` GET/POST/DELETE | Metadata/validation, file/ZIP/folder upload and file removal or `{ all: true, expectedRevision }` bulk removal with revision checks. |
 | `prepared-file` GET | Read-only preview of a prepared file. |
 | `teacher-solution` GET/PUT/DELETE; `select-functions` POST | Private solution upload/replacement/removal and known-function AI selection. |
+| `simulation` POST | Manager-only transient challenge generation from the saved private teacher solution; no student academic writes. |
 | `workflow-settings` GET/PUT | Generation model, bounded concurrency, manual opening and file submission policy; legacy reference reads/selection saves delegate to core. |
 | `reference-preview` GET | Compatibility alias delegating to the generic core reference preview. |
 | `prepare-material` POST; `prepare-references` POST | Compatibility aliases delegating indexing/snapshot completion to core. |
@@ -226,6 +227,12 @@ The shared deferred-assessment contract lets this activity declare preparation r
 ## Explicit AI choices
 
 The protected `questionGenerationAi` setting remains activity-owned and accepts only core-validated model selections. New `embeddingAi` writes through homework reject with `COURSE_EMBEDDING_SETTINGS_REQUIRED`; the teacher saves the course-wide setting through core. Historical embedding fields remain for snapshot compatibility. Generic authoring saves cannot inject either setting. Generation changes affect only future hand-ins and do not invalidate references. Course embedding changes invalidate preparation for disabled activities; enabled homework and existing hand-ins retain their pinned models/indexes. Bank copies strip course references/explicit choices. Core enforces active ownership, catalogue purpose and endpoint identity. See [AI connection contracts](../../../../docs/AI_MODEL_CONNECTIONS.md).
+
+## Teacher Simulation
+
+The course-only Simulation tab uses the saved private teacher solution and the same prepared question generator as real student hand-ins. It applies the saved question model, count, candidate/retrieval limits and generation instructions, the Subject teaching language and unchanged-provided-code exclusion. Selected references must be prepared; empty references are allowed. Activity/reference drafts must be saved, and the server rejects results if saved inputs change during generation. Final submission opening is not required.
+
+Results remain in the editor only and display numbered questions with read-only teacher-solution code. The operation never writes student drafts, submissions, challenge-question rows, core attempts or grades, and never includes retrieved private excerpts in its response. Normal query-vector cache reuse is permitted. A blocking progress dialog includes Cancel, which propagates to provider transport and ignores late responses while preserving previous completed results. Leaving the editor aborts the request and discards results. See [core integration and limits](../../../../docs/ACTIVITY_MATERIAL_REFERENCES.md#homework-simulation).
 
 ## Challenge code context, instructions and teaching language
 

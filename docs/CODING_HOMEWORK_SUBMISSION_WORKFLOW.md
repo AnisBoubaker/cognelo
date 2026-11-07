@@ -27,6 +27,8 @@ The user expanded the provider requirement: choose any configured supported mode
 
 The entire reference-material selection/preparation/preview UI belongs to core, activated by an activity capability. Its Reference materials tab has an independent Save/Cancel bar, search, folder expansion, hidden labels and readiness. Generate embeddings is part of this tab. The embedding connection/model is configured once for the course and reused across subscribing activities; the activity retains only its question-generation model. Enabled homework keeps pinned references, while disabled activities must prepare against a changed course model before opening. See [shared reference services](ACTIVITY_MATERIAL_REFERENCES.md).
 
+A course-only **Simulation** tab generates teacher-visible sample questions from the saved private solution using the real question generator. It respects saved instructions, the course language and prepared references, excludes unchanged provided code, supports Cancel and creates no student academic records. Results are transient.
+
 ## Scope
 
 - Support **C** for this delivery, with approximately **30 students submitting at a time**.

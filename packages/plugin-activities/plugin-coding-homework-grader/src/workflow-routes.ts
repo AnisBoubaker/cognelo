@@ -13,6 +13,7 @@ async function teacherScope(context: PluginRouteContext) {
 }
 const route = (path: string, value: Omit<PluginRouteDefinition, "path" | "activityTypeKeys">): PluginRouteDefinition => ({ path: `coding-homework-grader/${path}`, activityTypeKeys: ["coding-homework-grader"], ...value });
 export const homeworkWorkflowRoutes: PluginRouteDefinition[] = [
+  route("simulation", { methods: { POST: async ({ context, readJson, request }) => (await import("./simulation")).simulateHomeworkQuestions(await teacherScope(context), await readJson(), request.signal) } }),
   route("workflow-settings", { methods: {
     GET: async ({ context }) => getHomeworkWorkflowSettings(await teacherScope(context)),
     PUT: async ({ context, readJson }) => updateHomeworkWorkflowSettings(await teacherScope(context), await readJson())

@@ -1,6 +1,7 @@
 "use client";
 import { homeworkWorkflowCopy } from "./workflow-copy";
 
+import { HomeworkSimulation } from "./homework-simulation";
 import { HomeworkDownloads } from "./homework-downloads";
 import { HomeworkChallengeQuestion } from "./homework-challenge-question";
 import { HomeworkAnswerConfirmation } from "./homework-answer-confirmation";
@@ -176,6 +177,7 @@ function LegacyCodingHomeworkActivityView({
   authoringClient,
   workflowRequest,
   authoringSettingsPortalTarget,
+  authoringSimulationPortalTarget,
   solutionRequest,
   canManage,
   locale = "en",
@@ -199,6 +201,7 @@ function LegacyCodingHomeworkActivityView({
   const [requirementsUpload, setRequirementsUpload] = useState<CodingHomeworkAttachmentRecord | null>(null);
   const [providedFiles, setProvidedFiles] = useState<CodingHomeworkAttachmentRecord[]>([]);
   const [loading, setLoading] = useState(Boolean(canManage && authoringClient));
+  const [workflowSettingsDirty, setWorkflowSettingsDirty] = useState(false);
   const [documentationPreview, setDocumentationPreview] = useState<CodingHomeworkDocumentationPreview | null>(null);
   const [loadingDocumentation, setLoadingDocumentation] = useState(false);
   const [showDocumentationProgress, setShowDocumentationProgress] = useState(false);
@@ -808,7 +811,7 @@ function LegacyCodingHomeworkActivityView({
       saveLabel={copy.save} savingLabel={actionCopy.saving} cancelLabel={actionCopy.cancel} onCancel={discardChanges}
       onSave={() => saveHomework()} saveDisabled={!authoringClient || !onSave} />
   </section>;
-  const workflowSettings = workflowRequest ? <HomeworkTeacherWorkflow key="homework-settings" request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} settingsPortalTarget={authoringSettingsPortalTarget} generationSettings={loading ? null : generationSettings} managementRevision={managementRevision} /> : null;
+  const workflowSettings = workflowRequest ? <HomeworkTeacherWorkflow key="homework-settings" request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} settingsPortalTarget={authoringSettingsPortalTarget} generationSettings={loading ? null : generationSettings} managementRevision={managementRevision} onDirtyChange={setWorkflowSettingsDirty} /> : null;
 
   if (loading) {
     return (
@@ -1125,6 +1128,7 @@ function LegacyCodingHomeworkActivityView({
       </form>
       {workflowRequest && <HomeworkSubmissionManagement request={workflowRequest} locale={locale} onChanged={() => setManagementRevision(value => value + 1)} />}
       {workflowSettings}
+      {workflowRequest && authoringSimulationPortalTarget ? createPortal(<HomeworkSimulation key={activity.id} request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges || workflowSettingsDirty} />, authoringSimulationPortalTarget) : null}
       {authoringSettingsPortalTarget ? createPortal(teacherProgress, authoringSettingsPortalTarget.ownerDocument.body) : teacherProgress}
     </>
   );

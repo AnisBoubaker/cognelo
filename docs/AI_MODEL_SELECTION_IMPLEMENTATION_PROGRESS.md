@@ -2,6 +2,8 @@
 
 User requested November 2, 2026: choose configured models directly in homework, allow providers beyond OpenAI, and reuse one saved credential across multiple models. Reasonable implementation choices and incremental commits are authorized. Do not deploy or test production; do not expose/copy stored tokens.
 
+The [November 6 shared-reference update](ACTIVITY_MATERIAL_REFERENCES.md) supersedes the original per-homework embedding picker/lock: new preparation uses one course-wide choice, while enabled activities and submitted work retain their pinned model. The generation-model and connection contracts below remain in effect.
+
 ## Plan and current state
 
 - Added additive schema fields: connection model catalog (`models` JSON) and prepared-index embedding configuration (`embeddingConfig` JSON). Existing default model/credentials remain intact; empty legacy catalogs retain compatibility defaults.

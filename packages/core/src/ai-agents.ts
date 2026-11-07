@@ -255,6 +255,7 @@ export async function generateQuestionAuthoringText(
     systemPrompt: string;
     userPrompt: string;
     maxOutputTokens?: number;
+    signal?: AbortSignal;
   }
 ) {
   const connection = await getQuestionAuthoringAiAgentConnection(user);
@@ -273,6 +274,7 @@ export async function generateAiAgentText(
     systemPrompt: string;
     userPrompt: string;
     maxOutputTokens?: number;
+    signal?: AbortSignal;
   }
 ) {
   return callAiAgent(connection, input);
@@ -398,6 +400,7 @@ async function callAiAgent(
     systemPrompt: string;
     userPrompt: string;
     maxOutputTokens?: number;
+    signal?: AbortSignal;
   }
 ) {
   const owner = connection.ownerId ? await prisma.user.findUnique({ where: { id: connection.ownerId }, select: { isActive: true, roles: { include: { role: true } } } }) : null;
@@ -414,10 +417,11 @@ async function callAiAgent(
 
 async function callOpenAiCompatible(
   connection: { model: string; baseUrl: string | null; apiKey: string | null; allowPrivate?: boolean },
-  input: { systemPrompt: string; userPrompt: string; maxOutputTokens?: number }
+  input: { systemPrompt: string; userPrompt: string; maxOutputTokens?: number; signal?: AbortSignal }
 ) {
   const baseUrl = normalizeBaseUrl(connection.baseUrl ?? "https://api.openai.com/v1");
   const response = await fetchAiResponse(`${baseUrl}/responses`, {
+    ...(input.signal ? { signal: input.signal } : {}),
     headers: {
       "Authorization": `Bearer ${connection.apiKey}`,
       "Content-Type": "application/json"
@@ -435,10 +439,11 @@ async function callOpenAiCompatible(
 
 async function callClaude(
   connection: { model: string; baseUrl: string | null; apiKey: string | null; allowPrivate?: boolean },
-  input: { systemPrompt: string; userPrompt: string; maxOutputTokens?: number }
+  input: { systemPrompt: string; userPrompt: string; maxOutputTokens?: number; signal?: AbortSignal }
 ) {
   const baseUrl = normalizeBaseUrl(connection.baseUrl ?? "https://api.anthropic.com/v1");
   const response = await fetchAiResponse(`${baseUrl}/messages`, {
+    ...(input.signal ? { signal: input.signal } : {}),
     headers: {
       "x-api-key": connection.apiKey ?? "",
       "anthropic-version": "2023-06-01",
@@ -457,10 +462,11 @@ async function callClaude(
 
 async function callOllama(
   connection: { model: string; baseUrl: string | null; apiKey?: string | null; allowPrivate?: boolean },
-  input: { systemPrompt: string; userPrompt: string }
+  input: { systemPrompt: string; userPrompt: string; signal?: AbortSignal }
 ) {
   const baseUrl = normalizeBaseUrl(connection.baseUrl ?? "http://localhost:11434");
   const response = await fetchAiResponse(`${baseUrl}/api/chat`, {
+    ...(input.signal ? { signal: input.signal } : {}),
     headers: { "Content-Type": "application/json", ...(connection.apiKey ? { Authorization: `Bearer ${connection.apiKey}` } : {}) },
     body: JSON.stringify({
       model: connection.model,

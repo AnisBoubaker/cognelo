@@ -4,12 +4,12 @@ import type { StudentQuestionContext } from "../question-context";
 import type { CodingHomeworkLocale } from "./messages";
 import { homeworkWorkflowCopy } from "./workflow-copy";
 
-export function QuestionCodeContext({ context, locale }: { context?: StudentQuestionContext; locale: CodingHomeworkLocale }) {
+export function QuestionCodeContext({ context, locale, label }: { context?: StudentQuestionContext; locale: CodingHomeworkLocale; label?: string }) {
   if (!context?.code) return null;
   const copy = homeworkWorkflowCopy(locale);
-  return <section className="homework-question-context" aria-label={copy.questionContext}>
+  return <section className="homework-question-context" aria-label={label ?? copy.questionContext}>
     <div className="homework-question-context-heading">
-      <strong>{copy.questionContext}</strong>
+      <strong>{label ?? copy.questionContext}</strong>
       {(context.filePath || context.functionName) && <div className="homework-question-context-source">
         {context.filePath && <code>{context.filePath}</code>}
         {context.functionName && <code>{context.functionName}</code>}

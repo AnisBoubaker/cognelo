@@ -19,7 +19,7 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
       assessmentFlow: "deferred",
       supportsTeamwork: true,
       usesMaterialEmbeddings: true,
-      authoring: { settingsTab: true },
+      authoring: { settingsTab: true, simulationTab: true },
       name: "Coding Homework Grader",
       description: "Programming assignment submission and grading workflow.",
       defaultCategoryIds: ["programming"],

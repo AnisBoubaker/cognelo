@@ -12,7 +12,7 @@ export { HomeworkSolutionSelector } from "./homework-solution-selector";
 
 type Settings = { submissionPolicy: HomeworkSubmissionPolicy; questionPolicyLocked: boolean; enabled: boolean; prepared: boolean; concurrency: number;
   ai: { connections: AiModelConnectionOption[]; question: { selection: AiModelSelection | null; resolved: { model: string } | null; error: string | null } } };
-export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, settingsPortalTarget, generationSettings, managementRevision = 0 }: { request: HomeworkRequest; locale: CodingHomeworkLocale; hasUnsavedChanges: boolean; settingsPortalTarget?: HTMLElement | null; generationSettings?: ReactNode | ((locked: boolean) => ReactNode); managementRevision?: number }) {
+export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, settingsPortalTarget, generationSettings, managementRevision = 0, onDirtyChange }: { request: HomeworkRequest; locale: CodingHomeworkLocale; hasUnsavedChanges: boolean; settingsPortalTarget?: HTMLElement | null; generationSettings?: ReactNode | ((locked: boolean) => ReactNode); managementRevision?: number; onDirtyChange?: (dirty: boolean) => void }) {
   const copy = homeworkWorkflowCopy(locale), notifications = useNotifications(), references = useActivityReferenceAuthoring();
   const [settings, setSettings] = useState<Settings | null>(null), [questionAi, setQuestionAi] = useState<AiModelSelection | null>(null), [error, setError] = useState("");
   const [busy, setBusy] = useState(false), [deadlineDirty, setDeadlineDirty] = useState(false), controller = useRef<AbortController | null>(null), version = useRef(0), modelDirty = useRef(false);
@@ -22,6 +22,7 @@ export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, se
   useEffect(() => { if (managementRevision || references?.loaded) void refresh().catch(report); }, [managementRevision, references?.revision, references?.loaded, refresh, report]);
   const changed = Boolean(settings && JSON.stringify(questionAi) !== JSON.stringify(settings.ai.question.selection));
   modelDirty.current = changed;
+  useEffect(() => onDirtyChange?.(changed || deadlineDirty), [changed, deadlineDirty, onDirtyChange]);
   async function run(input: unknown, adopt = false) {
     if (controller.current) return;
     const pending = new AbortController(); controller.current = pending; setBusy(true); setError("");

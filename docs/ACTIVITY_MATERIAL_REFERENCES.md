@@ -1,6 +1,6 @@
 # Shared activity references and homework simulation
 
-Status: implementation in progress, November 6, 2026.
+Status: implemented and locally validated, November 6, 2026.
 
 ## Requested behavior
 
@@ -24,8 +24,8 @@ Simulation is a course-authoring operation, uses saved settings and the teacher 
 - [x] Course-wide embedding model setting and resolver, preserving pinned history.
 - [x] Generic SDK/core activity-reference services and homework persistence adapter.
 - [x] Core reference UI with in-tab Save/Cancel, clearer tree/readiness and previews.
-- [ ] Host Simulation tab and shared generation implementation without academic writes.
-- [ ] Focused unit/E2E checks, existing-workflow regressions, documentation and incremental commits.
+- [x] Host Simulation tab and shared generation implementation without academic writes.
+- [x] Focused unit/E2E checks, existing-workflow regressions, documentation and incremental commits.
 
 No production deployment or testing is authorized by this implementation request. Any compatibility assumptions and validation limits must be recorded before handoff.
 
@@ -56,3 +56,21 @@ New preparation and generic material calls without an explicit historical select
 Homework retains its existing private selection/snapshot schema through its adapter. Legacy plugin selection/preparation/preview routes delegate to core. New per-homework `embeddingAi` writes reject with `COURSE_EMBEDDING_SETTINGS_REQUIRED`; old fields survive only for pinned-record compatibility. Same-course duplicates inherit the same course model and clone the source's prepared references; moving between courses does not transplant references.
 
 Migration: apply `202611060001_course_material_embedding_settings` using `npm run db:migrate:all`, then regenerate clients with `npm run db:generate`. This adds the course-owned settings table; it does not rewrite existing selections, indexes, credentials or student records. No environment variable changes.
+
+## Homework simulation
+
+The plugin enables `authoring.simulationTab` in course authoring and exposes manager-only `POST coding-homework-grader/simulation`. The empty request does not accept arbitrary student IDs, code or prompt overrides. It reads the saved private teacher solution, saved question-generation settings/model, current Subject teaching language, provided-code comparison manifest and prepared reference snapshot. Selected references must be ready; an empty selection needs no embedding call. Final submissions need not be enabled. The browser disables the action while activity/reference drafts are unsaved, and the server rejects changed inputs at completion.
+
+The extracted `generatePreparedHomeworkQuestions` routine is shared with the actual prepared-submission worker: C parsing, unchanged-provided-function exclusion, eligible candidate cycling, retrieval, short-answer prompt policy, previous-question diversity and bounded corrective retries are the same. Simulation reads the teacher solution as the candidate source without adding it to course indexes or writing any student draft, submission, question, attempt or grade rows. Results contain question text and allowlisted solution-code context only; retrieved reference excerpts/prompts stay server-side. Normal core query-vector caching may occur.
+
+Results are transient within the current editor, survive switching tabs and are replaced only by a complete new result. Cancel aborts provider requests, prevents later questions/results from publishing and keeps an earlier successful result. Core text-generation transport accepts an optional AbortSignal for all supported providers. One simulation per user/activity may run in each API process; shared per-user/per-activity rate limits bound requests. Simulation is course-only because its references, model access and teaching language depend on that course; bank authoring remains unchanged.
+
+## Validation and assumptions
+
+- Full unit suite: 337 files / 1,942 tests passed. All workspace typechecks, plugin boundary checks and API/web production builds passed. Focused lint has no errors; three existing warnings remain in the shared editor/legacy homework renderer.
+- Twenty-one distinct local E2E scenarios passed across the reference/simulation and existing-workflow runs. Coverage includes independent Save/Cancel/draft retention, compact checkboxes, preparation cancellation, hidden-reference privacy, exact text previews, cross-activity index reuse, course-model invalidation and pinned enabled references, duplication, incomplete/complete hand-ins, named extraction failures/retry, Codex/Ollama model choices, other text-provider rubric generation, SEB, the 30-student queue and both team question policies.
+- Simulation checks cover saved instructions, course French despite an English session, provided-code exclusion, private retrieved text, aborting further generation, no student records, preserved results across tabs, unsaved instruction/model blocking and a subsequent real hand-in using the shared generator. Unit checks also reject changed saved inputs and overlapping simulation requests. Desktop/mobile screenshots were inspected; no page-width overflow was found.
+- AI E2Es use isolated disposable accounts/course data and local provider fixtures. They validate integration and prompt/configuration delivery, not the pedagogical quality of real model output. No shared AI preferences were replaced and no production tests/deployment were performed.
+- Authorized assumptions: Simulation is course-only, uses saved configuration and prepared references, and keeps results transient. An absent explicit course model preserves the existing staff default. Already enabled work retains its previous prepared references; disabled work must prepare against the current course model. Material extraction stays plugin-owned and never launches a browser.
+
+The root README/memory/architecture/index, shared material/model contracts, plugin-authoring handbook and homework README/memory/reference/workflow/progress were reviewed and updated. Material plugin extraction contracts remain unchanged and their orientation/reference documents remain accurate. No documentation verification gap remains.
