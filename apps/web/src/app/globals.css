@@ -6962,3 +6962,29 @@ button:hover > .disclosure-indicator {
 .ai-grading-recovery-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; overflow-wrap: anywhere; }
 .ai-grading-recovery-lists ul { padding-inline-start: 20px; }
 @media (max-width: 640px) { .ai-grading-recovery-lists { grid-template-columns: minmax(0, 1fr); } }
+
+.activity-reference-model {
+  justify-content: space-between;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.activity-reference-search { flex: 1; min-width: min(100%, 220px); }
+.activity-reference-tree { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.activity-reference-entry { padding: 8px 12px; padding-inline-start: calc(12px + var(--reference-depth, 0) * 16px); }
+.activity-reference-entry + .activity-reference-entry { border-top: 1px solid var(--line); }
+.activity-reference-entry.is-folder { background: var(--surface-2); }
+.activity-reference-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.activity-reference-indent { flex: 0 0 30px; }
+.activity-reference-choice { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 120px; cursor: pointer; }
+.activity-reference-choice input { flex: 0 0 auto; }
+.activity-reference-choice span { overflow-wrap: anywhere; }
+.activity-reference-choice small { display: block; color: var(--muted); margin-top: 3px; }
+.activity-reference-entry.is-folder .activity-reference-choice { font-weight: 700; }
+.activity-reference-preview { margin-top: 8px; }
+@media (max-width: 600px) {
+  .activity-reference-entry { padding-inline-start: calc(8px + min(var(--reference-depth, 0), 3) * 10px); }
+  .activity-reference-row { gap: 6px; }
+  .activity-reference-row .metadata-badge { max-width: 100%; white-space: normal; }
+}

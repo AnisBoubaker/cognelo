@@ -978,6 +978,7 @@ export const zhMessages = {
     },
     activityConcepts: {
       settingsTab: "设置",
+      simulationTab: "模拟",
       referenceMaterialsTab: "参考资料",
       tabsLabel: "活动编辑器", activityTab: "活动", conceptsTab: "概念", gradingTab: "评分", title: "知识概念",
       description: "选择此活动帮助学习者练习或展示的学科概念。", search: "搜索概念",

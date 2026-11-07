@@ -1,8 +1,9 @@
 "use client";
 
-import { ActivityKnowledgeGenerationProvider, EditActionBar, getEditActionBarCopy, useNotifications, useUnsavedChangesActions, useUnsavedChangesGuard, type ActivityKnowledgeGenerationMode, type ActivityKnowledgeGenerationRequest } from "@cognelo/activity-ui";
+import { ActivityReferenceAuthoringProvider, type ActivityReferenceAuthoringState, ActivityKnowledgeGenerationProvider, EditActionBar, getEditActionBarCopy, useNotifications, useUnsavedChangesActions, useUnsavedChangesGuard, type ActivityKnowledgeGenerationMode, type ActivityKnowledgeGenerationRequest } from "@cognelo/activity-ui";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityKnowledgeConceptSelection } from "@cognelo/contracts";
+import { ActivityMaterialReferences } from "./activity-material-references";
 import type { SubjectKnowledgeConcept, SubjectKnowledgePrerequisite } from "@/lib/api";
 
 type ActivityEditorTabsProps = {
@@ -18,7 +19,12 @@ type ActivityEditorTabsProps = {
   showGradingTab?: boolean;
   showReferenceMaterialsTab?: boolean;
   showSettingsTab?: boolean;
+  showSimulationTab?: boolean;
+  materialReferences?: { courseId: string; activityId: string };
 };
+
+const ActivityEditorSimulationPortalContext = createContext<HTMLElement | null | undefined>(undefined);
+export function useActivityEditorSimulationPortalTarget() { return useContext(ActivityEditorSimulationPortalContext); }
 
 const ActivityEditorSettingsPortalContext = createContext<HTMLElement | null | undefined>(undefined);
 export function useActivityEditorSettingsPortalTarget() { return useContext(ActivityEditorSettingsPortalContext); }
@@ -78,10 +84,13 @@ function ConceptCheckbox({ checked, partial, label, onChange }: { checked: boole
   return <input ref={ref} type="checkbox" checked={checked} aria-label={label} onChange={(event) => onChange(event.target.checked)} />;
 }
 
-export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites, selectedConcepts, onSaveConcepts, onConceptDraftChange, t, locale, showGradingTab = false, showReferenceMaterialsTab = false, showSettingsTab = false }: ActivityEditorTabsProps) {
+export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites, selectedConcepts, onSaveConcepts, onConceptDraftChange, t, locale, showGradingTab = false, showReferenceMaterialsTab = false, showSettingsTab = false, showSimulationTab = false, materialReferences }: ActivityEditorTabsProps) {
   const notifications = useNotifications();
   const unsavedActions = useUnsavedChangesActions();
-  const [activeTab, setActiveTab] = useState<"activity" | "concepts" | "grading" | "references" | "settings">("activity");
+  const [activeTab, setActiveTab] = useState<"activity" | "concepts" | "grading" | "references" | "settings" | "simulation">("activity");
+  const [simulationPortalTarget, setSimulationPortalTarget] = useState<HTMLDivElement | null>(null);
+  const [referenceState, setReferenceState] = useState<ActivityReferenceAuthoringState>({ loaded: false, dirty: false, prepared: false, revision: "" });
+  const simulationPortalRef = useCallback((node: HTMLDivElement | null) => setSimulationPortalTarget(current => current === node ? current : node), []);
   const [settingsPortalTarget, setSettingsPortalTarget] = useState<HTMLDivElement | null>(null);
   const [referenceMaterialsPortalTarget, setReferenceMaterialsPortalTarget] = useState<HTMLDivElement | null>(null);
   const [gradingPortalTarget, setGradingPortalTarget] = useState<HTMLDivElement | null>(null);
@@ -250,8 +259,10 @@ export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites,
   }
 
   return (
+    <ActivityReferenceAuthoringProvider value={materialReferences ? referenceState : null}>
+    <ActivityEditorSimulationPortalContext.Provider value={showSimulationTab ? simulationPortalTarget : undefined}>
     <ActivityEditorSettingsPortalContext.Provider value={showSettingsTab ? settingsPortalTarget : undefined}>
-    <ActivityEditorReferenceMaterialsPortalContext.Provider value={showReferenceMaterialsTab ? referenceMaterialsPortalTarget : undefined}>
+    <ActivityEditorReferenceMaterialsPortalContext.Provider value={showReferenceMaterialsTab && !materialReferences ? referenceMaterialsPortalTarget : undefined}>
     <ActivityEditorGradingPortalContext.Provider value={showGradingTab ? gradingPortalTarget : undefined}>
     <ActivityKnowledgeGenerationProvider value={{
       mode: generationMode,
@@ -276,6 +287,7 @@ export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites,
               {t("activityConcepts.settingsTab")}
             </button>
           ) : null}
+          {showSimulationTab ? <button id="activity-editor-simulation-tab" type="button" role="tab" aria-selected={activeTab === "simulation"} aria-controls="activity-editor-simulation-panel" onClick={() => setActiveTab("simulation")}>{t("activityConcepts.simulationTab")}</button> : null}
           {showGradingTab ? (
             <button type="button" role="tab" aria-selected={activeTab === "grading"} onClick={() => setActiveTab("grading")}>
               {t("activityConcepts.gradingTab")}
@@ -347,7 +359,8 @@ export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites,
           </section>
         )}
       </div>
-      {showReferenceMaterialsTab ? <div id="activity-editor-references-panel" role="tabpanel" aria-labelledby="activity-editor-references-tab" hidden={activeTab !== "references"} ref={referenceMaterialsPortalRef} /> : null}
+      {showReferenceMaterialsTab ? <div id="activity-editor-references-panel" role="tabpanel" aria-labelledby="activity-editor-references-tab" hidden={activeTab !== "references"} ref={referenceMaterialsPortalRef}>{materialReferences && <ActivityMaterialReferences key={materialReferences.activityId} {...materialReferences} locale={locale} onStateChange={setReferenceState} />}</div> : null}
+      {showSimulationTab ? <div id="activity-editor-simulation-panel" role="tabpanel" aria-labelledby="activity-editor-simulation-tab" hidden={activeTab !== "simulation"} ref={simulationPortalRef} /> : null}
       {showSettingsTab ? <div id="activity-editor-settings-panel" role="tabpanel" aria-labelledby="activity-editor-settings-tab" hidden={activeTab !== "settings"} ref={settingsPortalRef} /> : null}
       {showGradingTab ? <div role="tabpanel" hidden={activeTab !== "grading"} ref={gradingPortalRef} /> : null}
     </div>
@@ -355,5 +368,7 @@ export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites,
     </ActivityEditorGradingPortalContext.Provider>
     </ActivityEditorReferenceMaterialsPortalContext.Provider>
     </ActivityEditorSettingsPortalContext.Provider>
+    </ActivityEditorSimulationPortalContext.Provider>
+    </ActivityReferenceAuthoringProvider>
   );
 }

@@ -92,6 +92,7 @@ export type ActivityAiFeedbackContract = {
 
 export type ActivityAuthoringContract = {
   gradingTab?: boolean;
+  simulationTab?: boolean;
   /** Course reference preparation rendered through the host editor portal. */
   referenceMaterialsTab?: boolean;
   /** Optional course operational settings supplied by the activity renderer. */
@@ -114,6 +115,8 @@ export type ActivityProvider =
 export type ActivityCreationScope = "bank" | "course";
 
 export type ActivityDefinition = {
+  /** Core owns reference selection, preparation and UI for this activity. */
+  usesMaterialEmbeddings?: boolean;
   /** Core may assign a shared team workspace; the plugin owns submission behavior. */
   supportsTeamwork?: boolean;
   /** Preparation is available before the explicit, plugin-owned assessment start. */

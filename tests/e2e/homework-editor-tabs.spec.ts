@@ -20,13 +20,13 @@ test("homework separates references and settings, keeps drafts across tabs, and 
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     const referenceB = page.getByRole("checkbox", { name: "Reference B", exact: true });
     await expect(referenceB).toBeChecked(); await referenceB.uncheck();
-    await expect(page.getByRole("button", { name: "Generate embeddings", exact: true })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Generate embeddings", exact: true })).toBeDisabled();
     await expect(page.getByLabel("Students processed at once (1–4)")).toBeHidden();
-    for (const choice of await page.locator('.homework-reference-materials input[type="checkbox"]').all()) {
+    for (const choice of await page.locator('.activity-reference-materials input[type="checkbox"]').all()) {
       const size = await choice.boundingBox(); expect(size!.width).toBeLessThanOrEqual(20); expect(size!.height).toBeLessThanOrEqual(20);
     }
     await page.getByRole("tab", { name: "Settings", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Generate embeddings", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Generate embeddings", exact: true })).toBeHidden();
     await expect(page.getByRole("button", { name: "Enable final submissions", exact: true })).toBeDisabled();
     const concurrencySaved = page.waitForResponse(response => response.request().method() === "PUT" && response.url().endsWith("/workflow-settings"));
     await page.getByLabel("Students processed at once (1–4)").fill("3"); await concurrencySaved;
@@ -41,30 +41,34 @@ test("homework separates references and settings, keeps drafts across tabs, and 
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await expect(referenceB).not.toBeChecked();
 
-    // The progress dialog must remain visible while the Activity/References panels are hidden.
+    // Save references independently, then exercise cancellable preparation in the shared panel.
+    await page.locator(".activity-reference-materials").getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.locator(".activity-reference-materials").getByText("Everything is saved.", { exact: true })).toBeVisible();
     let hold = true;
     const gate = new Promise<void>(resolve => { releasePreparation = resolve; });
-    await page.route("**/coding-homework-grader/prepare-material", async route => {
+    await page.route("**/material-references/prepare-material", async route => {
       if (hold) { hold = false; await gate; }
       await route.continue().catch(() => {});
     });
-    await page.getByRole("tab", { name: "Settings", exact: true }).click();
     await page.getByRole("button", { name: "Generate embeddings", exact: true }).click();
     const progress = page.getByRole("dialog", { name: "Preparing reference materials…", exact: true });
     await expect(progress).toBeVisible();
     await progress.getByRole("button", { name: "Cancel", exact: true }).click();
     releasePreparation!();
     await expect(progress).toBeHidden();
+    await page.getByRole("tab", { name: "Settings", exact: true }).click();
     await expect(page.getByRole("button", { name: "Enable final submissions", exact: true })).toBeDisabled();
+    await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await page.getByRole("button", { name: "Generate embeddings", exact: true }).click();
-    await expect(page.getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
+    await expect(page.locator(".activity-reference-materials").getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
+    await page.getByRole("tab", { name: "Settings", exact: true }).click();
     await page.getByRole("button", { name: "Enable final submissions", exact: true }).click();
     await expect(page.getByRole("button", { name: "Disable final submissions", exact: true })).toBeVisible();
     await page.reload();
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await expect(referenceB).not.toBeChecked(); await expect(referenceB).toBeDisabled();
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.locator('.homework-reference-materials').screenshot({ path: "tmp/homework-reference-tab-mobile.png" });
+    await page.locator('.activity-reference-materials').screenshot({ path: "tmp/homework-reference-tab-mobile.png" });
     await page.getByRole("tab", { name: "Settings", exact: true }).click();
     await expect(page.getByLabel("Students processed at once (1–4)")).toHaveValue("3");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);

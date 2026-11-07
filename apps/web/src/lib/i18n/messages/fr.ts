@@ -978,6 +978,7 @@ export const frMessages = {
     },
     activityConcepts: {
       settingsTab: "Paramètres",
+      simulationTab: "Simulation",
       referenceMaterialsTab: "Documents de référence",
       tabsLabel: "Éditeur d’activité", activityTab: "Activité", conceptsTab: "Concepts", gradingTab: "Évaluation", title: "Concepts de connaissances",
       description: "Sélectionnez les concepts de la matière que cette activité permet de pratiquer ou de démontrer.", search: "Rechercher des concepts",

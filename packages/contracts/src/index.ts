@@ -1,3 +1,4 @@
+export * from "./material-references";
 export * from "./ai-grading-runs";
 import { z } from "zod";
 

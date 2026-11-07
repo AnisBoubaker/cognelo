@@ -1,3 +1,4 @@
+import { readCourseMaterialEmbeddingSelection } from "./course-material-embedding-settings";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -19,7 +20,8 @@ export type MaterialEmbeddingSelection = Partial<StoredAiModelSelection> & { dim
 function selectionOptions(selection?: string | MaterialEmbeddingSelection): MaterialEmbeddingSelection { return typeof selection === "string" ? { connectionId: selection } : selection ?? {}; }
 export async function createCourseEmbeddingProvider(user: CurrentUser, courseId: string, selection?: string | MaterialEmbeddingSelection, historical = false) {
   await assertCanViewCourse(user, courseId);
-  const requested = selectionOptions(selection);
+  const explicit = selectionOptions(selection);
+  const requested = explicit.connectionId || explicit.model ? explicit : { ...await readCourseMaterialEmbeddingSelection(courseId), ...explicit };
   const connection = requested.connectionId
     ? await getCourseAiAgentConnection(user, courseId, { ...requested, connectionId: requested.connectionId }, "embedding", historical)
     : await getCourseAiAgentConnection(user, courseId, snapshotAiModelSelection(selectAiAgentModel(await getCourseTeacherQuestionAuthoringAiAgentConnection(user, courseId), "embedding", requested.model)), "embedding");

@@ -345,8 +345,27 @@ export type StudentPreviewExecutionHandler = (input: {
 
 export type PluginHostCapabilityHandler<TResult = unknown> = () => Promise<TResult> | TResult;
 
+export type PreparedActivityMaterialReferences = {
+  id: string;
+  selected: string[];
+  indexIds: string[];
+  hiddenReferenceIndexIds: string[];
+  embeddingAi: Record<string, unknown> | null;
+  preparedByUserId: string;
+  preparedAt: string;
+  selectionFingerprint: string;
+};
+export type ActivityMaterialReferencesState = { selected: string[] | null; prepared: PreparedActivityMaterialReferences | null; locked: boolean; revision: string };
+export type ActivityMaterialReferencesService = {
+  activityTypeKeys: readonly string[];
+  /** Acquire the plugin's reference/settings lock when called inside the supplied transaction. */
+  read: (input: { user: CurrentUser; courseId: string; activityId: string; transaction: PluginTeamworkTransaction }) => Promise<ActivityMaterialReferencesState>;
+  write: (input: { user: CurrentUser; courseId: string; activityId: string; selected: string[]; prepared?: Omit<PreparedActivityMaterialReferences, "id">; transaction: PluginTeamworkTransaction }) => Promise<void>;
+};
+
 export type ServerActivityPlugin = {
   key: string;
+  materialReferences?: ActivityMaterialReferencesService;
   /** Private workspace lifecycle, invoked by core without knowing plugin tables. */
   teamwork?: {
     activityTypeKeys: readonly string[];
@@ -445,6 +464,10 @@ export type PluginTeamworkTransaction = {
   query: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
   execute: (query: TemplateStringsArray, ...values: unknown[]) => Promise<number>;
 };
+
+export function getActivityMaterialReferencesHandler(activityTypeKey: string) {
+  return currentServerPlugins().find(plugin => plugin.materialReferences?.activityTypeKeys.includes(activityTypeKey))?.materialReferences ?? null;
+}
 
 export function getActivityTeamworkHandler(activityTypeKey: string) {
   return currentServerPlugins().find(plugin => plugin.teamwork?.activityTypeKeys.includes(activityTypeKey))?.teamwork ?? null;

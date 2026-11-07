@@ -106,6 +106,7 @@ Subject
     CourseContentItem folder tree
     CourseContentResource
     CourseMaterial (legacy compatibility)
+    CourseMaterialEmbeddingSettings (shared embedding model)
     Activity
       ActivityKnowledgeConcept
     Section/CourseGroup
@@ -229,4 +230,4 @@ These descriptors remain a compatibility surface. Activity generation consumes p
 
 Material embedding preparation is a plugin-owned service dispatched through core. Core provides private reusable vector/index storage and authorized snapshot search; material plugins own extraction/revision/freshness policy. See [prepared material services](MATERIAL_EMBEDDING_SERVICES.md).
 
-Core also provides a course-manager-only, paginated projection of saved indexed text. Homework resolves its own prepared snapshot and delegates storage/access to that generic reader, so its preview retains the exact pinned reference version without exposing vectors or invoking AI. Extraction failure checks remain owned by each material plugin; a stored index alone is not proof of complete pedagogical coverage.
+Activities subscribe to the [shared reference service](ACTIVITY_MATERIAL_REFERENCES.md) through `usesMaterialEmbeddings` and a type-scoped persistence adapter. Core owns the entire selection/preparation/preview UI and routes; the embedding connection/model is course-wide. Plugins expose private selection/snapshot locks without core querying their tables. Core resolves the prepared snapshot through that adapter and supplies a course-manager-only, paginated projection of exact saved indexed text, without exposing vectors or invoking AI. Extraction failure checks remain owned by each material plugin; a stored index alone is not proof of complete pedagogical coverage.

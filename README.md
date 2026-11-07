@@ -63,7 +63,7 @@ Some plugins need additional services:
 
 - Programming Exercises: build and start the hardened Judge0 services described in [Platform details](docs/reference/PLATFORM_DETAILS.md#run-locally).
 - Web Design Coding Exercises: set a dedicated `WEB_DESIGN_RUNNER_TOKEN` in `.env`, enter the same Bearer credential in **Settings → Runners**, then run `npm run dev:runner -- --build`. See the [runner contract](packages/plugin-activities/plugin-web-design-coding-exercises/docs/REFERENCE.md#docker-runner).
-- Coding Homework Grader: configure generation and embedding models in [AI connections](docs/AI_MODEL_CONNECTIONS.md), run the API background worker, and install Poppler (`pdftotext`) for PDF material indexing. See [homework setup](packages/plugin-activities/plugin-coding-homework-grader/README.md) and [material services](docs/MATERIAL_EMBEDDING_SERVICES.md).
+- Coding Homework Grader: configure the activity generation model and course-wide embedding model in [AI connections](docs/AI_MODEL_CONNECTIONS.md), run the API background worker, and install Poppler (`pdftotext`) for PDF material indexing. See [homework setup](packages/plugin-activities/plugin-coding-homework-grader/README.md) and [material services](docs/MATERIAL_EMBEDDING_SERVICES.md).
 
 Teacher answer PDF/ZIP exports use an API-side Chromium renderer. See [answer exports](docs/ANSWER_EXPORTS.md#runtime-installation) for browser and font setup.
 

@@ -96,7 +96,7 @@ type CodingHomeworkGraderActivityViewProps = {
   submittedFilesUrl?: string;
   authoringClient?: AuthoringClient;
   workflowRequest?: HomeworkRequest;
-  authoringReferenceMaterialsPortalTarget?: HTMLElement | null;
+  authoringSimulationPortalTarget?: HTMLElement | null;
   authoringSettingsPortalTarget?: HTMLElement | null;
   solutionRequest?: HomeworkRequest;
   canManage: boolean;
@@ -175,7 +175,6 @@ function LegacyCodingHomeworkActivityView({
   providedFilesUrl,
   authoringClient,
   workflowRequest,
-  authoringReferenceMaterialsPortalTarget,
   authoringSettingsPortalTarget,
   solutionRequest,
   canManage,
@@ -809,17 +808,13 @@ function LegacyCodingHomeworkActivityView({
       saveLabel={copy.save} savingLabel={actionCopy.saving} cancelLabel={actionCopy.cancel} onCancel={discardChanges}
       onSave={() => saveHomework()} saveDisabled={!authoringClient || !onSave} />
   </section>;
-  const referenceWorkflow = workflowRequest ? <HomeworkTeacherWorkflow key="homework-references" request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} settingsPortalTarget={authoringSettingsPortalTarget} generationSettings={loading ? null : generationSettings} managementRevision={managementRevision} /> : null;
-  const referenceMaterials = authoringReferenceMaterialsPortalTarget === undefined
-    ? referenceWorkflow
-    : authoringReferenceMaterialsPortalTarget && referenceWorkflow
-      ? createPortal(referenceWorkflow, authoringReferenceMaterialsPortalTarget, "homework-references") : null;
+  const workflowSettings = workflowRequest ? <HomeworkTeacherWorkflow key="homework-settings" request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} settingsPortalTarget={authoringSettingsPortalTarget} generationSettings={loading ? null : generationSettings} managementRevision={managementRevision} /> : null;
 
   if (loading) {
     return (
       <><section className="section stack">
         <p>{copy.loading}</p>
-      </section>{referenceMaterials}</>
+      </section>{workflowSettings}</>
     );
   }
 
@@ -1129,7 +1124,7 @@ function LegacyCodingHomeworkActivityView({
       />
       </form>
       {workflowRequest && <HomeworkSubmissionManagement request={workflowRequest} locale={locale} onChanged={() => setManagementRevision(value => value + 1)} />}
-      {referenceMaterials}
+      {workflowSettings}
       {authoringSettingsPortalTarget ? createPortal(teacherProgress, authoringSettingsPortalTarget.ownerDocument.body) : teacherProgress}
     </>
   );

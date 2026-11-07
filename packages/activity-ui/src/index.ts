@@ -24,3 +24,5 @@ export * from "./zoned-date-time";
 export * from "./ai-model-picker";
 
 export { SideNavigation, sideNavigationItemId, type SideNavigationItem } from "./side-navigation";
+
+export * from "./activity-reference-authoring";

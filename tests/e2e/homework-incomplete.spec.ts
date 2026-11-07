@@ -25,9 +25,10 @@ test("teacher selects private solution signatures and student explicitly acknowl
     await expect(fn).toBeChecked();
     expect(await responseJson(await teacherApi.get(`${base}/authoring`))).toMatchObject({ requirements: { requirements: { requiredFunctions: [{ name: "add", filePath: "src/main.c", returnType: "int", parameterTypes: ["int*", "int"] }] } } });
     await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/groups/${data.groupId}/activities`, { data: { activityId: id, metadata: { assessmentMode: "summative" }, gradebookSettings: { maxAttempts: 1, attemptLimitMode: "max_attempts", pointsPossible: 100 } } }));
-    await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
+    await teacherPage.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Generate embeddings", exact: true }).click();
-    await expect(teacherPage.getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
+    await expect(teacherPage.locator(".activity-reference-materials").getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
+    await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Enable final submissions", exact: true }).click();
     await expect(teacherPage.getByRole("button", { name: "Disable final submissions", exact: true })).toBeVisible();
     const assigned = `/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${id}`;

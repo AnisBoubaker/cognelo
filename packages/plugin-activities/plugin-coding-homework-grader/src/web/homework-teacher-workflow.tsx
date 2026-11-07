@@ -1,155 +1,58 @@
 "use client";
-import { HomeworkDeadlineSettings } from "./homework-deadline-settings";
-import { defaultHomeworkSubmissionPolicy, type HomeworkSubmissionPolicy } from "../submission-policy";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ActionIcon, AiModelPicker, type AiModelConnectionOption, ProgressDialog, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { ActionIcon, AiModelPicker, ProgressDialog, useNotifications, useUnsavedChangesGuard, useActivityReferenceAuthoring, type AiModelConnectionOption } from "@cognelo/activity-ui";
 import type { AiModelSelection } from "@cognelo/contracts";
+import { defaultHomeworkSubmissionPolicy, type HomeworkSubmissionPolicy } from "../submission-policy";
 import type { CodingHomeworkLocale } from "./messages";
 import { homeworkWorkflowCopy } from "./workflow-copy";
 import { body, type HomeworkRequest } from "./workflow-types";
-import { HomeworkReferencePreview } from "./homework-reference-preview";
-
+import { HomeworkDeadlineSettings } from "./homework-deadline-settings";
 export { HomeworkSolutionSelector } from "./homework-solution-selector";
 
-type AiChoice = { selection: AiModelSelection | null; resolved: { connectionId: string; model: string; displayName?: string; provider?: string } | null; error: string | null };
-type Settings = { submissionPolicy: HomeworkSubmissionPolicy; questionPolicyLocked: boolean; ai: { connections: AiModelConnectionOption[]; question: AiChoice; embedding: AiChoice }; rows: Array<{ id: string; parentId: string | null; kind: string; title: string; depth: number; resourceId: string | null; hidden?: boolean }>; selected: string[]; statuses: Record<string, { state: string; maxAgeHours?: number | null; error?: string; index?: { id: string } | null }>; enabled: boolean; prepared: boolean; concurrency: number };
+type Settings = { submissionPolicy: HomeworkSubmissionPolicy; questionPolicyLocked: boolean; enabled: boolean; prepared: boolean; concurrency: number;
+  ai: { connections: AiModelConnectionOption[]; question: { selection: AiModelSelection | null; resolved: { model: string } | null; error: string | null } } };
 export function HomeworkTeacherWorkflow({ request, locale, hasUnsavedChanges, settingsPortalTarget, generationSettings, managementRevision = 0 }: { request: HomeworkRequest; locale: CodingHomeworkLocale; hasUnsavedChanges: boolean; settingsPortalTarget?: HTMLElement | null; generationSettings?: ReactNode | ((locked: boolean) => ReactNode); managementRevision?: number }) {
-  const copy = homeworkWorkflowCopy(locale);
-  const notifications = useNotifications();
-  const [materialErrors, setMaterialErrors] = useState<Record<string, string>>({});
-  const [currentMaterial, setCurrentMaterial] = useState("");
-  const [deadlineDirty, setDeadlineDirty] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
-  const reportError = useCallback((reason: unknown) => {
-    const message = reason instanceof Error ? reason.message : copy.error;
-    setError(message); notifications.error(message);
-  }, [copy.error, notifications]);
-  const [settings, setSettings] = useState<Settings | null>(null), [selected, setSelected] = useState<string[]>([]);
-  const [embeddingAi, setEmbeddingAi] = useState<AiModelSelection | null>(null), [questionAi, setQuestionAi] = useState<AiModelSelection | null>(null);
-  const [error, setError] = useState(""), [busy, setBusy] = useState<string | null>(null), [progressValue, setProgress] = useState<number | null>(null);
-  const controller = useRef<AbortController | null>(null);
-  const refreshVersion = useRef(0);
-  const refresh = useCallback(async (keepSelection = false, adoptModels: boolean | "embedding" | "question" = !keepSelection) => {
-    const version = ++refreshVersion.current;
-    const value = await request<Settings>("workflow-settings");
-    if (version !== refreshVersion.current) return;
-    const available = new Set(value.rows.flatMap(row => row.resourceId ? [row.resourceId] : []));
-    setSettings(value);
-    if (adoptModels === true || adoptModels === "embedding") setEmbeddingAi(value.ai.embedding.selection);
-    if (adoptModels === true || adoptModels === "question") setQuestionAi(value.ai.question.selection);
-    setSelected(current => (keepSelection ? current : value.selected).filter(id => available.has(id)));
-  }, [request]);
-  useEffect(() => { void refresh().catch(reportError); return () => controller.current?.abort(); }, [refresh, reportError]);
-  useEffect(() => { if (managementRevision) void refresh(true, false).catch(reportError); }, [managementRevision, refresh, reportError]);
-  async function run(label: string, action: (signal: AbortSignal) => Promise<void>, adoptModels: boolean | "embedding" | "question" = false) {
+  const copy = homeworkWorkflowCopy(locale), notifications = useNotifications(), references = useActivityReferenceAuthoring();
+  const [settings, setSettings] = useState<Settings | null>(null), [questionAi, setQuestionAi] = useState<AiModelSelection | null>(null), [error, setError] = useState("");
+  const [busy, setBusy] = useState(false), [deadlineDirty, setDeadlineDirty] = useState(false), controller = useRef<AbortController | null>(null), version = useRef(0), modelDirty = useRef(false);
+  const report = useCallback((error: unknown) => { const message = error instanceof Error ? error.message : copy.error; setError(message); notifications.error(message); }, [copy.error, notifications]);
+  const refresh = useCallback(async (adopt = false) => { const id = ++version.current; const data = await request<Settings>("workflow-settings"); if (id !== version.current) return; setSettings(data); if (adopt || !modelDirty.current) setQuestionAi(data.ai.question.selection); }, [request]);
+  useEffect(() => { const requests = version; void refresh(true).catch(report); return () => { requests.current++; controller.current?.abort(); }; }, [refresh, report]);
+  useEffect(() => { if (managementRevision || references?.loaded) void refresh().catch(report); }, [managementRevision, references?.revision, references?.loaded, refresh, report]);
+  const changed = Boolean(settings && JSON.stringify(questionAi) !== JSON.stringify(settings.ai.question.selection));
+  modelDirty.current = changed;
+  async function run(input: unknown, adopt = false) {
     if (controller.current) return;
-    const pending = new AbortController(); controller.current = pending;
-    setBusy(label); setProgress(null); setError(""); setCurrentMaterial(""); setPreview(null);
-    let failed = false;
-    try { await action(pending.signal); }
-    catch (reason) { failed = true; if (!pending.signal.aborted) reportError(reason); }
-    finally {
-      try { await refresh(true, failed || pending.signal.aborted ? false : adoptModels); }
-      catch (reason) { if (!failed && !pending.signal.aborted) reportError(reason); }
-      controller.current = null; setBusy(null); setCurrentMaterial("");
-    }
+    const pending = new AbortController(); controller.current = pending; setBusy(true); setError("");
+    try { await request("workflow-settings", body("PUT", input, pending.signal)); await refresh(adopt); }
+    catch (error) { if (!pending.signal.aborted) report(error); throw error; }
+    finally { controller.current = null; setBusy(false); }
   }
-  function idsForRow(row: Settings["rows"][number]) {
-    if (row.resourceId) return [row.resourceId];
-    const descendants = new Set([row.id]); const ids: string[] = [];
-    for (const item of settings?.rows ?? []) if (item.parentId && descendants.has(item.parentId)) { descendants.add(item.id); if (item.resourceId) ids.push(item.resourceId); }
-    return [...new Set(ids)];
-  }
-  const selectionChanged = Boolean(settings && JSON.stringify([...selected].sort()) !== JSON.stringify([...settings.selected].sort()));
-  const sameChoice = (left: AiModelSelection | null | undefined, right: AiModelSelection | null | undefined) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
-  const embeddingChanged = Boolean(settings && !sameChoice(embeddingAi, settings.ai.embedding.selection));
-  const questionChanged = Boolean(settings && !sameChoice(questionAi, settings.ai.question.selection));
-  const aiChanges = () => ({ ...(embeddingChanged ? { embeddingAi } : {}), ...(questionChanged ? { questionGenerationAi: questionAi } : {}) });
-  useUnsavedChangesGuard({ isDirty: selectionChanged || embeddingChanged || questionChanged,
-    onDiscard: () => { setSelected(settings?.selected ?? []); setEmbeddingAi(settings?.ai.embedding.selection ?? null); setQuestionAi(settings?.ai.question.selection ?? null); },
-    onSave: async () => { await request("workflow-settings", body("PUT", { selected, ...aiChanges() })); await refresh(); } });
-  function modelPicker(purpose: "generation" | "embedding") {
-    if (!settings) return null;
-    const embedding = purpose === "embedding", choice = embedding ? settings.ai.embedding : settings.ai.question;
-    const changed = embedding ? embeddingChanged : questionChanged;
-    return <section className="stack homework-ai-model-selection">
-      <h4>{embedding ? copy.embeddingModelTitle : copy.questionModelTitle}</h4>
-      <AiModelPicker connections={settings.ai.connections} value={embedding ? embeddingAi : questionAi} purpose={purpose}
-        onChange={embedding ? setEmbeddingAi : setQuestionAi} disabled={busy !== null || (embedding && settings.enabled)}
-        labels={{ connection: copy.aiConnection, model: copy.aiModel, inherit: copy.aiCourseDefault, unavailable: copy.aiUnavailable, noModels: embedding ? copy.aiNoEmbeddingModels : copy.aiNoGenerationModels }} />
-      <p className="muted">{embedding ? copy.embeddingModelHelp : copy.questionModelHelp}</p>
-      {!changed && choice.resolved && <p className="muted">{copy.aiInUse}: {choice.resolved.model}</p>}
-      {!changed && choice.error && <p className="error">{choice.error}</p>}
-      <div className="row wrap">
-        <button type="button" className="secondary" disabled={!changed || busy !== null || (embedding && settings.enabled)} onClick={() => void run(copy.save, async signal => {
-          await request("workflow-settings", body("PUT", embedding ? { embeddingAi } : { questionGenerationAi: questionAi }, signal));
-        }, embedding ? "embedding" : "question")}><ActionIcon name="save" /> {copy.saveModel}</button>
-        <a className="button secondary" href="/settings/ai-agents" target="_blank" rel="noreferrer"><ActionIcon name="settings" /> {copy.manageConnections}</a>
-        <button type="button" className="secondary" disabled={busy !== null} onClick={() => void refresh(true).catch(reportError)}><ActionIcon name="refresh" /> {copy.refreshModels}</button>
-      </div>
-    </section>;
-  }
-  const references = <section className="section stack homework-reference-materials"><h3>{copy.materials}</h3><p>{copy.materialHelp}</p><p className="muted">{copy.archiveHelp}</p>
-    {error && <p className="error" role="alert">{error}</p>}
+  useUnsavedChangesGuard({ isDirty: changed, onSave: () => run({ questionGenerationAi: questionAi }, true), onDiscard: () => setQuestionAi(settings?.ai.question.selection ?? null) });
+  const ready = references ? references.loaded && references.prepared && !references.dirty : settings?.prepared;
+  const panel = <section className="section stack homework-workflow-settings"><h3>{copy.workflowSettings}</h3>
+    {error && <p role="alert" className="error">{error}</p>}
     {!settings && <p>{copy.loading}</p>}
-    {modelPicker("embedding")}
-    {settings?.rows.filter(row => row.kind === "folder" || row.resourceId).map(row => {
-      const ids = idsForRow(row); const status = row.resourceId ? settings.statuses[row.resourceId] : null;
-      const materialError = row.resourceId ? materialErrors[row.resourceId] : undefined;
-      const statusText = materialError ? copy.unsupportedIndex : status?.state === "ready" ? copy.readyIndex : status?.state === "stale" ? copy.staleIndex : status?.state === "missing" ? copy.missingIndex : status?.state === "needs_model" ? copy.aiChooseEmbedding : copy.unsupportedIndex;
-      const previewId = `homework-reference-preview-${row.id}`;
-      return <div key={row.id} style={{ marginInlineStart: `${Math.min(10, row.depth) * 1.25}rem` }}>
-        <label className="homework-choice"><input type="checkbox" disabled={settings.enabled || !ids.length} checked={ids.length > 0 && ids.every(id => selected.includes(id))} ref={input => { if (input) input.indeterminate = ids.some(id => selected.includes(id)) && !ids.every(id => selected.includes(id)); }} onChange={event => { const checked = event.currentTarget.checked; setSelected(current => checked ? [...new Set([...current, ...ids])] : current.filter(id => !ids.includes(id))); }} /> {row.title}</label>
-        {row.hidden && <span className="muted"> — {copy.hiddenMaterial}</span>}
-        {status && <span className="muted"> — {statusText}{status.maxAgeHours ? ` · ${copy.freshness}: ${status.maxAgeHours}` : ""}{materialError || status.error ? ` · ${materialError ?? status.error}` : ""}</span>}
-        {row.resourceId && (status?.index || (settings.prepared && settings.selected.includes(row.resourceId))) && <button type="button" className="secondary" aria-expanded={preview === row.resourceId} aria-controls={previewId} onClick={() => setPreview(current => current === row.resourceId ? null : row.resourceId)}><ActionIcon name="visible" /> {copy.indexedText}</button>}
-        {row.resourceId && preview === row.resourceId && <HomeworkReferencePreview id={previewId} resourceId={row.resourceId} request={request} locale={locale} onClose={() => setPreview(null)} />}
-      </div>;
-    })}
-    {!selected.length && <p className="muted">{copy.noMaterials}</p>}
-    <p className="muted">{copy.referenceSettingsHelp}</p>
-  </section>;
-  const settingsPanel = <section className="section stack homework-workflow-settings">
-    <h3>{copy.workflowSettings}</h3>
-    {error && <p className="error" role="alert">{error}</p>}
-    {!settings && <p>{copy.loading}</p>}
-    {modelPicker("generation")}
+    {settings && <section className="stack homework-ai-model-selection"><h4>{copy.questionModelTitle}</h4>
+      <AiModelPicker connections={settings.ai.connections} value={questionAi} purpose="generation" onChange={setQuestionAi} disabled={busy}
+        labels={{ connection: copy.aiConnection, model: copy.aiModel, inherit: copy.aiCourseDefault, unavailable: copy.aiUnavailable, noModels: copy.aiNoGenerationModels }} />
+      <p className="muted">{copy.questionModelHelp}</p>
+      {!changed && settings.ai.question.resolved && <p className="muted">{copy.aiInUse}: {settings.ai.question.resolved.model}</p>}
+      {!changed && settings.ai.question.error && <p role="status">{settings.ai.question.error}</p>}
+      <div className="row wrap"><button type="button" disabled={!changed || busy} onClick={() => void run({ questionGenerationAi: questionAi }, true).catch(() => {})}><ActionIcon name="save" />{copy.saveModel}</button>
+        <a className="button secondary" href="/settings/ai-agents" target="_blank" rel="noreferrer"><ActionIcon name="settings" />{copy.manageConnections}</a>
+        <button type="button" disabled={busy} onClick={() => void refresh().catch(report)}><ActionIcon name="refresh" />{copy.refreshModels}</button></div>
+    </section>}
     {typeof generationSettings === "function" ? generationSettings(settings?.questionPolicyLocked ?? true) : generationSettings}
-    <p>{copy.materials}: {selected.length}</p>
     {settings && <>
       <HomeworkDeadlineSettings policy={settings.submissionPolicy ?? defaultHomeworkSubmissionPolicy} request={request} locale={locale} onDirtyChange={setDeadlineDirty} onSaved={submissionPolicy => setSettings(current => current ? { ...current, submissionPolicy } : current)} />
-      <label className="field">{copy.concurrency}<input type="number" min={1} max={4} value={settings.concurrency} onChange={event => { const concurrency = Number(event.target.value); if (concurrency >= 1 && concurrency <= 4) void run(copy.save, async signal => { await request("workflow-settings", body("PUT", { concurrency }, signal)); }); }} /></label>
-      <p role="status">{settings.enabled ? copy.enabledHelp : settings.prepared && !selectionChanged ? copy.prepared : copy.needsPreparation}</p>
-      {(hasUnsavedChanges || deadlineDirty) && <p className="muted">{copy.saveFirst}</p>}
-      <div className="row">
-        <button type="button" className="secondary" disabled={settings.enabled} onClick={() => void run(copy.preparing, async signal => {
-          setMaterialErrors({});
-          await request("workflow-settings", body("PUT", { selected, ...aiChanges() }, signal));
-          for (let index = 0; index < selected.length; index++) {
-            signal.throwIfAborted();
-            const resourceId = selected[index];
-            const title = settings.rows.find(row => row.resourceId === resourceId)?.title ?? copy.materials;
-            setCurrentMaterial(title);
-            try { await request("prepare-material", body("POST", { resourceId }, signal)); }
-            catch (reason) {
-              if (signal.aborted) throw reason;
-              const message = reason instanceof Error ? reason.message : copy.error;
-              setMaterialErrors(current => ({ ...current, [resourceId]: message }));
-              throw new Error(`${title}: ${message}`);
-            }
-            setProgress(Math.round(100 * (index + 1) / selected.length));
-          }
-          signal.throwIfAborted(); await request("prepare-references", body("POST", undefined, signal));
-        }, true)}><ActionIcon name="generate" /> {copy.embeddings}</button>
-        <button type="button" disabled={!settings.enabled && (hasUnsavedChanges || deadlineDirty || !settings.prepared || selectionChanged || embeddingChanged || questionChanged)} onClick={() => void run(copy.save, async signal => { await request("workflow-settings", body("PUT", { enabled: !settings.enabled }, signal)); })}><ActionIcon name={settings.enabled ? "close" : "check"} /> {settings.enabled ? copy.disable : copy.enabled}</button>
-      </div>
+      <label className="field">{copy.concurrency}<input type="number" min={1} max={4} value={settings.concurrency} disabled={busy} onChange={event => { const concurrency = Number(event.currentTarget.value); if (concurrency >= 1 && concurrency <= 4) void run({ concurrency }).catch(() => {}); }} /></label>
+      <p role="status">{settings.enabled ? copy.enabledHelp : ready ? copy.prepared : copy.needsPreparation}</p>
+      {(hasUnsavedChanges || deadlineDirty || references?.dirty) && <p className="muted">{copy.saveFirst}</p>}
+      <button type="button" disabled={busy || (!settings.enabled && (hasUnsavedChanges || deadlineDirty || !ready || changed))} onClick={() => void run({ enabled: !settings.enabled }).catch(() => {})}><ActionIcon name={settings.enabled ? "close" : "check"} />{settings.enabled ? copy.disable : copy.enabled}</button>
     </>}
   </section>;
-  const progress = <ProgressDialog open={busy !== null} title={busy ?? copy.preparing} progressLabel={currentMaterial ? `${copy.preparing} ${currentMaterial}` : busy ?? copy.preparing} progress={progressValue} onCancel={() => controller.current?.abort()} cancelLabel={copy.cancel} />;
-  return <>
-    {references}
-    {settingsPortalTarget === undefined ? settingsPanel : settingsPortalTarget ? createPortal(settingsPanel, settingsPortalTarget) : null}
-    {settingsPortalTarget ? createPortal(progress, settingsPortalTarget.ownerDocument.body) : progress}
-  </>;
+  const progress = <ProgressDialog open={busy} title={copy.save} progressLabel={copy.save} cancelLabel={copy.cancel} onCancel={() => controller.current?.abort()} />;
+  return <>{settingsPortalTarget === undefined ? panel : settingsPortalTarget ? createPortal(panel, settingsPortalTarget) : null}{settingsPortalTarget ? createPortal(progress, settingsPortalTarget.ownerDocument.body) : progress}</>;
 }

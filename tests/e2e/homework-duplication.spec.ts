@@ -36,7 +36,8 @@ test("course duplication retains homework design and prepared references without
       questionCount: 2, candidateLimit: 7, retrievedExampleCount: 2, generationInstructions: "Ask short questions about parameter values.", settings: { authoringOption: "retained" } }, requirements: authored.requirements.requirements } }));
     const embeddingAi = { connectionId: model.connection.id, model: "chosen-vectors" };
     const questionGenerationAi = { connectionId: model.connection.id, model: "chosen-questions" };
-    await responseJson(await api.put(`${base}/workflow-settings`, { data: { selected: [resource.id], concurrency: 3, embeddingAi, questionGenerationAi } }));
+    await responseJson(await api.put(`${course}/material-embedding-settings`, { data: { selection: embeddingAi } }));
+    await responseJson(await api.put(`${base}/workflow-settings`, { data: { selected: [resource.id], concurrency: 3, questionGenerationAi } }));
     await responseJson(await api.post(`${base}/prepare-material`, { data: { resourceId: resource.id } }));
     await responseJson(await api.post(`${base}/prepare-references`, { data: {} }));
     await responseJson(await api.put(`${base}/workflow-settings`, { data: { enabled: true } }));
@@ -108,7 +109,7 @@ test("course duplication retains homework design and prepared references without
     await page.goto(`/courses/${data.courseId}/activities/${copy.id}`);
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await expect(page.getByRole("checkbox", { name: "Shared C reference", exact: true })).toBeChecked();
-    await expect(page.locator(".homework-reference-materials").getByLabel("Model", { exact: true })).toHaveValue("chosen-vectors");
+    await expect(page.locator(".activity-reference-materials")).toContainText("chosen-vectors");
     await page.getByRole("tab", { name: "Settings", exact: true }).click();
     await expect(page.locator(".homework-workflow-settings").getByLabel("Model", { exact: true })).toHaveValue("chosen-questions");
     await expect(page.getByLabel("Students processed at once (1–4)")).toHaveValue("3");

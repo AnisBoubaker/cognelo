@@ -113,7 +113,9 @@ export default function ActivityPage() {
             t={t}
             locale={locale}
             showSettingsTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.settingsTab === true}
-            showReferenceMaterialsTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.referenceMaterialsTab === true}
+            showReferenceMaterialsTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.usesMaterialEmbeddings === true || activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.referenceMaterialsTab === true}
+            materialReferences={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.usesMaterialEmbeddings ? { courseId, activityId } : undefined}
+            showSimulationTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.simulationTab === true}
             showGradingTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.gradingTab === true}
           >
           <ActivityRenderer
@@ -149,7 +151,9 @@ export default function ActivityPage() {
             t={t}
             locale={locale}
             showSettingsTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.settingsTab === true}
-            showReferenceMaterialsTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.referenceMaterialsTab === true}
+            showReferenceMaterialsTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.usesMaterialEmbeddings === true || activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.referenceMaterialsTab === true}
+            materialReferences={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.usesMaterialEmbeddings ? { courseId, activityId } : undefined}
+            showSimulationTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.simulationTab === true}
             showGradingTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.gradingTab === true}
           >
             <section className="section stack">

@@ -30,7 +30,8 @@ test("hidden references start unchecked, can be prepared explicitly, and stay pr
     expect(initial.rows.find(row => row.resourceId === later.id)?.hidden).toBe(false);
     await page.goto(`/courses/${data.courseId}/activities/${activityId}`);
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
-    const picker = page.locator(".homework-reference-materials");
+    const picker = page.locator(".activity-reference-materials");
+    await picker.getByRole("button", { name: "Expand all", exact: true }).click();
     await expect(picker.getByRole("checkbox", { name: "Visible lesson", exact: true })).toBeChecked();
     for (const title of ["Hidden instructor note", "Hidden instructor folder", "Note inside hidden folder", "Later visible lesson"]) await expect(picker.getByRole("checkbox", { name: title, exact: true })).not.toBeChecked();
     await expect(picker.getByText("Hidden from students", { exact: false })).toHaveCount(3);
@@ -38,9 +39,10 @@ test("hidden references start unchecked, can be prepared explicitly, and stay pr
     await expect(picker.getByRole("checkbox", { name: "Note inside hidden folder", exact: true })).toBeChecked();
     await picker.getByRole("checkbox", { name: "Hidden instructor note", exact: true }).check();
     await picker.screenshot({ path: "tmp/homework-hidden-references.png" });
-    await page.getByRole("tab", { name: "Settings", exact: true }).click();
+    await picker.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(picker.getByText("Everything is saved.", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Generate embeddings", exact: true }).click();
-    await expect(page.getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
+    await expect(page.locator(".activity-reference-materials").getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
     const prepared = await responseJson<Settings>(await api.get(`${base}/workflow-settings`));
     expect(prepared.prepared).toBe(true); expect(prepared.selected.sort()).toEqual([visible.id, hidden.id, child.id].sort());
     const [snapshot] = await prisma.$queryRaw<Array<{ metadata: { preparedByUserId: string; hiddenReferenceIndexIds: string[] } }>>`SELECT s.metadata FROM "PluginCodingHomeworkDocumentationSnapshot" s JOIN "PluginCodingHomeworkAssignment" a ON a.settings->>'preparedSnapshotId'=s.id WHERE a."activityId"=${activityId}`;

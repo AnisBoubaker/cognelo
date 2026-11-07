@@ -311,7 +311,9 @@ An authorized plugin route may return a native `Response` for files/streams. The
 
 ### Reference and settings authoring tabs
 
-Course activity definitions may opt into `authoring.referenceMaterialsTab` and `authoring.settingsTab`. The shared editor owns these optional tabs and mounted portal targets; the renderer registry passes the targets to the plugin. Bank editors omit these course-specific panels. One plugin state can render into both targets without losing selection or draft edits during tab changes. Portal progress dialogs to the document body so a hidden source tab cannot hide cancellation/progress. Incidental settings saves must not replace an unsaved material-selection draft.
+Embedding consumers declare `ActivityDefinition.usesMaterialEmbeddings` and register a type-scoped `ServerActivityPlugin.materialReferences` adapter. The host supplies the entire Reference materials UI: tree/defaults, hidden labels, selection Save/Cancel, previews, readiness and cancellable preparation. Core owns the corresponding routes and course-wide embedding setting; content plugins still own extraction/refresh. The adapter exposes private selection/snapshot/lock persistence through the core transaction, never its own reference UI or sibling-plugin calls. Use `useActivityReferenceAuthoring` from activity-ui for dependent readiness and unsaved-state checks. See [shared activity references](../ACTIVITY_MATERIAL_REFERENCES.md) for the contract and migration.
+
+`authoring.settingsTab` and `authoring.simulationTab` opt into host-owned mounted portal targets for plugin-specific controls. A plugin may implement a teacher-only simulation using saved authoring data, with no learner academic writes. The older `authoring.referenceMaterialsTab` portal remains for compatibility; new embedding consumers use the capability above. Bank editors omit course-specific panels. Portal progress dialogs to the document body so hidden source panels cannot hide progress/Cancel. Incidental refreshes must preserve local drafts.
 
 ### Team-capable activities
 

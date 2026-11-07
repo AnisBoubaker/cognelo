@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { aiAgentModels, type AiModelSelection } from "@cognelo/contracts";
 import { AiModelPicker, EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { CourseMaterialEmbeddingSettings } from "./course-material-embedding-settings";
 import { CourseForm } from "@/components/course-form";
 import { CourseTimeSettings } from "@/components/course-time-settings";
 import { SettingsSectionNav } from "@/components/settings-nav";
@@ -212,6 +213,7 @@ export function CourseSettingsPanel({
             </form>
           </section>
         ) : null}
+        {activeSection === "ai" ? <CourseMaterialEmbeddingSettings courseId={course.id} /> : null}
       </div>
     </div>
   );

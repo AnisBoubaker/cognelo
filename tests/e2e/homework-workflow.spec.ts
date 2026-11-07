@@ -27,15 +27,15 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
     await teacherPage.goto(`/courses/${data.courseId}/activities/${activityId}`);
     await teacherPage.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await expect(teacherPage.getByRole("heading", { name: "Reference materials", exact: true })).toBeVisible();
-    await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Generate embeddings", exact: true }).click();
-    await expect(teacherPage.getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
+    await expect(teacherPage.locator(".activity-reference-materials").getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
     expect(model.embeddingTexts.length).toBe(1);
     await teacherPage.getByRole("button", { name: "Generate embeddings", exact: true }).click();
     await expect(teacherPage.getByRole("dialog", { name: "Preparing reference materials…", exact: true })).toBeHidden();
     expect(model.embeddingTexts.length).toBe(1);
     await prisma.aiAgentConnection.update({ where: { id: connection.id }, data: { model: "new-question-model" } });
     expect(await responseJson(await teacherApi.get(`${authoring}/workflow-settings`))).toMatchObject({ statuses: { [resource.id]: { state: "ready" } } });
+    await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Enable final submissions", exact: true }).click();
     await expect(teacherPage.getByRole("button", { name: "Disable final submissions", exact: true })).toBeVisible();
     expect((await teacherApi.put(`${authoring}/workflow-settings`, { data: { selected: [] } })).status()).toBe(409);

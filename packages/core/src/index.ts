@@ -1,3 +1,6 @@
+export * from "./material-reference-search";
+export * from "./activity-material-references";
+export * from "./course-material-embedding-settings";
 export * from "./material-embeddings";
 export * from "./activity-teamwork";
 export * from "./test-grading-instructions";

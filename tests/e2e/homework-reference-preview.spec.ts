@@ -40,9 +40,9 @@ test("teachers inspect the exact prepared text with pagination and no model call
     const requestsBefore = model.requests.length;
     await page.goto(`/courses/${data.courseId}/activities/${id}`);
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
-    await page.getByRole("button", { name: "Preview indexed text", exact: true }).click();
+    await page.getByRole("button", { name: /^Preview indexed text:/ }).click();
     const panel = page.getByRole("region", { name: "Preview indexed text", exact: true });
-    await expect(panel).toContainText("Prepared reference for this homework.");
+    await expect(panel).toContainText("Prepared reference for this activity.");
     await expect(panel).toContainText("FIRST_PASSAGE");
     await expect(panel.locator('div[tabindex="0"]')).toBeFocused();
     await expect(panel).not.toContainText("NEW_MATERIAL_VERSION");
@@ -58,7 +58,7 @@ test("teachers inspect the exact prepared text with pagination and no model call
     expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
     await panel.getByRole("button", { name: "Close", exact: true }).click();
     await expect(panel).toHaveCount(0);
-    await page.getByRole("button", { name: "Preview indexed text", exact: true }).click();
+    await page.getByRole("button", { name: /^Preview indexed text:/ }).click();
     await expect(panel).toContainText("FIRST_PASSAGE");
     expect(model.requests).toHaveLength(requestsBefore);
     await panel.getByRole("button", { name: "Close", exact: true }).click();

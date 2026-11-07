@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ indexes: vi.fn(), vectors: vi.fn(), saveVector: vi.fn(), embed: vi.fn(), selected: vi.fn(), teacher: vi.fn() }));
-vi.mock("@cognelo/db", () => ({ Prisma: {}, prisma: { contentMaterialIndex: { findMany: mocks.indexes }, contentMaterialVector: { findMany: mocks.vectors, upsert: mocks.saveVector } } }));
+const mocks = vi.hoisted(() => ({ indexes: vi.fn(), vectors: vi.fn(), saveVector: vi.fn(), embed: vi.fn(), selected: vi.fn(), teacher: vi.fn(), courseSelection: vi.fn() }));
+vi.mock("@cognelo/db", () => ({ Prisma: {}, prisma: { courseMaterialEmbeddingSettings: { findUnique: mocks.courseSelection }, contentMaterialIndex: { findMany: mocks.indexes }, contentMaterialVector: { findMany: mocks.vectors, upsert: mocks.saveVector } } }));
 vi.mock("./authorization", () => ({ assertCanViewCourse: vi.fn(), assertCanManageCourse: vi.fn() }));
 vi.mock("./course-content", () => ({ getContentResourceForPluginRoute: vi.fn() }));
 vi.mock("./ai-embeddings", () => ({ requestAiEmbeddings: mocks.embed }));
@@ -10,7 +10,7 @@ const user = { id: "admin", email: "admin@example.test", roles: ["admin" as cons
 const connection = { id: "connection", ownerId: null, provider: "openai" as const, model: "changed-text-model", models: [], baseUrl: null, apiKey: "synthetic" };
 describe("embedding compatibility and frozen search", () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.resetAllMocks(); mocks.courseSelection.mockResolvedValue(null);
     mocks.teacher.mockResolvedValue(connection);
     mocks.selected.mockImplementation(async (_user, _course, selected) => ({ ...connection, model: selected.model }));
     mocks.vectors.mockResolvedValue([]);
@@ -24,6 +24,13 @@ describe("embedding compatibility and frozen search", () => {
     expect(compatible.modelKey).toBe(original);
     expect(compatible.selection).not.toHaveProperty("apiKey");
     expect((await createCourseEmbeddingProvider(user, "course", { connectionId: "connection", model: "new-vector-model" })).modelKey).not.toBe(original);
+  });
+  it("uses the course-wide model by default while honoring explicit pinned history", async () => {
+    mocks.courseSelection.mockResolvedValue({ selection: { connectionId: "course-connection", model: "shared-vectors", selectedByUserId: "owner" } });
+    expect((await createCourseEmbeddingProvider(user, "course")).model).toBe("shared-vectors");
+    expect((await createCourseEmbeddingProvider(user, "course", {})).model).toBe("shared-vectors");
+    expect(mocks.selected).toHaveBeenCalledWith(user, "course", expect.objectContaining({ connectionId: "course-connection", model: "shared-vectors", selectedByUserId: "owner" }), "embedding", false);
+    expect((await createCourseEmbeddingProvider(user, "course", { connectionId: "old", model: "old-vectors" }, true)).model).toBe("old-vectors");
   });
   it("queries an old index using its original embedding model after the default text model changes", async () => {
     const modelKey = contentIndexRevision({ provider: "openai", baseUrl: "https://api.openai.com/v1", model: "text-embedding-3-small", dimensions: 1536 });

@@ -1,3 +1,4 @@
+import { homeworkMaterialReferences } from "./material-references";
 import { homeworkTeamworkService } from "./team-workspaces";
 import { homeworkWorkflowRoutes } from "./workflow-routes";
 import { codingHomeworkGradebookFileRoute } from "./gradebook-file";
@@ -43,6 +44,7 @@ registerCodingHomeworkBackgroundJobs();
 
 export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
   teamwork: homeworkTeamworkService,
+  materialReferences: homeworkMaterialReferences,
   submissionExport: { activityTypeKeys: ["coding-homework-grader"], getContent: exportHomeworkSubmission },
   key: "coding-homework-grader",
   timedFinalization: { activityTypeKeys: ["coding-homework-grader"], finalize: finalizeHomeworkSavedAnswers },

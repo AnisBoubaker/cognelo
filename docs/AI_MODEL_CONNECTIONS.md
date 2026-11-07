@@ -12,9 +12,11 @@ Existing connections and API clients remain compatible: `model` is still the def
 | Course student support | `studentSupportAiAgentConnectionId` plus optional `studentSupportAiAgentModel` |
 | Automatic formative/summative feedback and AI grading | Dedicated course `assessmentFeedbackAiAgentConnectionId` plus optional `assessmentFeedbackAiAgentModel`, gated by `automaticFeedbackEnabled` |
 | Homework challenge generation and required-function AI selection | Explicit homework generation choice, otherwise the course staff authoring preference |
-| Prepared material indexes and semantic queries | Separate embedding connection/model, frozen with the prepared reference snapshot |
+| Prepared material indexes and semantic queries | Course-wide embedding choice in Course settings → AI; semantic queries use the model pinned with the prepared reference snapshot |
 
 The account and course screens use separate connection and model selectors. Omitted model overrides retain the connection default. Core resolvers return a connection with its effective model, so consumers retain the same provider transport and credential handling. Personal selection remains limited to one's own or shared enabled connections. No connection secret is copied into preferences, activity configuration, snapshots, browser responses, or audit events.
+
+Course embedding preferences have an independent Save/Cancel boundary and manager-only route, persisted in `CourseMaterialEmbeddingSettings`. An absent explicit choice retains the course staff default. Changes invalidate future preparation while enabled activities and existing hand-ins keep their pinned references. See [shared activity references](ACTIVITY_MATERIAL_REFERENCES.md).
 
 ## Providers
 
@@ -27,3 +29,5 @@ See [material services](MATERIAL_EMBEDDING_SERVICES.md) and the [homework workfl
 ## Migration
 
 `202611020001_ai_connection_models` adds default-empty JSON fields `AiAgentConnection.models` and `ContentMaterialIndex.embeddingConfig`. Run `npm run db:migrate:all` and regenerate clients with the normal upgrade procedure. Existing default models, encrypted credentials, preference IDs and prepared indexes are preserved; no new environment variable is required.
+
+`202611060001_course_material_embedding_settings` adds the independent course-owned embedding selection and audit path. Apply through the same migration command and regenerate clients. Existing prepared snapshots remain unchanged; no environment variable changes.

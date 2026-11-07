@@ -978,6 +978,7 @@ export const enMessages = {
     },
     activityConcepts: {
       settingsTab: "Settings",
+      simulationTab: "Simulation",
       referenceMaterialsTab: "Reference materials",
       tabsLabel: "Activity editor", activityTab: "Activity", conceptsTab: "Concepts", gradingTab: "Grading", title: "Knowledge concepts",
       description: "Select the subject concepts this activity helps learners practice or demonstrate.", search: "Search concepts",

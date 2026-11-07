@@ -666,6 +666,7 @@ export type ProgrammingLanguageOption = {
 };
 
 export type ActivityDefinition = {
+  usesMaterialEmbeddings?: boolean;
   supportsSolution?: boolean;
   key: string;
   name: string;
@@ -684,6 +685,7 @@ export type ActivityDefinition = {
     supportsCompositeExecution?: boolean;
   };
   authoring?: {
+    simulationTab?: boolean;
     gradingTab?: boolean;
     referenceMaterialsTab?: boolean;
     settingsTab?: boolean;

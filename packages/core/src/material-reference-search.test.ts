@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ search: vi.fn(), manage: vi.fn(), user: vi.fn() }));
-vi.mock("@cognelo/core", async original => ({ ...await original<typeof import("@cognelo/core")>(), createPreparedMaterialSearch: mocks.search, assertCanManageCourse: mocks.manage }));
+vi.mock("./material-embeddings", () => ({ createPreparedMaterialSearch: mocks.search }));
+vi.mock("./authorization", () => ({ assertCanManageCourse: mocks.manage }));
 vi.mock("@cognelo/db", () => ({ prisma: { user: { findUnique: mocks.user } } }));
-vi.mock("./file-preparation", () => ({ record: (value: unknown) => value && typeof value === "object" ? value : {} }));
-const { AppError } = await import("@cognelo/core");
-const { createHomeworkReferenceSearch } = await import("./prepared-reference-search");
+const { AppError } = await import("./errors");
+const { createPreparedActivityReferenceSearch } = await import("./material-reference-search");
 const learner = { id: "learner", email: "learner@example.test", name: null, firstName: null, lastName: null, roles: ["student" as const] };
 const scope = { user: learner, courseId: "course", groupId: "section" };
 const snapshot = { indexIds: ["public", "hidden"], hiddenReferenceIndexIds: ["hidden"], preparedByUserId: "teacher" };
@@ -15,13 +15,13 @@ beforeEach(() => {
 });
 describe("explicitly prepared hidden homework references", () => {
   it("preserves learner visibility checks for legacy and public references", async () => {
-    const search = await createHomeworkReferenceSearch(scope, { indexIds: ["public"] });
+    const search = await createPreparedActivityReferenceSearch(scope, { indexIds: ["public"] });
     expect(await search.search("code")).toMatchObject([{ title: "public" }]);
     expect(mocks.search).toHaveBeenCalledWith(learner, "course", ["public"], "section", undefined);
     expect(mocks.user).not.toHaveBeenCalled(); expect(mocks.manage).not.toHaveBeenCalled();
   });
   it("authorizes only the prepared hidden subset through its current course manager", async () => {
-    const search = await createHomeworkReferenceSearch(scope, snapshot);
+    const search = await createPreparedActivityReferenceSearch(scope, snapshot);
     expect(mocks.search).toHaveBeenNthCalledWith(1, learner, "course", ["public"], "section", undefined);
     expect(mocks.manage).toHaveBeenCalledWith(expect.objectContaining({ id: "teacher" }), "course");
     expect(mocks.search).toHaveBeenNthCalledWith(2, expect.objectContaining({ id: "teacher" }), "course", ["hidden"], "section", undefined);
@@ -29,16 +29,16 @@ describe("explicitly prepared hidden homework references", () => {
   });
   it.each([null, { isActive: false }])("fails closed without an active preparing account", async account => {
     mocks.user.mockResolvedValue(account);
-    await expect(createHomeworkReferenceSearch(scope, snapshot)).rejects.toMatchObject({ code: "HOMEWORK_PRIVATE_REFERENCES_UNAVAILABLE" });
+    await expect(createPreparedActivityReferenceSearch(scope, snapshot)).rejects.toMatchObject({ code: "MATERIAL_PRIVATE_REFERENCES_UNAVAILABLE" });
     expect(mocks.search).toHaveBeenCalledTimes(1);
   });
   it("rechecks management permission and does not bypass revocation", async () => {
     mocks.manage.mockRejectedValue(new AppError(403, "FORBIDDEN", "Forbidden"));
-    await expect(createHomeworkReferenceSearch(scope, snapshot)).rejects.toMatchObject({ status: 403 });
+    await expect(createPreparedActivityReferenceSearch(scope, snapshot)).rejects.toMatchObject({ status: 403 });
     expect(mocks.search).toHaveBeenCalledTimes(1);
   });
   it("rejects hidden indexes outside the immutable selection", async () => {
-    await expect(createHomeworkReferenceSearch(scope, { ...snapshot, hiddenReferenceIndexIds: ["foreign"] })).rejects.toMatchObject({ code: "HOMEWORK_PRIVATE_REFERENCES_UNAVAILABLE" });
+    await expect(createPreparedActivityReferenceSearch(scope, { ...snapshot, hiddenReferenceIndexIds: ["foreign"] })).rejects.toMatchObject({ code: "MATERIAL_PRIVATE_REFERENCES_UNAVAILABLE" });
     expect(mocks.search).not.toHaveBeenCalled(); expect(mocks.user).not.toHaveBeenCalled();
   });
 });

@@ -721,6 +721,7 @@ export const arMessages = {
     },
     activityConcepts: {
       settingsTab: "الإعدادات",
+      simulationTab: "المحاكاة",
       referenceMaterialsTab: "المواد المرجعية",
       tabsLabel: "محرر النشاط", activityTab: "النشاط", conceptsTab: "المفاهيم", gradingTab: "التقييم", title: "مفاهيم المعرفة",
       description: "اختر مفاهيم المادة التي يساعد هذا النشاط المتعلمين على ممارستها أو إظهارها.", search: "البحث في المفاهيم",
