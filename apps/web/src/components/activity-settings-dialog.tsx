@@ -1,4 +1,6 @@
 "use client";
+import { ActivityStageSchedule, StageScheduleContext, stagePoliciesForDraft, stagePoliciesForSave, useStageSchedule, type StageScheduleDefinition } from "./activity-stage-schedule";
+import { mergeSubmissionStagePolicies, type SubmissionStagePolicies } from "@cognelo/contracts";
 
 import { DialogHeader } from "@cognelo/activity-ui";
 
@@ -32,6 +34,7 @@ type GradebookDraft = {
   dropLowestAttempt: boolean;
 };
 type AssignmentValueDraft = GradebookDraft & {
+  submissionStages: SubmissionStagePolicies;
   availableFrom: string;
   availableUntil: string;
   timeLimitEnabled: boolean;
@@ -108,6 +111,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
   const dialogs = useDialogs();
   const [activeTab, setActiveTab] = useState<ActivitySettingsTab>("general");
   const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [submissionStages, setSubmissionStages] = useState<StageScheduleDefinition[]>([]);
   const [draft, setDraft] = useState<ActivitySettingsDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -125,6 +129,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
       .then(({ settings }) => {
         if (cancelled) return;
         const nextDraft = buildDraft(settings, isTest, timeZone);
+        setSubmissionStages(settings.submissionStages ?? []);
         nextDraft.groups.sort((left, right) => left.title.localeCompare(right.title, locale, { numeric: true, sensitivity: "base" }));
         setDraft(nextDraft);
         setSavedAssessmentMode(nextDraft.assessmentMode);
@@ -218,6 +223,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         ? undefined
         : (field: ActivityAssignmentOverrideField) => !summativeOverrideFields.has(field);
       const input = {
+        submissionStages: stagePoliciesForSave(draft.general.submissionStages, timeZone),
         availableFrom: toIsoOrNull(draft.general.availableFrom, timeZone),
         availableUntil: toIsoOrNull(draft.general.availableUntil, timeZone),
         timeLimitMinutes: buildTimeLimitMinutes(draft.general),
@@ -240,18 +246,20 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         },
         groupAssignments: draft.groups.map((group) => ({
           groupId: group.groupId,
+          submissionStages: stagePoliciesForSave(group.submissionStages, timeZone),
           ...(supportsTeamwork ? { teamGroupingId: group.teamGroupingId || null, allowIndividualSubmission: group.allowIndividualSubmission } : {}),
           assigned: group.assigned,
           exceptions: group.assigned ? group.exceptions.map((exception) => ({
             teamId: exception.teamId, participantId: exception.participantId,
-            overrideFields: exception.overrideFields.filter((field) => allowedGroupFields ? allowedGroupFields(field) : true),
+            submissionStages: stagePoliciesForSave(exception.submissionStages, timeZone),
+            overrideFields: exception.overrideFields.filter((field) => (!submissionStages.length || field !== "timeLimit") && (allowedGroupFields ? allowedGroupFields(field) : true)),
             availableFrom: toIsoOrNull(exception.availableFrom, timeZone), availableUntil: toIsoOrNull(exception.availableUntil, timeZone),
             timeLimitMinutes: buildTimeLimitMinutes(exception), requireSafeExamBrowser: exception.requireSafeExamBrowser,
             gradeChallengesEnabled: exception.gradeChallengesEnabled, gradebookSettings: buildGradebookSettings(exception),
             contentPlacement: { isVisible: exception.isVisible, metadata: {} }
           })) : [],
           overrideFields: group.assigned
-            ? group.overrideFields.filter((field) => allowedGroupFields ? allowedGroupFields(field) : true)
+            ? group.overrideFields.filter((field) => (!submissionStages.length || field !== "timeLimit") && (allowedGroupFields ? allowedGroupFields(field) : true))
             : [],
           availableFrom: toIsoOrNull(group.availableFrom, timeZone),
           availableUntil: toIsoOrNull(group.availableUntil, timeZone),
@@ -302,6 +310,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
   ];
 
   return (
+    <StageScheduleContext.Provider value={{ stages: submissionStages, general: draft?.general.submissionStages ?? {}, timeZone, locale }}>
     <form className="activity-settings-form" onSubmit={saveSettings}>
           <div className="activity-settings-layout">
             <nav aria-label={t("courseDetail.activitySettingsNavigation")} className="activity-settings-nav" role="tablist">
@@ -371,12 +380,13 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                       />
                     </div>
                   </div>
-                  <TimeLimitField
+                  <ActivityStageSchedule value={draft.general.submissionStages} onChange={submissionStages => updateGeneral({ submissionStages })} availableUntil={draft.general.availableUntil} disabled={saving} legacyTimeLimit={buildTimeLimitMinutes(draft.general)} />
+                  {!submissionStages.length && <TimeLimitField
                     disabled={saving}
                     idPrefix={`activity-settings-general-${activity.id}`}
                     value={draft.general}
                     onChange={updateGeneral}
-                  />
+                  />}
                   <div>
                     <label className="checkbox-row" htmlFor={`activity-settings-messaging-${activity.id}`}>
                       <input
@@ -542,6 +552,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
             </button>
           </div>
     </form>
+    </StageScheduleContext.Provider>
   );
 }
 
@@ -567,7 +578,7 @@ function ExceptionsEditor({ group, general, summative, disabled, onChange }: {
     const id = kind === "team" ? teamId : participantId;
     if (!id) return;
     const key = `${kind}-${id}`;
-    onChange([...group.exceptions, { ...sectionValues, key, teamId: kind === "team" ? id : null, participantId: kind === "student" ? id : null, overrideFields: [] }]);
+    onChange([...group.exceptions, { ...sectionValues, submissionStages: {}, key, teamId: kind === "team" ? id : null, participantId: kind === "student" ? id : null, overrideFields: [] }]);
     setSelectedKey(key);
     if (kind === "team") setTeamId(""); else setParticipantId("");
   }
@@ -608,7 +619,7 @@ function ExceptionsEditor({ group, general, summative, disabled, onChange }: {
     </section>)}
     {selected ? <section className="activity-exception-editor stack" aria-label={t("activityExceptions.edit")}>
       <h4>{label(selected)}</h4>
-      <AssignmentOverrideFields group={{ ...selected, groupId: selected.key }} summative={summative} disabled={disabled} onChange={edit} onToggle={(field, checked) => edit({
+      <AssignmentOverrideFields group={{ ...selected, groupId: selected.key }} inheritedStages={mergeSubmissionStagePolicies(general.submissionStages, group.submissionStages)} summative={summative} disabled={disabled} onChange={edit} onToggle={(field, checked) => edit({
         ...(checked ? copyGeneralField(sectionValues, field) : {}),
         overrideFields: checked ? [...new Set([...selected.overrideFields, field])] : selected.overrideFields.filter((value) => value !== field)
       })} />
@@ -616,13 +627,14 @@ function ExceptionsEditor({ group, general, summative, disabled, onChange }: {
   </div>;
 }
 
-function AssignmentOverrideFields({ group, summative, disabled, onChange, onToggle }: {
+function AssignmentOverrideFields({ group, summative, disabled, onChange, onToggle, inheritedStages }: {
   group: AssignmentValueDraft & { groupId: string; overrideFields: ActivityAssignmentOverrideField[] };
   summative: boolean; disabled: boolean;
   onChange: (update: Partial<AssignmentValueDraft>) => void;
   onToggle: (field: ActivityAssignmentOverrideField, checked: boolean) => void;
+  inheritedStages?: SubmissionStagePolicies;
 }) {
-  const { t } = useI18n();
+  const { t } = useI18n(), stageContext = useStageSchedule();
   return <>                          <OverrideField
                             checked={group.overrideFields.includes("availableFrom")}
                             disabled={disabled}
@@ -651,7 +663,8 @@ function AssignmentOverrideFields({ group, summative, disabled, onChange, onTogg
                               onChange={(availableUntil) => onChange({ availableUntil })}
                             />
                           </OverrideField>
-                          <OverrideField
+                          <ActivityStageSchedule value={group.submissionStages} inherited={inheritedStages ?? stageContext.general} onChange={submissionStages => onChange({ submissionStages })} availableUntil={group.availableUntil} disabled={disabled} legacyTimeLimit={buildTimeLimitMinutes(group)} />
+                          {!stageContext.stages.length && <OverrideField
                             checked={group.overrideFields.includes("timeLimit")}
                             disabled={disabled}
                             id={`activity-group-time-limit-${group.groupId}`}
@@ -664,7 +677,7 @@ function AssignmentOverrideFields({ group, summative, disabled, onChange, onTogg
                               value={group}
                               onChange={(update) => onChange(update)}
                             />
-                          </OverrideField>
+                          </OverrideField>}
                           <OverrideField
                             checked={group.overrideFields.includes("visibility")}
                             disabled={disabled}
@@ -1045,6 +1058,7 @@ function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean,
         ...assignmentValueDraft({
           ...group,
           ...exception,
+          submissionStages: exception.submissionStages ?? {},
           availableFrom: exception.availableFrom ?? null,
           availableUntil: exception.availableUntil ?? null,
           timeLimitMinutes: exception.timeLimitMinutes ?? null,
@@ -1065,6 +1079,7 @@ function buildDraft(settings: CourseActivityAssignmentSettings, isTest: boolean,
 }
 
 function assignmentValueDraft(value: {
+  submissionStages?: SubmissionStagePolicies;
   availableFrom: string | null;
   availableUntil: string | null;
   timeLimitMinutes: number | null;
@@ -1074,6 +1089,7 @@ function assignmentValueDraft(value: {
   contentPlacement: { parentId: string | null; isVisible: boolean };
 }, timeZone: string = "UTC"): AssignmentValueDraft {
   return {
+    submissionStages: stagePoliciesForDraft(value.submissionStages, timeZone),
     availableFrom: toDateTimeLocalValue(value.availableFrom, timeZone),
     availableUntil: toDateTimeLocalValue(value.availableUntil, timeZone),
     timeLimitEnabled: value.timeLimitMinutes !== null,

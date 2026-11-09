@@ -1,3 +1,5 @@
+/** Ephemeral exception provenance; never serialized as assignment metadata. */
+export const assignmentTimeLimitException = Symbol("assignmentTimeLimitException");
 export type AssignmentAssessmentPolicyMode = "formative" | "formative_ai" | "summative";
 
 /** Exam-content retention is opt-in and shared by all sections and Test children. */

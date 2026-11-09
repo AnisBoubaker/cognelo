@@ -6,7 +6,9 @@ Implemented in the activity settings dialog's **Exceptions** tab. Course manager
 
 Resolve each setting independently: **General → section override → matching team exceptions → student exception**. Teachers order team exceptions with the highest priority first. When several matching teams replace the same setting, the first wins; unchecked settings continue inheriting from lower-priority rules. An individual's selected setting always wins over teams, regardless of list position. Explicit null dates/time limits and false switches are replacements, not inheritance.
 
-Every section override is also available on an exception:
+Every section override is also available on an exception. Staged activities additionally expose independent stage deadline/duration/late-policy fields through optional `submissionStages` partial maps. Supplied stage fields override the lower-priority value; omitted fields inherit and explicit null clears a date/duration. These maps do not add or consume entries in the legacy `overrideFields` enum. See [submission-stage scheduling](ACTIVITY_SUBMISSION_STAGES.md).
+
+The existing common overrides are:
 
 | Override | Behavior |
 | --- | --- |
@@ -20,7 +22,7 @@ Every section override is also available on an exception:
 | Attempts | Unlimited, until due, or a maximum count. |
 | Grade strategy | Latest, first, best, or weighted average with optional drop-lowest. |
 
-The last six categories are summative-only. Switching to formative removes their override selections from both section and exception settings. Assessment mode remains General-only, and folder placement remains controlled by the content tree. Grade release, late grace, activity configuration, and Test child authoring are not exception fields because they are not section overrides in this dialog.
+The last six categories are summative-only. Switching to formative removes their override selections from both section and exception settings. Assessment mode remains General-only, and folder placement remains controlled by the content tree. Grade release, legacy gradebook lateness grace, activity configuration, and Test child authoring are not exception fields because they are not section overrides in this dialog.
 
 [Release solution](ACTIVITY_SOLUTIONS.md) is General-only and shared by sections, like messaging. Summative solutions require the independent section grade release as well.
 

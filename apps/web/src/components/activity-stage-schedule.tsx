@@ -1,0 +1,66 @@
+"use client";
+import { createContext, useContext } from "react";
+import { ToggleSwitch, fromZonedDateTimeInput, toZonedDateTimeInput } from "@cognelo/activity-ui";
+import { defaultSubmissionStagePolicy, submissionStageWindow, type SubmissionStagePolicies, type SubmissionStagePolicy } from "@cognelo/contracts";
+import type { SubmissionStageDefinition } from "@cognelo/activity-sdk";
+import { DateTimeMinuteInput } from "./date-time-minute-input";
+
+const en = { title: "Submission stages", deadline: "deadline", limit: "time limit", override: "Override", timed: "Set a time limit", minutes: "Minutes", allowLate: "Allow late submissions", latePolicy: "late-submission policy", limited: "Limit the late-submission period", days: "Days", hours: "Hours", noDeadline: "No deadline", inherited: "Uses activity cutoff", effective: "Effective deadline", start: "The time limit starts when this stage begins. It does not include waiting between stages.", optional: "Leave blank to use the activity cutoff, if one is set.", hard: "Available until is a hard cutoff for every stage, including late submissions.", accepts: "Submissions close", inactive: "This stage is disabled in the activity. Its settings are retained." };
+const fr: typeof en = { title: "Étapes de remise", deadline: "date limite", limit: "limite de temps", override: "Remplacer", timed: "Fixer une limite de temps", minutes: "Minutes", allowLate: "Autoriser les remises en retard", latePolicy: "politique de retard", limited: "Limiter la période de remise en retard", days: "Jours", hours: "Heures", noDeadline: "Aucune date limite", inherited: "Utilise la fermeture de l’activité", effective: "Date limite effective", start: "La limite de temps commence au début de cette étape. L’attente entre les étapes ne compte pas.", optional: "Laissez vide pour utiliser la fermeture de l’activité, si elle est définie.", hard: "Disponible jusqu’au est une fermeture définitive pour toutes les étapes, y compris les remises en retard.", accepts: "Fin des remises", inactive: "Cette étape est désactivée dans l’activité. Ses paramètres sont conservés." };
+const zh: typeof en = { title: "提交阶段", deadline: "截止时间", limit: "时间限制", override: "覆盖", timed: "设置时间限制", minutes: "分钟", allowLate: "允许迟交", latePolicy: "迟交规则", limited: "限制迟交期限", days: "天", hours: "小时", noDeadline: "无截止时间", inherited: "使用活动关闭时间", effective: "实际截止时间", start: "计时从本阶段开始，不包括阶段之间的等待。", optional: "留空则使用活动关闭时间（如已设置）。", hard: "活动关闭时间限制所有阶段，包括迟交。", accepts: "提交关闭时间", inactive: "此阶段已关闭，设置仍保留。" };
+const ar: typeof en = { title: "مراحل التسليم", deadline: "الموعد النهائي", limit: "الحد الزمني", override: "تجاوز", timed: "تحديد مدة زمنية", minutes: "دقائق", allowLate: "السماح بالتسليم المتأخر", latePolicy: "سياسة التأخير", limited: "تحديد فترة التأخير", days: "أيام", hours: "ساعات", noDeadline: "لا موعد نهائي", inherited: "يستخدم إغلاق النشاط", effective: "الموعد النهائي الفعلي", start: "تبدأ المدة عند بدء المرحلة ولا تشمل الانتظار بين المراحل.", optional: "اتركه فارغاً لاستخدام إغلاق النشاط إن وُجد.", hard: "إغلاق النشاط حد نهائي لكل المراحل بما فيها التسليم المتأخر.", accepts: "إغلاق التسليم", inactive: "هذه المرحلة معطلة وتُحفظ إعداداتها." };
+export type StageScheduleDefinition = SubmissionStageDefinition & { active?: boolean };
+export const StageScheduleContext = createContext<{ stages: StageScheduleDefinition[]; general: SubmissionStagePolicies; timeZone: string; locale: string }>({ stages: [], general: {}, timeZone: "UTC", locale: "en" });
+export const useStageSchedule = () => useContext(StageScheduleContext);
+export function stagePoliciesForDraft(value: SubmissionStagePolicies | undefined, timeZone: string): SubmissionStagePolicies {
+  return Object.fromEntries(Object.entries(value ?? {}).map(([id, policy]) => [id, { ...policy, ...(policy.deadline !== undefined ? { deadline: policy.deadline ? toZonedDateTimeInput(policy.deadline, timeZone) : null } : {}) }]));
+}
+export function stagePoliciesForSave(value: SubmissionStagePolicies, timeZone: string): SubmissionStagePolicies {
+  return Object.fromEntries(Object.entries(value).map(([id, policy]) => [id, { ...policy, ...(policy.deadline !== undefined ? { deadline: policy.deadline ? fromZonedDateTimeInput(policy.deadline, timeZone) : null } : {}) }]));
+}
+export function ActivityStageSchedule({ value, onChange, availableUntil, disabled, inherited, legacyTimeLimit }: {
+  value: SubmissionStagePolicies; onChange: (value: SubmissionStagePolicies) => void; availableUntil: string; disabled: boolean; inherited?: SubmissionStagePolicies; legacyTimeLimit?: number | null;
+}) {
+  const { stages, locale, timeZone } = useStageSchedule(), copy = ({ en, fr, zh, ar } as Record<string, typeof en>)[locale] ?? en;
+  if (!stages.length) return null;
+  const update = (id: string, patch: Partial<SubmissionStagePolicy>) => onChange({ ...value, [id]: { ...value[id], ...patch } });
+  function override(id: string, keys: Array<keyof SubmissionStagePolicy>, checked: boolean, effective: SubmissionStagePolicy) {
+    const next = { ...value[id] };
+    for (const key of keys) { if (checked) Object.assign(next, { [key]: effective[key] }); else delete next[key]; }
+    onChange({ ...value, [id]: next });
+  }
+  return <section className="stack activity-stage-schedule"><h3>{copy.title}</h3><p className="muted">{copy.hard}</p>
+    {stages.map(stage => {
+      const name = stage.names[locale as keyof typeof stage.names] ?? stage.names.en, own = value[stage.id] ?? {};
+      const policy = { ...defaultSubmissionStagePolicy, ...(stage.assessment ? { timeLimitMinutes: legacyTimeLimit ?? null } : {}), ...inherited?.[stage.id], ...own };
+      const dateLabel = `${name} — ${copy.deadline}`, limitLabel = `${name} — ${copy.limit}`;
+      let window: ReturnType<typeof submissionStageWindow> | null = null;
+      try { const saved = stagePoliciesForSave({ [stage.id]: policy }, timeZone)[stage.id] as SubmissionStagePolicy; window = submissionStageWindow(saved, availableUntil ? fromZonedDateTimeInput(availableUntil, timeZone) : null); } catch { /* Keep invalid input in the draft for ordinary form validation. */ }
+      const duration = policy.lateLimitMinutes ?? 1440;
+      const enabled = (key: keyof SubmissionStagePolicy) => !inherited || own[key] !== undefined;
+      const group = (label: string, keys: Array<keyof SubmissionStagePolicy>) => inherited && <label className="checkbox-row"><input type="checkbox" checked={keys.some(key => own[key] !== undefined)} disabled={disabled || stage.active === false} onChange={event => override(stage.id, keys, event.currentTarget.checked, policy)} />{copy.override} {label}</label>;
+      return <fieldset className="stack preview-panel" key={stage.id} disabled={disabled || stage.active === false}><legend><strong>{name}</strong></legend>
+        {stage.active === false && <p>{copy.inactive}</p>}
+        {group(dateLabel, ["deadline"])}
+        <div className="field"><label htmlFor={`stage-${stage.id}-${inherited ? "override" : "general"}-deadline`}>{dateLabel} ({timeZone})</label>
+          <DateTimeMinuteInput id={`stage-${stage.id}-${inherited ? "override" : "general"}-deadline`} value={policy.deadline ?? ""} disabled={!enabled("deadline")} onChange={deadline => update(stage.id, { deadline: deadline || null })} />
+          <p className="muted">{copy.optional}</p>
+        </div>
+        <p role="status">{window?.deadline ? `${policy.deadline ? copy.effective : copy.inherited}: ${new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(window.deadline))}` : copy.noDeadline}</p>
+        {group(limitLabel, ["timeLimitMinutes"])}
+        <ToggleSwitch locale={locale} label={<><span className="sr-only">{name} — </span>{copy.timed}</>} checked={policy.timeLimitMinutes !== null} disabled={!enabled("timeLimitMinutes")} onChange={checked => update(stage.id, { timeLimitMinutes: checked ? 60 : null })} />
+        {policy.timeLimitMinutes !== null && <label className="field">{limitLabel} ({copy.minutes})<input type="number" min={1} max={1440} value={policy.timeLimitMinutes} disabled={!enabled("timeLimitMinutes")} onChange={event => update(stage.id, { timeLimitMinutes: Number(event.currentTarget.value) })} /></label>}
+        {policy.timeLimitMinutes !== null && <p className="muted">{copy.start}</p>}
+        {stage.allowsLateSubmissions && <>
+          {group(`${name} — ${copy.latePolicy}`, ["allowLate", "lateLimitMinutes"])}
+          <ToggleSwitch locale={locale} label={<><span className="sr-only">{name} — </span>{copy.allowLate}</>} checked={policy.allowLate} disabled={!enabled("allowLate")} onChange={allowLate => update(stage.id, { allowLate, ...(!allowLate ? { lateLimitMinutes: null } : {}) })} />
+          {policy.allowLate && <>
+            <ToggleSwitch locale={locale} label={<><span className="sr-only">{name} — </span>{copy.limited}</>} checked={policy.lateLimitMinutes !== null} disabled={!enabled("allowLate")} onChange={limited => update(stage.id, { lateLimitMinutes: limited ? 1440 : null })} />
+            {policy.lateLimitMinutes !== null && <div className="activity-stage-duration">{([[copy.days, 1440, 3650], [copy.hours, 60, 23], [copy.minutes, 1, 59]] as const).map(([label, unit, max]) => <label className="field" key={unit}>{label}<input aria-label={`${name} — ${label}`} type="number" min={0} max={max} disabled={!enabled("allowLate")} value={unit === 1440 ? Math.floor(duration / unit) : Math.floor(duration % (unit === 60 ? 1440 : 60) / unit)} onChange={event => { const prior = unit === 1440 ? Math.floor(duration / unit) : Math.floor(duration % (unit === 60 ? 1440 : 60) / unit); update(stage.id, { lateLimitMinutes: duration + (Number(event.currentTarget.value) - prior) * unit }); }} /></label>)}</div>}
+          </>}
+        </>}
+        {window?.closesAt && <p className="muted">{copy.accepts}: {new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(window.closesAt))}</p>}
+      </fieldset>;
+    })}
+  </section>;
+}

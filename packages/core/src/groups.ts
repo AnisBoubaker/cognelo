@@ -1,4 +1,4 @@
-import { getActivitySubmissionStageConfiguration, readSubmissionStagePolicies, validateSubmissionStagePolicies } from "./activity-submission-stages";
+import { getActivitySubmissionStageConfiguration, legacyGeneralStagePolicies, legacySectionStageOverrides, readSubmissionStagePolicies, validateSubmissionStagePolicies } from "./activity-submission-stages";
 import { mergeSubmissionStagePolicies, type SubmissionStagePolicies } from "@cognelo/contracts";
 import { assertMaterialStorageUnchanged } from "./material-storage";
 import { projectStudentActivity } from "./student-activity";
@@ -256,7 +256,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
     metadata: rule?.contentPlacement?.metadata ?? asMetadataRecord(coursePlacement?.metadata)
   };
   const stageConfiguration = await getActivitySubmissionStageConfiguration(activity);
-  const generalStages = mergeSubmissionStagePolicies(stageConfiguration.defaults, rule?.submissionStages);
+  const generalStages = mergeSubmissionStagePolicies(stageConfiguration.defaults, legacyGeneralStagePolicies(activity.activityType?.key ?? "", rule?.timeLimitMinutes), rule?.submissionStages);
   const general = {
     ...(stageConfiguration.stages.length ? { submissionStages: generalStages } : {}),
     ...(supportsTeamwork ? { teamworkEnabled: rule?.teamworkEnabled === true, teamworkLocked: lockedTeamGroups.size > 0 } : {}),
@@ -316,9 +316,13 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
         assigned,
         students: group.participants ?? [],
         teams: (group.studentGroupings ?? []).flatMap((grouping) => grouping.teams.map((team) => ({ ...team, groupingTitle: grouping.title }))),
-        exceptions: (assignment?.assignmentExceptions ?? []).map((exception) => ({ ...ActivityAssignmentOverrideValuesSchema.parse(exception.settings), teamId: exception.teamId, participantId: exception.participantId })),
+        exceptions: (assignment?.assignmentExceptions ?? []).map((exception) => {
+          const value = ActivityAssignmentOverrideValuesSchema.parse(exception.settings);
+          const stages = stageConfiguration.stages.length ? mergeSubmissionStagePolicies(value.overrideFields.includes("timeLimit") ? legacyGeneralStagePolicies(activity.activityType?.key ?? "", value.timeLimitMinutes) : {}, value.submissionStages) : undefined;
+          return { ...value, ...(stages ? { submissionStages: stages } : {}), teamId: exception.teamId, participantId: exception.participantId };
+        }),
         assignmentId: assignment?.id ?? null,
-        ...(stageConfiguration.stages.length ? { submissionStages: readSubmissionStagePolicies(asMetadataRecord(assignment?.metadata).submissionStageOverrides) } : {}),
+        ...(stageConfiguration.stages.length ? { submissionStages: legacySectionStageOverrides(activity.activityType?.key ?? "", assignment?.metadata, overrideFields) } : {}),
         overrideFields,
         availableFrom: assignment ? assignment.availableFrom?.toISOString() ?? null : general.availableFrom,
         availableUntil: assignment ? assignment.availableUntil?.toISOString() ?? null : general.availableUntil,
@@ -356,7 +360,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   await assertTestReadyForCompositeExecution(courseId, activity);
   const gradebookSettings = normalizeGradebookItemSettings(data.gradebookSettings);
   const stageConfiguration = await getActivitySubmissionStageConfiguration(activity);
-  const stagePolicies = data.submissionStages ?? mergeSubmissionStagePolicies(stageConfiguration.defaults, getCourseWideAssignmentMetadata(activity.metadata)?.submissionStages);
+  const stagePolicies = mergeSubmissionStagePolicies(stageConfiguration.defaults, legacyGeneralStagePolicies(activity.activityType?.key ?? "", data.timeLimitMinutes), getCourseWideAssignmentMetadata(activity.metadata)?.submissionStages, data.submissionStages);
   validateSubmissionStagePolicies(activity.activityType?.key ?? "", stagePolicies, data.availableFrom, stageConfiguration.stages.filter(stage => stage.active).map(stage => stage.id));
 
   return prisma.$transaction(async (tx) => {
@@ -542,7 +546,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
           groupTimeLimitMinutes
         );
         if (stageConfiguration.stages.length) {
-          const stageOverrides = requested.submissionStages ?? readSubmissionStagePolicies(asMetadataRecord(existingAssignment?.metadata).submissionStageOverrides);
+          const stageOverrides = requested.submissionStages ?? legacySectionStageOverrides(activity.activityType?.key ?? "", existingAssignment?.metadata, overrideFields);
           const effectiveStages = mergeSubmissionStagePolicies(stagePolicies, stageOverrides);
           validateSubmissionStagePolicies(activity.activityType?.key ?? "", effectiveStages, groupAvailableFrom, stageConfiguration.stages.filter(stage => stage.active).map(stage => stage.id));
           groupAssignmentMetadata.submissionStages = effectiveStages as Prisma.JsonValue;

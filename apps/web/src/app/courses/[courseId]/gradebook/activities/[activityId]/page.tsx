@@ -95,7 +95,7 @@ export default function GradebookActivityResultsPage() {
   const [submissionDeletionRow, setSubmissionDeletionRow] = useState<CourseGradebookRow | null>(null);
   const [answerExportTarget, setAnswerExportTarget] = useState<{ participantId?: string } | null>(null);
   const [showGradeExport, setShowGradeExport] = useState(false);
-  const [showActivitySettings, setShowActivitySettings] = useState(false);
+  const [showActivitySettings, setShowActivitySettings] = useState(searchParams.get("settings") === "1");
   const [showActivityMessenger, setShowActivityMessenger] = useState(false);
   const [messagingStatus, setMessagingStatus] = useState<ActivityMessagingStatus | null>(null);
   const [messagingParticipantId, setMessagingParticipantId] = useState<string | null>(null);

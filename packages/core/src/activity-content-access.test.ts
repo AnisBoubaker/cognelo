@@ -1,3 +1,4 @@
+import { registerActivityPlugin } from "@cognelo/activity-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ assignment: vi.fn(), participant: vi.fn(), attempts: vi.fn(), manage: vi.fn(), grade: vi.fn(), exceptions: vi.fn(), releasedGrade: vi.fn(), deletions: vi.fn() }));
 vi.mock("@cognelo/db", () => ({ prisma: {
@@ -24,6 +25,18 @@ beforeEach(() => {
 });
 
 describe("activity content closure", () => {
+  it("uses the assessment-stage date and a cleared stage duration instead of the old general timer", async () => {
+    const names = { en: "Answers", fr: "Réponses", zh: "作答", ar: "الإجابات" };
+    registerActivityPlugin({ key: "closure-stage-fixture", name: "Stages", packageName: "test", db: { namespace: "closure_stage_test", tables: [] }, activities: [{ key: "closure-stage-fixture", name: "Stages", description: "Stages", studentView: { mode: "read_only" }, submissionStages: [{ id: "questions", names, assessment: true }] }] });
+    const assignment = { id: "assignment-1", metadata: { assessmentMode: "summative", timeLimitMinutes: 1, submissionStages: { questions: { timeLimitMinutes: null, deadline: new Date(Date.now() + 3600_000).toISOString() } } }, availableUntil: null,
+      activity: { id: "activity-1", activityType: { key: "closure-stage-fixture" }, title: "Stages", metadata: { allGroupsAssignment: { hideAfterAttempts: true } } }, gradebookItem: policy };
+    mocks.assignment.mockResolvedValue(assignment);
+    mocks.attempts.mockResolvedValue([{ ...attempt, lifecycle: "started", submittedAt: null, startedAt: new Date(Date.now() - 7200_000) }]);
+    expect((await getActivityContentAccess(user, "course-1", "group-1", "activity-1")).locked).toBe(false);
+    assignment.metadata.submissionStages.questions.deadline = new Date(Date.now() - 60_000).toISOString();
+    expect((await getActivityContentAccess(user, "course-1", "group-1", "activity-1")).locked).toBe(true);
+  });
+
   it("is opt-in, including for legacy metadata", () => {
     for (const value of [null, {}, { allGroupsAssignment: {} }, { allGroupsAssignment: { hideAfterAttempts: false } }]) expect(courseActivityHidesAfterAttempts(value)).toBe(false);
   });

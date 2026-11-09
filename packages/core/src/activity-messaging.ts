@@ -1,3 +1,4 @@
+import { activityAssessmentStageAssignment } from "./activity-submission-stages";
 import { Prisma, prisma } from "@cognelo/db";
 import { ActivityBroadcastMessageInputSchema, ActivityMessageDeletionInputSchema, ActivityMessageTestItemContextSchema, LearnerActivityMessageInputSchema, type ActivityMessageDeletionInput, type ActivityMessageTestItemInput, type ActivityMessageTestItemContext, type CurrentUser } from "@cognelo/contracts";
 import { assignmentAttemptExpiresAt, assignmentTimeLimitMinutes, courseActivityMessagingEnabled, courseActivityTwoWayMessagingEnabled } from "./activity-assignment-policy";
@@ -52,11 +53,12 @@ export async function getLearnerActivityConversation(
     select: { id: true, attemptNumber: true, lifecycle: true, startedAt: true }, orderBy: { attemptNumber: "desc" }
   });
   const activeAttempt = attempts.find((attempt) => attempt.lifecycle === "started");
-  const timeLimit = assignmentTimeLimitMinutes(activity.assignment.metadata);
-  const expiresAt = activeAttempt ? assignmentAttemptExpiresAt(activeAttempt.startedAt, timeLimit, activity.assignment.availableUntil) : null;
+  const stageAssignment = await activityAssessmentStageAssignment(activity, activity.assignment);
+  const timeLimit = assignmentTimeLimitMinutes(stageAssignment.metadata);
+  const expiresAt = activeAttempt ? assignmentAttemptExpiresAt(activeAttempt.startedAt, timeLimit, stageAssignment.availableUntil) : null;
   const requiresStartedAttempt = activity.activityType.key === "test" || timeLimit !== null;
   if ((!activeAttempt && requiresStartedAttempt) || (expiresAt && expiresAt <= now)
-    || (activity.assignment.availableUntil && activity.assignment.availableUntil <= now)) {
+    || (stageAssignment.availableUntil && stageAssignment.availableUntil <= now)) {
     await closeLearnerConversations(activity.assignment.id, participant.id, now);
     return getStoredLearnerActivityConversation(user, courseId, groupId, activityId, before, summaryOnly);
   }

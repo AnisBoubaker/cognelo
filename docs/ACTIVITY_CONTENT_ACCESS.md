@@ -10,6 +10,8 @@ Closed students retain the activity title, submission receipts, deletion reasons
 
 This prevents later retrieval; it cannot revoke material copied, photographed, or saved while legitimately accessible. Public external resources and materials independently shared elsewhere retain their own access policy.
 
+For activities declaring an assessment stage, content closure uses its effective calendar cutoff and duration after assignment exceptions. Clearing that stage’s duration also clears an inherited legacy general timer for closure; a longer overall Until never extends an earlier stage cutoff. Ordinary activities keep their existing behavior. See [stage scheduling](ACTIVITY_SUBMISSION_STAGES.md).
+
 ## Enforcement
 
 - `Activity.metadata.allGroupsAssignment.hideAfterAttempts` stores the opt-in setting. No database migration is required.

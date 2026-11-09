@@ -26,6 +26,9 @@ export async function markCodingHomeworkSubmissionDeleted(input: {
     return;
   }
 
+  if (!submission.workspaceId) await prisma.$executeRaw`UPDATE "PluginCodingHomeworkDraft" d SET "preparationStartedAt"=NULL
+    WHERE d."activityId"=${input.activityId} AND d."groupId"=${input.groupId} AND d."userId"=${submission.userId}
+    AND NOT EXISTS(SELECT 1 FROM "PluginCodingHomeworkSubmission" newer WHERE newer."activityId"=d."activityId" AND newer."groupId"=d."groupId" AND newer."userId"=d."userId" AND newer.kind='final' AND newer."createdAt">${submission.createdAt})`;
   await prisma.pluginCodingHomeworkSubmission.update({
     where: { id: submission.id },
     data: {

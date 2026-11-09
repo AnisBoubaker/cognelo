@@ -1,3 +1,4 @@
+import { assignmentTimeLimitException } from "./activity-assignment-policy";
 import { mergeSubmissionStagePolicies, type SubmissionStagePolicies, ActivityAssignmentOverrideValuesSchema, type ActivityAssignmentExceptionInput, type GradebookItemSettingsInput } from "@cognelo/contracts";
 import { prisma, type Prisma } from "@cognelo/db";
 import { AppError } from "./errors";
@@ -73,18 +74,20 @@ export function exceptionsForParticipant(rows: Awaited<ReturnType<typeof loadAss
 
 export function applyAssignmentExceptions<T extends { metadata: Prisma.JsonValue; availableFrom?: Date | null; availableUntil?: Date | null }>(assignment: T, overrides: AssignmentExceptionOverrides): T {
   const metadata = assignment.metadata && typeof assignment.metadata === "object" && !Array.isArray(assignment.metadata) ? assignment.metadata : {};
-  return {
+  const result = {
     ...assignment,
     ...(overrides.availableFrom !== undefined ? { availableFrom: overrides.availableFrom ? new Date(overrides.availableFrom) : null } : {}),
     ...(overrides.availableUntil !== undefined ? { availableUntil: overrides.availableUntil ? new Date(overrides.availableUntil) : null } : {}),
     metadata: {
       ...metadata,
-      ...(overrides.submissionStages ? { submissionStages: mergeSubmissionStagePolicies(metadata.submissionStages as SubmissionStagePolicies | undefined, overrides.submissionStages) } : {}),
+      ...(overrides.submissionStages ? { submissionStages: mergeSubmissionStagePolicies(metadata.submissionStages as SubmissionStagePolicies | undefined, overrides.submissionStages), submissionStageExceptionOverrides: overrides.submissionStages } : {}),
       ...(overrides.timeLimitMinutes !== undefined ? { timeLimitMinutes: overrides.timeLimitMinutes } : {}),
       ...(metadata.assessmentMode === "summative" && overrides.requireSafeExamBrowser !== undefined ? { requireSafeExamBrowser: overrides.requireSafeExamBrowser } : {}),
       ...(metadata.assessmentMode === "summative" && overrides.gradeChallengesEnabled !== undefined ? { gradeChallengesEnabled: overrides.gradeChallengesEnabled } : {})
     }
   };
+  if (overrides.timeLimitMinutes !== undefined) Object.defineProperty(result.metadata, assignmentTimeLimitException, { value: overrides.timeLimitMinutes, enumerable: false });
+  return result;
 }
 
 export function applyGradebookExceptions<T>(item: T, overrides: AssignmentExceptionOverrides): T {

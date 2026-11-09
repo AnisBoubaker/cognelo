@@ -1,3 +1,4 @@
+import { activityAssessmentStageAssignment } from "./activity-submission-stages";
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma } from "@cognelo/db";
 import { canManageCourse, canGradeGroup } from "./authorization";
@@ -31,7 +32,7 @@ export function resolveActivityContentLock(policy: Policy, attempts: Attempt[], 
 export async function getActivityContentAccess(user: CurrentUser, courseId: string, groupId: string, activityId: string) {
   const assignment = await prisma.courseGroupActivity.findFirst({
     where: { groupId, activityId, group: { courseId } },
-    include: { activity: { select: { title: true, metadata: true } }, gradebookItem: true }
+    include: { activity: { select: { id: true, title: true, metadata: true, activityType: { select: { key: true } } } }, gradebookItem: true }
   });
   if (!assignment) throw notFound("Group activity assignment");
   const participant = await prisma.courseGroupParticipant.findFirst({ where: { groupId, userId: user.id }, select: { id: true, role: true } });
@@ -43,7 +44,7 @@ export async function getActivityContentAccess(user: CurrentUser, courseId: stri
     receipts: [] as Array<{ attemptNumber: number; submittedAt: string | null; deleted: boolean; reason?: string | null }> };
   if (staff || !enabled) return base;
   const overrides = (await assignmentExceptionsForUser([assignment.id], user.id)).get(assignment.id) ?? {};
-  const effective = applyAssignmentExceptions(assignment, overrides);
+  const effective = await activityAssessmentStageAssignment(assignment.activity, applyAssignmentExceptions(assignment, overrides));
   const item = assignment.gradebookItem ? applyGradebookExceptions(assignment.gradebookItem, overrides) : null;
   if (!item) throw new AppError(409, "GRADEBOOK_ITEM_MISSING", "The activity's attempt policy is unavailable.");
   const summative = assignmentAssessmentPolicyMode(effective.metadata) === "summative";

@@ -178,6 +178,7 @@ function LegacyCodingHomeworkActivityView({
   workflowRequest,
   solutionRequest,
   canManage,
+  course,
   locale = "en",
   onSave,
   preflightClient,
@@ -750,7 +751,7 @@ function LegacyCodingHomeworkActivityView({
     {teamQuestionField(locked)}
 
   </section>;
-  const workflowSettings = workflowRequest ? <HomeworkTeacherWorkflow workflow={workflow} locale={locale} busy={saving} questionPortalTarget={questionPortalTarget} submissionPortalTarget={submissionPortalTarget} questionsEnabled={questionsEnabled} generationSettings={loading ? null : generationSettings} /> : null;
+  const workflowSettings = workflowRequest ? <HomeworkTeacherWorkflow schedulingUrl={course?.id ? `/courses/${course.id}/gradebook/activities/${activity.id}?settings=1` : undefined} workflow={workflow} locale={locale} busy={saving} questionPortalTarget={questionPortalTarget} submissionPortalTarget={submissionPortalTarget} questionsEnabled={questionsEnabled} generationSettings={loading ? null : generationSettings} /> : null;
 
   if (loading || (canManage && authoringClient && loadedAuthoringId.current !== activity.id)) {
     return (

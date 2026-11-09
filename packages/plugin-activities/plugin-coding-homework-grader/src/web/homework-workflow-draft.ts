@@ -1,23 +1,22 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useActivityReferenceAuthoring, useApplicationTime, useNotifications, type AiModelConnectionOption } from "@cognelo/activity-ui";
+import { useActivityReferenceAuthoring, useNotifications, type AiModelConnectionOption } from "@cognelo/activity-ui";
 import type { AiModelSelection } from "@cognelo/contracts";
 import { homeworkWorkflowDraftSchema, type HomeworkWorkflowDraftInput } from "../workflow-contract";
-import { defaultHomeworkSubmissionPolicy, type HomeworkSubmissionPolicy } from "../submission-policy";
-import { homeworkDeadlineDraft, homeworkDeadlinePolicy, type HomeworkDeadlineDraft } from "./homework-deadline-settings";
+import { type HomeworkSubmissionPolicy } from "../submission-policy";
 import { homeworkWorkflowCopy } from "./workflow-copy";
 import type { CodingHomeworkLocale } from "./messages";
 import type { HomeworkRequest } from "./workflow-types";
 
 type Settings = { questionGenerationEnabled: boolean; submissionPolicy: HomeworkSubmissionPolicy; questionPolicyLocked: boolean; enabled: boolean; prepared: boolean; concurrency: number;
   ai: { connections: AiModelConnectionOption[]; question: { selection: AiModelSelection | null; resolved: { model: string } | null; error: string | null } } };
-type Draft = { questionAi: AiModelSelection | null; concurrency: string; enabled: boolean; deadline: HomeworkDeadlineDraft };
+type Draft = { questionAi: AiModelSelection | null; concurrency: string; enabled: boolean };
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-const draftFor = (settings: Settings, timeZone: string): Draft => ({ questionAi: settings.ai.question.selection, concurrency: String(settings.concurrency), enabled: settings.enabled, deadline: homeworkDeadlineDraft(settings.submissionPolicy ?? defaultHomeworkSubmissionPolicy, timeZone) });
+const draftFor = (settings: Settings): Draft => ({ questionAi: settings.ai.question.selection, concurrency: String(settings.concurrency), enabled: settings.enabled });
 
 /** One draft and saved baseline for all course-only controls in the main editor. */
 export function useHomeworkWorkflowDraft(request: HomeworkRequest | undefined, locale: CodingHomeworkLocale, managementRevision: number) {
-  const { timeZone } = useApplicationTime(), references = useActivityReferenceAuthoring(), notifications = useNotifications(), copy = homeworkWorkflowCopy(locale);
+  const references = useActivityReferenceAuthoring(), notifications = useNotifications(), copy = homeworkWorkflowCopy(locale);
   const [settings, setSettings] = useState<Settings | null>(null), [draft, setDraft] = useState<Draft | null>(null), [saved, setSaved] = useState<Draft | null>(null);
   const dirty = !same(draft, saved), dirtyRef = useRef(dirty), version = useRef(0);
   dirtyRef.current = dirty;
@@ -27,8 +26,8 @@ export function useHomeworkWorkflowDraft(request: HomeworkRequest | undefined, l
     const id = ++version.current, data = await request<Settings>("workflow-settings");
     if (id !== version.current) return;
     setSettings(data);
-    if (adopt || !dirtyRef.current) { const next = draftFor(data, timeZone); setDraft(next); setSaved(next); }
-  }, [request, timeZone]);
+    if (adopt || !dirtyRef.current) { const next = draftFor(data); setDraft(next); setSaved(next); }
+  }, [request]);
   useEffect(() => { const requests = version; setSettings(null); setDraft(null); setSaved(null); void refresh(true).catch(report); return () => { requests.current++; }; }, [refresh, report]);
   useEffect(() => {
     const focus = () => { if (!document.hidden) void refresh().catch(report); };
@@ -45,15 +44,14 @@ export function useHomeworkWorkflowDraft(request: HomeworkRequest | undefined, l
     if (!same(draft.questionAi, saved.questionAi)) result.questionGenerationAi = draft.questionAi;
     if (draft.concurrency !== saved.concurrency) result.concurrency = Number(draft.concurrency);
     if (modeChanged || draft.enabled !== saved.enabled) result.enabled = draft.enabled;
-    if (!same(draft.deadline, saved.deadline)) result.submissionPolicy = homeworkDeadlinePolicy(draft.deadline, timeZone, locale);
     return homeworkWorkflowDraftSchema.parse(result);
-  }, [draft, saved, request, copy.loading, timeZone, locale]);
+  }, [draft, saved, request, copy.loading]);
   const acceptSaved = useCallback(async () => {
     setSaved(draft);
     // Saving has committed; a transient metadata refresh failure must not turn it
     // into an apparent failed save. Retain the known persisted draft and allow retry.
     await refresh(true).catch(report);
   }, [draft, refresh, report]);
-  return { settings, draft, dirty, update, discard, changes, acceptSaved, refresh, report, timeZone, references };
+  return { settings, draft, dirty, update, discard, changes, acceptSaved, refresh, report, references };
 }
 export type HomeworkWorkflowDraft = ReturnType<typeof useHomeworkWorkflowDraft>;

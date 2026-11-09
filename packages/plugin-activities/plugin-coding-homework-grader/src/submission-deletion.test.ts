@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const dbMocks = vi.hoisted(() => ({
+  $executeRaw: vi.fn(),
   pluginCodingHomeworkSubmission: {
     findFirst: vi.fn(),
     update: vi.fn()
@@ -21,7 +22,7 @@ describe("coding homework submission deletion", () => {
 
   it("marks the plugin submission as deleted and clears the core attempt link", async () => {
     dbMocks.pluginCodingHomeworkSubmission.findFirst.mockResolvedValueOnce({
-      id: "submission-1",
+      id: "submission-1", userId: "student-1", createdAt: new Date("2026-06-18T10:00:00.000Z"), workspaceId: null,
       activityId: "activity-1",
       groupId: "group-1",
       coreAttemptId: "attempt-1",

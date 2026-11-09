@@ -297,6 +297,10 @@ Use the host-provided bounded `readJson`, and `readBoundedFormData` for multipar
 
 An activity definition may opt into `assessmentFlow: "deferred"` and mark individual trusted routes with `learnerAccessPhase: "preparation"` or `"assessment_start"`. Preparation retains assignment/availability/content authorization while bypassing SEB and an unstarted answer timer. Assessment start retains SEB verification and must establish its own core attempt; the generic host start rejects deferred activities. Unmarked routes remain protected. The renderer requests host SEB access through `onAssessmentAccessRequested` and refreshes timing after successful start through `onAssessmentStarted`. Do not mark answer, grading, or unrestricted mutation routes as preparation.
 
+### Ordered submission stages
+
+Definitions may declare `submissionStages`, an ordered list of stable IDs and localized names including the first stage. Core derives the count, validates unique IDs/names and at most one `assessment` stage, and owns calendar deadlines, optional durations, supported late policy and General/section/team/student field-level inheritance. The effective calendar date is the earlier stage/overall Until date; stage duration further caps work. Both dates may be absent. The `submissionStages.configuration` server service may supply active IDs and legacy defaults without exposing private storage to core. Plugins own stage starts/completion/evidence and must pass the assessment-effective assignment into answering/finalization. Waiting between stages starts no answering clock. See [the full contract](../ACTIVITY_SUBMISSION_STAGES.md).
+
 ### Deferred submission management and finalization
 
 An activity may advertise `submissionManagement.rendererKey` for its operational panel in the shared activity details report. The host resolves this through its renderer registry; the plugin owns pending submission data and staff actions. This includes preparation/generation workflows that have no core attempt yet.

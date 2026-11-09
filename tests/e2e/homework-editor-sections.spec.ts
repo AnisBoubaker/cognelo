@@ -48,7 +48,8 @@ test("Programming Homework keeps core top tabs and shared left sections, rich te
   await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
   expect(await responseJson(await api.get(`${base}/authoring`))).toMatchObject({ assignment: { questionCount: 4, generationInstructions: "Ask about one parameter.", settings: { questionGenerationEnabled: false } } });
   await left.getByRole("tab", { name: "Submission settings", exact: true }).click();
-  await expect(page.getByRole("switch", { name: "Allow late submissions", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Activity scheduling", exact: true })).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Allow late submissions", exact: true })).toHaveCount(0);
   await page.getByLabel("Max files", { exact: true }).fill("100");
   await top.getByRole("tab", { name: "Concepts", exact: true }).click(); await top.getByRole("tab", { name: "Activity", exact: true }).click();
   await expect(left.getByRole("tab", { name: "Submission settings", exact: true })).toHaveAttribute("aria-selected", "true");

@@ -1,3 +1,5 @@
+import type { SubmissionStagePolicies } from "@cognelo/contracts";
+import type { SubmissionStageDefinition } from "@cognelo/activity-sdk";
 import type { TestAiGradingInstructions } from "@cognelo/contracts";
 import type { AiGradingRunSummary } from "@cognelo/contracts";
 import type { AnswerExportRequest, AnswerExportStudent, TestAttemptReviewInput } from "@cognelo/contracts";
@@ -961,7 +963,9 @@ export type ActivityAssignmentGradebookSettings = {
 };
 
 export type CourseActivityAssignmentSettings = {
+  submissionStages?: Array<SubmissionStageDefinition & { active?: boolean }>;
   general: {
+    submissionStages?: SubmissionStagePolicies;
     teamworkEnabled?: boolean;
     teamworkLocked?: boolean;
     messagingEnabled: boolean;
@@ -984,6 +988,7 @@ export type CourseActivityAssignmentSettings = {
   };
   groups: Array<{
     groupId: string;
+    submissionStages?: SubmissionStagePolicies;
     groupings?: Array<{ id: string; title: string }>;
     teamGroupingId?: string | null;
     allowIndividualSubmission?: boolean;

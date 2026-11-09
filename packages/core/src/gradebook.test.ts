@@ -1,3 +1,4 @@
+import { registerActivityPlugin } from "@cognelo/activity-sdk";
 import { recoverExpiredTestAttempts } from "./test-timeout-recovery";
 vi.mock("./test-timeout-recovery", () => ({ recoverExpiredTestAttempts: vi.fn().mockResolvedValue(0) }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -437,6 +438,14 @@ describe("gradebook attempt services", () => {
     });
   });
 
+  it("snapshots a stage cutoff and measures lateness from the stage due date", async () => {
+    const names = { en: "Submission", fr: "Remise", zh: "提交", ar: "التسليم" };
+    registerActivityPlugin({ key: "gradebook-stage-fixture", name: "Stages", packageName: "test", db: { namespace: "gradebook_stage_test", tables: [] }, activities: [{ key: "gradebook-stage-fixture", name: "Stages", description: "Stages", studentView: { mode: "read_only" }, submissionStages: [{ id: "submission", names, assessment: true, allowsLateSubmissions: true }] }] });
+    mockPrisma.activityAttempt.findUnique.mockResolvedValue({ id: "attempt-1", courseId: "course-1", participant, participantId: "participant-1", userId: "student-1", lifecycle: "started", startedAt: new Date("2030-01-01T09:00:00Z"), metadata: {},
+      groupActivity: { ...groupActivity, availableUntil: new Date("2030-01-01T12:00:00Z"), activity: { id: "activity-1", activityType: { key: "gradebook-stage-fixture" } }, metadata: { submissionStages: { submission: { deadline: "2030-01-01T10:00:00Z", allowLate: true, lateLimitMinutes: 60 } } } }, gradebookItem: { lateGracePeriodMinutes: 0 } });
+    expect(await submitActivityAttempt(studentUser, { attemptId: "attempt-1", now: new Date("2030-01-01T10:30:00Z") })).toMatchObject({ isLate: true, lateBySeconds: 1800,
+      metadata: { submittedAvailableUntil: "2030-01-01T11:00:00.000Z", submittedStageDeadline: "2030-01-01T10:00:00.000Z", submittedStageId: "submission" } });
+  });
   it("computes lateness when submitting an attempt after available until and grace", async () => {
     mockPrisma.activityAttempt.findUnique.mockResolvedValue({
       id: "attempt-1",

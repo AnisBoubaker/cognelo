@@ -4,7 +4,7 @@ import { homeworkModelFixture } from "./fixtures/homework-model";
 import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import type { CodingHomeworkAuthoringRecord } from "../../packages/plugin-activities/plugin-coding-homework-grader/src/web/client";
 
-test("one homework Save/Cancel covers every left section and persists the combined draft", async ({ bankCourse: data, browser }) => {
+test("one homework Save/Cancel covers activity-specific left sections and persists the combined draft", async ({ bankCourse: data, browser }) => {
   test.setTimeout(120_000);
   const model = await homeworkModelFixture(data), page = await model.page(browser), api = model.api;
   try {
@@ -33,10 +33,6 @@ test("one homework Save/Cancel covers every left section and persists the combin
       await expect(page.getByRole("button", { name: "Save", exact: true })).toHaveCount(1);
       await expect(page.getByRole("button", { name: "Save deadline settings", exact: true })).toHaveCount(0);
       await page.getByLabel("Max files", { exact: true }).fill("90");
-      await page.locator('.homework-deadline-settings input[type="datetime-local"]').fill("2030-01-15T09:30");
-      await page.getByRole("switch", { name: "Allow late submissions", exact: true }).check();
-      await page.getByRole("switch", { name: "Limit the late-submission period", exact: true }).check();
-      await page.getByLabel("Hours", { exact: true }).fill("2");
     };
     await edit();
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
@@ -44,7 +40,6 @@ test("one homework Save/Cancel covers every left section and persists the combin
     expect(mutations).toEqual([]); expect(await snapshot()).toEqual(before);
     await bar.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(page.getByLabel("Max files", { exact: true })).toHaveValue("200");
-    await expect(page.locator('.homework-deadline-settings input[type="datetime-local"]')).toHaveValue("");
     await openHomeworkEditorSection(page, "Question Generation");
     await expect(page.getByLabel("Students processed at once (1–4)")).toHaveValue("2");
     await expect(page.getByLabel("AI question-generation instructions", { exact: true })).toHaveValue("");
@@ -58,15 +53,9 @@ test("one homework Save/Cancel covers every left section and persists the combin
     expect((await saved).ok()).toBe(true); await expect(bar).toContainText("Everything is saved.");
     expect(mutations).toHaveLength(1); expect(mutations[0]).toContain("/authoring");
     const authored = await snapshot();
-    expect(authored).toMatchObject({ assignment: { generationInstructions: "Ask about one guard.", settings: { generationConcurrency: 3, questionGenerationAi: { connectionId: model.connection.id, model: "alternate-text" }, submissionPolicy: { allowLate: true, lateLimitMinutes: 1560 } } }, requirements: { requirements: { maxFileCount: 90, requiredFiles: [{ path: "main.c" }] } } });
+    expect(authored).toMatchObject({ assignment: { generationInstructions: "Ask about one guard.", settings: { generationConcurrency: 3, questionGenerationAi: { connectionId: model.connection.id, model: "alternate-text" } } }, requirements: { requirements: { maxFileCount: 90, requiredFiles: [{ path: "main.c" }] } } });
     await page.reload(); await openHomeworkEditorSection(page, "Submission settings");
     await expect(page.getByLabel("Max files", { exact: true })).toHaveValue("90");
-    await expect(page.locator('.homework-deadline-settings input[type="datetime-local"]')).toHaveValue("2030-01-15T09:30");
-    await page.getByLabel("Hours", { exact: true }).fill("24");
-    await bar.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(page.locator('section[role="alert"]')).toContainText("Enter a positive duration");
-    expect(mutations).toHaveLength(1); expect(await snapshot()).toEqual(authored);
-    await bar.getByRole("button", { name: "Cancel", exact: true }).click();
     await openHomeworkEditorSection(page, "Question Generation");
     await expect(page.locator(".homework-workflow-questions").getByLabel("Model", { exact: true })).toHaveValue("alternate-text");
     await expect(page.getByLabel("Students processed at once (1–4)")).toHaveValue("3");

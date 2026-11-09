@@ -123,7 +123,8 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     void submitAnswers(true).then(timedAutoSubmit.onSettled);
   }, [timedAutoSubmit, completed, submitAnswers]);
   const policy = workspace?.submissionPolicy ?? defaultHomeworkSubmissionPolicy;
-  const submissionWindow = homeworkSubmissionWindow(policy, clock);
+  const ordinaryWindow = homeworkSubmissionWindow(policy, clock);
+  const submissionWindow = workspace?.submissionClosesAt !== undefined ? { ...ordinaryWindow, closesAt: workspace.submissionClosesAt, closed: workspace.submissionClosesAt !== null && clock >= Date.parse(workspace.submissionClosesAt) } : ordinaryWindow;
   const files = active?.files ?? preparation?.draft.files ?? [];
   const hasCurrentCheck = Boolean(preparation && checkedPreparation && preparation.draft.revision === checkedPreparation.draft.revision &&
     JSON.stringify(preparation.validation.issues) === JSON.stringify(checkedPreparation.validation.issues) &&
@@ -136,6 +137,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     <MarkdownRenderer markdown={assignment?.assignment.promptMarkdown ?? ""} />
     <HomeworkDownloads promptPdfId={assignment?.assignment.promptPdf?.id} hasProvidedFiles={Boolean(assignment?.assignment.providedFiles.length)}
       activityFileUrl={activityFileUrl} providedFilesUrl={providedFilesUrl} locale={locale} />
+    {!active && !policy.deadline && submissionWindow.closesAt && <p role="status"><strong>{deadlineCopy.deadline}: </strong><AppDateTime value={submissionWindow.closesAt} locale={locale} /> ({timeZone})</p>}
     {(active?.submissionTiming?.deadline ?? (!active ? policy.deadline : null)) && <div className="stack" role="status">
       <p><strong>{deadlineCopy.deadline}: </strong><AppDateTime value={(active?.submissionTiming?.deadline ?? policy.deadline)!} locale={locale} /> ({timeZone})</p>
       {!active && <p>{policy.allowLate ? submissionWindow.closesAt ? <>{deadlineCopy.closes}: <AppDateTime value={submissionWindow.closesAt} locale={locale} /> ({timeZone})</> : deadlineCopy.unlimited : deadlineCopy.noLate}</p>}

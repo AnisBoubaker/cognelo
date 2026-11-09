@@ -5,16 +5,15 @@ import { ActionIcon, AiModelPicker, ToggleSwitch } from "@cognelo/activity-ui";
 import type { CodingHomeworkLocale } from "./messages";
 import { homeworkWorkflowCopy } from "./workflow-copy";
 import { homeworkEditorCopy } from "./editor-copy";
-import { HomeworkDeadlineSettings } from "./homework-deadline-settings";
 import type { HomeworkWorkflowDraft } from "./homework-workflow-draft";
 export { HomeworkSolutionSelector } from "./homework-solution-selector";
 
-export function HomeworkTeacherWorkflow({ workflow, locale, busy, questionPortalTarget, submissionPortalTarget, generationSettings, questionsEnabled }: {
+export function HomeworkTeacherWorkflow({ workflow, locale, busy, questionPortalTarget, submissionPortalTarget, generationSettings, questionsEnabled, schedulingUrl }: {
   workflow: HomeworkWorkflowDraft; locale: CodingHomeworkLocale; busy: boolean; questionPortalTarget: HTMLElement | null; submissionPortalTarget: HTMLElement | null;
-  generationSettings?: ReactNode | ((locked: boolean) => ReactNode); questionsEnabled: boolean;
+  generationSettings?: ReactNode | ((locked: boolean) => ReactNode); questionsEnabled: boolean; schedulingUrl?: string;
 }) {
   const edit = homeworkEditorCopy(locale), copy = homeworkWorkflowCopy(locale);
-  const { settings, draft, update, references, timeZone, refresh, report } = workflow;
+  const { settings, draft, update, references, refresh, report } = workflow;
   const changed = JSON.stringify(draft?.questionAi) !== JSON.stringify(settings?.ai.question.selection);
   const ready = !questionsEnabled || (references ? references.loaded && references.prepared && !references.dirty : settings?.prepared);
   const questionPanel = <div className="stack homework-workflow-questions">
@@ -37,7 +36,8 @@ export function HomeworkTeacherWorkflow({ workflow, locale, busy, questionPortal
       <ToggleSwitch locale={locale} label={edit.finalSubmissions} checked={draft.enabled} disabled={busy || (!draft.enabled && !ready)} onChange={enabled => update({ enabled })} />
       <p role="status">{draft.enabled !== settings.enabled ? draft.enabled ? edit.pendingOpening : edit.pendingClosing : draft.enabled ? copy.enabledHelp : questionsEnabled ? ready ? copy.prepared : copy.needsPreparation : edit.disabledHelp}</p>
       {questionsEnabled && references?.dirty && <p className="muted">{copy.saveFirst}</p>}
-      <HomeworkDeadlineSettings draft={draft.deadline} timeZone={timeZone} locale={locale} busy={busy} onChange={deadline => update({ deadline })} />
+      <p className="muted">{edit.schedulingHelp}</p>
+      {schedulingUrl && <a className="button secondary" href={schedulingUrl}><ActionIcon name="settings" />{edit.scheduling}</a>}
     </>}
   </div>;
   return <>{questionPortalTarget && createPortal(questionPanel, questionPortalTarget)}{submissionPortalTarget && createPortal(submissionPanel, submissionPortalTarget)}</>;

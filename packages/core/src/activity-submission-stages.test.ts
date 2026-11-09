@@ -1,3 +1,4 @@
+import { applyAssignmentExceptions } from "./activity-assignment-exceptions";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ definition: vi.fn(), configuration: vi.fn() }));
 vi.mock("@cognelo/activity-sdk", () => ({ getActivityDefinition: mocks.definition }));
@@ -9,6 +10,7 @@ describe("core stage capability resolution", () => {
   it("uses plugin names, ordered IDs and active stages, without concrete plugin imports", async () => {
     mocks.configuration.mockResolvedValue({ activeStageIds: ["files"] });
     expect((await getActivitySubmissionStageConfiguration(activity)).stages).toMatchObject([{ id: "files", names, active: true }, { id: "questions", active: false }]);
+    expect((await activityAssessmentStageAssignment(activity, { metadata: { timeLimitMinutes: 25 } })).metadata.timeLimitMinutes).toBeNull();
   });
   it("preserves legacy defaults until core settings explicitly replace or clear them", async () => {
     expect((await resolveActivitySubmissionStage(activity, { metadata: {} }, "files")).policy.deadline).toBe("2030-01-01T10:00:00.000Z");
@@ -26,9 +28,24 @@ describe("core stage capability resolution", () => {
     const value = await activityAssessmentStageAssignment(activity, { availableUntil: new Date("2030-01-01T12:00:00Z"), metadata: { timeLimitMinutes: 10, submissionStages: { questions: { deadline: "2030-01-01T11:00:00Z" } } } });
     expect(value.availableUntil?.toISOString()).toBe("2030-01-01T11:00:00.000Z"); expect(value.metadata.timeLimitMinutes).toBe(10);
   });
+  it("separates an assessment stage's late cutoff from its due date", async () => {
+    mocks.definition.mockReturnValue({ submissionStages: [{ id: "questions", names, assessment: true, allowsLateSubmissions: true }] });
+    const value = await activityAssessmentStageAssignment(activity, { availableUntil: new Date("2030-01-01T12:00:00Z"), metadata: { submissionStages: { questions: { deadline: "2030-01-01T10:00:00Z", allowLate: true, lateLimitMinutes: 60 } } } });
+    expect(value.availableUntil?.toISOString()).toBe("2030-01-01T11:00:00.000Z");
+    expect(value.metadata).toMatchObject({ submissionStageDeadline: "2030-01-01T10:00:00.000Z" });
+  });
   it("explicitly clears the legacy duration", async () => {
     const value = await activityAssessmentStageAssignment(activity, { metadata: { timeLimitMinutes: 10, submissionStages: { questions: { timeLimitMinutes: null } } } });
     expect(value.metadata.timeLimitMinutes).toBeNull();
+  });
+  it("preserves legacy section durations until a canonical override is explicitly cleared", async () => {
+    const withGeneral = { ...activity, metadata: { allGroupsAssignment: { timeLimitMinutes: 20, submissionStages: { questions: { timeLimitMinutes: 20 } } } } };
+    const legacy = { timeLimitMinutes: 60, overrideFields: ["timeLimit"], submissionStages: { questions: { timeLimitMinutes: 20 } } };
+    expect((await resolveActivitySubmissionStage(withGeneral, { metadata: legacy }, "questions")).policy.timeLimitMinutes).toBe(60);
+    expect((await resolveActivitySubmissionStage(withGeneral, { metadata: { ...legacy, submissionStageExceptionOverrides: { questions: { timeLimitMinutes: 15 } } } }, "questions")).policy.timeLimitMinutes).toBe(15);
+    expect((await resolveActivitySubmissionStage(withGeneral, { metadata: { ...legacy, submissionStageOverrides: {} } }, "questions")).policy.timeLimitMinutes).toBe(20);
+    const exception = applyAssignmentExceptions({ metadata: { timeLimitMinutes: 20, overrideFields: [], submissionStages: { questions: { timeLimitMinutes: 20 } }, submissionStageOverrides: {} } }, { timeLimitMinutes: 90 });
+    expect((await resolveActivitySubmissionStage(withGeneral, exception, "questions")).policy.timeLimitMinutes).toBe(90);
   });
   it("rejects undeclared stages and late policy on an unsupported stage", () => {
     expect(() => validateSubmissionStagePolicies("staged", { unknown: {} })).toThrow("declared submission stage");

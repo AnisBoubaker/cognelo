@@ -365,7 +365,7 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
     where: { id: input.attemptId },
     include: {
       gradebookItem: true,
-      groupActivity: true,
+      groupActivity: { include: { activity: { select: { id: true, metadata: true, activityType: { select: { key: true } } } } } },
       participant: true
     }
   });
@@ -384,7 +384,8 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
   if (attempt.lifecycle === "deleted") throw new AppError(409, "SUBMISSION_DELETED", "A deleted attempt cannot be submitted.");
 
   const exceptions = await loadAssignmentExceptions([attempt.groupActivityId], db);
-  const effectiveAssignment = applyAssignmentExceptions(attempt.groupActivity, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
+  const exceptionAssignment = applyAssignmentExceptions(attempt.groupActivity, exceptionsForParticipant(exceptions, attempt.groupActivityId, attempt.participantId));
+  const effectiveAssignment = attempt.groupActivity.activity ? await activityAssessmentStageAssignment(attempt.groupActivity.activity, exceptionAssignment) : exceptionAssignment;
 
   if (attempt.assessmentMode !== "formative" && attempt.gradebookItem.gradesReleased && !asJsonObject(attempt.metadata)?.continuation && !asJsonObject(attempt.metadata)?.replacementOfAttemptId) {
     throw new AppError(400, "GRADES_RELEASED", "No more submissions are allowed after grades have been released.");
@@ -394,7 +395,11 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
     throw new AppError(400, "ACTIVITY_ATTEMPT_ALREADY_GRADED", "This attempt has already been graded.");
   }
 
-  const lateness = computeAttemptLateness(effectiveAssignment.availableUntil, attempt.gradebookItem.lateGracePeriodMinutes, now);
+  const stageMetadata = asJsonObject(effectiveAssignment.metadata);
+  const due = stageMetadata?.submissionAssessmentStage
+    ? typeof stageMetadata.submissionStageDeadline === "string" ? new Date(stageMetadata.submissionStageDeadline) : null
+    : effectiveAssignment.availableUntil;
+  const lateness = computeAttemptLateness(due, attempt.gradebookItem.lateGracePeriodMinutes, now);
   const durationSeconds = Math.max(0, Math.round((now.getTime() - attempt.startedAt.getTime()) / 1000));
 
   return db.activityAttempt.update({
@@ -411,7 +416,8 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
         ...attemptInputMetadata(input.metadata),
         // Preserve the original attempt/manifest; record final timing separately.
         submittedTimeLimitMinutes: assignmentTimeLimitMinutes(effectiveAssignment.metadata),
-        submittedAvailableUntil: effectiveAssignment.availableUntil?.toISOString() ?? null
+        submittedAvailableUntil: effectiveAssignment.availableUntil?.toISOString() ?? null,
+        ...(stageMetadata?.submissionAssessmentStage ? { submittedStageDeadline: due?.toISOString() ?? null, submittedStageId: stageMetadata.submissionAssessmentStage } : {})
       } as JsonInput
     }
   });
@@ -635,6 +641,8 @@ export async function reopenActivitySubmission(user: CurrentUser, courseId: stri
       // Submission evidence is archived in the event before clearing completion state.
       delete metadata.submittedTimeLimitMinutes;
       delete metadata.submittedAvailableUntil;
+      delete metadata.submittedStageDeadline;
+      delete metadata.submittedStageId;
       delete metadata.teacherFeedback;
       delete metadata.timedOut;
       delete metadata.savedResponse;
@@ -2019,6 +2027,7 @@ async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: S
       activity: {
         select: {
           id: true,
+          metadata: true,
           activityType: { select: { key: true } },
           activityVersionId: true,
           knowledgeConcepts: {
@@ -2745,6 +2754,6 @@ function studentDeletedMetadata(attempt: Record<string, unknown>): Record<string
 
 /** Replacement grants are core-owned authorization, never plugin/learner input metadata. */
 function attemptInputMetadata(value: unknown) {
-  const { replacementAllowed: _allowed, replacementOfAttemptId: _replacement, ...metadata } = asJsonObject(value) ?? {};
+  const { replacementAllowed: _allowed, replacementOfAttemptId: _replacement, submittedStageDeadline: _stageDeadline, submittedStageId: _stageId, ...metadata } = asJsonObject(value) ?? {};
   return metadata;
 }
