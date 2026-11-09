@@ -28,12 +28,12 @@ for (const owner of ["bank", "course"] as const) test(`${owner} homework solutio
   const fileChoice = selector.getByRole("checkbox", { name: "Solution/main.c", exact: true });
   await expect(fileChoice).toBeVisible();
   const geometry = await fileChoice.evaluate(input => {
-    const checkbox = input.getBoundingClientRect(), text = input.closest("label")!.querySelector("code")!.getBoundingClientRect();
+    const checkbox = input.getBoundingClientRect(), text = input.parentElement!.querySelector('[role="tab"]')!.getBoundingClientRect();
     return { width: checkbox.width, height: checkbox.height, sameLine: text.top < checkbox.bottom && text.left > checkbox.right };
   });
   expect(geometry.width).toBeLessThanOrEqual(20); expect(geometry.height).toBeLessThanOrEqual(20); expect(geometry.sameLine).toBe(true);
   await fileChoice.check(); await selector.getByRole("checkbox", { name: "int add(int) Solution/main.c", exact: true }).check();
-  await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.getByText("Programming homework saved.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
 
   // Finder-created resource forks look like C files but contain binary NUL bytes.
   await upload([
@@ -50,7 +50,12 @@ for (const owner of ["bank", "course"] as const) test(`${owner} homework solutio
   expect(solution.files.map(file => file.path)).toEqual(["main.c", "main.h"]);
   const replacedRevision = solution.revision;
   await selector.getByRole("checkbox", { name: "int helper(void) main.c", exact: true }).check();
-  await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.getByText("Programming homework saved.", { exact: true })).toBeVisible();
+  await selector.getByRole("tab", { name: "main.h", exact: true }).click();
+  await expect(selector.getByRole("checkbox", { name: "int helper(void) main.c", exact: true })).toHaveCount(0);
+  await expect(selector.getByText("Upload source files to list their function definitions. Headers and files without definitions can still be required.", { exact: true })).toBeVisible();
+  await selector.getByRole("tab", { name: "main.c", exact: true }).click();
+  await expect(selector.getByRole("checkbox", { name: "int helper(void) main.c", exact: true })).toBeChecked();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
   await openHomeworkEditorSection(page, "Activity");
   await page.getByLabel("Description", { exact: true }).fill("An unrelated unsaved description.");
   await openHomeworkEditorSection(page, "Teacher solution");
@@ -58,13 +63,31 @@ for (const owner of ["bank", "course"] as const) test(`${owner} homework solutio
   await expect(selector.getByRole("checkbox", { name: "int helper(void) main.c", exact: true })).toHaveCount(0);
   await expect(page.getByLabel("Description", { exact: true })).toHaveValue("An unrelated unsaved description.");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await openHomeworkEditorSection(page, "Submission requirements");
   await expect(page.getByLabel("Required functions", { exact: true })).toHaveValue("");
+  await openHomeworkEditorSection(page, "Teacher solution");
   // Adding an unrelated header must not resurrect an excluded function.
   await fileInput.setInputFiles({ name: "other.h", mimeType: "text/plain", buffer: Buffer.from("int other(void);\n") });
   await expect(selector.getByRole("checkbox", { name: "other.h", exact: true })).toBeVisible();
+  await fileInput.setInputFiles({ name: "other.c", mimeType: "text/plain", buffer: Buffer.from("int other(void) { return 2; }\n") });
+  await expect(selector.getByRole("tab", { name: "other.c", exact: true })).toBeVisible();
+  await selector.getByRole("checkbox", { name: "int add(int) main.c", exact: true }).check();
+  await selector.getByRole("tab", { name: "other.c", exact: true }).click();
+  await expect(selector.getByRole("checkbox", { name: "int add(int) main.c", exact: true })).toHaveCount(0);
+  await selector.getByRole("checkbox", { name: "int other(void) other.c", exact: true }).check();
+  await selector.getByRole("tab", { name: "other.c", exact: true }).press("Home");
+  await expect(selector.getByRole("tab", { name: "main.c", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(selector.getByRole("checkbox", { name: "int add(int) main.c", exact: true })).toBeChecked();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
+  await selector.screenshot({ path: `tmp/homework-solution-${owner}-desktop.png` });
   await page.reload();
   await openHomeworkEditorSection(page, "Teacher solution");
   await expect(selector.getByRole("checkbox", { name: "other.h", exact: true })).toBeVisible();
+  await selector.getByRole("tab", { name: "other.c", exact: true }).click();
+  await expect(selector.getByRole("checkbox", { name: "int other(void) other.c", exact: true })).toBeChecked();
+  await selector.getByRole("button", { name: "Remove file: other.c", exact: true }).click();
+  await expect(selector.getByRole("tab", { name: "main.c", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(selector.getByRole("button", { name: "Remove function: main.c:helper", exact: true })).toHaveCount(0);
   await selector.getByRole("button", { name: "Remove file: main.h", exact: true }).click();
   await expect(selector.getByRole("checkbox", { name: "main.h", exact: true })).toHaveCount(0);

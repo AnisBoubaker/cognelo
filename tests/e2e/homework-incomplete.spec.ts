@@ -34,6 +34,8 @@ test("teacher selects private solution signatures and student explicitly acknowl
     await openHomeworkEditorSection(teacherPage, "Submission");
     await teacherPage.getByRole("switch", { name: "Accept final submissions", exact: true }).click();
     await expect(teacherPage.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeChecked();
+    await teacherPage.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(teacherPage.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
     const assigned = `/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${id}`;
     await studentPage.goto(assigned);
     await expect(studentPage.locator('input[type="file"][multiple]')).toBeEnabled();

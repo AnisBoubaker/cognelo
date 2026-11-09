@@ -1,48 +1,32 @@
 "use client";
-import { createPortal } from "react-dom";
-import { useEffect, useId, useRef, useState } from "react";
-import { EditActionBar, ProgressDialog, ToggleSwitch, getEditActionBarCopy, useApplicationTime, useNotifications, useUnsavedChangesGuard, toZonedDateTimeInput, fromZonedDateTimeInput } from "@cognelo/activity-ui";
+import { useId } from "react";
+import { ToggleSwitch, toZonedDateTimeInput, fromZonedDateTimeInput } from "@cognelo/activity-ui";
 import { homeworkSubmissionPolicySchema, type HomeworkSubmissionPolicy } from "../submission-policy";
 import type { CodingHomeworkLocale } from "./messages";
-import { body, type HomeworkRequest } from "./workflow-types";
 import { submissionDeadlineCopy } from "./submission-deadline-copy";
 
-type Draft = { deadline: string; allowLate: boolean; limited: boolean; days: string; hours: string; minutes: string };
-function draftFor(policy: HomeworkSubmissionPolicy, timeZone: string): Draft {
+export type HomeworkDeadlineDraft = { deadline: string; allowLate: boolean; limited: boolean; days: string; hours: string; minutes: string };
+export function homeworkDeadlineDraft(policy: HomeworkSubmissionPolicy, timeZone: string): HomeworkDeadlineDraft {
   const minutes = policy.lateLimitMinutes ?? 1440;
   return { deadline: toZonedDateTimeInput(policy.deadline, timeZone), allowLate: policy.allowLate, limited: policy.lateLimitMinutes !== null,
     days: String(Math.floor(minutes / 1440)), hours: String(Math.floor(minutes % 1440 / 60)), minutes: String(minutes % 60) };
 }
-export function HomeworkDeadlineSettings({ policy, request, locale, onSaved, onDirtyChange }: { policy: HomeworkSubmissionPolicy; request: HomeworkRequest; locale: CodingHomeworkLocale; onSaved: (policy: HomeworkSubmissionPolicy) => void; onDirtyChange: (dirty: boolean) => void }) {
-  const { timeZone } = useApplicationTime(), copy = submissionDeadlineCopy(locale), action = getEditActionBarCopy(locale), notifications = useNotifications(), id = useId();
-  const [saved, setSaved] = useState(policy), [draft, setDraft] = useState(() => draftFor(policy, timeZone)), [busy, setBusy] = useState(false);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(draftFor(saved, timeZone)), dirtyRef = useRef(dirty), controller = useRef<AbortController | null>(null);
-  dirtyRef.current = dirty;
-  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
-  useEffect(() => { setSaved(policy); if (!dirtyRef.current) setDraft(draftFor(policy, timeZone)); }, [policy, timeZone]);
-  useEffect(() => () => controller.current?.abort(), []);
-  const discard = () => setDraft(draftFor(saved, timeZone));
-  async function save() {
-    if (controller.current) throw new Error(action.saving);
-    const pending = new AbortController(); controller.current = pending; setBusy(true);
-    try {
-      let deadline: string | null;
-      try { deadline = fromZonedDateTimeInput(draft.deadline, timeZone); } catch { throw new Error(copy.invalidDeadline); }
-      const allowLate = Boolean(deadline) && draft.allowLate;
-      let lateLimitMinutes: number | null = null;
-      if (allowLate && draft.limited) {
-        if ([draft.days, draft.hours, draft.minutes].some(value => !/^\d*$/.test(value)) || Number(draft.days) > 3650 || Number(draft.hours) > 23 || Number(draft.minutes) > 59) throw new Error(copy.invalidDuration);
-        lateLimitMinutes = Number(draft.days) * 1440 + Number(draft.hours) * 60 + Number(draft.minutes);
-        if (lateLimitMinutes <= 0 || lateLimitMinutes > 3650 * 1440) throw new Error(copy.invalidDuration);
-      }
-      const submissionPolicy = homeworkSubmissionPolicySchema.parse({ deadline, allowLate, lateLimitMinutes });
-      const result = await request<{ submissionPolicy: HomeworkSubmissionPolicy }>("workflow-settings", body("PUT", { submissionPolicy }, pending.signal));
-      setSaved(result.submissionPolicy); setDraft(draftFor(result.submissionPolicy, timeZone)); onSaved(result.submissionPolicy);
-    } catch (error) { if (!pending.signal.aborted) notifications.error(error instanceof Error ? error.message : copy.invalidDeadline); throw error; }
-    finally { controller.current = null; setBusy(false); }
+export function homeworkDeadlinePolicy(draft: HomeworkDeadlineDraft, timeZone: string, locale: CodingHomeworkLocale): HomeworkSubmissionPolicy {
+  const copy = submissionDeadlineCopy(locale);
+  let deadline: string | null;
+  try { deadline = fromZonedDateTimeInput(draft.deadline, timeZone); } catch { throw new Error(copy.invalidDeadline); }
+  const allowLate = Boolean(deadline) && draft.allowLate;
+  let lateLimitMinutes: number | null = null;
+  if (allowLate && draft.limited) {
+    if ([draft.days, draft.hours, draft.minutes].some(value => !/^\d*$/.test(value)) || Number(draft.days) > 3650 || Number(draft.hours) > 23 || Number(draft.minutes) > 59) throw new Error(copy.invalidDuration);
+    lateLimitMinutes = Number(draft.days) * 1440 + Number(draft.hours) * 60 + Number(draft.minutes);
+    if (lateLimitMinutes <= 0 || lateLimitMinutes > 3650 * 1440) throw new Error(copy.invalidDuration);
   }
-  useUnsavedChangesGuard({ isDirty: dirty, onDiscard: discard, onSave: save });
-  const update = (key: keyof Draft, value: string | boolean) => setDraft(current => ({ ...current, [key]: value }));
+  return homeworkSubmissionPolicySchema.parse({ deadline, allowLate, lateLimitMinutes });
+}
+export function HomeworkDeadlineSettings({ draft, timeZone, locale, busy, onChange }: { draft: HomeworkDeadlineDraft; timeZone: string; locale: CodingHomeworkLocale; busy: boolean; onChange: (draft: HomeworkDeadlineDraft) => void }) {
+  const copy = submissionDeadlineCopy(locale), id = useId();
+  const update = (key: keyof HomeworkDeadlineDraft, value: string | boolean) => onChange({ ...draft, [key]: value });
   return <section className="stack homework-deadline-settings" aria-labelledby={`${id}-title`}>
     <h4 id={`${id}-title`}>{copy.title}</h4>
     <div className="field"><label htmlFor={`${id}-deadline`}>{copy.deadline} ({timeZone})</label>
@@ -57,7 +41,5 @@ export function HomeworkDeadlineSettings({ policy, request, locale, onSaved, onD
       </div>)}</div>}
     </>}
     <p className="muted">{copy.help}</p>
-    <EditActionBar isDirty={dirty} isSaving={busy} savedLabel={action.saved} unsavedLabel={action.unsaved} saveLabel={copy.save} savingLabel={action.saving} cancelLabel={action.cancel} onCancel={discard} onSave={() => save().catch(() => {})} />
-    {busy && createPortal(<ProgressDialog open title={copy.save} progressLabel={action.saving} cancelLabel={action.cancel} onCancel={() => controller.current?.abort()} />, document.body)}
   </section>;
 }

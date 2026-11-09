@@ -1,4 +1,5 @@
 "use client";
+import { useHomeworkWorkflowDraft } from "./homework-workflow-draft";
 import { homeworkWorkflowCopy } from "./workflow-copy";
 
 import { HomeworkSimulation } from "./homework-simulation";
@@ -189,10 +190,12 @@ function LegacyCodingHomeworkActivityView({
   const notifications = useNotifications();
   const [managementRevision, setManagementRevision] = useState(0);
   const teamCopy = homeworkWorkflowCopy(locale), editor = homeworkEditorCopy(locale);
-  const [authoringTab, setAuthoringTab] = useState<"activity" | "solution" | "questions" | "submission" | "simulation">("activity");
-  const authoringTabs = ["activity", "solution", "questions", "submission", ...(workflowRequest && preflightClient ? ["simulation"] : [])] as Array<typeof authoringTab>;
+  const [authoringTab, setAuthoringTab] = useState<"activity" | "solution" | "requirements" | "questions" | "submission" | "simulation">("activity");
+  const authoringTabs = ["activity", "solution", "requirements", "questions", "submission", ...(workflowRequest && preflightClient ? ["simulation"] : [])] as Array<typeof authoringTab>;
   const [questionPortalTarget, setQuestionPortalTarget] = useState<HTMLDivElement | null>(null), [submissionPortalTarget, setSubmissionPortalTarget] = useState<HTMLDivElement | null>(null);
-  const [questionPolicyLocked, setQuestionPolicyLocked] = useState(Boolean(workflowRequest));
+  const workflow = useHomeworkWorkflowDraft(canManage ? workflowRequest : undefined, locale, managementRevision);
+  const { discard: discardWorkflow, changes: workflowChanges, acceptSaved: acceptWorkflowSaved } = workflow;
+  const questionPolicyLocked = Boolean(workflowRequest) && (workflow.settings?.questionPolicyLocked ?? true);
   const preflightController = useRef<AbortController | null>(null);
   useEffect(() => () => preflightController.current?.abort(), []);
   const [title, setTitle] = useState(activity.title);
@@ -205,8 +208,8 @@ function LegacyCodingHomeworkActivityView({
   const [providedFiles, setProvidedFiles] = useState<CodingHomeworkAttachmentRecord[]>([]);
   const [loading, setLoading] = useState(Boolean(canManage && authoringClient));
   const loadedAuthoringId = useRef<string | null>(null);
+  const activityForLoad = useRef(activity); activityForLoad.current = activity;
   const [authoringLoadError, setAuthoringLoadError] = useState(false), [authoringReload, setAuthoringReload] = useState(0);
-  const [workflowSettingsDirty, setWorkflowSettingsDirty] = useState(false);
   const [preflightResult, setPreflightResult] = useState<CodingHomeworkPreflightResult | null>(null);
   useEffect(() => { preflightController.current?.abort(); setPreflightResult(null); setAuthoringTab("activity"); }, [activity.id]);
   const [runningPreflight, setRunningPreflight] = useState(false);
@@ -260,6 +263,7 @@ function LegacyCodingHomeworkActivityView({
 
   useEffect(() => {
     let cancelled = false;
+    const activity = activityForLoad.current;
     if (!canManage || !authoringClient) {
       const initial = defaultAuthoring(activity);
       applyAuthoring(initial, activity.title, activity.description);
@@ -291,7 +295,7 @@ function LegacyCodingHomeworkActivityView({
     return () => {
       cancelled = true;
     };
-  }, [activity, applyAuthoring, authoringClient, canManage, copy.saveError, notifications, authoringReload]);
+  }, [activity.id, applyAuthoring, authoringClient, canManage, copy.saveError, notifications, authoringReload]);
 
   useEffect(() => {
     let cancelled = false;
@@ -370,9 +374,11 @@ function LegacyCodingHomeworkActivityView({
       }),
     [assignment, description, requirementDraft, title]
   );
-  const hasUnsavedChanges = savedSnapshotRef.current !== "" && currentSnapshot !== savedSnapshotRef.current;
+  const assignmentDirty = savedSnapshotRef.current !== "" && currentSnapshot !== savedSnapshotRef.current;
+  const hasUnsavedChanges = assignmentDirty || workflow.dirty;
 
   const discardChanges = useCallback(() => {
+    discardWorkflow();
     if (!savedSnapshotRef.current) {
       return;
     }
@@ -386,7 +392,7 @@ function LegacyCodingHomeworkActivityView({
     setDescription(snapshot.description);
     setRequirementDraft(snapshot.requirementDraft);
     setTitle(snapshot.title);
-  }, []);
+  }, [discardWorkflow]);
 
   function reconcileSolution(previous: TeacherSolutionSelection, next: TeacherSolutionSelection) {
     const reconcileDraft = (draft: RequirementDraft, languageKey: string) => requirementsToDraft(
@@ -408,6 +414,8 @@ function LegacyCodingHomeworkActivityView({
       setSaving(true);
       try {
         const requirements = draftToRequirements(requirementDraft, assignment.languageKey);
+        const saved = savedSnapshotRef.current ? JSON.parse(savedSnapshotRef.current) as { assignment: CodingHomeworkAssignmentRecord } : null;
+        const workflowInput = workflowChanges(saved ? homeworkQuestionsEnabled(saved.assignment.settings) !== questionsEnabled : false);
         await onSave({
           title,
           description,
@@ -429,8 +437,10 @@ function LegacyCodingHomeworkActivityView({
             retrievedExampleCount: assignment.retrievedExampleCount,
             settings: assignment.settings
           },
-          requirements
+          requirements,
+          ...(workflowInput ? { workflow: workflowInput } : {})
         });
+        await acceptWorkflowSaved();
         applyAuthoring(record, title, description);
         notifications.success(copy.saved);
       } catch (error) {
@@ -442,7 +452,7 @@ function LegacyCodingHomeworkActivityView({
         setSaving(false);
       }
     },
-    [activity.config, activity.id, applyAuthoring, assignment, authoringClient, copy.saveError, copy.saved, description, notifications, onSave, requirementDraft, title]
+    [activity.config, activity.id, applyAuthoring, assignment, authoringClient, copy.saveError, copy.saved, description, notifications, onSave, requirementDraft, title, questionsEnabled, workflowChanges, acceptWorkflowSaved]
   );
 
   useUnsavedChangesGuard(
@@ -740,7 +750,7 @@ function LegacyCodingHomeworkActivityView({
     {teamQuestionField(locked)}
 
   </section>;
-  const workflowSettings = workflowRequest ? <HomeworkTeacherWorkflow key={activity.id} request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} questionPortalTarget={questionPortalTarget} submissionPortalTarget={submissionPortalTarget} questionsEnabled={questionsEnabled} onQuestionPolicyLockedChange={setQuestionPolicyLocked} generationSettings={loading ? null : generationSettings} managementRevision={managementRevision} onDirtyChange={setWorkflowSettingsDirty} /> : null;
+  const workflowSettings = workflowRequest ? <HomeworkTeacherWorkflow workflow={workflow} locale={locale} busy={saving} questionPortalTarget={questionPortalTarget} submissionPortalTarget={submissionPortalTarget} questionsEnabled={questionsEnabled} generationSettings={loading ? null : generationSettings} /> : null;
 
   if (loading || (canManage && authoringClient && loadedAuthoringId.current !== activity.id)) {
     return (
@@ -847,8 +857,10 @@ function LegacyCodingHomeworkActivityView({
           </section>
           <section className="stack" hidden={authoringTab !== "solution"}><h2>{editor.solution}</h2>
           {(solutionRequest ?? workflowRequest) && <HomeworkSolutionSelector request={(solutionRequest ?? workflowRequest)!} locale={locale} onSolutionChanged={reconcileSolution} requirements={draftToRequirements(requirementDraft, assignment.languageKey)} onChange={requirements => setRequirementDraft(requirementsToDraft(requirements))} />}
+          </section>
+          <section className="stack" hidden={authoringTab !== "requirements"}>
           <div className="section-subheading">
-            <h3>{copy.requirements}</h3>
+            <h2>{editor.requirements}</h2>
             <label className="button secondary">
               {importingRequirements ? "..." : copy.importRequirements}
               <input accept="application/json,.json" hidden type="file" onChange={importRequirements} />
@@ -889,7 +901,7 @@ function LegacyCodingHomeworkActivityView({
           </div>
           </section>
           <section className="stack" hidden={authoringTab !== "questions"}><h2>{editor.questions}</h2>
-            <ToggleSwitch locale={locale} label={editor.enabled} checked={questionsEnabled} disabled={loading || saving || questionPolicyLocked} onChange={questionGenerationEnabled => setAssignment(current => ({ ...current, settings: { ...current.settings, questionGenerationEnabled } }))} />
+            <ToggleSwitch locale={locale} label={editor.enabled} checked={questionsEnabled} disabled={loading || saving || questionPolicyLocked} onChange={questionGenerationEnabled => { workflow.update({ enabled: false }); setAssignment(current => ({ ...current, settings: { ...current.settings, questionGenerationEnabled } })); }} />
             {questionPolicyLocked && <p role="status">{editor.locked}</p>}
             <p className="muted">{questionsEnabled ? editor.modeChange : editor.disabledHelp}</p>
             <div className="stack" hidden={!questionsEnabled}>
@@ -951,7 +963,7 @@ function LegacyCodingHomeworkActivityView({
             <div ref={setSubmissionPortalTarget} />
           </section>
           {workflowRequest && preflightClient && <section hidden={authoringTab !== "simulation"}>
-            <HomeworkSimulation key={activity.id} request={workflowRequest} locale={locale} questionsEnabled={questionsEnabled} hasUnsavedChanges={hasUnsavedChanges || workflowSettingsDirty} preflightResult={preflightResult}
+            <HomeworkSimulation key={activity.id} request={workflowRequest} locale={locale} questionsEnabled={questionsEnabled} hasUnsavedChanges={hasUnsavedChanges} preflightResult={preflightResult}
               preflight={<PreflightPanel copy={copy} disabled={hasUnsavedChanges} preflightResult={preflightResult} runningPreflight={runningPreflight} onUpload={runPreflight} />} />
           </section>}
           <div hidden={authoringTab === "simulation"}>
@@ -965,7 +977,7 @@ function LegacyCodingHomeworkActivityView({
         cancelLabel={actionCopy.cancel}
         onCancel={discardChanges}
         onSave={() => saveHomework()}
-        saveDisabled={!authoringClient || !onSave}
+        saveDisabled={!authoringClient || !onSave || Boolean(workflowRequest && !workflow.draft)}
       />
           </div>
         </form>

@@ -94,7 +94,7 @@ for (const provider of ["codex", "ollama"] as const) test(`homework selects ${pr
     const settingsPanel = page.locator(".homework-workflow-questions");
     await settingsPanel.getByLabel("AI connection", { exact: true }).selectOption(model.connection.id);
     await settingsPanel.getByLabel("Model", { exact: true }).selectOption("alternate-text");
-    await settingsPanel.getByRole("button", { name: "Save model choice", exact: true }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(settingsPanel.getByText("Model in use: alternate-text", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await referencePanel.getByRole("button", { name: "Generate embeddings", exact: true }).click();

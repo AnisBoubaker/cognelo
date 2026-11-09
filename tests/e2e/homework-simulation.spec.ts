@@ -94,7 +94,6 @@ test("teacher simulation checks an uploaded ZIP, confirms incomplete work and us
     await tabs.getByRole("tab", { name: "Question Generation", exact: true }).click(); await mode.check();
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
-    await settings.getByRole("button", { name: "Save model choice", exact: true }).click();
     await tabs.getByRole("tab", { name: "Simulation", exact: true }).click(); await expect(generate).toBeEnabled();
     await responseJson(await teacherApi.post(`${course}/groups/${data.groupId}/activities`, { data: { activityId, metadata: { assessmentMode: "summative" } } }));
     await responseJson(await api.put(`${base}/workflow-settings`, { data: { enabled: true } }));

@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { ActionIcon, ProgressDialog, useDialogs } from "@cognelo/activity-ui";
+import { useEffect, useId, useRef, useState } from "react";
+import { ActionIcon, ProgressDialog, SideNavigation, sideNavigationItemId, useDialogs } from "@cognelo/activity-ui";
 import type { CodingHomeworkLocale } from "./messages";
 import type { CodingHomeworkAuthoringSubmissionRequirements } from "./client";
 import type { TeacherSolutionSelection } from "../teacher-solution-selection";
@@ -17,14 +17,18 @@ export function HomeworkSolutionSelector({ request, locale, requirements, onChan
   const [solution, setSolution] = useState<Solution | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const controller = useRef<AbortController | null>(null), current = useRef(solution), onChanged = useRef(onSolutionChanged);
   current.current = solution; onChanged.current = onSolutionChanged;
+  const [selectedPath, setSelectedPath] = useState<string | null>(null), navigationId = useId();
+  const activePath = solution?.files.some(file => file.path === selectedPath) ? selectedPath! : solution?.files[0]?.path;
+  const visibleFunctions = solution?.functions.filter(fn => fn.sourcePath === activePath) ?? [];
   const selected = new Set(requirements.requiredFunctions.map(fn => `${fn.filePath}:${fn.name}`));
   const disabled = busy || !solution || solution.locked;
   function apply(next: Solution) {
     if (current.current && current.current.revision !== next.revision) onChanged.current(current.current, next);
     current.current = next; setSolution(next);
+    setSelectedPath(previous => next.files.some(file => file.path === previous) ? previous : next.files[0]?.path ?? null);
   }
   useEffect(() => {
-    const pending = new AbortController(); setSolution(null); current.current = null;
+    const pending = new AbortController(); setSolution(null); setSelectedPath(null); current.current = null;
     void request<Solution>("teacher-solution", { signal: pending.signal }).then(next => { if (!pending.signal.aborted) apply(next); })
       .catch(reason => { if (!pending.signal.aborted) setError(reason.message); });
     return () => { pending.abort(); controller.current?.abort(); };
@@ -69,16 +73,22 @@ export function HomeworkSolutionSelector({ request, locale, requirements, onChan
     {error && <p className="error" role="alert">{error}</p>}
     {solution?.locked && <p className="muted">{copy.solutionLocked}</p>}
     {solution?.files.length ? <>
-      <h4>{copy.requiredFiles}</h4>
-      <ul className="homework-solution-list">{solution.files.map(file => <li className="homework-solution-row" key={file.path}>
-        <label className="homework-choice"><input type="checkbox" disabled={disabled} checked={requirements.requiredFiles.some(item => item.path === file.path)} onChange={event => onChange({ ...requirements, requiredFiles: event.target.checked ? [...requirements.requiredFiles.filter(item => item.path !== file.path), { path: file.path }] : requirements.requiredFiles.filter(item => item.path !== file.path) })} /><span className="homework-choice-text"><code>{file.path}</code></span></label>
-        <button type="button" className="secondary" disabled={disabled} aria-label={`${copy.removeFile}: ${file.path}`} onClick={() => void remove({ kind: "file", path: file.path })}><ActionIcon name="remove" /> {copy.remove}</button>
-      </li>)}</ul>
-      <h4>{copy.requiredFunctions}</h4>
-      {solution.functions.length ? <ul className="homework-solution-list">{solution.functions.map(fn => <li className="homework-solution-row" key={fn.key}>
-        <label className="homework-choice"><input type="checkbox" disabled={disabled} checked={selected.has(fn.key)} onChange={event => select(event.target.checked ? [...selected, fn.key] : [...selected].filter(key => key !== fn.key))} /><span className="homework-choice-text"><code>{fn.signature ? `${fn.signature.returnType} ${fn.functionName}(${fn.signature.parameterTypes.join(", ") || "void"})` : fn.functionName}</code><span className="muted">{fn.sourcePath}</span></span></label>
-        <button type="button" className="secondary" disabled={disabled} aria-label={`${copy.removeFunction}: ${fn.key}`} onClick={() => void remove({ kind: "function", key: fn.key })}><ActionIcon name="remove" /> {copy.remove}</button>
-      </li>)}</ul> : <p className="muted">{copy.solutionNoFunctions}</p>}
+      <div className="homework-solution-browser">
+        <div className="stack"><h4>{copy.requiredFiles}</h4>
+          <SideNavigation ariaLabel={copy.requiredFiles} items={solution.files.map(file => ({ id: file.path, label: file.path, isActive: activePath === file.path,
+            selection: { label: file.path, checked: requirements.requiredFiles.some(item => item.path === file.path), disabled,
+              onChange: checked => onChange({ ...requirements, requiredFiles: checked ? [...requirements.requiredFiles.filter(item => item.path !== file.path), { path: file.path }] : requirements.requiredFiles.filter(item => item.path !== file.path) }) },
+            action: { label: `${copy.removeFile}: ${file.path}`, disabled, onClick: () => void remove({ kind: "file", path: file.path }) }
+          }))} tabs={{ idPrefix: navigationId, panelId: `${navigationId}-signatures`, onSelect: setSelectedPath }} />
+        </div>
+        <div className="stack homework-solution-signatures" role="tabpanel" id={`${navigationId}-signatures`} aria-labelledby={activePath ? sideNavigationItemId(navigationId, activePath) : undefined}>
+          <h4>{copy.requiredFunctions}</h4>
+          {visibleFunctions.length ? <ul className="homework-solution-list">{visibleFunctions.map(fn => <li className="homework-solution-row" key={fn.key}>
+            <label className="homework-choice"><input type="checkbox" disabled={disabled} checked={selected.has(fn.key)} onChange={event => select(event.target.checked ? [...selected, fn.key] : [...selected].filter(key => key !== fn.key))} /><span className="homework-choice-text"><code>{fn.signature ? `${fn.signature.returnType} ${fn.functionName}(${fn.signature.parameterTypes.join(", ") || "void"})` : fn.functionName}</code><span className="sr-only">{fn.sourcePath}</span></span></label>
+            <button type="button" className="secondary icon-button" disabled={disabled} aria-label={`${copy.removeFunction}: ${fn.key}`} title={`${copy.removeFunction}: ${fn.key}`} onClick={() => void remove({ kind: "function", key: fn.key })}><ActionIcon name="remove" /></button>
+          </li>)}</ul> : <p className="muted">{copy.solutionNoFunctions}</p>}
+        </div>
+      </div>
     </> : solution && <p className="muted">{copy.solutionEmpty}</p>}
     <ProgressDialog open={busy} title={copy.solution} progressLabel={copy.loading} cancelLabel={copy.cancel} onCancel={() => controller.current?.abort()} />
   </section>;

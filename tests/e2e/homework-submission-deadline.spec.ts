@@ -37,8 +37,8 @@ for (const team of [false, true]) test(`homework deadline and recorded lateness 
     await panel.getByLabel("Days", { exact: true }).fill("1"); await panel.getByLabel("Hours", { exact: true }).fill("2"); await panel.getByLabel("Minutes", { exact: true }).fill("15");
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click(); await openHomeworkEditorSection(page, "Submission");
     await expect(date).toHaveValue("2030-01-15T09:30");
-    await panel.getByRole("button", { name: "Save deadline settings", exact: true }).click();
-    await expect(panel.getByText("Everything is saved.", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar").getByText("Everything is saved.", { exact: true })).toBeVisible();
     const saved = await responseJson<{ submissionPolicy: { deadline: string; allowLate: boolean; lateLimitMinutes: number } }>(await teacherApi.get(`${teacherPath}/workflow-settings`));
     expect(saved.submissionPolicy).toEqual({ deadline: "2030-01-15T14:30:00.000Z", allowLate: true, lateLimitMinutes: 1575 });
     await page.reload(); await openHomeworkEditorSection(page, "Submission"); await expect(date).toHaveValue("2030-01-15T09:30");

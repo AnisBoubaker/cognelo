@@ -2038,6 +2038,8 @@ a.card:hover,
 
 .side-navigation-tab-with-action { position: relative; min-width: 0; }
 .settings-nav .side-navigation-tab-with-action > [role="tab"] { padding-inline-end: 36px; }
+.side-navigation-tab-with-selection { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 8px; }
+.side-navigation-tab-with-selection > input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 15px 0 0; }
 .settings-nav .side-navigation-tab-action { position: absolute; inset-inline-end: 5px; top: 7px; display: inline-flex; align-items: center; justify-content: center; width: 26px; min-height: 26px; height: 26px; padding: 4px; }
 
 .settings-nav a span,
@@ -6153,6 +6155,9 @@ button:hover > .disclosure-indicator {
 }
 
 /* Homework choices use compact native checkboxes, independent of text-input sizing. */
+.homework-solution-browser { display: grid; grid-template-columns: minmax(150px, 0.8fr) minmax(0, 1.5fr); gap: 20px; align-items: start; min-width: 0; }
+.homework-solution-browser > *, .homework-solution-signatures { min-width: 0; }
+.homework-solution-browser .settings-nav [role="tab"] { padding-inline-start: 6px; padding-inline-end: 28px; overflow-wrap: anywhere; text-align: start; }
 .homework-solution-list { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; }
 .homework-solution-row { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; min-width: 0; }
 .homework-choice { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
@@ -7006,6 +7011,3 @@ button:hover > .disclosure-indicator {
 .homework-authoring-panel details > summary { cursor: pointer; font-weight: 600; }
 
 .homework-authoring-panel [hidden] { display: none !important; }
-
-.homework-authoring-panel .homework-workflow-questions .edit-action-bar,
-.homework-authoring-panel .homework-deadline-settings .edit-action-bar { position: static; }

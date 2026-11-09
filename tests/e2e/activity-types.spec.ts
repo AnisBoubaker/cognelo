@@ -684,7 +684,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await teacherPage.locator(".rich-text-editor textarea").fill("Implement `main` in `main.c`, then submit the project ZIP.");
     await openHomeworkEditorSection(teacherPage, "Question Generation");
     await teacherPage.getByRole("spinbutton", { name: "Questions", exact: true }).fill("1");
-    await openHomeworkEditorSection(teacherPage, "Teacher solution");
+    await openHomeworkEditorSection(teacherPage, "Submission requirements");
     await teacherPage.getByLabel("Required files").fill("main.c");
     await teacherPage.getByLabel("Required functions").fill("main");
     await teacherPage.getByLabel("Allowed extensions").fill(".c");

@@ -58,5 +58,7 @@ test("ZIP reference extraction reports named failures in notification history an
     expect(await prisma.contentMaterialIndex.count({ where: { resourceId: starter } })).toBe(1);
     await page.getByRole("switch", { name: "Accept final submissions", exact: true }).click();
     await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeChecked();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
   } finally { await model.close(); }
 });

@@ -116,8 +116,9 @@ test("course duplication retains homework design and prepared references without
     await expect(page.getByLabel("Students processed at once (1–4)")).toHaveValue("3");
     await openHomeworkEditorSection(page, "Submission");
     await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeEnabled();
-    const opened = page.waitForResponse(response => response.request().method() === "PUT" && response.url().endsWith("/workflow-settings"));
+    const opened = page.waitForResponse(response => response.request().method() === "PUT" && response.url().endsWith("/authoring"));
     await page.getByRole("switch", { name: "Accept final submissions", exact: true }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     expect((await opened).ok()).toBe(true);
     await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeChecked();
     expect(model.requests).toHaveLength(modelCalls);
