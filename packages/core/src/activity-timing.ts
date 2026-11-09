@@ -1,3 +1,4 @@
+import { activityAssessmentStageAssignment } from "./activity-submission-stages";
 import { resolveActivityTimedFinalization } from "@cognelo/activity-sdk/server";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -22,7 +23,8 @@ export async function getTimedActivityRuntime(
   const context = await resolveTimedActivityContext(user, courseId, groupId, activityId);
   const activeAttempt = await findActiveAttempt(context.assignmentId, context.participantId);
   const timeLimitMinutes = assignmentTimeLimitMinutes(context.assignmentMetadata);
-  const expiresAt = assignmentAttemptExpiresAt(activeAttempt?.startedAt ?? null, timeLimitMinutes, context.availableUntil);
+  const expiresAt = assignmentAttemptExpiresAt(activeAttempt?.startedAt ?? null, timeLimitMinutes, context.availableUntil)
+    ?? (activeAttempt && asRecord(context.assignmentMetadata).submissionAssessmentStage ? context.availableUntil : null);
   return {
     timeLimitMinutes,
     attempt: activeAttempt ? {
@@ -139,7 +141,8 @@ export async function assertTimedActivityWriteAllowed(
     return;
   }
   const timeLimitMinutes = assignmentTimeLimitMinutes(context.assignmentMetadata);
-  const expiresAt = assignmentAttemptExpiresAt(activeAttempt.startedAt, timeLimitMinutes, context.availableUntil);
+  const expiresAt = assignmentAttemptExpiresAt(activeAttempt.startedAt, timeLimitMinutes, context.availableUntil)
+    ?? (asRecord(context.assignmentMetadata).submissionAssessmentStage ? context.availableUntil : null);
   if (expiresAt && Date.now() >= expiresAt.getTime()) {
     if (!options.allowExpiredAttempt) throw new AppError(409, "ACTIVITY_TIME_LIMIT_EXPIRED", "The activity time limit has expired. Submit the saved response to finish the attempt.");
     return { expiredAttemptId: activeAttempt.id };
@@ -163,10 +166,11 @@ async function resolveTimedActivityContext(
   if (!participant) {
     throw new AppError(403, "PARTICIPANT_REQUIRED", "Only enrolled students can start a timed activity.");
   }
+  const effective = await activityAssessmentStageAssignment(activity, activity.assignment);
   return {
     assignmentId: activity.assignment.id,
-    assignmentMetadata: activity.assignment.metadata,
-    availableUntil: activity.assignment.availableUntil,
+    assignmentMetadata: effective.metadata,
+    availableUntil: effective.availableUntil,
     participantId: participant.id,
     activityTypeKey: activity.activityType.key,
     providerKind: activity.activityType.providerKind,

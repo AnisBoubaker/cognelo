@@ -1,3 +1,4 @@
+import { getCourseActivitySubmissionStage, updateCourseActivitySubmissionStage } from "@cognelo/core";
 import { homeworkWorkflowDraftSchema, type HomeworkWorkflowDraftInput } from "./workflow-contract";
 import { homeworkQuestionsEnabled } from "./question-policy";
 import { snapshotProvidedCode } from "./provided-code";
@@ -9,7 +10,6 @@ import { AppError, updateBackgroundJobConcurrency, getAiAgentConnectionForUser, 
   createCourseEmbeddingProvider, lockCourseMaterialEmbeddingSettings, materialEmbeddingSelectionIdentity, teamworkTransaction } from "@cognelo/core";
 import { prisma, type Prisma } from "./db-client";
 import { json, record } from "./file-preparation";
-import { readHomeworkSubmissionPolicy } from "./submission-policy";
 
 export type HomeworkTeacherScope = { user: CurrentUser; courseId: string; activityId: string };
 export const workflowSettingKeys = ["workflowVersion", "submissionsEnabled", "preparedSnapshotId", "referenceMaterialIds", "embeddingConnectionId", "generationConcurrency", "embeddingAi", "questionGenerationAi", "submissionPolicy"] as const;
@@ -32,7 +32,8 @@ export async function getHomeworkWorkflowSettings(scope: HomeworkTeacherScope) {
   const selection = storedHomeworkAiSelection(settings.questionGenerationAi);
   const { homeworkTeamworkService } = await import("./team-workspaces");
   const questionPolicyLocked = await homeworkTeamworkService.hasActiveSubmissions({ activityId: scope.activityId, transaction: teamworkTransaction(prisma) });
-  return { ...references, questionGenerationEnabled: homeworkQuestionsEnabled(settings), submissionPolicy: readHomeworkSubmissionPolicy(settings), questionPolicyLocked,
+  const filePolicy = (await getCourseActivitySubmissionStage(scope, "files")).policy;
+  return { ...references, questionGenerationEnabled: homeworkQuestionsEnabled(settings), submissionPolicy: { deadline: filePolicy.deadline, allowLate: filePolicy.allowLate, lateLimitMinutes: filePolicy.lateLimitMinutes }, questionPolicyLocked,
     enabled: settings.submissionsEnabled === true, concurrency: Number(settings.generationConcurrency ?? 2),
     ai: { connections: listed.connections.filter(connection => connection.isEnabled), question: { selection: selection ? { connectionId: selection.connectionId, model: selection.model } : null, resolved: questionResolved, error: questionError },
       embedding: { selection: null, resolved: references.embedding.resolved, error: references.embedding.error } } };
@@ -64,7 +65,7 @@ export async function applyHomeworkWorkflowUpdate(scope: HomeworkTeacherScope, p
   const { data, questionSelection, references } = prepared;
   const current = await tx.pluginCodingHomeworkAssignment.findUniqueOrThrow({ where: { activityId: scope.activityId } }), settings = record(current.settings);
   const next: Record<string, unknown> = { ...settings, workflowVersion: 2, ...(data.concurrency ? { generationConcurrency: data.concurrency } : {}) };
-  if (data.submissionPolicy !== undefined) next.submissionPolicy = data.submissionPolicy;
+  if (data.submissionPolicy !== undefined) await updateCourseActivitySubmissionStage(scope, "files", data.submissionPolicy, tx);
   if (questionSelection !== undefined) { if (questionSelection) next.questionGenerationAi = questionSelection; else delete next.questionGenerationAi; }
   if (data.concurrency) await updateBackgroundJobConcurrency("coding-homework-grader", scope.activityId, data.concurrency, tx);
   if (data.enabled === true && settings.submissionsEnabled !== true) {

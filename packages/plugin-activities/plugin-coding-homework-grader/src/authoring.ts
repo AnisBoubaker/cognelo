@@ -543,6 +543,7 @@ export async function copyCourseCodingHomeworkAuthoring(params: HomeworkTeacherS
       submissionsEnabled: false,
       referenceMaterialIds: await getHomeworkReferenceSelection({ ...params, activityId: params.sourceActivityId }, sourceSettings)
     };
+    delete settings.submissionPolicy;
     if (typeof sourceSettings.preparedSnapshotId === "string") {
       const snapshot = await transaction.pluginCodingHomeworkDocumentationSnapshot.findFirst({
         where: { id: sourceSettings.preparedSnapshotId, activityId: params.sourceActivityId, courseId: params.courseId, groupId: null }

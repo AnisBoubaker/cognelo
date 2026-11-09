@@ -1,6 +1,7 @@
+import { homeworkFileStageSettings, homeworkAnsweringAssignment } from "./stage-scheduling";
 import { completeFileOnlyHomework } from "./file-only-submission";
 import { homeworkQuestionsEnabled } from "./question-policy";
-import { readHomeworkSubmissionPolicy, readHomeworkSubmissionTiming } from "./submission-policy";
+import { readHomeworkSubmissionTiming } from "./submission-policy";
 import { acceptHomeworkSubmissionTiming, automaticHomeworkTiming, assertAutomaticHomeworkDraft, type AutomaticHomeworkHandIn } from "./submission-window";
 import { snapshotProvidedCode } from "./provided-code";
 import { studentQuestionContextInclude } from "./question-context";
@@ -47,7 +48,7 @@ export async function handInHomework(scope: HomeworkStudentScope, input: unknown
       const settings = record(assignment?.settings);
       const questionsEnabled = homeworkQuestionsEnabled(settings);
       if (!assignment || settings.submissionsEnabled !== true || (questionsEnabled && typeof settings.preparedSnapshotId !== "string")) throw new AppError(409, "HOMEWORK_SUBMISSIONS_CLOSED", "Your teacher has not enabled final submissions yet.");
-      if (automatic) automaticHomeworkTiming(settings, automatic); else acceptHomeworkSubmissionTiming(settings);
+
       const [draft] = await tx.$queryRaw<Array<NonNullable<Awaited<ReturnType<typeof prisma.pluginCodingHomeworkDraft.findUnique>>>>>`SELECT * FROM "PluginCodingHomeworkDraft" WHERE "activityId"=${scope.activityId} AND "groupId"=${scope.groupId} AND "userId"=${scope.user.id}`;
       if (!draft || draft.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "Your prepared files changed. Reload them before submitting.");
       if (automatic) assertAutomaticHomeworkDraft(draft, latest, automatic);
@@ -60,7 +61,8 @@ export async function handInHomework(scope: HomeworkStudentScope, input: unknown
       const questionLanguage = questionsEnabled ? await getHomeworkQuestionLanguage(scope.courseId) : null;
       const generation = questionsEnabled ? { providedCode: await snapshotProvidedCode(scope.activityId), questionLanguage,
         questionGenerationAi: snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings)) } : {};
-      const submissionTiming = automatic ? automaticHomeworkTiming(settings, automatic) : acceptHomeworkSubmissionTiming(settings);
+      const stageSettings = await homeworkFileStageSettings(scope, draft.preparationStartedAt);
+      const submissionTiming = automatic ? automaticHomeworkTiming(stageSettings, automatic) : acceptHomeworkSubmissionTiming(stageSettings);
       const metadata = { workflowVersion: 2, questionGenerationEnabled: questionsEnabled, ...generation, draftRevision: draft.revision, handInAt: submissionTiming.submittedAt, submissionTiming,
         ...(automatic ? { automaticHandIn: { cutoff: automatic.cutoff, recoveredAt: new Date().toISOString(), triggeredBy: automatic.triggeredBy, acknowledgementSource: "automatic_deadline" } } : {}), incompleteAcknowledged: readiness.requiresAcknowledgement, requirements, folders: draft.folders,
         assignment: { candidateLimit: assignment.candidateLimit, languageKey: assignment.languageKey, promptMarkdown: assignment.promptMarkdown, generationInstructions: assignment.generationInstructions, questionCount: questionsEnabled ? assignment.questionCount : 0, retrievedExampleCount: assignment.retrievedExampleCount } };
@@ -98,7 +100,7 @@ export async function getHomeworkWorkspace(scope: HomeworkStudentScope) {
   const job = active ? await coreDb.backgroundJob.findUnique({ where: { queue_idempotencyKey: { queue: codingHomeworkProcessingQueue, idempotencyKey: `submission:${active.id}` } } }) : null;
   const position = job?.status === "queued" ? 1 + await coreDb.backgroundJob.count({ where: { queue: job.queue, status: "queued", createdAt: { lt: job.createdAt } } }) : null;
   const canReadQuestions = Boolean(active && record(active.metadata).assessmentStartedAt);
-  return { automaticSubmissionIssue: automaticIssues.length > 0, submissionPolicy: readHomeworkSubmissionPolicy(assignment?.settings), submissionsEnabled: record(assignment?.settings).submissionsEnabled === true,
+  return { automaticSubmissionIssue: automaticIssues.length > 0, ...await homeworkFileStageSettings(scope, (await prisma.pluginCodingHomeworkDraft.findUnique({ where: { activityId_groupId_userId: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id } }, select: { preparationStartedAt: true } }))?.preparationStartedAt), submissionsEnabled: record(assignment?.settings).submissionsEnabled === true,
     submission: active ? { questionGenerationEnabled: homeworkQuestionsEnabled(active.metadata), automaticHandIn: Boolean(record(active.metadata).automaticHandIn), submissionTiming: readHomeworkSubmissionTiming(active.metadata), id: active.id, status: active.status, createdAt: active.createdAt.toISOString(), started: canReadQuestions, coreAttemptId: active.coreAttemptId,
       processingStatus: job?.status ?? null, generationIssue: record(job?.error).code === "HOMEWORK_NO_ELIGIBLE_CODE" ? "no_eligible_code" as const : null, queuePosition: position, questionCount: Number(record(record(active.metadata).assignment).questionCount ?? assignment?.questionCount ?? 3),
       files: active.files.map(file => ({ path: file.path, sizeBytes: Number(file.sizeBytes) })),
@@ -116,7 +118,8 @@ export async function getStartedHomeworkQuestions(scope: HomeworkStudentScope) {
   return { questions: submission.questions.map(toStudentChallengeQuestionRecord), status: submission.status, submissionId: submission.id };
 }
 export async function startHomeworkAnswering(scope: HomeworkStudentScope, expectedSubmissionId?: string | null) {
-  const activity = await assertHomeworkStudentScope(scope);
+  await assertHomeworkStudentScope(scope);
+  const activity = await homeworkAnsweringAssignment(scope);
   const start = async (tx: CorePrisma.TransactionClient, teamSubmissionId: string | null = null) => {
     await lockHomeworkWorkflow(tx, scope);
     const [submission] = await tx.$queryRaw<Array<{ id: string; status: string; metadata: unknown; coreAttemptId: string | null }>>`SELECT id, status, metadata, "coreAttemptId" FROM "PluginCodingHomeworkSubmission"

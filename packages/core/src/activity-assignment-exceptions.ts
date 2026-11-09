@@ -1,9 +1,10 @@
-import { ActivityAssignmentOverrideValuesSchema, type ActivityAssignmentExceptionInput, type GradebookItemSettingsInput } from "@cognelo/contracts";
+import { mergeSubmissionStagePolicies, type SubmissionStagePolicies, ActivityAssignmentOverrideValuesSchema, type ActivityAssignmentExceptionInput, type GradebookItemSettingsInput } from "@cognelo/contracts";
 import { prisma, type Prisma } from "@cognelo/db";
 import { AppError } from "./errors";
 
 type ExceptionRow = { groupActivityId: string; teamId: string | null; participantId: string | null; priority: number; settings: unknown };
 export type AssignmentExceptionOverrides = {
+  submissionStages?: SubmissionStagePolicies;
   availableFrom?: string | null;
   availableUntil?: string | null;
   timeLimitMinutes?: number | null;
@@ -28,6 +29,7 @@ export function resolveAssignmentExceptions(rows: readonly ExceptionRow[]): Assi
     const parsed = ActivityAssignmentOverrideValuesSchema.safeParse(row.settings);
     if (!parsed.success) throw new AppError(500, "ASSIGNMENT_EXCEPTION_INVALID", "The saved activity exception is invalid.");
     const value = parsed.data;
+    if (value.submissionStages) result.submissionStages = mergeSubmissionStagePolicies(result.submissionStages, value.submissionStages);
     for (const field of value.overrideFields) {
       if (field === "availableFrom" || field === "availableUntil") result[field] = value[field] ?? null;
       else if (field === "timeLimit") result.timeLimitMinutes = value.timeLimitMinutes ?? null;
@@ -77,6 +79,7 @@ export function applyAssignmentExceptions<T extends { metadata: Prisma.JsonValue
     ...(overrides.availableUntil !== undefined ? { availableUntil: overrides.availableUntil ? new Date(overrides.availableUntil) : null } : {}),
     metadata: {
       ...metadata,
+      ...(overrides.submissionStages ? { submissionStages: mergeSubmissionStagePolicies(metadata.submissionStages as SubmissionStagePolicies | undefined, overrides.submissionStages) } : {}),
       ...(overrides.timeLimitMinutes !== undefined ? { timeLimitMinutes: overrides.timeLimitMinutes } : {}),
       ...(metadata.assessmentMode === "summative" && overrides.requireSafeExamBrowser !== undefined ? { requireSafeExamBrowser: overrides.requireSafeExamBrowser } : {}),
       ...(metadata.assessmentMode === "summative" && overrides.gradeChallengesEnabled !== undefined ? { gradeChallengesEnabled: overrides.gradeChallengesEnabled } : {})

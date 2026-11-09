@@ -5,6 +5,13 @@ const team = (priority: number, settings: unknown) => ({ groupActivityId: "assig
 const student = (settings: unknown) => ({ ...team(5, settings), teamId: null, participantId: "student" });
 
 describe("activity assignment exception precedence", () => {
+  it("merges stage fields independently across prioritized teams and explicit student clearing", () => {
+    const rows = [team(1, { submissionStages: { files: { deadline: "2030-01-01T10:00:00Z", allowLate: true }, questions: { timeLimitMinutes: 10 } } }), team(0, { submissionStages: { questions: { timeLimitMinutes: 20 } } }), student({ submissionStages: { files: { deadline: null }, questions: { deadline: "2030-01-01T12:00:00Z" } } })];
+    const overrides = resolveAssignmentExceptions(rows);
+    expect(overrides.submissionStages).toEqual({ files: { deadline: null, allowLate: true }, questions: { timeLimitMinutes: 20, deadline: "2030-01-01T12:00:00Z" } });
+    expect(applyAssignmentExceptions({ metadata: { submissionStages: { files: { timeLimitMinutes: 60 } } } }, overrides).metadata).toMatchObject({ submissionStages: { files: { deadline: null, allowLate: true, timeLimitMinutes: 60 } } });
+  });
+
   it("resolves each field independently with highest-priority team first and student last", () => {
     const rows = [
       team(1, { overrideFields: ["timeLimit", "availableUntil"], timeLimitMinutes: 80, availableUntil: "2026-12-02T12:00:00.000Z" }),

@@ -1,3 +1,4 @@
+import { activityAssessmentStageAssignment } from "./activity-submission-stages";
 import { studentTestFeedback } from "./student-test-feedback";
 import { escapeCsvCell } from "./csv";
 import { getActivityDefinition, getActivityPlugin, getActivityPluginForActivityType } from "@cognelo/activity-sdk";
@@ -2018,6 +2019,7 @@ async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: S
       activity: {
         select: {
           id: true,
+          activityType: { select: { key: true } },
           activityVersionId: true,
           knowledgeConcepts: {
             select: {
@@ -2055,7 +2057,7 @@ async function resolveAssignedActivityAttemptContext(user: CurrentUser, input: S
 
   return {
     courseId: groupActivity.group.courseId,
-    groupActivity: applyAssignmentExceptions(groupActivity, overrides),
+    groupActivity: await activityAssessmentStageAssignment(groupActivity.activity, applyAssignmentExceptions(groupActivity, overrides)),
     gradebookItem: applyGradebookExceptions(groupActivity.gradebookItem, overrides),
     participant
   };

@@ -114,7 +114,11 @@ export type ActivityProvider =
 
 export type ActivityCreationScope = "bank" | "course";
 
+export type SubmissionStageDefinition = { id: string; names: Record<PluginLocale, string>; assessment?: boolean; allowsLateSubmissions?: boolean };
+
 export type ActivityDefinition = {
+  /** Ordered stages, including the first; core owns their scheduling. */
+  submissionStages?: readonly SubmissionStageDefinition[];
   /** Core owns reference selection, preparation and UI for this activity. */
   usesMaterialEmbeddings?: boolean;
   /** Core may assign a shared team workspace; the plugin owns submission behavior. */
@@ -232,7 +236,16 @@ const definitions = new Map<string, RegisteredActivityDefinition>();
 for (const definition of coreDefinitions) {
   registerActivityDefinition(definition, { kind: "core", key: definition.key });
 }
+function validateSubmissionStages(definition: ActivityDefinition) {
+  const stages = definition.submissionStages;
+  if (!stages) return;
+  if (!stages.length || stages.length > 20 || new Set(stages.map(stage => stage.id)).size !== stages.length || stages.filter(stage => stage.assessment).length > 1
+    || stages.some(stage => !/^[a-z][a-z0-9-]{0,63}$/.test(stage.id) || (["en", "fr", "zh", "ar"] as const).some(locale => !stage.names[locale]?.trim()))) {
+    throw new Error(`Invalid submission stages: ${definition.key}`);
+  }
+}
 function registerActivityDefinition(definition: ActivityDefinition, provider: ActivityProvider) {
+  validateSubmissionStages(definition);
   if (definitions.has(definition.key)) {
     throw new Error(`Activity type already registered: ${definition.key}`);
   }
@@ -256,6 +269,7 @@ export function registerActivityPlugin(plugin: ActivityPlugin) {
   }
 
   for (const definition of plugin.activities) {
+    validateSubmissionStages(definition);
     if (!definition.studentView) {
       throw new Error(`Activity type must declare Student view support: ${definition.key}`);
     }

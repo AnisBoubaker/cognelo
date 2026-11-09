@@ -1,6 +1,7 @@
+import { homeworkAnsweringAssignment } from "./stage-scheduling";
 import { prisma as corePrisma, type Prisma as CorePrisma } from "@cognelo/db";
 import { z } from "zod";
-import { AppError, activityTeamworkEnabled, startActivityAttempt, submitActivityAttempt, getGroupAssignedActivity, assignmentTimeLimitMinutes, assignmentAttemptExpiresAt } from "@cognelo/core";
+import { AppError, activityTeamworkEnabled, startActivityAttempt, submitActivityAttempt, assignmentTimeLimitMinutes, assignmentAttemptExpiresAt } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma } from "./db-client";
 import { toStudentChallengeQuestionRecord } from "./generation";
@@ -77,7 +78,7 @@ export async function saveCodingHomeworkChallengeAnswers(
   }
 ) {
   const parsed = challengeAnswersInputSchema.parse(input ?? {});
-  const activity = await getGroupAssignedActivity(scope.user, scope.courseId, scope.groupId, scope.activityId);
+  const activity = await homeworkAnsweringAssignment(scope);
   return corePrisma.$transaction(async (tx) => {
   if (activityTeamworkEnabled(activity.metadata)) {
     const { getHomeworkTeamAccessInTransaction } = await import("./team-workspaces");

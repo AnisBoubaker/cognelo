@@ -1,3 +1,5 @@
+import { SubmissionStagePoliciesSchema } from "./submission-stages";
+export * from "./submission-stages";
 export * from "./material-references";
 export * from "./ai-grading-runs";
 import { z } from "zod";
@@ -944,6 +946,7 @@ export const ActivityAssignmentOverrideFieldSchema = z.enum([
 export type ActivityAssignmentOverrideField = z.infer<typeof ActivityAssignmentOverrideFieldSchema>;
 
 export const ActivityAssignmentOverrideValuesSchema = z.object({
+  submissionStages: SubmissionStagePoliciesSchema.optional(),
   overrideFields: z.array(ActivityAssignmentOverrideFieldSchema).max(10).refine(
     (fields) => new Set(fields).size === fields.length,
     { message: "Override fields must be unique." }
@@ -978,6 +981,7 @@ export const CourseActivityGroupAssignmentSettingsSchema = ActivityAssignmentOve
 export type CourseActivityGroupAssignmentSettings = z.infer<typeof CourseActivityGroupAssignmentSettingsSchema>;
 
 export const CourseAllGroupsActivityAssignmentInputSchema = z.object({
+  submissionStages: SubmissionStagePoliciesSchema.optional(),
   teamworkEnabled: z.boolean().optional(),
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),

@@ -1,3 +1,5 @@
+import { getActivitySubmissionStageConfiguration, readSubmissionStagePolicies, validateSubmissionStagePolicies } from "./activity-submission-stages";
+import { mergeSubmissionStagePolicies, type SubmissionStagePolicies } from "@cognelo/contracts";
 import { assertMaterialStorageUnchanged } from "./material-storage";
 import { projectStudentActivity } from "./student-activity";
 import bcrypt from "bcryptjs";
@@ -41,6 +43,7 @@ type GradebookItemSettingsInput = ReturnType<typeof normalizeGradebookItemSettin
 type GroupActivityInput = ReturnType<typeof CourseGroupActivityInputSchema.parse>;
 type CourseWideContentPlacement = NonNullable<ReturnType<typeof CourseAllGroupsActivityAssignmentInputSchema.parse>["contentPlacement"]>;
 type CourseWideAssignmentMetadata = {
+  submissionStages?: SubmissionStagePolicies;
   teamworkEnabled?: boolean;
   enabled?: boolean;
   availableFrom?: string | null;
@@ -252,7 +255,10 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
     isVisible: coursePlacement?.isVisible ?? rule?.contentPlacement?.isVisible ?? true,
     metadata: rule?.contentPlacement?.metadata ?? asMetadataRecord(coursePlacement?.metadata)
   };
+  const stageConfiguration = await getActivitySubmissionStageConfiguration(activity);
+  const generalStages = mergeSubmissionStagePolicies(stageConfiguration.defaults, rule?.submissionStages);
   const general = {
+    ...(stageConfiguration.stages.length ? { submissionStages: generalStages } : {}),
     ...(supportsTeamwork ? { teamworkEnabled: rule?.teamworkEnabled === true, teamworkLocked: lockedTeamGroups.size > 0 } : {}),
     messagingEnabled: courseActivityMessagingEnabled(activity.metadata),
     twoWayMessagingEnabled: courseActivityTwoWayMessagingEnabled(activity.metadata),
@@ -268,6 +274,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
     contentPlacement: generalContentPlacement
   };
   return {
+    submissionStages: stageConfiguration.stages,
     general,
     groups: groups.map((group) => {
       const assignment = group.activities[0] ?? null;
@@ -311,6 +318,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
         teams: (group.studentGroupings ?? []).flatMap((grouping) => grouping.teams.map((team) => ({ ...team, groupingTitle: grouping.title }))),
         exceptions: (assignment?.assignmentExceptions ?? []).map((exception) => ({ ...ActivityAssignmentOverrideValuesSchema.parse(exception.settings), teamId: exception.teamId, participantId: exception.participantId })),
         assignmentId: assignment?.id ?? null,
+        ...(stageConfiguration.stages.length ? { submissionStages: readSubmissionStagePolicies(asMetadataRecord(assignment?.metadata).submissionStageOverrides) } : {}),
         overrideFields,
         availableFrom: assignment ? assignment.availableFrom?.toISOString() ?? null : general.availableFrom,
         availableUntil: assignment ? assignment.availableUntil?.toISOString() ?? null : general.availableUntil,
@@ -347,6 +355,9 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   assertGradeChallengesAreSummative(data.assessmentMode, data.gradeChallengesEnabled);
   await assertTestReadyForCompositeExecution(courseId, activity);
   const gradebookSettings = normalizeGradebookItemSettings(data.gradebookSettings);
+  const stageConfiguration = await getActivitySubmissionStageConfiguration(activity);
+  const stagePolicies = data.submissionStages ?? mergeSubmissionStagePolicies(stageConfiguration.defaults, getCourseWideAssignmentMetadata(activity.metadata)?.submissionStages);
+  validateSubmissionStagePolicies(activity.activityType?.key ?? "", stagePolicies, data.availableFrom, stageConfiguration.stages.filter(stage => stage.active).map(stage => stage.id));
 
   return prisma.$transaction(async (tx) => {
     if (supportsTeamwork) {
@@ -394,6 +405,10 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
       gradebookSettings,
       contentPlacement: data.contentPlacement
     }));
+    for (const requested of requestedAssignments) {
+      validateSubmissionStagePolicies(activity.activityType?.key ?? "", requested.submissionStages);
+      for (const exception of requested.exceptions ?? []) validateSubmissionStagePolicies(activity.activityType?.key ?? "", exception.submissionStages);
+    }
     const unknownGroup = requestedAssignments.find((assignment) => !groupById.has(assignment.groupId));
     if (unknownGroup) {
       throw new AppError(400, "COURSE_ACTIVITY_SETTINGS_GROUP_INVALID", "Every group setting must belong to the course.");
@@ -409,6 +424,7 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
           [COURSE_WIDE_ASSIGNMENT_METADATA_KEY]: {
             ...(supportsTeamwork ? { teamworkEnabled } : {}),
             enabled: assignedGroupIds.length > 0 && assignedGroupIds.length === groups.length,
+            ...(stageConfiguration.stages.length ? { submissionStages: stagePolicies } : {}),
             availableFrom: data.availableFrom ?? null,
             availableUntil: data.availableUntil ?? null,
             timeLimitMinutes: data.timeLimitMinutes,
@@ -525,6 +541,13 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
           gradeChallengesEnabled,
           groupTimeLimitMinutes
         );
+        if (stageConfiguration.stages.length) {
+          const stageOverrides = requested.submissionStages ?? readSubmissionStagePolicies(asMetadataRecord(existingAssignment?.metadata).submissionStageOverrides);
+          const effectiveStages = mergeSubmissionStagePolicies(stagePolicies, stageOverrides);
+          validateSubmissionStagePolicies(activity.activityType?.key ?? "", effectiveStages, groupAvailableFrom, stageConfiguration.stages.filter(stage => stage.active).map(stage => stage.id));
+          groupAssignmentMetadata.submissionStages = effectiveStages as Prisma.JsonValue;
+          groupAssignmentMetadata.submissionStageOverrides = stageOverrides as Prisma.JsonValue;
+        }
         if (nextTeamPolicy) groupAssignmentMetadata.teamwork = nextTeamPolicy;
         else delete groupAssignmentMetadata.teamwork;
         if (existingAssignment) {
@@ -585,11 +608,13 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
           for (const row of rows.filter((row) => row.team && row.team.members.length === 0)) {
             const effective = applyAssignmentExceptions(assignment, resolveAssignmentExceptions([row]));
             validateAvailability(effective.availableFrom?.toISOString(), effective.availableUntil?.toISOString());
+            validateSubmissionStagePolicies(activity.activityType?.key ?? "", readSubmissionStagePolicies(asMetadataRecord(effective.metadata).submissionStages), effective.availableFrom?.toISOString(), stageConfiguration.stages.filter(stage => stage.active).map(stage => stage.id));
           }
           const affected = new Set(rows.flatMap((row) => row.participantId ? [row.participantId] : row.team?.members.map((member) => member.participantId) ?? []));
           for (const participantId of affected) {
             const effective = applyAssignmentExceptions(assignment, exceptionsForParticipant(rows, assignment.id, participantId));
             validateAvailability(effective.availableFrom?.toISOString(), effective.availableUntil?.toISOString());
+            validateSubmissionStagePolicies(activity.activityType?.key ?? "", readSubmissionStagePolicies(asMetadataRecord(effective.metadata).submissionStages), effective.availableFrom?.toISOString(), stageConfiguration.stages.filter(stage => stage.active).map(stage => stage.id));
           }
         }
       })

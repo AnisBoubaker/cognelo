@@ -43,6 +43,15 @@ import { markCodingHomeworkSubmissionDeleted } from "./submission-deletion";
 registerCodingHomeworkBackgroundJobs();
 
 export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
+  submissionStages: {
+    activityTypeKeys: ["coding-homework-grader"],
+    async configuration({ activityId }) {
+      const assignment = await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId }, select: { settings: true } });
+      const { homeworkQuestionsEnabled } = await import("./question-policy");
+      const { readHomeworkSubmissionPolicy } = await import("./submission-policy");
+      return { activeStageIds: homeworkQuestionsEnabled(assignment?.settings) ? ["files", "questions"] : ["files"], defaults: { files: readHomeworkSubmissionPolicy(assignment?.settings) } };
+    }
+  },
   teamwork: homeworkTeamworkService,
   materialReferences: homeworkMaterialReferences,
   submissionExport: { activityTypeKeys: ["coding-homework-grader"], getContent: exportHomeworkSubmission },

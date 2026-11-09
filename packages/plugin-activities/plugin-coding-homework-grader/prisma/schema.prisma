@@ -269,6 +269,7 @@ model PluginCodingHomeworkReview {
 }
 
 model PluginCodingHomeworkDraft {
+  preparationStartedAt DateTime?
   id String @id @default(cuid())
   activityId String
   groupId String
@@ -293,6 +294,7 @@ model PluginCodingHomeworkTeacherSolution {
 }
 
 model PluginCodingHomeworkWorkspace {
+  preparationStartedAt DateTime?
   id String @id @default(uuid())
   courseId String
   activityId String

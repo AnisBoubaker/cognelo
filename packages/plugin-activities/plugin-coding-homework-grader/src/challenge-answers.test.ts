@@ -18,6 +18,8 @@ const coreMocks = vi.hoisted(() => ({
   submitActivityAttempt: vi.fn()
 }));
 
+vi.mock("./stage-scheduling", () => ({ homeworkAnsweringAssignment: coreMocks.getGroupAssignedActivity }));
+
 const dbMocks = vi.hoisted(() => ({
   $transaction: vi.fn(), $queryRaw: vi.fn(), $executeRaw: vi.fn(),
   pluginCodingHomeworkChallengeQuestion: {

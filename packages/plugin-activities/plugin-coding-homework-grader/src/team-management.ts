@@ -29,7 +29,7 @@ export async function cancelTeamHomeworkSubmission(scope: HomeworkTeacherScope, 
     await withdraw(tx, scope, attempts, reason);
     await cancelTeamJobs(sql, [workspace.currentSubmissionId]);
     await sql.execute`UPDATE "PluginCodingHomeworkSubmission" SET status='cancelled', metadata=metadata || ${JSON.stringify({ cancellation: { cancelledAt: new Date().toISOString(), cancelledBy: scope.user.id, reason } })}::jsonb,"updatedAt"=NOW() WHERE id=${workspace.currentSubmissionId}`;
-    await sql.execute`UPDATE "PluginCodingHomeworkWorkspace" SET "currentSubmissionId"=NULL,revision=revision+1,"updatedAt"=NOW() WHERE id=${workspace.id}`;
+    await sql.execute`UPDATE "PluginCodingHomeworkWorkspace" SET "currentSubmissionId"=NULL,"preparationStartedAt"=NULL,revision=revision+1,"updatedAt"=NOW() WHERE id=${workspace.id}`;
     await auditHomeworkWorkspace(sql, workspace, scope.user, "submission_cancelled", { metadata: { reason, submissionId: workspace.currentSubmissionId, affectedMembers: members.length } });
   }, { timeout: 30_000 });
   return { cancelled: true, team: Boolean(initial.teamId) };

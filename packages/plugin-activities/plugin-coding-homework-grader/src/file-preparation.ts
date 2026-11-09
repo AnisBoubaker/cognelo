@@ -1,4 +1,4 @@
-import { acceptHomeworkSubmissionTiming } from "./submission-window";
+import { acceptHomeworkStageTiming } from "./submission-window";
 import { lockHomeworkSettings } from "./workflow-settings";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
@@ -100,17 +100,17 @@ export async function uploadHomeworkPreparation(scope: HomeworkStudentScope, inp
       compressedSize: bytes?.length ?? 0, uncompressedSize: bytes?.length ?? 0 }];
     await prisma.$transaction(async tx => {
       await lockHomeworkSettings(tx, scope.activityId);
-      const assignment = await tx.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId } });
-      acceptHomeworkSubmissionTiming(assignment?.settings);
+      await acceptHomeworkStageTiming(scope);
       await lockHomeworkWorkflow(tx, scope);
       await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, incoming.reduce((sum, file) => sum + file.uncompressedSize, 0));
       await assertHomeworkDraftWritable(tx, scope);
       const draft = await tx.pluginCodingHomeworkDraft.upsert({ where: { activityId_groupId_userId: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id } },
         create: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id }, update: {} });
+      await acceptHomeworkStageTiming(scope, draft.preparationStartedAt);
       if (draft.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "Your prepared files changed. Reload them before uploading.");
       const next = await applyHomeworkPreparedUpload(draft, data, incoming, requirements, written);
-      const preparedAt = acceptHomeworkSubmissionTiming(assignment?.settings).submittedAt;
-      await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { updatedAt: new Date(preparedAt), files: json(next.files), folders: json(next.folders), revision: { increment: 1 } } });
+      const preparedAt = (await acceptHomeworkStageTiming(scope, draft.preparationStartedAt)).submittedAt;
+      await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { preparationStartedAt: draft.preparationStartedAt ?? new Date(preparedAt), updatedAt: new Date(preparedAt), files: json(next.files), folders: json(next.folders), revision: { increment: 1 } } });
       obsolete.push(...next.obsolete);
     }, { timeout: 30_000, maxWait: 30_000 });
     committed = true;
@@ -128,8 +128,7 @@ export async function removeHomeworkPreparedFile(scope: HomeworkStudentScope, in
   ]).parse(input);
   const removed = await prisma.$transaction(async tx => {
     await lockHomeworkSettings(tx, scope.activityId);
-    const assignment = await tx.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId } });
-    acceptHomeworkSubmissionTiming(assignment?.settings);
+    await acceptHomeworkStageTiming(scope);
     await lockHomeworkWorkflow(tx, scope); await assertHomeworkDraftWritable(tx, scope);
     const draft = await tx.pluginCodingHomeworkDraft.findUnique({ where: { activityId_groupId_userId: { activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id } } });
     if (!draft || draft.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "Your prepared files changed. Reload them first.");
@@ -137,7 +136,7 @@ export async function removeHomeworkPreparedFile(scope: HomeworkStudentScope, in
     const clearAll = "all" in data;
     const targets = clearAll ? files : files.filter(file => file.path === data.path);
     const removedPaths = targets.map(file => draftFilePath(draft.id, file.storedName));
-    const preparedAt = acceptHomeworkSubmissionTiming(assignment?.settings).submittedAt;
+    const preparedAt = (await acceptHomeworkStageTiming(scope, draft.preparationStartedAt)).submittedAt;
     await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { updatedAt: new Date(preparedAt), files: json(clearAll ? [] : files.filter(file => file.path !== data.path)),
       ...(clearAll ? { folders: json([]) } : {}), revision: { increment: 1 } } });
     return removedPaths;

@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
-  handIn: vi.fn(), manage: vi.fn(), grade: vi.fn(),
+  stage: vi.fn(), handIn: vi.fn(), manage: vi.fn(), grade: vi.fn(),
   core: { activity: { findFirst: vi.fn() }, user: { findMany: vi.fn() }, $queryRaw: vi.fn() },
   plugin: { pluginCodingHomeworkAssignment: { findUnique: vi.fn() } }
 }));
 vi.mock("@cognelo/core", async original => ({ ...await original<typeof import("@cognelo/core")>(), assertCanManageCourse: mocks.manage, assertCanGradeGroup: mocks.grade }));
 vi.mock("@cognelo/db", () => ({ prisma: mocks.core }));
 vi.mock("./db-client", () => ({ prisma: mocks.plugin }));
+vi.mock("./stage-scheduling", () => ({ homeworkFileStageSettings: mocks.stage }));
 vi.mock("./hand-in", () => ({ handInHomework: mocks.handIn }));
 vi.mock("./file-preparation", () => ({ record: (value: unknown) => value && typeof value === "object" ? value : {} }));
 const { AppError } = await import("@cognelo/core");
@@ -16,6 +17,7 @@ const scope = { user, courseId: "course", activityId: "activity" };
 const settings = { submissionsEnabled: true, submissionPolicy: { deadline: "2020-01-01T12:00:00.000Z", allowLate: false } };
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.stage.mockResolvedValue({ submissionClosesAt: settings.submissionPolicy.deadline });
   mocks.plugin.pluginCodingHomeworkAssignment.findUnique.mockResolvedValue({ settings });
   mocks.core.activity.findFirst.mockResolvedValue({ metadata: {} });
   mocks.core.$queryRaw.mockResolvedValue([{ id: "draft-a", groupId: "section", userId: "a", revision: 2 }, { id: "draft-b", groupId: "section", userId: "b", revision: 3 }]);
@@ -41,8 +43,9 @@ describe("automatic homework recovery scope and failures", () => {
     { submissionsEnabled: true, submissionPolicy: { ...settings.submissionPolicy, allowLate: true, lateLimitMinutes: null } }
   ])("does not recover without an enabled finite cutoff", async value => {
     mocks.plugin.pluginCodingHomeworkAssignment.findUnique.mockResolvedValue({ settings: value });
+    mocks.stage.mockResolvedValue({ submissionClosesAt: null });
     expect(await recoverHomeworkForClass(scope)).toEqual([]);
-    expect(mocks.core.$queryRaw).not.toHaveBeenCalled(); expect(mocks.handIn).not.toHaveBeenCalled();
+    expect(mocks.handIn).not.toHaveBeenCalled();
   });
   it("keeps the learner recovery query scoped to their enrollment", async () => {
     mocks.core.$queryRaw.mockResolvedValue([]);

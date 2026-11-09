@@ -8,8 +8,10 @@ test("combined homework settings reject invalid enablement without changing priv
   await responseJson(await api.get(`${base}/workflow-settings`));
   const initial = await responseJson<CodingHomeworkAuthoringRecord>(await api.get(`${base}/authoring`));
   const original = await responseJson<CodingHomeworkAuthoringRecord>(await api.put(`${base}/authoring`, { data: { assignment: initial.assignment, requirements: initial.requirements.requirements } }));
+  const beforeSchedule = await responseJson(await api.get(`/api/courses/${data.courseId}/activities/${id}/assign-all-groups`));
   const failed = await api.put(`${base}/authoring`, { data: { assignment: { ...original.assignment, generationInstructions: "Must roll back" }, requirements: { ...original.requirements.requirements, requiredFiles: [{ path: "main.c" }] }, workflow: { enabled: true, concurrency: 4, submissionPolicy: { deadline: "2030-01-15T09:30:00.000Z", allowLate: false, lateLimitMinutes: null } } } });
   expect(failed.status()).toBe(409);
+  expect(await responseJson(await api.get(`/api/courses/${data.courseId}/activities/${id}/assign-all-groups`))).toEqual(beforeSchedule);
   expect(await responseJson(await api.get(`${base}/authoring`))).toEqual(original);
   const saved = await responseJson<CodingHomeworkAuthoringRecord>(await api.put(`${base}/authoring`, { data: { assignment: { ...original.assignment, settings: { questionGenerationEnabled: false } }, requirements: original.requirements.requirements, workflow: { enabled: true, concurrency: 3 } } }));
   expect(saved.assignment.settings).toMatchObject({ questionGenerationEnabled: false, submissionsEnabled: true, generationConcurrency: 3 });

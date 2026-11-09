@@ -31,6 +31,7 @@ export async function cancelHomeworkSubmission(scope: HomeworkTeacherScope, inpu
     if (current.status === "cancelled" || record(current.metadata).deletion) return;
     if (current.coreAttemptId) await deleteActivitySubmission(scope.user, scope.courseId, { attemptId: current.coreAttemptId, reason: data.reason }, { allowStartedReplacement: true, transaction: tx });
     const metadata = { ...record(current.metadata), cancellation: { cancelledAt: new Date().toISOString(), cancelledBy: scope.user.id, reason: data.reason } };
+    await tx.$executeRaw`UPDATE "PluginCodingHomeworkDraft" SET "preparationStartedAt"=NULL WHERE "activityId"=${scope.activityId} AND "groupId"=${submission.groupId} AND "userId"=${submission.userId}`;
     await tx.$executeRaw`UPDATE "PluginCodingHomeworkSubmission" SET status='cancelled', metadata=${JSON.stringify(metadata)}::jsonb, "updatedAt"=NOW() WHERE id=${submission.id}`;
     await tx.backgroundJob.updateMany({ where: { queue: codingHomeworkProcessingQueue, idempotencyKey: `submission:${submission.id}`, status: { in: ["queued", "failed"] } }, data: { status: "cancelled", lockedAt: null, lockedBy: null, completedAt: new Date() } });
     // An in-flight provider request retains its concurrency slot until its worker unwinds.

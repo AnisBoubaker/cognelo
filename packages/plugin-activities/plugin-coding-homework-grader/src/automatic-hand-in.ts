@@ -1,3 +1,4 @@
+import { homeworkFileStageSettings } from "./stage-scheduling";
 import { AppError, activityTeamworkEnabled, assertCanGradeGroup, assertCanManageCourse } from "@cognelo/core";
 import { prisma as coreDb } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -5,9 +6,8 @@ import { prisma } from "./db-client";
 import { handInHomework } from "./hand-in";
 import { record, type HomeworkStudentScope } from "./file-preparation";
 import type { HomeworkTeacherScope } from "./workflow-settings";
-import { homeworkSubmissionWindow, readHomeworkSubmissionPolicy } from "./submission-policy";
 
-type Candidate = { id: string; groupId: string; userId: string; revision: number };
+type Candidate = { id: string; groupId: string; userId: string; revision: number; preparationStartedAt: Date | null };
 export type AutomaticHomeworkIssue = { student: string; code: string; message: string };
 const benign = new Set(["HOMEWORK_AUTOMATIC_NOT_DUE", "HOMEWORK_AUTOMATIC_CANCELLED", "HOMEWORK_AUTOMATIC_EMPTY", "HOMEWORK_FILES_FROZEN", "HOMEWORK_MEMBERSHIP_CHANGED", "HOMEWORK_TEAM_MODE_CHANGED", "HOMEWORK_TEAM_REQUIRED", "HOMEWORK_DRAFT_CONFLICT", "ACTIVITY_TEAM_ENROLLMENT_REQUIRED"]);
 /** Called only after the learner page or staff activity route has authorized its scope. */
@@ -18,11 +18,9 @@ async function recover(scope: HomeworkTeacherScope, groupId?: string, studentId?
   ]);
   const settings = record(assignment?.settings);
   if (!activity || settings.submissionsEnabled !== true) return [];
-  const window = homeworkSubmissionWindow(readHomeworkSubmissionPolicy(settings), Date.now());
-  if (!window.closed || !window.closesAt) return [];
   const team = activityTeamworkEnabled(activity.metadata);
   // Candidate lists contain identities/revisions only; read each bounded file collection inside its hand-in transaction.
-  const candidates = team ? await coreDb.$queryRaw<Candidate[]>`SELECT w.id,w."groupId",w.revision,member."userId"
+  const candidates = team ? await coreDb.$queryRaw<Candidate[]>`SELECT w.id,w."groupId",w.revision,w."preparationStartedAt",member."userId"
     FROM "PluginCodingHomeworkWorkspace" w JOIN "CourseGroupActivity" ga ON ga."groupId"=w."groupId" AND ga."activityId"=w."activityId"
     JOIN "CourseGroup" g ON g.id=w."groupId" AND g."courseId"=${scope.courseId}
     CROSS JOIN LATERAL (SELECT p."userId" FROM "CourseGroupParticipant" p JOIN "User" u ON u.id=p."userId" AND u."isActive"=TRUE
@@ -32,7 +30,7 @@ async function recover(scope: HomeworkTeacherScope, groupId?: string, studentId?
       ORDER BY p.id LIMIT 1) member
     WHERE w."activityId"=${scope.activityId} AND w."groupingId"=ga.metadata->'teamwork'->>'groupingId'
       AND (${groupId ?? null}::text IS NULL OR w."groupId"=${groupId ?? null}) AND w."currentSubmissionId" IS NULL AND jsonb_array_length(w.files)>0 ORDER BY w.id`
-    : await coreDb.$queryRaw<Candidate[]>`SELECT d.id,d."groupId",d."userId",d.revision FROM "PluginCodingHomeworkDraft" d
+    : await coreDb.$queryRaw<Candidate[]>`SELECT d.id,d."groupId",d."userId",d.revision,d."preparationStartedAt" FROM "PluginCodingHomeworkDraft" d
       JOIN "CourseGroupActivity" ga ON ga."activityId"=d."activityId" AND ga."groupId"=d."groupId"
       JOIN "CourseGroup" g ON g.id=d."groupId" AND g."courseId"=${scope.courseId}
       JOIN "CourseGroupParticipant" p ON p."groupId"=d."groupId" AND p."userId"=d."userId" AND p.role='student'
@@ -47,8 +45,10 @@ async function recover(scope: HomeworkTeacherScope, groupId?: string, studentId?
     const stored = users.find(user => user.id === candidate.userId); if (!stored) continue;
     const user: CurrentUser = { ...stored, roles: stored.roles.map(value => value.role.key) as CurrentUser["roles"] };
     try {
+      const stage = await homeworkFileStageSettings({ user, courseId: scope.courseId, activityId: scope.activityId, groupId: candidate.groupId }, candidate.preparationStartedAt);
+      if (!stage.submissionClosesAt || Date.parse(stage.submissionClosesAt) > Date.now()) continue;
       await handInHomework({ user, courseId: scope.courseId, activityId: scope.activityId, groupId: candidate.groupId }, { expectedRevision: candidate.revision, acknowledgeIncomplete: true },
-        { cutoff: window.closesAt, triggeredBy: scope.user.id, ...(team ? { workspaceId: candidate.id } : {}) });
+        { cutoff: stage.submissionClosesAt, triggeredBy: scope.user.id, ...(team ? { workspaceId: candidate.id } : {}) });
     } catch (error) {
       if (error instanceof AppError && benign.has(error.code)) continue;
       issues.push({ student: stored.name || [stored.firstName, stored.lastName].filter(Boolean).join(" ") || stored.email,

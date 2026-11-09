@@ -366,6 +366,11 @@ export type ActivityMaterialReferencesService = {
 export type ServerActivityPlugin = {
   key: string;
   materialReferences?: ActivityMaterialReferencesService;
+  submissionStages?: {
+    activityTypeKeys: readonly string[];
+    /** Legacy defaults and enabled stages; no plugin-private records cross this boundary. */
+    configuration: (input: { activityId: string }) => Promise<{ activeStageIds?: string[]; defaults?: Record<string, { deadline?: string | null; timeLimitMinutes?: number | null; allowLate?: boolean; lateLimitMinutes?: number | null }> }>;
+  };
   /** Private workspace lifecycle, invoked by core without knowing plugin tables. */
   teamwork?: {
     activityTypeKeys: readonly string[];
@@ -845,4 +850,8 @@ export function getSubmissionExportHandler(activityTypeKey: string): SubmissionE
 
 export function resolveActivityTimedFinalization(activityTypeKey: string) {
   return listServerActivityPlugins().find(plugin => plugin.timedFinalization?.activityTypeKeys.includes(activityTypeKey))?.timedFinalization?.finalize ?? null;
+}
+
+export function getActivitySubmissionStagesHandler(activityTypeKey: string) {
+  return currentServerPlugins().find(plugin => plugin.submissionStages?.activityTypeKeys.includes(activityTypeKey))?.submissionStages ?? null;
 }
