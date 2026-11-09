@@ -1,9 +1,9 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { AppIcon } from "@/components/app-icon";
 
 import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
-
 
 import { useEffect, useState } from "react";
 import { useNotifications } from "@cognelo/activity-ui";
@@ -228,11 +228,10 @@ export default function PluginSettingsPage() {
             <div className="section-heading">
               <div>
                 <p className="eyebrow">{t("settings.pluginsEyebrow")}</p>
-                <h1 className="content-title">{t("settings.pluginsTitle")}</h1>
+                <HelpLabel help={t(isAdmin ? "settings.pluginsHelp" : "settings.pluginsAdminOnly")}><h1 className="content-title">{t("settings.pluginsTitle")}</h1></HelpLabel>
               </div>
             </div>
 
-            {isAdmin ? <p className="muted">{t("settings.pluginsHelp")}</p> : <p className="muted">{t("settings.pluginsAdminOnly")}</p>}
             {error ? <p className="error">{error}</p> : null}
             {loading ? <p className="muted">{t("common.loading")}</p> : null}
 
@@ -249,10 +248,10 @@ export default function PluginSettingsPage() {
                         <div className="section-heading">
                           <div>
                             <p className="eyebrow">{t("settings.activityPluginsEyebrow")}</p>
-                            <h3>{t("settings.activityPluginsTitle")}</h3>
+                            <HelpLabel help={<>{t("settings.activityPluginsHelp")}</>}><h3>{t("settings.activityPluginsTitle")}</h3></HelpLabel>
                           </div>
                         </div>
-                        <p className="muted">{t("settings.activityPluginsHelp")}</p>
+
                         {renderPluginList("activity", activityPlugins)}
                       </div>
                     )
@@ -265,10 +264,10 @@ export default function PluginSettingsPage() {
                         <div className="section-heading">
                           <div>
                             <p className="eyebrow">{t("settings.contentTypePluginsEyebrow")}</p>
-                            <h3>{t("settings.contentTypePluginsTitle")}</h3>
+                            <HelpLabel help={<>{t("settings.contentTypePluginsHelp")}</>}><h3>{t("settings.contentTypePluginsTitle")}</h3></HelpLabel>
                           </div>
                         </div>
-                        <p className="muted">{t("settings.contentTypePluginsHelp")}</p>
+
                         {renderPluginList("content", contentTypePlugins)}
                       </div>
                     )

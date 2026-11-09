@@ -32,7 +32,7 @@ test("admin timezone governs scheduling in a differently configured browser and 
     await dialog.locator(`[id="${fromId}-time"]`).fill("13:14");
     await dialog.locator(`[id="${untilId}"]`).fill("2030-07-15");
     await dialog.locator(`[id="${untilId}-time"]`).fill("15:14");
-    await expect(dialog.locator(".date-time-zone-label").first()).toHaveText("America/Toronto");
+    await expect(dialog.locator(".date-time-zone-label")).toHaveCount(0);
     await dialog.getByRole("button", { name: "Save settings", exact: true }).click();
     await expect(dialog).toBeHidden();
     const saved = await responseJson<{ settings: CourseActivityAssignmentSettings }>(await teacherApi.get(`/api/courses/${data.courseId}/activities/${data.activityId}/assign-all-groups`));

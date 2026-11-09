@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "./help-tooltip";
 
 import { createContext, useContext, type ReactNode } from "react";
 
@@ -41,13 +42,13 @@ export function KnowledgeGenerationModeField({
   const labels = knowledgeGenerationCopy[locale as keyof typeof knowledgeGenerationCopy] ?? knowledgeGenerationCopy.en;
   return (
     <div className="field">
-      <label>{labels.title}</label>
+      <HelpLabel help={<>{labels.help}</>}><label>{labels.title}</label></HelpLabel>
       <select value={knowledge.mode} onChange={(event) => knowledge.setMode(event.target.value as ActivityKnowledgeGenerationMode)}>
         <option value="selected">{labels.selected}</option>
         <option value="suggest">{labels.suggest}</option>
         <option value="ignore">{labels.ignore}</option>
       </select>
-      <p className="muted">{labels.help}</p>
+
     </div>
   );
 }

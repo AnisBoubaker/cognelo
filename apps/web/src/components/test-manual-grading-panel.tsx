@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { DialogHeader, MarkdownRenderer, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
@@ -150,18 +151,18 @@ export function TestManualGradingPanel({ embedded = false, courseId, row, attemp
       </> : null}
       {!loading && !review ? <p className="muted">{t("courseDetail.noAnswers")}</p> : null}
       {!loading && review && !inspectionOnly ? <section className="form inline-panel">
-        <div className="section-heading"><div><p className="eyebrow">{t("courseDetail.testReviewTotal")}</p>
+        <div className="section-heading"><div><HelpLabel help={<>{t("courseDetail.testReviewTotalHelp")}</>}><p className="eyebrow">{t("courseDetail.testReviewTotal")}</p></HelpLabel>
           <h3 aria-live="polite">{displayedTotal === null ? t("courseDetail.testReviewPendingTotal") : `${formatTestReviewScore(displayedTotal)} / ${row.maxScore}`}</h3>
         </div><button className="button secondary" disabled={busy} type="button" onClick={() => { void regrade(); }}><AppIcon name="refresh" />{t("courseDetail.regrade")}</button></div>
-        <p className="muted">{t("courseDetail.testReviewTotalHelp")}</p>
+
         <label className="checkbox-row"><input type="checkbox" checked={draft.overrideTotal} disabled={busy}
           onChange={event => setDraft(current => ({ ...current, overrideTotal: event.target.checked, totalTouched: true,
             totalScore: !current.overrideTotal && calculatedTotal !== null ? formatTestReviewScore(calculatedTotal) : current.totalScore }))} />
           <span>{t("courseDetail.testReviewOverrideTotal")}</span></label>
-        {draft.overrideTotal ? <div className="field"><label htmlFor="test-parent-score">{t("courseDetail.testReviewTotal")}</label>
+        {draft.overrideTotal ? <div className="field"><HelpLabel help={<>{t("courseDetail.testReviewOverrideHelp")}</>}><label htmlFor="test-parent-score">{t("courseDetail.testReviewTotal")}</label></HelpLabel>
           <input id="test-parent-score" min={0} max={row.maxScore} step="any" type="number" value={draft.totalScore} disabled={busy}
             onChange={event => setDraft(current => ({ ...current, totalTouched: true, totalScore: event.target.value }))} />
-          <p className="muted">{t("courseDetail.testReviewOverrideHelp")}</p>
+
         </div> : null}
         <div className="field"><label htmlFor="test-manual-reason">{t("courseDetail.overrideReasonPrompt")}</label>
           <textarea id="test-manual-reason" maxLength={10000} value={draft.reason} disabled={busy} onChange={event => setDraft(current => ({ ...current, reason: event.target.value }))} /></div>

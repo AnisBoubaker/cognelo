@@ -1,4 +1,6 @@
 "use client";
+import { HelpLabel, HelpTooltip } from "@cognelo/activity-ui";
+
 import { createContext, useContext } from "react";
 import { ToggleSwitch, fromZonedDateTimeInput, toZonedDateTimeInput } from "@cognelo/activity-ui";
 import { defaultSubmissionStagePolicy, submissionStageWindow, type SubmissionStagePolicies, type SubmissionStagePolicy } from "@cognelo/contracts";
@@ -29,7 +31,7 @@ export function ActivityStageSchedule({ value, onChange, availableUntil, disable
     for (const key of keys) { if (checked) Object.assign(next, { [key]: effective[key] }); else delete next[key]; }
     onChange({ ...value, [id]: next });
   }
-  return <section className="stack activity-stage-schedule"><h3>{copy.title}</h3><p className="muted">{copy.hard}</p>
+  return <section className="stack activity-stage-schedule"><HelpLabel help={copy.hard}><h3>{copy.title}</h3></HelpLabel>
     {stages.map(stage => {
       const name = stage.names[locale as keyof typeof stage.names] ?? stage.names.en, own = value[stage.id] ?? {};
       const policy = { ...defaultSubmissionStagePolicy, ...(stage.assessment ? { timeLimitMinutes: legacyTimeLimit ?? null } : {}), ...inherited?.[stage.id], ...own };
@@ -39,18 +41,15 @@ export function ActivityStageSchedule({ value, onChange, availableUntil, disable
       const duration = policy.lateLimitMinutes ?? 1440;
       const enabled = (key: keyof SubmissionStagePolicy) => !inherited || own[key] !== undefined;
       const group = (label: string, keys: Array<keyof SubmissionStagePolicy>) => inherited && <label className="checkbox-row"><input type="checkbox" checked={keys.some(key => own[key] !== undefined)} disabled={disabled || stage.active === false} onChange={event => override(stage.id, keys, event.currentTarget.checked, policy)} />{copy.override} {label}</label>;
-      return <fieldset className="stack preview-panel" key={stage.id} disabled={disabled || stage.active === false}><legend><strong>{name}</strong></legend>
-        {stage.active === false && <p>{copy.inactive}</p>}
+      return <fieldset aria-label={name} className="stack preview-panel" key={stage.id} disabled={disabled || stage.active === false}><legend><strong>{name}</strong>{stage.active === false && <HelpTooltip content={copy.inactive} label={name} />}</legend>
         {group(dateLabel, ["deadline"])}
-        <div className="field"><label htmlFor={`stage-${stage.id}-${inherited ? "override" : "general"}-deadline`}>{dateLabel} ({timeZone})</label>
+        <div className="field"><HelpLabel help={copy.optional}><label htmlFor={`stage-${stage.id}-${inherited ? "override" : "general"}-deadline`}>{dateLabel}</label></HelpLabel>
           <DateTimeMinuteInput id={`stage-${stage.id}-${inherited ? "override" : "general"}-deadline`} value={policy.deadline ?? ""} disabled={!enabled("deadline")} onChange={deadline => update(stage.id, { deadline: deadline || null })} />
-          <p className="muted">{copy.optional}</p>
         </div>
         <p role="status">{window?.deadline ? `${policy.deadline ? copy.effective : copy.inherited}: ${new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(window.deadline))}` : copy.noDeadline}</p>
         {group(limitLabel, ["timeLimitMinutes"])}
-        <ToggleSwitch locale={locale} label={<><span className="sr-only">{name} — </span>{copy.timed}</>} checked={policy.timeLimitMinutes !== null} disabled={!enabled("timeLimitMinutes")} onChange={checked => update(stage.id, { timeLimitMinutes: checked ? 60 : null })} />
+        <ToggleSwitch locale={locale} help={copy.start} label={<><span className="sr-only">{name} — </span>{copy.timed}</>} checked={policy.timeLimitMinutes !== null} disabled={!enabled("timeLimitMinutes")} onChange={checked => update(stage.id, { timeLimitMinutes: checked ? 60 : null })} />
         {policy.timeLimitMinutes !== null && <label className="field">{limitLabel} ({copy.minutes})<input type="number" min={1} max={1440} value={policy.timeLimitMinutes} disabled={!enabled("timeLimitMinutes")} onChange={event => update(stage.id, { timeLimitMinutes: Number(event.currentTarget.value) })} /></label>}
-        {policy.timeLimitMinutes !== null && <p className="muted">{copy.start}</p>}
         {stage.allowsLateSubmissions && <>
           {group(`${name} — ${copy.latePolicy}`, ["allowLate", "lateLimitMinutes"])}
           <ToggleSwitch locale={locale} label={<><span className="sr-only">{name} — </span>{copy.allowLate}</>} checked={policy.allowLate} disabled={!enabled("allowLate")} onChange={allowLate => update(stage.id, { allowLate, ...(!allowLate ? { lateLimitMinutes: null } : {}) })} />

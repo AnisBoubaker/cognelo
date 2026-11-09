@@ -11,8 +11,8 @@ Display timezone names only where the administrator/course owner actually choose
 ## Delivery checkpoints
 
 - [x] Shared localized help primitive, focus/touch/Escape behavior, portal positioning and tests.
-- [ ] Scheduling and repeated timezone reminders.
-- [ ] Course, subject, bank, roster, grading and teacher settings rollout.
+- [x] Scheduling and repeated timezone reminders.
+- [x] Course, subject, bank, roster, grading and teacher settings rollout.
 - [ ] Activity editors and shared authoring tools rollout.
 - [ ] Accessibility/mobile/regression checks, documentation review and incremental commits.
 

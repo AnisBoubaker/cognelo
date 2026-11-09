@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { AppIcon } from "@/components/app-icon";
 
@@ -78,8 +79,8 @@ export function CourseGradeChallengesPanel({ courseId }: { courseId: string }) {
       <div className="section-heading">
         <div>
           <p className="eyebrow">{t("courseDetail.challengesEyebrow")}</p>
-          <h2>{t("courseDetail.challengesTitle")}</h2>
-          <p className="muted">{t("courseDetail.challengesHelp")}</p>
+          <HelpLabel help={<>{t("courseDetail.challengesHelp")}</>}><h2>{t("courseDetail.challengesTitle")}</h2></HelpLabel>
+
         </div>
         <label className="checkbox-row grade-challenge-filter">
           <input

@@ -1,9 +1,9 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { toZonedDateTimeInput, fromZonedDateTimeInput } from "@cognelo/activity-ui";
 
 import { useApplicationTime, isZonedMidnight } from "@cognelo/activity-ui";
-
 
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import "@cognelo/plugin-registry/activity";
@@ -428,7 +428,6 @@ export default function CourseGroupPage() {
     }
     return material.url ?? undefined;
   }
-
 
   function resetParticipantForm() {
     setParticipantRole("student");
@@ -1239,7 +1238,7 @@ export default function CourseGroupPage() {
                             </div>
                             {effectiveAssignAssessmentMode === "summative" ? (
                               <>
-                                <label className="checkbox-row" htmlFor="assignRequireSafeExamBrowser">
+                                <HelpLabel help={<>{t("groupPage.requireSafeExamBrowserHelp")}</>}><label className="checkbox-row" htmlFor="assignRequireSafeExamBrowser">
                                   <input
                                     id="assignRequireSafeExamBrowser"
                                     type="checkbox"
@@ -1249,9 +1248,9 @@ export default function CourseGroupPage() {
                                   />
                                   <span>
                                     {t("groupPage.requireSafeExamBrowser")}
-                                    <small className="muted">{t("groupPage.requireSafeExamBrowserHelp")}</small>
+
                                   </span>
-                                </label>
+                                </label></HelpLabel>
                                 <div className="field">
                                   <label htmlFor="assignPointsPossible">{t("groupPage.pointsPossible")}</label>
                                   <input
@@ -1755,8 +1754,7 @@ export default function CourseGroupPage() {
                         <form className="form inline-panel" onSubmit={addParticipant}>
                           <div>
                             <p className="eyebrow">{t("groupPage.addParticipantEyebrow")}</p>
-                            <h2>{t("groupPage.addParticipantTitle")}</h2>
-                            <p className="muted">{t("groupPage.addParticipantText")}</p>
+                            <HelpLabel help={<><p>{t("groupPage.addParticipantText")}</p><p>{t("groupPage.pendingAccountHelp")}</p></>}><h2>{t("groupPage.addParticipantTitle")}</h2></HelpLabel>
                           </div>
                           <div className="grid compact-form-grid">
                             <div className="field">
@@ -1826,7 +1824,7 @@ export default function CourseGroupPage() {
                                 ? t("groupPage.participantLookupFound", { name: participantCandidate.name || participantCandidate.email })
                                 : t("groupPage.participantLookupNew")}
                           </p>
-                          <p className="muted">{t("groupPage.pendingAccountHelp")}</p>
+
                           {participantError ? <p className="error">{participantError}</p> : null}
                           <div className="row">
                             <button type="submit" disabled={savingParticipant}>

@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { AppIcon } from "@/components/app-icon";
 
@@ -94,7 +95,7 @@ export default function SubjectsPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="subject-teaching-language">{t("subjects.teachingLanguageLabel")}</label>
+                <HelpLabel help={<>{t("subjects.teachingLanguageHelp")}</>}><label htmlFor="subject-teaching-language">{t("subjects.teachingLanguageLabel")}</label></HelpLabel>
                 <select
                   id="subject-teaching-language"
                   value={teachingLanguage}
@@ -102,10 +103,10 @@ export default function SubjectsPage() {
                 >
                   {locales.map((language) => <option key={language} value={language}>{t(`locale.${language}`)}</option>)}
                 </select>
-                <p className="muted">{t("subjects.teachingLanguageHelp")}</p>
+
               </div>
               <div className="field">
-                <label htmlFor="subject-programming-language">{t("subjects.programmingLanguageLabel")}</label>
+                <HelpLabel help={<>{t("subjects.programmingLanguageHelp")}</>}><label htmlFor="subject-programming-language">{t("subjects.programmingLanguageLabel")}</label></HelpLabel>
                 <select
                   id="subject-programming-language"
                   value={programmingLanguage}
@@ -115,7 +116,7 @@ export default function SubjectsPage() {
                   <option value={subjectMultipleProgrammingLanguages}>{t("subjects.programmingLanguageMultiple")}</option>
                   {programmingLanguages.map((language) => <option key={language.key} value={language.key}>{language.label}</option>)}
                 </select>
-                <p className="muted">{t("subjects.programmingLanguageHelp")}</p>
+
               </div>
               <div className="row">
                 <button type="submit" disabled={saving}>

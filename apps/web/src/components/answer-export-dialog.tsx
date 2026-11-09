@@ -49,7 +49,7 @@ export function AnswerExportDialog({ courseId, activityId, activityTitle, groupI
   }
   const date = (value: string | null) => value ? new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "-";
   return <>
-    <ConfirmationDialog open={!exporting} title={t("answerExport.title")} eyebrow={activityTitle} confirmIcon="download"
+    <ConfirmationDialog open={!exporting} title={t("answerExport.title")} titleHelp={t("answerExport.submittedOnly")} eyebrow={activityTitle} confirmIcon="download"
       confirmLabel={t("answerExport.download")} cancelLabel={t("common.cancel")} onConfirm={download} onCancel={onClose}
       confirmDisabled={loading || !selected.length || Boolean(participantId && !students[0]?.attempts.some((attempt) => attempt.id === attemptId))}
       message={<div className="stack answer-export-options">
@@ -75,7 +75,6 @@ export function AnswerExportDialog({ courseId, activityId, activityTitle, groupI
         </>}
         <label className="checkbox-row"><input type="checkbox" checked={includePrompt} onChange={(event) => setIncludePrompt(event.target.checked)} />{t("answerExport.includePrompt")}</label>
         <label className="checkbox-row"><input type="checkbox" checked={includeGrading} onChange={(event) => setIncludeGrading(event.target.checked)} />{t("answerExport.includeGrading")}</label>
-        <p className="muted">{t("answerExport.submittedOnly")}</p>
         {error ? <p className="error" role="alert">{error}</p> : null}
       </div>} />
     <ProgressDialog open={exporting} title={t("answerExport.preparing")} progressLabel={t("common.operationProgress")} message={t("answerExport.preparingHelp")} />

@@ -63,7 +63,7 @@ test("course timezone opt-in, inheritance, scheduling and student display stay i
     await dialog.locator(`[id="${from}-time"]`).fill("13:14");
     await dialog.locator(`[id="${until}"]`).fill("2030-07-15");
     await dialog.locator(`[id="${until}-time"]`).fill("15:14");
-    await expect(dialog.locator(".date-time-zone-label").first()).toHaveText("America/Toronto");
+    await expect(dialog.locator(".date-time-zone-label")).toHaveCount(0);
     await dialog.getByRole("button", { name: "Save settings", exact: true }).click();
     await expect(dialog).toBeHidden();
     const assignmentPath = `/api/courses/${data.courseId}/activities/${data.activityId}/assign-all-groups`;

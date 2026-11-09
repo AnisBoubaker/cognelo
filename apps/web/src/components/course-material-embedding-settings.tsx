@@ -1,4 +1,6 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
+
 import { useCallback, useEffect, useState } from "react";
 import type { AiModelSelection, CourseMaterialEmbeddingSettingsView } from "@cognelo/contracts";
 import { AiModelPicker, EditActionBar, getEditActionBarCopy, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
@@ -20,7 +22,7 @@ export function CourseMaterialEmbeddingSettings({ courseId }: { courseId: string
   }, [path, selection, notifications, copy.modelSaved, copy.error]);
   const discard = () => setSelection(value?.selection ?? null);
   useUnsavedChangesGuard({ isDirty: dirty, onDiscard: discard, onSave: save });
-  return <section className="section stack" id="material-embeddings"><h3>{copy.model}</h3><p className="muted">{copy.modelHelp}</p>
+  return <section className="section stack" id="material-embeddings"><HelpLabel help={<>{copy.modelHelp}</>}><h3>{copy.model}</h3></HelpLabel>
     {!value ? <><p role="status">{loadError || copy.loading}</p>{loadError && <button type="button" onClick={() => setRetry(value => value + 1)}>{copy.retry}</button>}</> : <>
       <AiModelPicker connections={value.connections} purpose="embedding" value={selection} onChange={setSelection} disabled={saving}
         labels={{ connection: copy.connection, model: copy.modelLabel, inherit: copy.inherited, unavailable: copy.unavailable, noModels: copy.noModels }} />

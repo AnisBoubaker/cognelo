@@ -1,7 +1,7 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
-
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ContextMenu, EditActionBar, getEditActionBarCopy, useDialogs, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
@@ -167,14 +167,14 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
         <div className="student-grouping-settings">
           <section className="student-grouping-setting" aria-label={t("studentGroupings.studentVisibility")}>
             <h3>{t("studentGroupings.studentVisibility")}</h3>
-            <label className="checkbox-row"><input type="checkbox" checked={draft.visibleToStudents} onChange={(event) => setDraft({ ...draft, visibleToStudents: event.target.checked })} />{t("studentGroupings.showToStudents")}</label>
-            <p className="muted">{t(draft.visibleToStudents ? "studentGroupings.visibleHelp" : "studentGroupings.hiddenHelp")}</p>
+            <HelpLabel help={<>{t(draft.visibleToStudents ? "studentGroupings.visibleHelp" : "studentGroupings.hiddenHelp")}</>}><label className="checkbox-row"><input type="checkbox" checked={draft.visibleToStudents} onChange={(event) => setDraft({ ...draft, visibleToStudents: event.target.checked })} />{t("studentGroupings.showToStudents")}</label></HelpLabel>
+
           </section>
           <section className="student-grouping-setting" aria-label={t("studentGroupings.assignmentMethod")}>
             <h3>{t("studentGroupings.assignmentMethod")}</h3>
-            <strong className="student-grouping-method">{methodLabel(draft.assignmentMethod)}</strong>
+            <HelpLabel help={!draft.studentChoiceEnabled ? <>{t(draft.assignmentMethod === "random" ? "studentGroupings.randomMethodHelp" : "studentGroupings.manualMethodHelp")}</> : null}><strong className="student-grouping-method">{methodLabel(draft.assignmentMethod)}</strong></HelpLabel>
             {choiceSummary(draft)}
-            {!draft.studentChoiceEnabled ? <p className="muted">{t(draft.assignmentMethod === "random" ? "studentGroupings.randomMethodHelp" : "studentGroupings.manualMethodHelp")}</p> : null}
+
             <div className="student-grouping-setting-actions">
               <button className="secondary" type="button" disabled={!draft.teams.length} onClick={() => setAssignmentDialogOpen(true)}><AppIcon name="assign" /> {t("studentGroupings.automaticAssign")}</button>
               {draft.assignmentMethod !== "manual" ? <button className="secondary" type="button" onClick={() => setDraft({ ...draft, assignmentMethod: "manual", studentChoiceEnabled: false, choiceOpensAt: null, choiceClosesAt: null, allowChoiceChanges: false })}><AppIcon name="edit" /> {t("studentGroupings.useManual")}</button> : null}
@@ -189,9 +189,9 @@ export function StudentGroupingsPanel({ courseId, groupId, teachingLanguage, onE
           <button className="secondary" type="button" aria-label={t("studentGroupings.removeTeam", { number: index + 1 })} onClick={() => setDraft({ ...draft, teams: draft.teams.filter((item) => item.key !== team.key) })}><AppIcon name="remove" /> {t("common.remove")}</button>
         </div>) : <p className="muted">{t("studentGroupings.noTeams")}</p>}
         <div className="section-heading">
-          <h3>{t("studentGroupings.students")}</h3>
+          <HelpLabel help={<>{t("studentGroupings.assignmentHelp", { count: students.length - assignments.size })}</>}><h3>{t("studentGroupings.students")}</h3></HelpLabel><span className="muted">{t("studentGroupings.unassigned")}: {students.length - assignments.size}</span>
         </div>
-        <p className="muted">{t("studentGroupings.assignmentHelp", { count: students.length - assignments.size })}</p>
+
         <div className="field"><label htmlFor="grouping-student-search">{t("studentGroupings.search")}</label><input id="grouping-student-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
         <label className="checkbox-row"><input type="checkbox" checked={unassignedOnly} onChange={(event) => setUnassignedOnly(event.target.checked)} />{t("studentGroupings.unassignedOnly")}</label>
         <div className="student-grouping-roster">

@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { DialogHeader } from "@cognelo/activity-ui";
 import { useApplicationTime } from "@cognelo/activity-ui";
@@ -67,7 +68,7 @@ export function GradebookExportDialog({ target, onClose }: { target: GradebookEx
             </select>
           </div>
           <div className="field">
-            <label htmlFor="gradebook-export-file-name">{t("courseDetail.exportFileName")}</label>
+            <HelpLabel help={<>{t("courseDetail.exportFinalGradesOnlyHelp")}</>}><label htmlFor="gradebook-export-file-name">{t("courseDetail.exportFileName")}</label></HelpLabel>
             <div className="grade-export-file-name">
               <input
                 autoFocus
@@ -80,7 +81,7 @@ export function GradebookExportDialog({ target, onClose }: { target: GradebookEx
               <span aria-hidden="true">.{format}</span>
             </div>
           </div>
-          <p className="muted">{t("courseDetail.exportFinalGradesOnlyHelp")}</p>
+
           <div className="dialog-actions">
             <button className="secondary" type="button" onClick={onClose}><AppIcon name="close" /> {t("common.cancel")}</button>
             <button disabled={!fileName.trim()} type="submit">

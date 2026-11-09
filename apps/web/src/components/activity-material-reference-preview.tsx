@@ -1,4 +1,6 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
+
 import { useEffect, useRef, useState } from "react";
 import { ActionIcon, useNotifications } from "@cognelo/activity-ui";
 import { materialReferenceCopy } from "@/lib/material-reference-copy";
@@ -25,8 +27,8 @@ export function ActivityMaterialReferencePreview({ id, resourceId, request, loca
     return () => controller.abort();
   }, [copy.error, notifications, page, request, resourceId]);
   return <section id={id} className="section stack activity-reference-preview" aria-label={copy.preview}>
-    <div className="row wrap"><h4>{copy.preview}{value ? ` · ${value.title}` : ""}</h4><button className="secondary" type="button" onClick={onClose}><ActionIcon name="close" /> {copy.close}</button></div>
-    <p className="muted">{copy.previewHelp}</p>
+    <div className="row wrap"><HelpLabel help={<>{copy.previewHelp}</>}><h4>{copy.preview}{value ? ` · ${value.title}` : ""}</h4></HelpLabel><button className="secondary" type="button" onClick={onClose}><ActionIcon name="close" /> {copy.close}</button></div>
+
     {!value && !failed && <p role="status">{copy.loading}</p>}
     {failed && <div className="row wrap"><p role="status">{copy.error}</p><button type="button" className="secondary" onClick={() => setPage({ offset: 0, retry: Date.now() })}><ActionIcon name="refresh" /> {copy.retry}</button></div>}
     {value && <>

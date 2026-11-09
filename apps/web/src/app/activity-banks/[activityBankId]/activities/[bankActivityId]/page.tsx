@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { AppIcon } from "@/components/app-icon";
 
@@ -201,12 +202,12 @@ export default function BankActivityAuthoringPage() {
               </Link>
             </div>
           </div>
-          <p className="muted">
-            {t("bankActivityPage.versionNote")}
-          </p>
+
           {activity ? (
             <div className="field" style={{ maxWidth: 360 }}>
-              <label htmlFor="bank-activity-lifecycle">{t("bankActivityPage.statusLabel")}</label>
+              <HelpLabel help={<>
+            {t("bankActivityPage.versionNote")}
+          </>}><label htmlFor="bank-activity-lifecycle">{t("bankActivityPage.statusLabel")}</label></HelpLabel>
               <select
                 id="bank-activity-lifecycle"
                 value={lifecycleDraft}

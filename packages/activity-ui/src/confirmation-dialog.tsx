@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "./help-tooltip";
 
 import { ActionIcon, type ActionIconName } from "./action-icon";
 import { DialogHeader, useDialogCloseLabel } from "./dialog-header";
@@ -8,6 +9,7 @@ import React, { type ReactNode, useEffect, useId, useRef } from "react";
 export type ConfirmationDialogProps = {
   open: boolean;
   title: string;
+  titleHelp?: ReactNode;
   message: ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
@@ -23,6 +25,7 @@ export type ConfirmationDialogProps = {
 export function ConfirmationDialog({
   open,
   title,
+  titleHelp,
   message,
   confirmLabel,
   cancelLabel,
@@ -84,7 +87,7 @@ export function ConfirmationDialog({
         <DialogHeader closeLabel={closeLabel} onClose={dismissOnly ? onConfirm : onCancel}
           closeDisabled={isConfirming} closeButtonRef={dismissOnly ? confirmButtonRef : undefined}>
           {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-          <h2 id={titleId}>{title}</h2>
+          <HelpLabel help={titleHelp}><h2 id={titleId}>{title}</h2></HelpLabel>
         </DialogHeader>
         <div className="muted">{message}</div>
         {!dismissOnly ? <div className="dialog-actions">

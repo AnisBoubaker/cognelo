@@ -334,8 +334,10 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       await page.getByRole("button", { name: "Close", exact: true }).click();
       await page.reload();
       await expect(page.getByRole("article", { name: "Section teacher grouping" })).toBeVisible();
-      await responseJson(await restricted.patch(`${path}/${grouping.id}`, { data: { ...grouping, title: "Managed by section teacher" } }));
-      await responseJson(await restricted.delete(`${path}/${grouping.id}`, { data: { revision: 2 } }));
+      // Role changes invalidate grouping revisions, just like roster changes.
+      const current = (await responseJson<{ groupings: StudentGroupingDto[] }>(await restricted.get(path))).groupings.find((entry) => entry.id === grouping.id)!;
+      const updated = await responseJson<{ grouping: StudentGroupingDto }>(await restricted.patch(`${path}/${grouping.id}`, { data: { ...current, title: "Managed by section teacher" } }));
+      await responseJson(await restricted.delete(`${path}/${grouping.id}`, { data: { revision: updated.grouping.revision } }));
     } finally { await teacher.dispose(); await restricted.dispose(); }
   });
 
@@ -349,7 +351,8 @@ test.describe("section groupings and teams", { tag: "@regression" }, () => {
       const result = await responseJson<{ groupings: StudentGroupingDto[]; students: StudentGroupingStudent[] }>(await api.get(path));
       expect(result.students).toHaveLength(1);
       expect(result.groupings[0]?.teams[0]?.participantIds).toEqual(result.students.map((student) => student.id));
-      expect((await api.patch(`${path}/${grouping.id}`, { data: grouping })).status()).toBe(400);
+      expect((await api.patch(`${path}/${grouping.id}`, { data: grouping })).status()).toBe(409);
+      expect((await api.patch(`${path}/${grouping.id}`, { data: { ...grouping, revision: result.groupings[0]!.revision } })).status()).toBe(400);
       await responseJson(await api.delete(`/api/courses/${data.courseId}/groups/${data.groupId}`, { data: { action: "move", targetGroupId: data.otherSectionId } }));
       expect(await prisma.studentGrouping.count({ where: { id: grouping.id } })).toBe(0);
       expect(await prisma.studentTeamMember.count({ where: { groupingId: grouping.id } })).toBe(0);

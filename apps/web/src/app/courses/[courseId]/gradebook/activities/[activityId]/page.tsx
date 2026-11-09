@@ -1,11 +1,11 @@
 "use client";
+import { HelpLabel, HelpTooltip } from "@cognelo/activity-ui";
 
 import { useAiGradingRun } from "@/lib/use-ai-grading-run";
 import { AiGradingRunDialog } from "@/components/ai-grading-run-dialog";
 import { DialogHeader } from "@cognelo/activity-ui";
 
 import { useApplicationTime } from "@cognelo/activity-ui";
-
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -870,8 +870,8 @@ export default function GradebookActivityResultsPage() {
           </div>
           {unreadMessageCount > 0 ? <aside className="activity-message-alert" role="status" aria-live="polite">
             <AppIcon name="messages" size={24} />
-            <div><strong id="activity-message-alert-summary">{t("activityMessenger.unreadStudentMessages", { count: unreadMessageCount })}</strong>
-              {alerts.needsInteraction ? <small>{t("activityMessenger.soundActivationHelp")}</small> : null}
+            <div><HelpLabel help={alerts.needsInteraction ? <>{t("activityMessenger.soundActivationHelp")}</> : null}><strong id="activity-message-alert-summary">{t("activityMessenger.unreadStudentMessages", { count: unreadMessageCount })}</strong></HelpLabel>
+
             </div>
             <button className="secondary" type="button" onClick={openActivityMessenger}><AppIcon name="messages" />{t("activityMessenger.openUnreadMessages")}</button>
           </aside> : null}
@@ -1052,7 +1052,7 @@ export default function GradebookActivityResultsPage() {
               <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setAiGradingBatchDialog(null)} closeDisabled={aiGradingBatchDialog.submitting}>
                 <div>
                   <p className="eyebrow">{t("courseDetail.gradebookEyebrow")}</p>
-                  <h2 id="ai-grading-batch-title">{t("courseDetail.aiBatchTitle")}</h2>
+                  <HelpLabel help={aiGradingBatchDialog.instructions === null ? <>{t("courseDetail.aiBatchTestInstructionsHelp")}</> : null}><h2 id="ai-grading-batch-title">{t("courseDetail.aiBatchTitle")}</h2></HelpLabel>
                   <p className="muted">{t("courseDetail.aiBatchImpact")}</p>
                 </div>
               </DialogHeader>
@@ -1063,11 +1063,11 @@ export default function GradebookActivityResultsPage() {
                   event.preventDefault();
                   void startGuidedAiGradingBatch();
                 }}>
-                  {aiGradingBatchDialog.instructions === null ? <p className="muted">{t("courseDetail.aiBatchTestInstructionsHelp")}</p> : null}
+
                   {aiGradingBatchDialog.templates.length ? (
-                    <fieldset className="field">
-                      <legend>{t("courseDetail.aiBatchTemplatesLabel")}</legend>
-                      <p className="muted">{t(aiGradingBatchDialog.instructions === null ? "courseDetail.aiBatchTestTemplatesHelp" : "courseDetail.aiBatchTemplatesHelp")}</p>
+                    <fieldset className="field" aria-label={t("courseDetail.aiBatchTemplatesLabel")}>
+                      <legend>{t("courseDetail.aiBatchTemplatesLabel")}<HelpTooltip content={<>{t(aiGradingBatchDialog.instructions === null ? "courseDetail.aiBatchTestTemplatesHelp" : "courseDetail.aiBatchTemplatesHelp")}</>} label={t("courseDetail.aiBatchTemplatesLabel")} /></legend>
+
                       {aiGradingBatchDialog.templates.map((template) => {
                         const selected = aiGradingBatchDialog.selectedTemplateAttemptIds.includes(template.attemptId);
                         const selectionFull = aiGradingBatchDialog.selectedTemplateAttemptIds.length >= 3;

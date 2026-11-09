@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { AppIcon } from "@/components/app-icon";
 
@@ -181,8 +182,8 @@ export default function RunnerSettingsPage() {
                     <article className="card card-compact stack" key={runnerType}>
                       <div className="section-heading">
                         <div>
-                          <h3>{runnerTitle(runnerType, t)}</h3>
-                          <p className="muted">{runnerHelp(runnerType, t)}</p>
+                          <HelpLabel help={<>{runnerHelp(runnerType, t)}</>}><h3>{runnerTitle(runnerType, t)}</h3></HelpLabel>
+
                         </div>
                         <label className="checkbox-row">
                           <input
@@ -230,7 +231,7 @@ export default function RunnerSettingsPage() {
                           />
                         </div>
                         <div className="field">
-                          <label htmlFor={`${runnerType}-auth-token`}>{t("settings.runnerAuthToken")}</label>
+                          <HelpLabel help={<>{canRetainToken ? t("settings.runnerSecretSavedHelp") : t("settings.runnerAuthHelp")}</>}><label htmlFor={`${runnerType}-auth-token`}>{t("settings.runnerAuthToken")}</label></HelpLabel>
                           <input
                             id={`${runnerType}-auth-token`}
                             maxLength={2000}
@@ -239,7 +240,7 @@ export default function RunnerSettingsPage() {
                             value={form.authToken}
                             onChange={(event) => updateForm(setForms, runnerType, { authToken: event.target.value })}
                           />
-                          <p className="muted">{canRetainToken ? t("settings.runnerSecretSavedHelp") : t("settings.runnerAuthHelp")}</p>
+
                         </div>
                       </div>
 

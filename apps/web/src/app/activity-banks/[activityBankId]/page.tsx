@@ -1,9 +1,9 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { DialogHeader } from "@cognelo/activity-ui";
 
 import { useApplicationTime } from "@cognelo/activity-ui";
-
 
 import {
   activityDefinitionBelongsToCategory,
@@ -950,8 +950,8 @@ export default function ActivityBankDetailPage() {
               <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setShowConceptFilter(false)}>
                 <div>
                   <p className="eyebrow">{t("activityBankDetail.filters")}</p>
-                  <h2 id="activity-bank-filter-title">{t("activityBankDetail.filterByConcepts")}</h2>
-                  <p className="muted">{t("activityBankDetail.filterByConceptsHelp")}</p>
+                  <HelpLabel help={<>{t("activityBankDetail.filterByConceptsHelp")}</>}><h2 id="activity-bank-filter-title">{t("activityBankDetail.filterByConcepts")}</h2></HelpLabel>
+
                 </div>
               </DialogHeader>
               {subjectConcepts.length ? (
@@ -1011,9 +1011,9 @@ export default function ActivityBankDetailPage() {
               <form className="form" onSubmit={createVariation}>
                 <p>{t("activityBankDetail.variationMessage", { title: variationActivity.title })}</p>
                 <div className="field">
-                  <label htmlFor="variation-ai-instructions">{t("activityBankDetail.variationInstructionsLabel")}</label>
+                  <HelpLabel help={<>{t("activityBankDetail.variationInstructionsHelp")}</>}><label htmlFor="variation-ai-instructions">{t("activityBankDetail.variationInstructionsLabel")}</label></HelpLabel>
                   <textarea id="variation-ai-instructions" maxLength={4000} rows={6} autoFocus value={variationInstructions} onChange={(event) => setVariationInstructions(event.target.value)} placeholder={t("activityBankDetail.variationInstructionsPlaceholder")} />
-                  <small>{t("activityBankDetail.variationInstructionsHelp")}</small>
+
                 </div>
                 <div className="dialog-actions"><button className="secondary" type="button" onClick={closeVariationDialog}><AppIcon name="close" /> {t("common.cancel")}</button><button type="submit"><AppIcon name="generate" /> {t("activityBankDetail.createVariation")}</button></div>
               </form>

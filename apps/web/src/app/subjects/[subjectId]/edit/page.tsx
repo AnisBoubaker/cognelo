@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { EditActionBar, RichTextEditor, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
@@ -161,8 +162,8 @@ export default function EditSubjectPage() {
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">{t("editSubject.detailsEyebrow")}</p>
-                  <h2>{t("editSubject.detailsTitle")}</h2>
-                  <p className="muted">{t("editSubject.detailsHelp")}</p>
+                  <HelpLabel help={<>{t("editSubject.detailsHelp")}</>}><h2>{t("editSubject.detailsTitle")}</h2></HelpLabel>
+
                 </div>
               </div>
               <form className="form subject-details-form" id="subject-metadata-form" onSubmit={saveSubject}>
@@ -182,14 +183,14 @@ export default function EditSubjectPage() {
                   />
                 </div>
                 <div className="field subject-language-field">
-                  <label htmlFor="subject-teaching-language">{t("subjects.teachingLanguageLabel")}</label>
+                  <HelpLabel help={<>{t("subjects.teachingLanguageHelp")}</>}><label htmlFor="subject-teaching-language">{t("subjects.teachingLanguageLabel")}</label></HelpLabel>
                   <select id="subject-teaching-language" value={teachingLanguage} onChange={(event) => setTeachingLanguage(event.target.value as Locale)}>
                     {locales.map((language) => <option key={language} value={language}>{t(`locale.${language}`)}</option>)}
                   </select>
-                  <p className="muted">{t("subjects.teachingLanguageHelp")}</p>
+
                 </div>
                 <div className="field subject-language-field">
-                  <label htmlFor="subject-programming-language">{t("subjects.programmingLanguageLabel")}</label>
+                  <HelpLabel help={<>{t("subjects.programmingLanguageHelp")}</>}><label htmlFor="subject-programming-language">{t("subjects.programmingLanguageLabel")}</label></HelpLabel>
                   <select
                     id="subject-programming-language"
                     value={programmingLanguage}
@@ -204,7 +205,7 @@ export default function EditSubjectPage() {
                       : null}
                     {programmingLanguages.map((language) => <option key={language.key} value={language.key}>{language.label}</option>)}
                   </select>
-                  <p className="muted">{t("subjects.programmingLanguageHelp")}</p>
+
                 </div>
               </form>
             </section>

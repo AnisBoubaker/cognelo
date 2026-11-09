@@ -81,7 +81,7 @@ test("authors rich text with retained images and presents inline, page, and moda
     await editor.getByRole("button", { name: "Add image", exact: true }).click();
     const imageDialog = page.getByRole("dialog", { name: "Add image", exact: true });
     await imageDialog.getByLabel("Image file").setInputFiles({ name: "diagram.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") });
-    await imageDialog.getByLabel("Alternative text").fill("Loop diagram");
+    await imageDialog.getByRole("textbox", { name: "Alternative text", exact: true }).fill("Loop diagram");
     await imageDialog.getByRole("button", { name: "Insert image", exact: true }).click();
     await expect(imageDialog).toBeHidden();
     await page.getByRole("button", { name: "Save material", exact: true }).click();

@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { DialogHeader } from "@cognelo/activity-ui";
 
@@ -714,8 +715,8 @@ export function SubjectKnowledgeGraph({
       <div className="section-heading knowledge-graph-heading">
         <div>
           <p className="eyebrow">{t("knowledgeGraph.eyebrow")}</p>
-          <h2>{t("knowledgeGraph.title")}</h2>
-          {!readOnly ? <p className="muted">{t("knowledgeGraph.help")}</p> : null}
+          <HelpLabel help={!readOnly ? <>{t("knowledgeGraph.help")}</> : null}><h2>{t("knowledgeGraph.title")}</h2></HelpLabel>
+
         </div>
         {!readOnly ? <form className="knowledge-graph-add" onSubmit={addConcept}>
           <label className="sr-only" htmlFor="new-concept-title">{t("knowledgeGraph.conceptTitle")}</label>
@@ -729,15 +730,15 @@ export function SubjectKnowledgeGraph({
           <summary>{t("knowledgeGraph.aiSection")}</summary>
           <div className="stack knowledge-graph-ai-content">
             <div className="field knowledge-graph-ai-mode">
-              <label htmlFor="knowledge-graph-ai-mode">{t("knowledgeGraph.aiMode")}</label>
+              <HelpLabel help={<>{t(generationMode === "iterate" ? "knowledgeGraph.aiModeIterateHelp" : "knowledgeGraph.aiModeNewHelp")}</>}><label htmlFor="knowledge-graph-ai-mode">{t("knowledgeGraph.aiMode")}</label></HelpLabel>
               <select id="knowledge-graph-ai-mode" value={generationMode} onChange={(event) => setGenerationMode(event.target.value as GenerationMode)}>
                 <option value="new">{t("knowledgeGraph.aiModeNew")}</option>
                 <option value="iterate" disabled={!concepts.length}>{t("knowledgeGraph.aiModeIterate")}</option>
               </select>
-              <p className="muted">{t(generationMode === "iterate" ? "knowledgeGraph.aiModeIterateHelp" : "knowledgeGraph.aiModeNewHelp")}</p>
+
             </div>
             <div className="field">
-              <label htmlFor="knowledge-graph-ai-directions">{t("knowledgeGraph.aiDirections")}</label>
+              <HelpLabel help={t("knowledgeGraph.aiHelp")}><label htmlFor="knowledge-graph-ai-directions">{t("knowledgeGraph.aiDirections")}</label></HelpLabel>
               <textarea
                 id="knowledge-graph-ai-directions"
                 maxLength={4000}
@@ -757,7 +758,7 @@ export function SubjectKnowledgeGraph({
                 onChange={(event) => setMaxConcepts(Math.max(1, Math.min(50, Number(event.target.value) || 1)))}
               />
             </div>
-            <p className="muted">{t("knowledgeGraph.aiHelp")}</p>
+
             <div className="row">
               <button type="button" disabled={generating || checkingGenerationImpact || subjectDescription.trim().length < 10} onClick={() => void requestGeneration()}>
                 <AppIcon name="generate" />
@@ -903,7 +904,7 @@ export function SubjectKnowledgeGraph({
               </div>
               <div className="field">
                 <div className="knowledge-skill-heading">
-                  <label>{t("knowledgeGraph.conceptSkills")}</label>
+                  <HelpLabel help={<>{t("knowledgeGraph.conceptSkillsHelp")}</>}><label>{t("knowledgeGraph.conceptSkills")}</label></HelpLabel>
                   <button className="knowledge-skill-add" type="button" aria-label={t("knowledgeGraph.addSkill")} title={t("knowledgeGraph.addSkill")} onClick={() => openSkillDialog("add")}><AppIcon name="add" /></button>
                 </div>
                 <div className="knowledge-skill-list">
@@ -917,11 +918,11 @@ export function SubjectKnowledgeGraph({
                     </div>
                   )) : <p className="muted">{t("knowledgeGraph.noSkills")}</p>}
                 </div>
-                <span className="muted">{t("knowledgeGraph.conceptSkillsHelp")}</span>
+
               </div>
               <div className="field">
                 <div className="knowledge-skill-heading">
-                  <label>{t("knowledgeGraph.conceptMisconceptions")}</label>
+                  <HelpLabel help={<>{t("knowledgeGraph.conceptMisconceptionsHelp")}</>}><label>{t("knowledgeGraph.conceptMisconceptions")}</label></HelpLabel>
                   <button className="knowledge-skill-add" type="button" aria-label={t("knowledgeGraph.addMisconception")} title={t("knowledgeGraph.addMisconception")} onClick={() => openMisconceptionDialog("add")}><AppIcon name="add" /></button>
                 </div>
                 <div className="knowledge-skill-list">
@@ -935,15 +936,15 @@ export function SubjectKnowledgeGraph({
                     </div>
                   )) : <p className="muted">{t("knowledgeGraph.noMisconceptions")}</p>}
                 </div>
-                <span className="muted">{t("knowledgeGraph.conceptMisconceptionsHelp")}</span>
+
               </div>
               <button className="button" disabled={!editTitle.trim()} type="submit"><AppIcon name="check" /> {t("knowledgeGraph.applyConcept")}</button>
               <button className="button danger" onClick={() => void requestDeleteConcept()} type="button"><AppIcon name="remove" /> {t("knowledgeGraph.deleteConcept")}</button>
             </form>
           ) : (
             <div className="knowledge-graph-empty stack">
-              <strong>{t("knowledgeGraph.noSelectionTitle")}</strong>
-              <p className="muted">{t("knowledgeGraph.noSelectionHelp")}</p>
+              <HelpLabel help={<>{t("knowledgeGraph.noSelectionHelp")}</>}><strong>{t("knowledgeGraph.noSelectionTitle")}</strong></HelpLabel>
+
             </div>
           )}
         </aside> : null}

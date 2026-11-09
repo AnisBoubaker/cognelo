@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppIcon } from "@/components/app-icon";
@@ -96,7 +97,7 @@ export function StaffActivityChat({ courseId, activityId, participantId, attempt
     void load();
   }, [refresh, t, updateKey]);
   return <>
-    <div className="activity-chat-context"><strong>{conversation?.studentName ?? t("common.loading")}</strong><small className="muted">{t("activityMessenger.privateHelp")}</small></div>
+    <div className="activity-chat-context"><HelpLabel help={<>{t("activityMessenger.privateHelp")}</>}><strong>{conversation?.studentName ?? t("common.loading")}</strong></HelpLabel></div>
     <ActivityChatThread messages={conversation?.messages ?? []} ownKind="staff" onDelete={async (message) => {
       const deletion = await api.deleteActivityMessage(courseId, activityId, message.broadcastId ? { broadcastId: message.broadcastId } : { messageId: message.id });
       setConversation((old) => old ? { ...old, messages: applyChatDeletion(old.messages, deletion) } : old);

@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { AppIcon } from "@/components/app-icon";
 
@@ -187,9 +188,9 @@ export default function MediaMaintenancePage() {
 function MaintenanceMetric({ label, value, help }: { label: string; value: string; help?: string }) {
   return (
     <article className="card card-compact maintenance-metric">
-      <span>{label}</span>
+      <HelpLabel help={help} label={label}><span>{label}</span></HelpLabel>
       <strong>{value}</strong>
-      {help ? <small className="muted">{help}</small> : null}
+
     </article>
   );
 }

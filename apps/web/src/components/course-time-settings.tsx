@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { useState } from "react";
 import { EditActionBar, getEditActionBarCopy, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
@@ -37,13 +38,12 @@ function CourseTimeForm({ context }: { context: NonNullable<ReturnType<typeof us
     <h2 id="course-time-heading">{t("timeSettings.title")}</h2>
     <form id="course-time-settings" className="form" onSubmit={(event) => { event.preventDefault(); void save().catch(() => {}); }}>
       <div className="field">
-        <label htmlFor="course-time-zone">{t("timeSettings.courseZone")}</label>
+        <HelpLabel help={<><p>{t("timeSettings.courseHelp")}</p><p>{t("timeSettings.reloadHelp")}</p></>}><label htmlFor="course-time-zone">{t("timeSettings.courseZone")}</label></HelpLabel>
         <select id="course-time-zone" disabled={busy} value={zone} onChange={(event) => setZone(event.target.value)}>
           <option value="">{t("timeSettings.inheritZone", { zone: settings.applicationTimeZone })}</option>
           {settings.timeZones.map((value) => <option key={value} value={value}>{value}</option>)}
         </select>
-        <p className="muted">{t("timeSettings.courseHelp")}</p>
-        <p className="muted">{t("timeSettings.reloadHelp")}</p>
+
       </div>
       <EditActionBar form="course-time-settings" isDirty={isDirty} isSaving={busy} savedLabel={copy.saved} unsavedLabel={copy.unsaved} saveLabel={copy.save} savingLabel={copy.saving} cancelLabel={copy.cancel} onCancel={discard} />
     </form>

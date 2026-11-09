@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { TestAiGradingInstructionsAction } from "./test-ai-grading-instructions";
 import { AppIcon } from "@/components/app-icon";
@@ -167,9 +168,9 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
         </div>
         <div className="form-grid-two">
           <div className="field">
-            <label htmlFor="bank-test-time-limit">Default course time limit in minutes (optional)</label>
+            <HelpLabel help={<>Copied when this Test is added to a course. Existing course settings stay independent.</>}><label htmlFor="bank-test-time-limit">Default course time limit in minutes (optional)</label></HelpLabel>
             <input id="bank-test-time-limit" min={1} type="number" value={settings.timeLimitMinutes ?? ""} disabled={busy} onChange={(event) => setTest({ ...test, settings: { ...settings, timeLimitMinutes: event.target.value ? Number(event.target.value) : null } })} />
-            <small className="muted">Copied when this Test is added to a course. Existing course settings stay independent.</small>
+
           </div>
           <div className="field">
             <label htmlFor="bank-test-navigation">Navigation</label>
@@ -224,8 +225,8 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
       <section className="section stack">
         <div>
           <p className="eyebrow">Composition</p>
-          <h2>Test activities</h2>
-          <p className="muted">Each activity is an independent copy owned by this reusable Test.</p>
+          <HelpLabel help={"Each activity is an independent copy owned by this reusable Test."}><h2>Test activities</h2></HelpLabel>
+
         </div>
         {bank.canManage ? <div className="row wrap"><TestAiGradingInstructionsAction scope="bank" ownerId={bank.id}
           activityId={activity.id} disabled={busy || hasUnsavedSettings} onApplied={refresh} /></div> : null}

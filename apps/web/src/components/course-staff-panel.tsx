@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { FormEvent, useMemo, useState } from "react";
 import { useDialogs } from "@cognelo/activity-ui";
@@ -76,8 +77,8 @@ export function CourseStaffPanel({
     <section className="section stack">
       <div className="section-heading">
         <div>
-          <h2>{t("courseDetail.courseStaffTitle")}</h2>
-          <p className="muted">{t("courseDetail.courseStaffText")}</p>
+          <HelpLabel help={<>{t("courseDetail.courseStaffText")}</>}><h2>{t("courseDetail.courseStaffTitle")}</h2></HelpLabel>
+
         </div>
         <button className="secondary" type="button" onClick={() => setAdding((current) => !current)}>
           <AppIcon name={adding ? "close" : "add"} />
@@ -89,7 +90,7 @@ export function CourseStaffPanel({
         <form className="form inline-panel" onSubmit={addStaff}>
           <div className="form-grid-two">
             <div className="field">
-              <label htmlFor="course-staff-email">{t("courseDetail.courseStaffEmail")}</label>
+              <HelpLabel help={<>{t("courseDetail.courseStaffExistingAccountHelp")}</>}><label htmlFor="course-staff-email">{t("courseDetail.courseStaffEmail")}</label></HelpLabel>
               <input id="course-staff-email" required type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
             </div>
             <div className="field">
@@ -100,7 +101,7 @@ export function CourseStaffPanel({
               </select>
             </div>
           </div>
-          <p className="muted">{t("courseDetail.courseStaffExistingAccountHelp")}</p>
+
           <div className="row">
             <button disabled={saving} type="submit"><AppIcon name="add" /> {saving ? t("common.saving") : t("courseDetail.courseStaffAdd")}</button>
           </div>

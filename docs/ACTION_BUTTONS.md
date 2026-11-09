@@ -6,6 +6,8 @@ Destructive actions keep the same shape with red text/border and a red hover tin
 
 Tabs, sidebar navigation, accordion rows, menu items, editor keys, and floating status controls have their own semantic layouts. Keep their selection/disclosure states; do not turn a clickable row into an action-button rectangle. Small editor controls may retain their compact dimensions. Ordinary actions within these surfaces still use the shared recipe.
 
+Teacher contextual-help triggers use the compact shared circled-question-mark control after the associated text on the same row. This is an icon-only disclosure, separate from ordinary action buttons. See [contextual help](CONTEXTUAL_HELP.md).
+
 ## Shared edit bars
 
 `EditActionBar` sizes to its status and controls instead of spanning the whole form. It stays at the physical left side to leave space for the fixed bottom-right Messages launcher, including in right-to-left layouts. Controls wrap within narrow containers; on narrow screens the sticky bar sits above the launcher and respects safe-area insets. Keep the notification location unchanged. Save/discard state, labels, keyboard focus and navigation guards retain their existing behavior.
@@ -29,6 +31,7 @@ Tabs, sidebar navigation, accordion rows, menu items, editor keys, and floating 
 | Run / Start | `run` |
 | Submit / Send | `submit` |
 | Settings | `settings` |
+| Contextual help | `help` |
 
 Choose icons explicitly from action semantics, never by inspecting translated labels. A toggle such as Add/Cancel changes its icon together with its label. Preserve visible labels; icon-only controls require a localized accessible label or title. Icons are decorative (`aria-hidden`, non-focusable) and normally 18px with an 8px gap. Shared save bars, confirmations, rich-text toolbars, and plugin controls reuse this registry. Generic confirmation uses a check or danger alert, and informational-dialog dismissal uses Close.
 

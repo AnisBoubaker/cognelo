@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { AppIcon } from "@/components/app-icon";
 
@@ -122,7 +123,7 @@ export function CourseForm({ initial, showStudentContentLayout = false, subjects
       </div>
       {showStudentContentLayout ? (
         <div className="field">
-          <label htmlFor="studentContentLayout">{t("courseForm.studentContentLayout")}</label>
+          <HelpLabel help={<>{t("courseForm.studentContentLayoutHelp")}</>}><label htmlFor="studentContentLayout">{t("courseForm.studentContentLayout")}</label></HelpLabel>
           <select
             id="studentContentLayout"
             value={studentContentLayout}
@@ -131,7 +132,7 @@ export function CourseForm({ initial, showStudentContentLayout = false, subjects
             <option value="accordion">{t("courseForm.studentContentLayoutAccordion")}</option>
             <option value="folder_tabs">{t("courseForm.studentContentLayoutFolderTabs")}</option>
           </select>
-          <p className="muted">{t("courseForm.studentContentLayoutHelp")}</p>
+
         </div>
       ) : null}
       {error ? <p className="error">{error}</p> : null}

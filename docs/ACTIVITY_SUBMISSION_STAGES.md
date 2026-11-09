@@ -12,6 +12,8 @@ Programming Homework advertises File submission and Questions answering. With qu
 
 Late hand-in may extend a stage's own due date, but never the overall cutoff or stage duration. Lateness measures from the due date, not from the end of the allowance. Automatic prepared-work recovery uses the finite effective file cutoff and preserves incomplete-work acknowledgement, team identity, cancellation suppression and immutable historical timing.
 
+Scheduling background explanations use shared help immediately after the relevant heading, deadline label or duration toggle on the same line. Disabled-stage help stays accessible in its legend. Current effective deadlines remain visible; timezone names appear only in configuration choosers. See [contextual help](CONTEXTUAL_HELP.md).
+
 ## Implementation assumptions
 
 - Scheduling configuration is stored as generic assignment metadata, with a plugin service supplying legacy defaults and active-stage configuration. Saving shared settings materializes those defaults in core; explicit null clears a saved field.

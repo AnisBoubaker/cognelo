@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { TestAiGradingInstructionsAction } from "./test-ai-grading-instructions";
 import { DialogHeader } from "@cognelo/activity-ui";
@@ -261,7 +262,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
         </div>
         <div className="form-grid-two">
           <div className="field">
-            <label htmlFor="test-time-limit">Default course time limit in minutes (optional)</label>
+            <HelpLabel help={<>Used when this Test is duplicated or added from the bank. Change the current course limit in Activity settings.</>}><label htmlFor="test-time-limit">Default course time limit in minutes (optional)</label></HelpLabel>
             <input
               id="test-time-limit"
               min={1}
@@ -270,7 +271,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
               disabled={!canManage || busy}
               onChange={(event) => setTest({ ...test, settings: { ...settings, timeLimitMinutes: event.target.value ? Number(event.target.value) : null } })}
             />
-            <small className="muted">Used when this Test is duplicated or added from the bank. Change the current course limit in Activity settings.</small>
+
           </div>
           <div className="field">
             <label htmlFor="test-navigation">Navigation</label>
@@ -334,9 +335,8 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
       <section className="section stack">
         <div>
           <p className="eyebrow">Composition</p>
-          <h2>Test activities</h2>
-          <p className="muted">Each item is a regular activity owned by this Test.</p>
-          <p className="muted">Published activities can be composed here while Test execution support is developed separately.</p>
+          <HelpLabel help={"Each item is a regular activity owned by this Test."}><h2>Test activities</h2></HelpLabel>
+
         </div>
         {canManage ? <div className="row wrap"><TestAiGradingInstructionsAction scope="course" ownerId={courseId}
           activityId={activity.id} disabled={busy || hasUnsavedSettings} onApplied={refresh} /></div> : null}

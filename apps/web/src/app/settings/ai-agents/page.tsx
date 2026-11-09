@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { aiAgentModels } from "@cognelo/contracts";
 import { AppIcon } from "@/components/app-icon";
@@ -191,11 +192,10 @@ export default function AiAgentSettingsPage() {
               {loading ? <p className="muted">{t("common.loading")}</p> : null}
 
               <form className="inline-panel form" onSubmit={savePreferences}>
-                <AiModelPicker connections={connections} purpose="generation"
+                <AiModelPicker connectionHelp={t("settings.questionAuthoringAgentHelp")} connections={connections} purpose="generation"
                   value={questionAuthoringAgentId ? { connectionId: questionAuthoringAgentId, model: questionAuthoringModel || defaultQuestionModel } : null}
                   onChange={selection => { setQuestionAuthoringAgentId(selection?.connectionId ?? ""); setQuestionAuthoringModel(selection?.model ?? ""); }} disabled={saving}
                   labels={{ connection: t("settings.questionAuthoringAgent"), model: t("settings.questionAuthoringModel"), inherit: t("settings.noAiAgentSelected"), unavailable: t("settings.aiModelUnavailable"), noModels: t("settings.aiNoGenerationModels") }} />
-                <p className="muted">{t("settings.questionAuthoringAgentHelp")}</p>
                 <div className="row">
                   <button disabled={saving} type="submit">
                     <AppIcon name="save" />
@@ -293,13 +293,12 @@ export default function AiAgentSettingsPage() {
                   </div>
                 </div>
 
-                <p className="muted">{t("settings.aiModelCatalogHelp")}</p>
-                <div className="field"><label htmlFor="modelPurpose">{t("settings.aiDefaultModelPurpose")}</label><select id="modelPurpose" value={form.modelPurpose} onChange={event => setForm(current => ({ ...current, modelPurpose: event.target.value as FormState["modelPurpose"] }))}>
+                <div className="field"><HelpLabel help={<>{t("settings.aiModelCatalogHelp")}</>}><label htmlFor="modelPurpose">{t("settings.aiDefaultModelPurpose")}</label></HelpLabel><select id="modelPurpose" value={form.modelPurpose} onChange={event => setForm(current => ({ ...current, modelPurpose: event.target.value as FormState["modelPurpose"] }))}>
                   <option value="generation">{t("settings.aiGenerationModels")}</option><option value="embedding" disabled={form.provider === "claude"}>{t("settings.aiEmbeddingModels")}</option>
                 </select></div>
                 <div className="form-grid-two">
                   <div className="field"><label htmlFor="otherModels">{t("settings.aiAdditionalModels")}</label><textarea id="otherModels" rows={3} value={form.otherModels} onChange={event => setForm(current => ({ ...current, otherModels: event.target.value }))} /></div>
-                  <div className="field"><label htmlFor="embeddingModels">{t("settings.aiEmbeddingModels")}</label><textarea id="embeddingModels" rows={3} disabled={form.provider === "claude"} value={form.embeddingModels} onChange={event => setForm(current => ({ ...current, embeddingModels: event.target.value }))} />{form.provider === "claude" && <p className="muted">{t("settings.aiEmbeddingUnsupported")}</p>}</div>
+                  <div className="field"><HelpLabel help={form.provider === "claude" && <>{t("settings.aiEmbeddingUnsupported")}</>}><label htmlFor="embeddingModels">{t("settings.aiEmbeddingModels")}</label></HelpLabel><textarea id="embeddingModels" rows={3} disabled={form.provider === "claude"} value={form.embeddingModels} onChange={event => setForm(current => ({ ...current, embeddingModels: event.target.value }))} /></div>
                 </div>
                 <div className="form-grid-two">
                   <div className="field">

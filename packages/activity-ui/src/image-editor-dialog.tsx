@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "./help-tooltip";
 
 import { DialogHeader } from "./dialog-header";
 
@@ -6,7 +7,7 @@ import { ActionIcon } from "./action-icon";
 
 /* eslint-disable @next/next/no-img-element -- Preview sources are local object URLs or authenticated media routes that Next Image cannot optimize reliably. */
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useId, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MarkdownImageSize, MarkdownImageSizeMode } from "./image-sizing";
 
@@ -64,6 +65,7 @@ export function ImageEditorDialog({
   onConfirm,
   onRemove
 }: ImageEditorDialogProps) {
+  const altId = useId();
   const [alt, setAlt] = useState(initialAlt);
   const [title, setTitle] = useState(initialTitle);
   const [file, setFile] = useState<File | null>(null);
@@ -147,8 +149,8 @@ export function ImageEditorDialog({
         <DialogHeader className="section-heading image-editor-heading" closeLabel={copy.close} onClose={onCancel} closeDisabled={busy}>
           <div>
             <p className="eyebrow">{copy.eyebrow}</p>
-            <h2 id="image-editor-title">{mode === "add" ? copy.addTitle : copy.editTitle}</h2>
-            <p className="muted">{copy.help}</p>
+            <HelpLabel help={<>{copy.help}</>}><h2 id="image-editor-title">{mode === "add" ? copy.addTitle : copy.editTitle}</h2></HelpLabel>
+
           </div>
         </DialogHeader>
 
@@ -167,17 +169,17 @@ export function ImageEditorDialog({
                 }}
               />
             </label>
-            <label className="field">
-              <span>{copy.altText}</span>
-              <input
+            <div className="field">
+              <HelpLabel help={copy.altHelp}><label htmlFor={altId}>{copy.altText}</label></HelpLabel>
+              <input id={altId}
                 autoFocus={mode === "edit"}
                 disabled={busy}
                 type="text"
                 value={alt}
                 onChange={(event) => setAlt(event.target.value)}
               />
-              <small className="muted">{copy.altHelp}</small>
-            </label>
+
+            </div>
             <label className="field">
               <span>{copy.optionalTitle}</span>
               <input disabled={busy} type="text" value={title} onChange={(event) => setTitle(event.target.value)} />

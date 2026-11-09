@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
@@ -212,8 +213,8 @@ export default function ProfileSettingsPage() {
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">{t("settings.passwordEyebrow")}</p>
-                  <h2>{t("settings.passwordTitle")}</h2>
-                  <p className="muted">{t("settings.passwordHelp")}</p>
+                  <HelpLabel help={<>{t("settings.passwordHelp")}</>}><h2>{t("settings.passwordTitle")}</h2></HelpLabel>
+
                 </div>
               </div>
 

@@ -1,4 +1,6 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
+
 import { useEffect, useState } from "react";
 import { EditActionBar, getEditActionBarCopy, useApplicationTime, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import { AppShell } from "@/components/app-shell";
@@ -40,17 +42,16 @@ export default function TimeSettingsPage() {
   }
   useUnsavedChangesGuard({ isDirty, onSave: save, onDiscard: discard });
   return <AppShell><main className="page settings-layout"><SettingsNav /><section className="section stack">
-    <h1 className="section-title">{t("timeSettings.title")}</h1>
+    <HelpLabel help={<>{t("timeSettings.help")}</>}><h1 className="section-title">{t("timeSettings.title")}</h1></HelpLabel>
     {!isAdmin ? <p>{t("timeSettings.adminOnly")}</p> : <>
-      <p className="muted">{t("timeSettings.help")}</p>
+
       <form id="application-time-settings" className="form" onSubmit={(event) => { event.preventDefault(); void save().catch(() => {}); }}>
         <div className="field"><label htmlFor="application-time-zone">{t("timeSettings.zone")}</label><select id="application-time-zone" value={zone} disabled={busy || !choices.length} onChange={(event) => setZone(event.target.value)}>{choices.map((value) => <option key={value} value={value}>{value}</option>)}</select></div>
-        <label className="checkbox-row">
+        <HelpLabel help={<><p>{t("timeSettings.courseTimeZoneHelp")}</p><p>{t("timeSettings.reloadHelp")}</p></>}><label className="checkbox-row">
           <input type="checkbox" checked={allowCourseTimeZone} disabled={busy || !choices.length} onChange={(event) => setAllowCourseTimeZone(event.target.checked)} />
           <span>{t("timeSettings.allowCourseTimeZone")}</span>
-        </label>
-        <p className="muted">{t("timeSettings.courseTimeZoneHelp")}</p>
-        <p className="muted">{t("timeSettings.reloadHelp")}</p>
+        </label></HelpLabel>
+
         {error ? <p className="error" role="alert">{error}</p> : null}
       </form>
       <EditActionBar form="application-time-settings" isDirty={isDirty} isSaving={busy} savedLabel={copy.saved} unsavedLabel={copy.unsaved} saveLabel={copy.save} savingLabel={copy.saving} cancelLabel={copy.cancel} onCancel={discard} saveDisabled={!choices.includes(zone)} />

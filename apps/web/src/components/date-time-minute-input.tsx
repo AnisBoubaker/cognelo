@@ -1,6 +1,5 @@
 "use client";
 
-import { useApplicationTime } from "@cognelo/activity-ui";
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 
@@ -13,7 +12,6 @@ type DateTimeMinuteInputProps = {
 
 export function DateTimeMinuteInput({ id, value, onChange, disabled }: DateTimeMinuteInputProps) {
   const { t } = useI18n();
-  const { timeZone } = useApplicationTime();
   const [datePart, setDatePart] = useState("");
   const [timePart, setTimePart] = useState("");
 
@@ -82,7 +80,6 @@ export function DateTimeMinuteInput({ id, value, onChange, disabled }: DateTimeM
           emit(datePart, normalizedTime);
         }}
       />
-      <small className="muted date-time-zone-label">{timeZone}</small>
     </div>
   );
 }

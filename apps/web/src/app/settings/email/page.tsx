@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { AppIcon } from "@/components/app-icon";
 
@@ -177,7 +178,7 @@ export default function EmailSettingsPage() {
               {isAdmin && !loading ? (
                 <form className="form" onSubmit={handleSave}>
                   <div className="field">
-                    <label htmlFor="emailTransport">{t("settings.emailTransport")}</label>
+                    <HelpLabel help={<>{form.transport === "smtp" ? t("settings.emailTransportSmtpHelp") : t("settings.emailTransportMicrosoftGraphHelp")}</>}><label htmlFor="emailTransport">{t("settings.emailTransport")}</label></HelpLabel>
                     <select
                       id="emailTransport"
                       value={form.transport}
@@ -186,12 +187,12 @@ export default function EmailSettingsPage() {
                       <option value="smtp">{t("settings.emailTransportSmtp")}</option>
                       <option value="microsoft_graph">{t("settings.emailTransportMicrosoftGraph")}</option>
                     </select>
-                    <p className="muted">{form.transport === "smtp" ? t("settings.emailTransportSmtpHelp") : t("settings.emailTransportMicrosoftGraphHelp")}</p>
+
                   </div>
 
                   <div className="form-grid-two">
                     <div className="field">
-                      <label htmlFor="fromName">{t("settings.emailFromName")}</label>
+                      <HelpLabel help={form.transport !== "smtp" ? t("settings.graphFromNameHelp") : null}><label htmlFor="fromName">{t("settings.emailFromName")}</label></HelpLabel>
                       <input id="fromName" maxLength={160} required value={form.fromName} onChange={(event) => setForm((current) => ({ ...current, fromName: event.target.value }))} />
                     </div>
                     <div className="field">
@@ -227,9 +228,9 @@ export default function EmailSettingsPage() {
                         </div>
                       </div>
                       <div className="field">
-                        <label htmlFor="smtpPassword">{t("settings.smtpPassword")}</label>
+                        <HelpLabel help={<>{canRetainSmtpPassword ? t("settings.emailSecretSavedHelp") : t("settings.smtpPasswordHelp")}</>}><label htmlFor="smtpPassword">{t("settings.smtpPassword")}</label></HelpLabel>
                         <input id="smtpPassword" maxLength={2000} required={Boolean(form.smtpUsername) && !canRetainSmtpPassword} type="password" value={form.smtpPassword} onChange={(event) => setForm((current) => ({ ...current, smtpPassword: event.target.value }))} />
-                        <p className="muted">{canRetainSmtpPassword ? t("settings.emailSecretSavedHelp") : t("settings.smtpPasswordHelp")}</p>
+
                       </div>
                     </>
                   ) : (
@@ -245,12 +246,11 @@ export default function EmailSettingsPage() {
                         </div>
                       </div>
                       <div className="field">
-                        <label htmlFor="graphClientSecret">{t("settings.graphClientSecret")}</label>
+                        <HelpLabel help={<><p>{canRetainGraphClientSecret ? t("settings.emailSecretSavedHelp") : t("settings.graphClientSecretHelp")}</p><p>{t("settings.graphPermissionHelp")}</p></>}><label htmlFor="graphClientSecret">{t("settings.graphClientSecret")}</label></HelpLabel>
                         <input id="graphClientSecret" maxLength={2000} required={!canRetainGraphClientSecret} type="password" value={form.graphClientSecret} onChange={(event) => setForm((current) => ({ ...current, graphClientSecret: event.target.value }))} />
-                        <p className="muted">{canRetainGraphClientSecret ? t("settings.emailSecretSavedHelp") : t("settings.graphClientSecretHelp")}</p>
+
                       </div>
-                      <p className="muted">{t("settings.graphPermissionHelp")}</p>
-                      <p className="muted">{t("settings.graphFromNameHelp")}</p>
+
                     </>
                   )}
 
@@ -274,10 +274,10 @@ export default function EmailSettingsPage() {
                 <div className="section-heading">
                   <div>
                     <p className="eyebrow">{t("settings.emailTestEyebrow")}</p>
-                    <h2>{t("settings.emailTestTitle")}</h2>
+                    <HelpLabel help={<>{t("settings.emailTestHelp")}</>}><h2>{t("settings.emailTestTitle")}</h2></HelpLabel>
                   </div>
                 </div>
-                <p className="muted">{t("settings.emailTestHelp")}</p>
+
                 <form className="inline-panel form" onSubmit={handleTest}>
                   <div className="field">
                     <label htmlFor="testRecipientEmail">{t("settings.emailTestRecipient")}</label>

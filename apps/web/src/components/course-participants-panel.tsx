@@ -1,11 +1,11 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { DialogHeader } from "@cognelo/activity-ui";
 
 import { toZonedDateTimeInput, fromZonedDateTimeInput } from "@cognelo/activity-ui";
 
 import { useApplicationTime } from "@cognelo/activity-ui";
-
 
 import { ConfirmationDialog, ContextMenu, ProgressDialog, useDialogs } from "@cognelo/activity-ui";
 import { ChangeEvent, FocusEvent, FormEvent, useEffect, useState } from "react";
@@ -349,8 +349,8 @@ export function CourseParticipantsPanel({
       <div className="section-heading">
         <div>
           <p className="eyebrow">{t("courseDetail.participantsEyebrow")}</p>
-          <h2>{t("courseDetail.participantsTitle")}</h2>
-          <p className="muted">{t("courseDetail.participantsText")}</p>
+          <HelpLabel help={<>{t("courseDetail.participantsText")}</>}><h2>{t("courseDetail.participantsTitle")}</h2></HelpLabel>
+
         </div>
         <button className="secondary" type="button" onClick={openCreateGroup}>
           <AppIcon name="add" />
@@ -494,13 +494,13 @@ export function CourseParticipantsPanel({
       {participantEditor ? (
         <div className="dialog-backdrop" role="presentation">
           <section aria-labelledby="participant-editor-title" aria-modal="true" className="dialog-panel participant-editor-dialog" role="dialog">
-            <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setParticipantEditor(null)}><div><p className="eyebrow">{participantEditor.group.title}</p><h2 id="participant-editor-title">{t("groupPage.addParticipantTitle")}</h2><p className="muted">{t("groupPage.addParticipantText")}</p></div></DialogHeader>
+            <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setParticipantEditor(null)}><div><p className="eyebrow">{participantEditor.group.title}</p><HelpLabel help={<><p>{t("groupPage.addParticipantText")}</p><p>{t("groupPage.pendingAccountHelp")}</p></>}><h2 id="participant-editor-title">{t("groupPage.addParticipantTitle")}</h2></HelpLabel></div></DialogHeader>
             <form className="form" onSubmit={addParticipant}>
               <div className="form-grid-two"><div className="field"><label htmlFor="participant-email">{t("groupPage.participantEmail")}</label><input id="participant-email" required type="email" value={participantEditor.email} onBlur={(event) => void resolveParticipantEmail(event)} onChange={(event) => setParticipantEditor({ ...participantEditor, email: event.target.value, candidate: null, firstName: "", lastName: "" })} /></div><div className="field"><label htmlFor="participant-role">{t("groupPage.participantRole")}</label><select id="participant-role" value={participantEditor.role} onChange={(event) => setParticipantEditor({ ...participantEditor, role: event.target.value as ParticipantEditor["role"] })}><option value="student">{t("groupPage.participantRoleStudent")}</option><option value="ta">{t("groupPage.participantRoleTa")}</option><option value="teacher">{t("groupPage.participantRoleTeacher")}</option></select></div></div>
               <div className="form-grid-two"><div className={`field ${participantEditor.candidate ? "field-readonly" : ""}`}><label htmlFor="participant-first-name">{t("groupPage.participantFirstName")}</label><input id="participant-first-name" readOnly={Boolean(participantEditor.candidate)} required={!participantEditor.candidate} value={participantEditor.firstName} onChange={(event) => setParticipantEditor({ ...participantEditor, firstName: event.target.value })} /></div><div className={`field ${participantEditor.candidate ? "field-readonly" : ""}`}><label htmlFor="participant-last-name">{t("groupPage.participantLastName")}</label><input id="participant-last-name" readOnly={Boolean(participantEditor.candidate)} required={!participantEditor.candidate} value={participantEditor.lastName} onChange={(event) => setParticipantEditor({ ...participantEditor, lastName: event.target.value })} /></div></div>
               <div className={`field ${participantEditor.candidate ? "field-readonly" : ""}`}><label htmlFor="participant-external-id">{t("groupPage.participantExternalId")}</label><input id="participant-external-id" readOnly={Boolean(participantEditor.candidate)} value={participantEditor.externalId} onChange={(event) => setParticipantEditor({ ...participantEditor, externalId: event.target.value })} /></div>
               <p className="muted">{checkingEmail ? t("groupPage.participantLookupChecking") : participantEditor.candidate ? t("groupPage.participantLookupFound", { name: participantEditor.candidate.name || participantEditor.candidate.email }) : t("groupPage.participantLookupNew")}</p>
-              <p className="muted">{t("groupPage.pendingAccountHelp")}</p>
+
               {error ? <p className="error" role="alert">{error}</p> : null}
               <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setParticipantEditor(null)}><AppIcon name="close" /> {t("common.cancel")}</button><button disabled={saving || checkingEmail} type="submit"><AppIcon name="add" /> {saving ? t("common.saving") : t("groupPage.addParticipant")}</button></div>
             </form>
@@ -514,12 +514,12 @@ export function CourseParticipantsPanel({
             <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setParticipantImport(null)} closeDisabled={participantImport.importing}>
               <div>
                 <p className="eyebrow">{participantImport.group.title}</p>
-                <h2 id="participant-import-title">{t("groupPage.importParticipantsTitle")}</h2>
-                <p className="muted">{t("groupPage.importParticipantsText")}</p>
+                <HelpLabel help={<>{t("groupPage.importParticipantsText")}</>}><h2 id="participant-import-title">{t("groupPage.importParticipantsTitle")}</h2></HelpLabel>
+
               </div>
             </DialogHeader>
             <div className="form">
-              <label className="checkbox-row">
+              <HelpLabel help={<>{t("groupPage.importIncludesAssignedPasswordsHelp")}</>}><label className="checkbox-row">
                 <input
                   checked={participantImport.includesAssignedPasswords}
                   disabled={participantImport.importing}
@@ -527,12 +527,12 @@ export function CourseParticipantsPanel({
                   onChange={(event) => setParticipantImportPasswordMode(event.target.checked)}
                 />
                 <span>{t("groupPage.importIncludesAssignedPasswords")}</span>
-              </label>
-              <p className="muted">{t("groupPage.importIncludesAssignedPasswordsHelp")}</p>
+              </label></HelpLabel>
+
               <div className="field">
-                <label htmlFor="participant-csv-file">{t("groupPage.importFileLabel")}</label>
+                <HelpLabel help={<>{t(participantImport.includesAssignedPasswords ? "groupPage.importFormatHelpWithPasswords" : "groupPage.importFormatHelp")}</>}><label htmlFor="participant-csv-file">{t("groupPage.importFileLabel")}</label></HelpLabel>
                 <input accept=".csv,text/csv" disabled={participantImport.importing} id="participant-csv-file" type="file" onChange={(event) => void selectParticipantCsv(event)} />
-                <p className="muted">{t(participantImport.includesAssignedPasswords ? "groupPage.importFormatHelpWithPasswords" : "groupPage.importFormatHelp")}</p>
+
                 <code className="participant-import-template">
                   {participantImport.includesAssignedPasswords
                     ? "Anonymous,Student,anonymous-1@example.invalid,AssignedPassword,20260001"
@@ -588,7 +588,7 @@ export function CourseParticipantsPanel({
           : undefined}
       />
 
-      {deleteState?.step === "options" ? <div className="dialog-backdrop" role="presentation"><section aria-labelledby="participant-group-delete-title" aria-modal="true" className="dialog-panel" role="dialog"><DialogHeader closeLabel={t("common.close")} onClose={() => setDeleteState(null)}><p className="eyebrow">{t("courseDetail.deleteGroupEyebrow")}</p><h2 id="participant-group-delete-title">{t("courseDetail.deleteGroupTitle")}</h2></DialogHeader><p>{t("courseDetail.deleteGroupParticipantsMessage", { title: deleteState.group.title, count: deleteState.participants.length })}</p><form className="form" onSubmit={submitDeleteOptions}><label className="checkbox-row"><input checked={deleteState.mode === "move"} name="participant-group-delete-mode" type="radio" onChange={() => setDeleteState({ ...deleteState, mode: "move" })} /><span>{t("courseDetail.moveGroupParticipants")}</span></label>{deleteState.mode === "move" ? <div className="field"><label htmlFor="participant-destination-group">{t("courseDetail.destinationGroup")}</label><select id="participant-destination-group" required value={deleteState.targetGroupId} onChange={(event) => setDeleteState({ ...deleteState, targetGroupId: event.target.value })}><option value="">{t("courseDetail.chooseDestinationGroup")}</option>{groups.filter((group) => group.id !== deleteState.group.id).map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select><p className="muted">{t("courseDetail.moveGroupParticipantsHelp")}</p></div> : null}<label className="checkbox-row"><input checked={deleteState.mode === "delete"} name="participant-group-delete-mode" type="radio" onChange={() => setDeleteState({ ...deleteState, mode: "delete" })} /><span>{t("courseDetail.deleteGroupParticipants")}</span></label>{error ? <p className="error">{error}</p> : null}<div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDeleteState(null)}><AppIcon name="close" /> {t("common.cancel")}</button><button className={deleteState.mode === "delete" ? "danger" : ""} disabled={saving || (deleteState.mode === "move" && !deleteState.targetGroupId)} type="submit"><AppIcon name="next" /> {saving ? t("common.saving") : t("courseDetail.continueGroupDeletion")}</button></div></form></section></div> : null}
+      {deleteState?.step === "options" ? <div className="dialog-backdrop" role="presentation"><section aria-labelledby="participant-group-delete-title" aria-modal="true" className="dialog-panel" role="dialog"><DialogHeader closeLabel={t("common.close")} onClose={() => setDeleteState(null)}><p className="eyebrow">{t("courseDetail.deleteGroupEyebrow")}</p><h2 id="participant-group-delete-title">{t("courseDetail.deleteGroupTitle")}</h2></DialogHeader><p>{t("courseDetail.deleteGroupParticipantsMessage", { title: deleteState.group.title, count: deleteState.participants.length })}</p><form className="form" onSubmit={submitDeleteOptions}><label className="checkbox-row"><input checked={deleteState.mode === "move"} name="participant-group-delete-mode" type="radio" onChange={() => setDeleteState({ ...deleteState, mode: "move" })} /><span>{t("courseDetail.moveGroupParticipants")}</span></label>{deleteState.mode === "move" ? <div className="field"><HelpLabel help={<>{t("courseDetail.moveGroupParticipantsHelp")}</>}><label htmlFor="participant-destination-group">{t("courseDetail.destinationGroup")}</label></HelpLabel><select id="participant-destination-group" required value={deleteState.targetGroupId} onChange={(event) => setDeleteState({ ...deleteState, targetGroupId: event.target.value })}><option value="">{t("courseDetail.chooseDestinationGroup")}</option>{groups.filter((group) => group.id !== deleteState.group.id).map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select></div> : null}<label className="checkbox-row"><input checked={deleteState.mode === "delete"} name="participant-group-delete-mode" type="radio" onChange={() => setDeleteState({ ...deleteState, mode: "delete" })} /><span>{t("courseDetail.deleteGroupParticipants")}</span></label>{error ? <p className="error">{error}</p> : null}<div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDeleteState(null)}><AppIcon name="close" /> {t("common.cancel")}</button><button className={deleteState.mode === "delete" ? "danger" : ""} disabled={saving || (deleteState.mode === "move" && !deleteState.targetGroupId)} type="submit"><AppIcon name="next" /> {saving ? t("common.saving") : t("courseDetail.continueGroupDeletion")}</button></div></form></section></div> : null}
       <ConfirmationDialog open={deleteState?.step === "confirm-empty"} eyebrow={t("courseDetail.deleteGroupEyebrow")} title={t("courseDetail.deleteGroupTitle")} message={t("courseDetail.deleteEmptyGroupConfirm", { title: deleteState?.group.title ?? "" })} confirmLabel={t("courseDetail.deleteGroupAction")} cancelLabel={t("common.cancel")} confirmVariant="danger" isConfirming={saving} onCancel={() => setDeleteState(null)} onConfirm={() => void deleteGroup({ action: "delete" })} />
       <ConfirmationDialog open={deleteState?.step === "confirm-permanent"} eyebrow={t("courseDetail.deleteGroupPermanentEyebrow")} title={t("courseDetail.deleteGroupPermanentTitle")} message={t("courseDetail.deleteGroupPermanentConfirm", { title: deleteState?.group.title ?? "", count: deleteState?.participants.length ?? 0 })} confirmLabel={t("courseDetail.deleteGroupPermanently")} cancelLabel={t("common.cancel")} confirmVariant="danger" isConfirming={saving} onCancel={() => setDeleteState(null)} onConfirm={() => void deleteGroup({ action: "delete", confirmParticipantDeletion: true })} />
     </section>

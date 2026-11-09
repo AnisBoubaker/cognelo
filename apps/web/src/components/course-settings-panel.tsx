@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { aiAgentModels, type AiModelSelection } from "@cognelo/contracts";
@@ -144,8 +145,8 @@ export function CourseSettingsPanel({
             <div className="section-heading">
               <div>
                 <p className="eyebrow">{t("courseDetail.settingsEyebrow")}</p>
-                <h2>{t("courseDetail.generalSettingsTitle")}</h2>
-                <p className="muted">{t("courseDetail.generalSettingsText")}</p>
+                <HelpLabel help={<>{t("courseDetail.generalSettingsText")}</>}><h2>{t("courseDetail.generalSettingsTitle")}</h2></HelpLabel>
+
               </div>
             </div>
             <CourseForm
@@ -169,18 +170,17 @@ export function CourseSettingsPanel({
             <div className="section-heading">
               <div>
                 <p className="eyebrow">{t("courseDetail.settingsEyebrow")}</p>
-                <h2>{t("courseDetail.aiSettingsTitle")}</h2>
-                <p className="muted">{t("courseDetail.aiSettingsText")}</p>
+                <HelpLabel help={<>{t("courseDetail.aiSettingsText")}</>}><h2>{t("courseDetail.aiSettingsTitle")}</h2></HelpLabel>
+
               </div>
             </div>
 
             <form className="form" id="course-ai-settings-form" onSubmit={handleAiSubmit}>
-              <AiModelPicker connections={aiAgentConnections} purpose="generation" value={pickerValue(studentSupportAgentId, supportModel)}
+              <AiModelPicker connectionHelp={t("courseDetail.studentSupportAgentHelp")} connections={aiAgentConnections} purpose="generation" value={pickerValue(studentSupportAgentId, supportModel)}
                 onChange={selection => { setStudentSupportAgentId(selection?.connectionId ?? ""); setSupportModel(selection?.model ?? ""); }}
                 labels={{ connection: t("courseDetail.studentSupportAgent"), model: t("settings.aiAgentModel"), inherit: t("courseDetail.noAiAgentSelected"), unavailable: t("settings.aiModelUnavailable"), noModels: t("settings.aiNoGenerationModels") }} />
-              <p className="muted">{t("courseDetail.studentSupportAgentHelp")}</p>
 
-              <label className="checkbox-row">
+              <HelpLabel help={<>{t("courseDetail.assessmentFeedbackAgentHelp")}</>}><label className="checkbox-row">
                 <input
                   checked={automaticFeedbackEnabled}
                   type="checkbox"
@@ -190,12 +190,11 @@ export function CourseSettingsPanel({
                   <strong>{t("courseDetail.automaticFeedbackEnabled")}</strong>
                   <span className="muted">{t("courseDetail.automaticFeedbackEnabledHelp")}</span>
                 </span>
-              </label>
+              </label></HelpLabel>
 
               <AiModelPicker connections={aiAgentConnections} purpose="generation" value={pickerValue(assessmentFeedbackAgentId, feedbackModel)} disabled={!automaticFeedbackEnabled}
                 onChange={selection => { setAssessmentFeedbackAgentId(selection?.connectionId ?? ""); setFeedbackModel(selection?.model ?? ""); }}
                 labels={{ connection: t("courseDetail.assessmentFeedbackAgent"), model: t("settings.aiAgentModel"), inherit: t("courseDetail.noAiAgentSelected"), unavailable: t("settings.aiModelUnavailable"), noModels: t("settings.aiNoGenerationModels") }} />
-              <p className="muted">{t("courseDetail.assessmentFeedbackAgentHelp")}</p>
 
               {aiAgentConnections.length ? null : <p className="muted">{t("courseDetail.noAiAgentsAvailable")}</p>}
 

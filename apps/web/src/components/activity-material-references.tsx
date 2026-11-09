@@ -1,4 +1,6 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
+
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ActivityMaterialReferencesView, MaterialReferenceRow } from "@cognelo/contracts";
@@ -85,7 +87,7 @@ export function ActivityMaterialReferences({ courseId, activityId, locale, onSta
     finally { controller.current = null; setBusy(null); setCurrentMaterial(""); }
   }
   return <section className="section stack activity-reference-materials">
-    <div><h3>{copy.title}</h3><p className="muted">{copy.help}</p></div>
+    <div><HelpLabel help={<><p>{copy.help}</p><p>{copy.archiveHelp}</p></>}><h3>{copy.title}</h3></HelpLabel></div>
     <div className="activity-reference-model row wrap"><div><strong>{copy.model}</strong><p>{data?.embedding.resolved?.model ?? copy.unavailable}</p>
       {data?.locked && data.embedding.preparedModel && data.embedding.preparedModel !== data.embedding.resolved?.model && <p className="muted">{copy.pinnedModel}: {data.embedding.preparedModel}</p>}</div>
       <a className="button secondary" href={`/courses/${courseId}?tab=settings&section=ai#material-embeddings`}><ActionIcon name="settings" />{copy.configure}</a></div>
@@ -113,7 +115,7 @@ export function ActivityMaterialReferences({ courseId, activityId, locale, onSta
       </div>;
     })}</div>
     {data && !visibleRows.length && <p>{copy.empty}</p>}
-    <p className="muted">{copy.archiveHelp}</p>
+
     <div className="row wrap"><button type="button" disabled={!data || data.locked || dirty || Boolean(busy) || (!data.embedding.resolved && selected.length > 0)} onClick={() => void prepare()}><ActionIcon name="generate" />{copy.prepare}</button><p role="status">{dirty ? copy.saveFirst : data?.prepared ? copy.prepared : copy.needsPreparation}</p></div>
     <EditActionBar isDirty={dirty} isSaving={busy === "save"} saveDisabled={Boolean(data?.locked || busy === "prepare")} savedLabel={actions.saved} unsavedLabel={actions.unsaved} saveLabel={actions.save} savingLabel={actions.saving} cancelLabel={actions.cancel} onCancel={() => setSelected(data?.selected ?? [])} onSave={() => void save().catch(() => {})} />
     {busy === "prepare" && createPortal(<ProgressDialog open title={copy.preparing} progressLabel={currentMaterial || copy.preparing} progress={progress} cancelLabel={actions.cancel} onCancel={() => controller.current?.abort()} />, document.body)}

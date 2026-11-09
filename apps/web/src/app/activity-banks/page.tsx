@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { DialogHeader } from "@cognelo/activity-ui";
 
@@ -134,7 +135,7 @@ export default function ActivityBanksPage() {
           <div className="dialog-backdrop" role="presentation"><section aria-modal="true" className="dialog-panel" role="dialog" aria-labelledby="bank-editor-title">
             <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={() => setEditorBank(undefined)}><div><p className="eyebrow">{t("activityBanks.eyebrow")}</p><h2 id="bank-editor-title">{editorBank ? t("activityBanks.editTitle") : t("activityBanks.addTitle")}</h2></div></DialogHeader>
             <form className="form" onSubmit={saveActivityBank}>
-              <div className={`field ${editorBank?.activities?.length ? "field-readonly" : ""}`}><label htmlFor="bank-subject">{t("activityBanks.subjectLabel")}</label><select id="bank-subject" value={draft.subjectId} disabled={Boolean(editorBank?.activities?.length)} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value })} required>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select>{editorBank?.activities?.length ? <p className="muted">{t("activityBanks.subjectLockedHelp")}</p> : null}</div>
+              <div className={`field ${editorBank?.activities?.length ? "field-readonly" : ""}`}><HelpLabel help={editorBank?.activities?.length ? <>{t("activityBanks.subjectLockedHelp")}</> : null}><label htmlFor="bank-subject">{t("activityBanks.subjectLabel")}</label></HelpLabel><select id="bank-subject" value={draft.subjectId} disabled={Boolean(editorBank?.activities?.length)} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value })} required>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></div>
               <div className="field"><label htmlFor="bank-title">{t("activityBanks.titleLabel")}</label><input id="bank-title" minLength={2} maxLength={160} required value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></div>
               <div className="field"><label htmlFor="bank-description">{t("activityBanks.descriptionLabel")}</label><textarea id="bank-description" maxLength={4000} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></div>
               <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setEditorBank(undefined)}><AppIcon name="close" /> {t("common.cancel")}</button><button disabled={saving || !draft.subjectId} type="submit"><AppIcon name="save" /> {saving ? t("common.saving") : t("common.save")}</button></div>

@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { ActivityReferenceAuthoringProvider, type ActivityReferenceAuthoringState, ActivityKnowledgeGenerationProvider, EditActionBar, getEditActionBarCopy, useNotifications, useUnsavedChangesActions, useUnsavedChangesGuard, type ActivityKnowledgeGenerationMode, type ActivityKnowledgeGenerationRequest } from "@cognelo/activity-ui";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -301,7 +302,7 @@ export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites,
       <div role="tabpanel" hidden={activeTab !== "concepts"}>
         {(
           <section className="section stack">
-            <div><h2>{t("activityConcepts.title")}</h2><p className="muted">{t("activityConcepts.description")}</p></div>
+            <div><HelpLabel help={<>{t("activityConcepts.description")}</>}><h2>{t("activityConcepts.title")}</h2></HelpLabel></div>
             {concepts.length ? (
               <>
                 <div className="field">

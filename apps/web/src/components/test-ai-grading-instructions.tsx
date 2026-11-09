@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -62,13 +63,11 @@ export function TestAiGradingInstructionsAction({ scope, ownerId, activityId, di
       open={open && !sharedDialogOpen} title={t("testAiInstructions.action")}
       message={<div className="stack">
         {loading ? <p role="status">{t("common.loading")}</p> : snapshot?.items.length ? <>
-          <p>{t("testAiInstructions.help", { count: snapshot.items.length })}</p>
+
           <ul>{snapshot.items.map(item => <li key={item.testItemId}>{item.title}</li>)}</ul>
-          <label className="field" htmlFor={inputId}>
-            <span>{t("testAiInstructions.label")}</span>
-            <textarea id={inputId} rows={8} maxLength={8000} value={instructions} disabled={saving}
-              onChange={event => setInstructions(event.target.value)} />
-          </label>
+          <div className="field"><HelpLabel help={t("testAiInstructions.help", { count: snapshot.items.length })}><label htmlFor={inputId}>{t("testAiInstructions.label")}</label></HelpLabel>
+            <textarea id={inputId} rows={8} maxLength={8000} value={instructions} disabled={saving} onChange={event => setInstructions(event.target.value)} />
+          </div>
           <p className="muted">{t("testAiInstructions.warning")}</p>
         </> : !error ? <p>{t("testAiInstructions.none")}</p> : null}
         {error ? <p className="error" role="alert">{error}</p> : null}

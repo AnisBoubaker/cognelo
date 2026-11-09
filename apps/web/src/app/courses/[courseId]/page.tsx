@@ -1,9 +1,9 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { DialogHeader } from "@cognelo/activity-ui";
 
 import { useApplicationTime, isZonedMidnight } from "@cognelo/activity-ui";
-
 
 import { ContextMenu, ProgressDialog, useBodyScrollLock, useDialogs } from "@cognelo/activity-ui";
 import { resolveLocalizedText, type ContentTypeDefinition } from "@cognelo/content-type-sdk";
@@ -2124,8 +2124,8 @@ export default function CourseDetailPage() {
                     <div><p className="eyebrow">{t("courseDetail.duplicateActivityEyebrow")}</p><h2 id="duplicate-course-activity-title">{t(duplicatingCourseActivity.kind === "content" ? "courseDetail.duplicateContentTitle" : "courseDetail.duplicateActivityTitle")}</h2></div>
                   </DialogHeader>
                   <form className="form" onSubmit={duplicateContentActivity}>
-                    <div className="field"><label htmlFor="duplicate-course-activity-name">{t("courseDetail.duplicateContentTitleLabel")}</label><input id="duplicate-course-activity-name" autoFocus minLength={2} maxLength={180} required value={duplicateCourseActivityTitle} onChange={(event) => setDuplicateCourseActivityTitle(event.target.value)} /></div>
-                    <p className="muted">{t("courseDetail.duplicateActivityLocationHelp")}</p>
+                    <div className="field"><HelpLabel help={<>{t("courseDetail.duplicateActivityLocationHelp")}</>}><label htmlFor="duplicate-course-activity-name">{t("courseDetail.duplicateContentTitleLabel")}</label></HelpLabel><input id="duplicate-course-activity-name" autoFocus minLength={2} maxLength={180} required value={duplicateCourseActivityTitle} onChange={(event) => setDuplicateCourseActivityTitle(event.target.value)} /></div>
+
                     <div className="dialog-actions"><button className="secondary" type="button" onClick={() => setDuplicatingCourseActivity(null)}><AppIcon name="close" /> {t("common.cancel")}</button><button disabled={isDuplicatingCourseActivity || duplicateCourseActivityTitle.trim().length < 2} type="submit"><AppIcon name="duplicate" /> {isDuplicatingCourseActivity ? t("common.saving") : t("courseDetail.duplicateActivity")}</button></div>
                   </form>
                 </section>

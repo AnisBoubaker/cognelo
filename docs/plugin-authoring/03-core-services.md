@@ -119,6 +119,7 @@ Shared UI primitives live in:
 - [packages/activity-ui/src/markdown-renderer.tsx](../../packages/activity-ui/src/markdown-renderer.tsx)
 - [packages/activity-ui/src/rich-text-editor.tsx](../../packages/activity-ui/src/rich-text-editor.tsx)
 - [packages/activity-ui/src/notifications.tsx](../../packages/activity-ui/src/notifications.tsx)
+- [packages/activity-ui/src/help-tooltip.tsx](../../packages/activity-ui/src/help-tooltip.tsx)
 - [packages/activity-ui/src/unsaved-changes.tsx](../../packages/activity-ui/src/unsaved-changes.tsx)
 
 These are especially useful for programming-learning activities.
@@ -167,6 +168,23 @@ The default image uploader stores a first-party `/api/media-assets/<id>/content`
 Use this for transient confirmations and non-field-specific errors.
 
 Prefer it over inline “saved” messages when the feedback does not need to stay attached to a specific form field.
+
+### Contextual help in teacher interfaces
+
+Use shared `HelpLabel` for background explanations in teacher pages and activity editors instead of permanently displayed helper paragraphs. It places a circled question mark **after the heading or native label on the same row**, outside its accessible name. Keep the input outside this row and preserve its `id`/`htmlFor` association:
+
+```tsx
+<div className="field">
+  <HelpLabel help={t("candidateLimitHelp")}>
+    <label htmlFor={candidateLimitId}>{t("candidateLimit")}</label>
+  </HelpLabel>
+  <input id={candidateLimitId} type="number" value={limit} onChange={updateLimit} />
+</div>
+```
+
+Import `HelpLabel`/`HelpTooltip` from `@cognelo/activity-ui`. Core supplies the localized `HelpProvider`. Hover/focus opens help, click/tap pins it, and Escape/outside interaction dismisses it without submitting or closing its parent dialog. Help is portaled and bounded to the viewport. For custom label rows, append `HelpTooltip` after the text. `ToggleSwitch.help`, `AiModelPicker.connectionHelp`/`modelHelp` and `ConfirmationDialog.titleHelp` use the same primitive. Keep help accessible when its associated setting is disabled; native disabled fieldsets require placing it in the first legend.
+
+Keep user-authored content, current results, required confirmations and learner task instructions visible. Errors and warnings use the existing notification system, never tooltips. Routine date fields use the effective timezone without repeating its name; show timezone names only in the actual configuration chooser. See [contextual help](../CONTEXTUAL_HELP.md).
 
 ### What `useUnsavedChangesGuard()` Gives You
 

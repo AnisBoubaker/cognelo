@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "./help-tooltip";
 
 import { DialogHeader } from "./dialog-header";
 
@@ -201,8 +202,8 @@ export function EquationEditorDialog({
         <DialogHeader className="section-heading equation-editor-heading" closeLabel={copy.close} onClose={onCancel}>
           <div>
             <p className="eyebrow">{copy.eyebrow}</p>
-            <h2 id="equation-editor-title">{mode === "edit" ? copy.editTitle : copy.addTitle}</h2>
-            <p className="muted">{copy.help}</p>
+            <HelpLabel help={<>{copy.help}</>}><h2 id="equation-editor-title">{mode === "edit" ? copy.editTitle : copy.addTitle}</h2></HelpLabel>
+
           </div>
         </DialogHeader>
 

@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel, HelpTooltip } from "@cognelo/activity-ui";
 
 import { AppIcon } from "@/components/app-icon";
 
@@ -50,22 +51,22 @@ export function StudentAssignmentDialog({ draft, studentIds, onApply, onClose }:
         <label className="muted"><input type="radio" name="assignment-method" disabled />{t("studentGroupings.smartMethod")}<small>{t("studentGroupings.smartComingSoon")}</small></label>
         <label><input type="radio" name="assignment-method" checked={mode === "student"} onChange={() => setMode("student")} />{t("studentGroupings.studentChoiceMethod")}</label>
       </fieldset>
-      {mode === "random" ? <fieldset className="student-assignment-methods">
-        <legend>{t("studentGroupings.randomScope")}</legend>
+      {mode === "random" ? <fieldset className="student-assignment-methods" aria-label={t("studentGroupings.randomScope")}>
+        <legend>{t("studentGroupings.randomScope")}<HelpTooltip content={<>{t("studentGroupings.capacityShortfallHelp")}</>} label={t("studentGroupings.randomScope")} /></legend>
         <label><input type="radio" name="assignment-scope" checked={scope === "unassigned"} onChange={() => setScope("unassigned")} />{t("studentGroupings.assignUnassigned")}</label>
         <label><input type="radio" name="assignment-scope" checked={scope === "all"} onChange={() => setScope("all")} />{t("studentGroupings.reassignAll")}</label>
-        <p className="muted">{t("studentGroupings.capacityShortfallHelp")}</p>
+
       </fieldset> : <div className="stack">
         <div className="form-grid-two">
-          <div className="field"><label htmlFor="team-choice-from">{t("studentGroupings.choiceFrom")}</label><DateTimeMinuteInput id="team-choice-from" value={opensAt} onChange={setOpensAt} /></div>
+          <div className="field"><HelpLabel help={<>{t("studentGroupings.choiceDateHelp")}</>}><label htmlFor="team-choice-from">{t("studentGroupings.choiceFrom")}</label></HelpLabel><DateTimeMinuteInput id="team-choice-from" value={opensAt} onChange={setOpensAt} /></div>
           <div className="field"><label htmlFor="team-choice-until">{t("studentGroupings.choiceUntil")}</label><DateTimeMinuteInput id="team-choice-until" value={closesAt} onChange={setClosesAt} /></div>
         </div>
-        <p className="muted">{t("studentGroupings.choiceDateHelp")}</p>
+
         <label className="checkbox-row"><input type="checkbox" checked={allowChanges} onChange={(event) => setAllowChanges(event.target.checked)} />{t("studentGroupings.allowChoiceChanges")}</label>
         {invalidDates ? <p role="alert" className="error">{t("studentGroupings.invalidChoiceDates")}</p> : null}
       </div>}
       <div className="stack">
-        <h3>{t("studentGroupings.teamSlots")}</h3>
+        <HelpLabel help={<>{t("studentGroupings.automaticAssignmentHelp")}</>}><h3>{t("studentGroupings.teamSlots")}</h3></HelpLabel>
         <div className="row">
           <div className="field"><label htmlFor="all-team-capacity">{t("studentGroupings.slotsPerTeam")}</label><input id="all-team-capacity" type="number" min={0} max={5000} value={Number.isFinite(bulkCapacity) ? bulkCapacity : ""} onChange={(event) => setBulkCapacity(event.target.valueAsNumber)} /></div>
           <button className="secondary" type="button" disabled={!validCapacity(bulkCapacity)} onClick={() => setTeams((current) => current.map((team) => ({ ...team, capacity: bulkCapacity })))}><AppIcon name="check" /> {t("studentGroupings.applySlotsToAll")}</button>
@@ -76,7 +77,7 @@ export function StudentAssignmentDialog({ draft, studentIds, onApply, onClose }:
         </div>)}</div>
         {exceedsCapacity ? <p role="alert" className="error">{t("studentGroupings.capacityExceeded")}</p> : null}
       </div>
-      <p className="muted">{t("studentGroupings.automaticAssignmentHelp")}</p>
+
     </div>
   } />;
 }

@@ -1,4 +1,6 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
+
 import { ActivityStageSchedule, StageScheduleContext, stagePoliciesForDraft, stagePoliciesForSave, useStageSchedule, type StageScheduleDefinition } from "./activity-stage-schedule";
 import { mergeSubmissionStagePolicies, type SubmissionStagePolicies } from "@cognelo/contracts";
 
@@ -340,12 +342,12 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                   role="tabpanel"
                 >
                   <div>
-                    <h3>{t("courseDetail.activitySettingsGeneralTitle")}</h3>
-                    <p className="muted">{t("courseDetail.activitySettingsGeneralText")}</p>
+                    <HelpLabel help={<>{t("courseDetail.activitySettingsGeneralText")}</>}><h3>{t("courseDetail.activitySettingsGeneralTitle")}</h3></HelpLabel>
+
                   </div>
                   {supportsTeamwork ? <div className="stack">
-                    <label className="checkbox-row"><input type="checkbox" checked={draft.teamworkEnabled} disabled={saving || draft.teamworkLocked} onChange={event => { const enabled = event.target.checked; setDraft(current => current ? { ...current, teamworkEnabled: enabled } : current); }} /> {t("courseDetail.teamworkEnabled")}</label>
-                    <p className="muted">{draft.teamworkLocked ? t("courseDetail.teamworkLocked") : t("courseDetail.teamworkHelp")}</p>
+                    <HelpLabel help={<>{draft.teamworkLocked ? t("courseDetail.teamworkLocked") : t("courseDetail.teamworkHelp")}</>}><label className="checkbox-row"><input type="checkbox" checked={draft.teamworkEnabled} disabled={saving || draft.teamworkLocked} onChange={event => { const enabled = event.target.checked; setDraft(current => current ? { ...current, teamworkEnabled: enabled } : current); }} /> {t("courseDetail.teamworkEnabled")}</label></HelpLabel>
+
                   </div> : null}
                   <div className="settings-grid">
                     <div className="field">
@@ -388,7 +390,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                     onChange={updateGeneral}
                   />}
                   <div>
-                    <label className="checkbox-row" htmlFor={`activity-settings-messaging-${activity.id}`}>
+                    <HelpLabel help={<>{t("activityMessenger.enabledHelp")}</>}><label className="checkbox-row" htmlFor={`activity-settings-messaging-${activity.id}`}>
                       <input
                         aria-describedby={`activity-settings-messaging-help-${activity.id}`}
                         checked={draft.messagingEnabled}
@@ -398,8 +400,8 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                         onChange={(event) => setDraft((current) => current ? { ...current, messagingEnabled: event.target.checked } : current)}
                       />
                       {t("activityMessenger.enabledLabel")}
-                    </label>
-                    <p className="muted" id={`activity-settings-messaging-help-${activity.id}`}>{t("activityMessenger.enabledHelp")}</p>
+                    </label></HelpLabel>
+                    <span className="sr-only" id={`activity-settings-messaging-help-${activity.id}`}>{t("activityMessenger.enabledHelp")}</span>
                     {draft.messagingEnabled ? <label className="checkbox-row" htmlFor={`activity-settings-two-way-${activity.id}`}>
                       <input id={`activity-settings-two-way-${activity.id}`} type="checkbox" disabled={saving}
                         checked={draft.twoWayMessagingEnabled}
@@ -408,16 +410,16 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                     </label> : null}
                   </div>
                   <div>
-                    <label className="checkbox-row" htmlFor={`activity-settings-hide-after-attempts-${activity.id}`}>
+                    <HelpLabel help={<>{t("activityContentAccess.settingHelp")}</>}><label className="checkbox-row" htmlFor={`activity-settings-hide-after-attempts-${activity.id}`}>
                       <input type="checkbox" id={`activity-settings-hide-after-attempts-${activity.id}`} checked={draft.hideAfterAttempts} disabled={saving}
                         onChange={(event) => setDraft((current) => current ? { ...current, hideAfterAttempts: event.target.checked } : current)} />
                       {t("activityContentAccess.setting")}
-                    </label>
-                    <p className="muted">{t("activityContentAccess.settingHelp")}</p>
+                    </label></HelpLabel>
+
                   </div>
                   {getActivityDefinition(activity.activityType.key)?.supportsSolution ? (
                     <div>
-                      <label className="checkbox-row" htmlFor={`activity-settings-solution-${activity.id}`}>
+                      <HelpLabel help={<>{t("activitySolution.releaseHelp")}</>}><label className="checkbox-row" htmlFor={`activity-settings-solution-${activity.id}`}>
                         <input
                           aria-describedby={`activity-settings-solution-help-${activity.id}`}
                           checked={draft.releaseSolution}
@@ -427,8 +429,8 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                           onChange={(event) => setDraft((current) => current ? { ...current, releaseSolution: event.target.checked } : current)}
                         />
                         {t("activitySolution.releaseLabel")}
-                      </label>
-                      <p className="muted" id={`activity-settings-solution-help-${activity.id}`}>{t("activitySolution.releaseHelp")}</p>
+                      </label></HelpLabel>
+                      <span className="sr-only" id={`activity-settings-solution-help-${activity.id}`}>{t("activitySolution.releaseHelp")}</span>
                     </div>
                   ) : null}
                   <label className="checkbox-row" htmlFor={`activity-settings-visible-${activity.id}`}>
@@ -492,7 +494,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
 
                   {!selectedGroup ? <p className="muted">{t("courseDetail.activitySettingsNoGroups")}</p> : (
                     <div className="activity-group-settings stack" role="tabpanel">
-                      <label className="checkbox-row activity-assigned-toggle" htmlFor={`activity-group-assigned-${selectedGroup.groupId}`}>
+                      <HelpLabel help={<>{t("courseDetail.activitySettingsOverridesText")}</>}><label className="checkbox-row activity-assigned-toggle" htmlFor={`activity-group-assigned-${selectedGroup.groupId}`}>
                         <input
                           checked={selectedGroup.assigned}
                           disabled={saving}
@@ -501,7 +503,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                           onChange={(event) => updateGroup(selectedGroup.groupId, { assigned: event.target.checked })}
                         />
                         <span>{t("courseDetail.activitySettingsAssigned")}</span>
-                      </label>
+                      </label></HelpLabel>
                       {selectedGroup.assigned ? (
                         <div className="activity-group-overrides stack">
                           {supportsTeamwork && draft.teamworkEnabled ? <div className="stack">
@@ -512,7 +514,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                             <label className="checkbox-row"><input type="checkbox" checked={selectedGroup.allowIndividualSubmission} disabled={saving || selectedGroup.teamworkLocked} onChange={event => updateGroup(selectedGroup.groupId, { allowIndividualSubmission: event.target.checked })} /> {t("courseDetail.teamworkAllowIndividual")}</label>
                             {selectedGroup.teamworkLocked ? <p className="muted">{t("courseDetail.teamworkLocked")}</p> : null}
                           </div> : null}
-                          <p className="muted">{t("courseDetail.activitySettingsOverridesText")}</p>
+
                           <AssignmentOverrideFields group={selectedGroup} summative={draft.assessmentMode === "summative"} disabled={saving} onChange={(update) => updateGroup(selectedGroup.groupId, update)} onToggle={(field, checked) => toggleGroupOverride(selectedGroup.groupId, field, checked)} />
                         </div>
                       ) : null}
@@ -522,8 +524,8 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
               ) : null}
 
               {!loading && draft && activeTab === "exceptions" ? <section aria-labelledby="activity-settings-tab-exceptions" className="activity-settings-panel stack" id="activity-settings-panel-exceptions" role="tabpanel">
-                <h3>{t("activityExceptions.title")}</h3>
-                <p className="muted">{t("activityExceptions.precedence")}</p>
+                <HelpLabel help={<><p>{t("activityExceptions.precedence")}</p><p>{t("activityExceptions.inheritanceHelp")}</p></>}><h3>{t("activityExceptions.title")}</h3></HelpLabel>
+
                 <div className="field"><label htmlFor="exception-section">{t("studentGroupings.section")}</label><select id="exception-section" value={selectedGroup?.groupId ?? ""} disabled={saving} onChange={(event) => setSelectedGroupId(event.target.value)}>{draft.groups.map((group) => <option key={group.groupId} value={group.groupId}>{group.title}</option>)}</select></div>
                 {selectedGroup?.assigned ? <ExceptionsEditor key={selectedGroup.groupId} group={selectedGroup} general={draft.general} summative={draft.assessmentMode === "summative"} disabled={saving} onChange={(exceptions) => updateGroup(selectedGroup.groupId, { exceptions })} /> : <p className="muted">{t("activityExceptions.assignSectionFirst")}</p>}
               </section> : null}
@@ -595,10 +597,10 @@ function ExceptionsEditor({ group, general, summative, disabled, onChange }: {
     onChange(next);
   }
   return <div className="stack activity-exceptions">
-    <p className="muted">{t("activityExceptions.inheritanceHelp")}</p>
+
     {(["team", "student"] as const).map((kind) => <section className="activity-exception-list stack" key={kind} aria-label={t(`activityExceptions.${kind}Exceptions`)}>
-      <h4>{t(`activityExceptions.${kind}Exceptions`)}</h4>
-      {kind === "team" ? <p className="muted">{t("activityExceptions.priorityHelp")}</p> : null}
+      <HelpLabel help={kind === "team" ? <>{t("activityExceptions.priorityHelp")}</> : null}><h4>{t(`activityExceptions.${kind}Exceptions`)}</h4></HelpLabel>
+
       <div className="activity-exception-add">
         <div className="field"><label htmlFor={`exception-${kind}-target`}>{t(`activityExceptions.choose${kind === "team" ? "Team" : "Student"}`)}</label>
           <select id={`exception-${kind}-target`} value={kind === "team" ? teamId : participantId} disabled={disabled} onChange={(event) => kind === "team" ? setTeamId(event.target.value) : setParticipantId(event.target.value)}>
@@ -720,7 +722,7 @@ function TimeLimitField({
   const { t } = useI18n();
   return (
     <div className="stack stack-tight">
-      <label className="checkbox-row" htmlFor={`${idPrefix}-enabled`}>
+      <HelpLabel help={<>{t("groupPage.timeLimitHelp")}</>}><label className="checkbox-row" htmlFor={`${idPrefix}-enabled`}>
         <input
           checked={value.timeLimitEnabled}
           disabled={disabled}
@@ -730,9 +732,9 @@ function TimeLimitField({
         />
         <span>
           {t("groupPage.timeLimitEnabled")}
-          <small className="muted">{t("groupPage.timeLimitHelp")}</small>
+
         </span>
-      </label>
+      </label></HelpLabel>
       {value.timeLimitEnabled ? (
         <div className="field">
           <label htmlFor={`${idPrefix}-minutes`}>{t("groupPage.timeLimitMinutes")}</label>
@@ -766,7 +768,7 @@ function SummativeFields({
   const { t } = useI18n();
   return (
     <div className="stack activity-summative-settings">
-      <label className="checkbox-row" htmlFor={`${idPrefix}-seb`}>
+      <HelpLabel help={t("groupPage.requireSafeExamBrowserHelp")}><label className="checkbox-row" htmlFor={`${idPrefix}-seb`}>
         <input
           checked={value.requireSafeExamBrowser}
           disabled={disabled}
@@ -776,10 +778,9 @@ function SummativeFields({
         />
         <span>
           {t("groupPage.requireSafeExamBrowser")}
-          <small className="muted">{t("groupPage.requireSafeExamBrowserHelp")}</small>
         </span>
-      </label>
-      <label className="checkbox-row" htmlFor={`${idPrefix}-grade-challenges`}>
+      </label></HelpLabel>
+      <HelpLabel help={t("groupPage.gradeChallengesEnabledHelp")}><label className="checkbox-row" htmlFor={`${idPrefix}-grade-challenges`}>
         <input
           checked={value.gradeChallengesEnabled}
           disabled={disabled}
@@ -789,9 +790,9 @@ function SummativeFields({
         />
         <span>
           {t("groupPage.gradeChallengesEnabled")}
-          <small className="muted">{t("groupPage.gradeChallengesEnabledHelp")}</small>
+
         </span>
-      </label>
+      </label></HelpLabel>
       <div className="settings-grid">
         <GradebookFields disabled={disabled} idPrefix={idPrefix} value={value} onChange={onChange} />
       </div>
