@@ -461,6 +461,8 @@ export type ServerActivityPlugin = {
 };
 
 export type PluginTeamworkTransaction = {
+  /** Core-owned completion of already-frozen deferred work within this transaction; never a learner endpoint. */
+  recordDeferredSubmission?: (input: { userId: string; courseId: string; groupId: string; activityId: string; pluginKey: string; pluginVersion: string; pluginAttemptRef: string; submittedAt: string; metadata?: Record<string, unknown> }) => Promise<{ id: string }>;
   query: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
   execute: (query: TemplateStringsArray, ...values: unknown[]) => Promise<number>;
 };

@@ -1,3 +1,4 @@
+import { homeworkQuestionsEnabled } from "./question-policy";
 import { readHomeworkSubmissionPolicy, readHomeworkSubmissionTiming } from "./submission-policy";
 import { acceptHomeworkSubmissionTiming, automaticHomeworkTiming, assertAutomaticHomeworkDraft, type AutomaticHomeworkHandIn } from "./submission-window";
 import { randomUUID, createHash } from "node:crypto";
@@ -40,7 +41,8 @@ export async function handInTeamHomework(scope: HomeworkStudentScope, input: unk
       const sql = teamworkTransaction(tx);
       const [assignment] = await sql.query<Array<{ promptMarkdown: string; candidateLimit: number; questionCount: number; retrievedExampleCount: number; generationInstructions: string; languageKey: string; settings: unknown }>>`SELECT * FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${scope.activityId}`;
       const settings = record(assignment?.settings);
-      if (!assignment || settings.submissionsEnabled !== true || typeof settings.preparedSnapshotId !== "string") throw new AppError(409, "HOMEWORK_SUBMISSIONS_CLOSED", "Your teacher has not enabled final submissions yet.");
+      const questionsEnabled = homeworkQuestionsEnabled(settings);
+      if (!assignment || settings.submissionsEnabled !== true || (questionsEnabled && typeof settings.preparedSnapshotId !== "string")) throw new AppError(409, "HOMEWORK_SUBMISSIONS_CLOSED", "Your teacher has not enabled final submissions yet.");
       if (automatic) automaticHomeworkTiming(settings, automatic); else acceptHomeworkSubmissionTiming(settings);
       if (automatic) {
         const [latest] = await sql.query<HomeworkSubmissionRow[]>`SELECT * FROM "PluginCodingHomeworkSubmission" WHERE "workspaceId"=${access.workspace.id} AND kind::text='team_source' ORDER BY "createdAt" DESC LIMIT 1`;
@@ -54,18 +56,18 @@ export async function handInTeamHomework(scope: HomeworkStudentScope, input: unk
       if (readiness.requiresAcknowledgement && !data.acknowledgeIncomplete && !automatic) throw new AppError(409, "HOMEWORK_INCOMPLETE_ACKNOWLEDGEMENT_REQUIRED", "Confirm that you are submitting incomplete work for your team.", { issues: readiness.incomplete });
       await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, entries.reduce((sum, entry) => sum + entry.uncompressedSize, 0));
       const separateTeamQuestions = !access.context.teamId || settings.separateTeamQuestions === true;
-      const metadata = { workflowVersion: 2, workspaceId: access.workspace.id, teamId: access.context.teamId, teamName: access.context.teamTitle, groupingId: access.context.groupingId,
+      const generation = questionsEnabled ? { providedCode: await snapshotProvidedCode(scope.activityId), questionLanguage: await getHomeworkQuestionLanguage(scope.courseId), questionGenerationAi: snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings)) } : {};
+      const metadata = { workflowVersion: 2, questionGenerationEnabled: questionsEnabled, workspaceId: access.workspace.id, teamId: access.context.teamId, teamName: access.context.teamTitle, groupingId: access.context.groupingId,
         submittedBy: scope.user.id, handInAt: new Date().toISOString(), draftRevision: access.workspace.revision,
         incompleteAcknowledged: readiness.requiresAcknowledgement, separateTeamQuestions,
-        providedCode: await snapshotProvidedCode(scope.activityId), questionLanguage: await getHomeworkQuestionLanguage(scope.courseId),
-        questionGenerationAi: snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings)),
+        ...generation,
         requirements, folders: access.workspace.folders,
-        assignment: { candidateLimit: assignment.candidateLimit, languageKey: assignment.languageKey, promptMarkdown: assignment.promptMarkdown, generationInstructions: assignment.generationInstructions, questionCount: assignment.questionCount, retrievedExampleCount: assignment.retrievedExampleCount } };
+        assignment: { candidateLimit: assignment.candidateLimit, languageKey: assignment.languageKey, promptMarkdown: assignment.promptMarkdown, generationInstructions: assignment.generationInstructions, questionCount: questionsEnabled ? assignment.questionCount : 0, retrievedExampleCount: assignment.retrievedExampleCount } };
       const submissionTiming = automatic ? automaticHomeworkTiming(settings, automatic) : acceptHomeworkSubmissionTiming(settings);
       Object.assign(metadata, { handInAt: submissionTiming.submittedAt, submissionTiming, ...(automatic ? { automaticHandIn: { cutoff: automatic.cutoff, recoveredAt: new Date().toISOString(), triggeredBy: automatic.triggeredBy, acknowledgementSource: "automatic_deadline" } } : {}) });
       const [owner] = await sql.query<Array<{ createdById: string }>>`SELECT "createdById" FROM "Activity" WHERE id=${scope.activityId}`;
       const [source] = await sql.query<HomeworkSubmissionRow[]>`INSERT INTO "PluginCodingHomeworkSubmission" (id,"activityId","groupId","userId",kind,status,"documentationSnapshotId","structureValidationSummary",metadata,"workspaceId","updatedAt")
-        VALUES (${sourceId},${scope.activityId},${scope.groupId},${owner.createdById},'team_source',${separateTeamQuestions ? "structure_valid" : "uploaded"}::"PluginCodingHomeworkSubmissionStatus",${settings.preparedSnapshotId},${JSON.stringify(validation)}::jsonb,${JSON.stringify(metadata)}::jsonb,${access.workspace.id},NOW()) RETURNING *`;
+        VALUES (${sourceId},${scope.activityId},${scope.groupId},${owner.createdById},'team_source',${!questionsEnabled ? "ready_for_grading" : separateTeamQuestions ? "structure_valid" : "uploaded"}::"PluginCodingHomeworkSubmissionStatus",${questionsEnabled ? String(settings.preparedSnapshotId) : null},${JSON.stringify(validation)}::jsonb,${JSON.stringify(metadata)}::jsonb,${access.workspace.id},NOW()) RETURNING *`;
       await mkdir(path.join(directory, "files"), { recursive: true, mode: 0o750 });
       for (const entry of entries) {
         if (entry.isDirectory || !entry.content || !validation.validFiles.includes(entry.path)) continue;
@@ -79,7 +81,7 @@ export async function handInTeamHomework(scope: HomeworkStudentScope, input: unk
       const enqueue = async (job: Parameters<typeof enqueueBackgroundJob>[0]) => { await enqueueBackgroundJob(job, tx); };
       const participants = access.context.teamId ? access.context.members : [{ participantId: access.context.participantId, userId: scope.user.id, membershipToken: access.context.membershipToken }];
       for (const participant of participants) await addWorkspaceMember(sql, enqueue, workspace, participant, scope.user);
-      if (!separateTeamQuestions) await enqueueTeamQuestions(sql, enqueue, workspace, source);
+      if (questionsEnabled && !separateTeamQuestions) await enqueueTeamQuestions(sql, enqueue, workspace, source);
       await auditHomeworkWorkspace(sql, workspace, scope.user, "submitted", { metadata: { sourceId, revision: workspace.revision, incompleteAcknowledged: readiness.requiresAcknowledgement, memberCount: participants.length, separateTeamQuestions } });
     });
     committed = true;
@@ -98,7 +100,7 @@ export async function getTeamHomeworkWorkspace(scope: HomeworkStudentScope) {
     const [cancelled] = await sql.query<Array<{ present: boolean }>>`SELECT EXISTS(SELECT 1 FROM "PluginCodingHomeworkSubmission" WHERE "workspaceMemberId"=${access.member.id} AND status='cancelled') AS present`;
     return { submissionPolicy: readHomeworkSubmissionPolicy(assignment?.settings), submissionsEnabled: record(assignment?.settings).submissionsEnabled === true, teamwork: teamWorkspaceProjection(access),
       previousCancelled: !submission && cancelled.present,
-      submission: submission ? { automaticHandIn: Boolean(record(submission.metadata).automaticHandIn), submissionTiming: readHomeworkSubmissionTiming(submission.metadata), id: submission.id, status: submission.status, createdAt: submission.createdAt.toISOString(), started: Boolean(record(submission.metadata).assessmentStartedAt), coreAttemptId: submission.coreAttemptId,
+      submission: submission ? { questionGenerationEnabled: homeworkQuestionsEnabled(submission.metadata), automaticHandIn: Boolean(record(submission.metadata).automaticHandIn), submissionTiming: readHomeworkSubmissionTiming(submission.metadata), id: submission.id, status: submission.status, createdAt: submission.createdAt.toISOString(), started: Boolean(record(submission.metadata).assessmentStartedAt), coreAttemptId: submission.coreAttemptId,
         processingStatus: job?.status ?? null, generationIssue: record(job?.error).code === "HOMEWORK_NO_ELIGIBLE_CODE" ? "no_eligible_code" : null, queuePosition: position,
         questionCount: Number(record(record(submission.metadata).assignment).questionCount ?? assignment?.questionCount ?? 3), files: files.map(file => ({ path: file.path, sizeBytes: Number(file.sizeBytes) })), incompleteAcknowledged: record(submission.metadata).incompleteAcknowledged === true } : null };
   }); } catch (error) {

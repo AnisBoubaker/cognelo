@@ -1,3 +1,4 @@
+import { homeworkQuestionsEnabled } from "./question-policy";
 import { snapshotProvidedCode } from "./provided-code";
 import { getHomeworkQuestionConnection, storedHomeworkAiSelection } from "./ai-selection";
 import { z } from "zod";
@@ -30,7 +31,7 @@ export async function getHomeworkWorkflowSettings(scope: HomeworkTeacherScope) {
   const selection = storedHomeworkAiSelection(settings.questionGenerationAi);
   const { homeworkTeamworkService } = await import("./team-workspaces");
   const questionPolicyLocked = await homeworkTeamworkService.hasActiveSubmissions({ activityId: scope.activityId, transaction: teamworkTransaction(prisma) });
-  return { ...references, submissionPolicy: readHomeworkSubmissionPolicy(settings), questionPolicyLocked,
+  return { ...references, questionGenerationEnabled: homeworkQuestionsEnabled(settings), submissionPolicy: readHomeworkSubmissionPolicy(settings), questionPolicyLocked,
     enabled: settings.submissionsEnabled === true, concurrency: Number(settings.generationConcurrency ?? 2),
     ai: { connections: listed.connections.filter(connection => connection.isEnabled), question: { selection: selection ? { connectionId: selection.connectionId, model: selection.model } : null, resolved: questionResolved, error: questionError },
       embedding: { selection: null, resolved: references.embedding.resolved, error: references.embedding.error } } };
@@ -44,7 +45,7 @@ export async function finishHomeworkMaterialPreparation(scope: HomeworkTeacherSc
   return { prepared: result.prepared, snapshotId: record(current?.settings).preparedSnapshotId };
 }
 export async function updateHomeworkWorkflowSettings(scope: HomeworkTeacherScope, input: unknown) {
-  await assignment(scope);
+  const initial = await assignment(scope);
   const data = z.object({ selected: z.array(z.string().min(1)).max(100).optional(), concurrency: z.number().int().min(1).max(4).optional(), enabled: z.boolean().optional(),
     embeddingAi: AiModelSelectionSchema.nullable().optional(), questionGenerationAi: AiModelSelectionSchema.nullable().optional(), submissionPolicy: homeworkSubmissionPolicySchema.optional() }).strict().parse(input);
   if (data.embeddingAi !== undefined) throw new AppError(409, "COURSE_EMBEDDING_SETTINGS_REQUIRED", "Set the embedding model in Course settings → AI. It is shared by all activities.");
@@ -57,7 +58,7 @@ export async function updateHomeworkWorkflowSettings(scope: HomeworkTeacherScope
     } else questionSelection = null;
   }
   if (data.selected) await saveActivityMaterialReferences(scope, { selected: data.selected });
-  const references = data.enabled === true ? await getActivityMaterialReferences(scope) : null;
+  const references = data.enabled === true && homeworkQuestionsEnabled(initial.settings) ? await getActivityMaterialReferences(scope) : null;
   await prisma.$transaction(async tx => {
     await lockHomeworkSettings(tx, scope.activityId);
     const current = await tx.pluginCodingHomeworkAssignment.findUniqueOrThrow({ where: { activityId: scope.activityId } }), settings = record(current.settings);
@@ -66,12 +67,15 @@ export async function updateHomeworkWorkflowSettings(scope: HomeworkTeacherScope
     if (questionSelection !== undefined) { if (questionSelection) next.questionGenerationAi = questionSelection; else delete next.questionGenerationAi; }
     if (data.concurrency) await updateBackgroundJobConcurrency("coding-homework-grader", scope.activityId, data.concurrency, tx);
     if (data.enabled === true && settings.submissionsEnabled !== true) {
+      if (homeworkQuestionsEnabled(next)) {
       await getHomeworkQuestionConnection(scope, next);
       const revision = contentIndexRevision({ selected: Array.isArray(settings.referenceMaterialIds) ? settings.referenceMaterialIds : null, preparedId: settings.preparedSnapshotId ?? null, locked: false });
       if (!references?.prepared || revision !== references.revision) throw new AppError(409, "HOMEWORK_EMBEDDINGS_REQUIRED", "Prepare the saved reference selection before enabling submissions.");
       await lockCourseMaterialEmbeddingSettings(tx, scope.courseId);
       if (references.selected.length && materialEmbeddingSelectionIdentity((await createCourseEmbeddingProvider(scope.user, scope.courseId)).selection) !== references.embedding.identity) throw new AppError(409, "COURSE_EMBEDDING_MODEL_CHANGED", "The course embedding model changed. Prepare the reference selection again.");
-      await snapshotProvidedCode(scope.activityId, tx); next.submissionsEnabled = true;
+      await snapshotProvidedCode(scope.activityId, tx);
+      }
+      next.submissionsEnabled = true;
     } else if (data.enabled === false) next.submissionsEnabled = false;
     await tx.pluginCodingHomeworkAssignment.update({ where: { activityId: scope.activityId }, data: { settings: json(next) } });
   }, { timeout: 30_000 });

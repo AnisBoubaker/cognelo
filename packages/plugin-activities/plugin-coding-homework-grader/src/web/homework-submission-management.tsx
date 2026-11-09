@@ -7,7 +7,7 @@ import { body, type HomeworkRequest } from "./workflow-types";
 import { homeworkWorkflowCopy, homeworkStatusLabel } from "./workflow-copy";
 import type { CodingHomeworkLocale } from "./messages";
 
-type Submission = { automaticHandIn?: boolean; submissionTiming?: HomeworkSubmissionTiming | null; id: string; student: string; status: string; cancelled: boolean; processingError: string | null; team?: boolean; teamName?: string | null };
+type Submission = { questionGenerationEnabled?: boolean; automaticHandIn?: boolean; submissionTiming?: HomeworkSubmissionTiming | null; id: string; student: string; status: string; cancelled: boolean; processingError: string | null; team?: boolean; teamName?: string | null };
 export function HomeworkSubmissionManagement({ request, locale, onChanged, recoverAutomatic = false }: { recoverAutomatic?: boolean; request: HomeworkRequest; locale: CodingHomeworkLocale; onChanged?: () => void }) {
   const copy = homeworkWorkflowCopy(locale), dialogs = useDialogs(), notifications = useNotifications();
   const automaticIssueSignature = useRef("");
@@ -48,7 +48,7 @@ export function HomeworkSubmissionManagement({ request, locale, onChanged, recov
         {submission.submissionTiming?.isLate && <strong>{submissionDeadlineCopy(locale).lateBy.replace("{duration}", formatHomeworkLateness(submission.submissionTiming.lateByMs, locale))}</strong>}
         {!submission.cancelled && <>
           <button type="button" className="secondary" onClick={() => void act(submission, false)}><ActionIcon name="close" /> {submission.team ? copy.cancelTeamSubmission : copy.cancelSubmission}</button>
-          <button type="button" className="secondary" onClick={() => void act(submission, true)}><ActionIcon name="refresh" /> {copy.resetChallenges}</button>
+          {submission.questionGenerationEnabled !== false && <button type="button" className="secondary" onClick={() => void act(submission, true)}><ActionIcon name="refresh" /> {copy.resetChallenges}</button>}
         </>}
       </div>
       {submission.automaticHandIn && <p>{submissionDeadlineCopy(locale).automatic}</p>}

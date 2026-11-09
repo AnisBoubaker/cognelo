@@ -24,9 +24,19 @@ Use shared SideNavigation, RichTextEditor, EditActionBar, notifications and canc
 
 ## Implementation checkpoints
 
-- [ ] Optional-question policy and immediate individual/team completion through core gradebook services.
+- [x] Optional-question policy and immediate individual/team completion through core gradebook services.
 - [ ] Preflight-owned simulation with validation, explicit acknowledgement, cancellation and private output.
 - [ ] Shared left-tab authoring, WYSIWYG assignment, collapsed PDF and common toggle control.
 - [ ] Focused unit/E2E regressions, documentation review and incremental commits.
 
 No production deployment or testing is part of this task. Preserve all stable plugin/API/storage identifiers and keep private archives, credentials and generated clients out of Git.
+
+## Completion boundary
+
+The authored `settings.questionGenerationEnabled` boolean defaults to true when missing. Omitted values in older clients preserve the saved setting. A mode change is rejected while active final hand-ins exist. Otherwise saving a mode change closes final submissions until the teacher explicitly reopens them, preventing newly enabled questions from bypassing reference/model preparation. Hidden generation settings and prepared references are retained.
+
+Hand-in freezes its effective question policy. File-only hand-in publishes immutable files and a completed, ungraded core attempt in one transaction, with question count zero and no generation/deadline job. Team members receive independent completed attempts over shared frozen bytes; late joiners do the same. Core revokes old membership attempts before the plugin creates new participation, so a newly completed late-join attempt is not withdrawn accidentally. Cancellation withdraws the associated grade and permits replacement; challenge reset is unavailable for file-only work. Automatic cutoff recovery uses its frozen submission time and normal incomplete-work acknowledgement rules.
+
+Core exposes `recordDeferredActivitySubmission` and a transaction-bound SDK `recordDeferredSubmission` callback. Only trusted server code that already authorized and froze the evidence may call it. It checks the deferred activity/provider, active enrolled learner, attempt limits and grade-release policy, preserves ordinary core lifecycle/knowledge snapshots, and can record existing frozen work after its availability end without opening an answering session. Ordinary `startActivityAttempt` date checks are unchanged. No public endpoint accepts this completion mode.
+
+Backend validation: 172 targeted unit tests and core/plugin typechecks passed. Five distinct local E2Es passed: file-only individual hand-in/retry/SEB/incomplete acknowledgement/cancellation/automatic recovery; file-only team late join, leave/rejoin, grade withdrawal and cancellation; normal individual challenges; both common and individual team question modes. Tests use disposable local courses and controlled model fixtures.

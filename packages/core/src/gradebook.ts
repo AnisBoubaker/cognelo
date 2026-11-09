@@ -1,6 +1,6 @@
 import { studentTestFeedback } from "./student-test-feedback";
 import { escapeCsvCell } from "./csv";
-import { getActivityPlugin } from "@cognelo/activity-sdk";
+import { getActivityDefinition, getActivityPlugin, getActivityPluginForActivityType } from "@cognelo/activity-sdk";
 import { resolveAttemptContinuationHandler } from "@cognelo/activity-sdk/server";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -143,6 +143,10 @@ export type DeletedSubmissionAudit = {
 };
 
 export async function startActivityAttempt(user: CurrentUser, input: StartActivityAttemptInput, transaction?: Prisma.TransactionClient) {
+  return startActivityAttemptInternal(user, input, transaction);
+}
+
+async function startActivityAttemptInternal(user: CurrentUser, input: StartActivityAttemptInput, transaction?: Prisma.TransactionClient, completedDeferredSubmission = false) {
   const now = input.now ?? new Date();
   const context = await resolveAssignedActivityAttemptContext(user, input, transaction);
   const assessmentMode = assignmentAssessmentMode(context.groupActivity.metadata);
@@ -171,7 +175,7 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
         }
       });
     }
-    await assertAttemptCanStart(context, now, assessmentMode, tx);
+    await assertAttemptCanStart(context, now, assessmentMode, tx, completedDeferredSubmission);
     const latestAttempt = await tx.activityAttempt.findFirst({
       where: {
         gradebookItemId: context.gradebookItem.id,
@@ -234,6 +238,32 @@ export async function startActivityAttempt(user: CurrentUser, input: StartActivi
     });
   };
   return transaction ? create(transaction) : prisma.$transaction(create);
+}
+
+/** Trusted plugin completion of already-frozen deferred work, including deadline recovery and late team membership.
+ * The plugin authorizes/freezes its evidence before calling; core retains enrollment, attempt and release policy.
+ * No answering session or timer is started and both lifecycle writes share the caller's transaction.
+ */
+export async function recordDeferredActivitySubmission(input: {
+  userId: string; courseId: string; groupId: string; activityId: string; pluginKey: string;
+  pluginVersion: string; pluginAttemptRef: string; submittedAt: string; metadata?: Record<string, unknown>;
+}, tx: Prisma.TransactionClient) {
+  const now = new Date(input.submittedAt);
+  if (!Number.isFinite(now.getTime()) || now.getTime() > Date.now() + 1000) throw new AppError(400, "SUBMISSION_TIME_INVALID", "The saved submission time is invalid.");
+  const activity = await tx.activity.findFirst({ where: { id: input.activityId, courseId: input.courseId }, include: { activityType: true } });
+  if (!activity || getActivityDefinition(activity.activityType.key)?.assessmentFlow !== "deferred" || getActivityPluginForActivityType(activity.activityType.key)?.key !== input.pluginKey) throw new AppError(409, "DEFERRED_SUBMISSION_UNSUPPORTED", "This activity cannot record a deferred submission.");
+  const stored = await tx.user.findUnique({ where: { id: input.userId }, include: { roles: { include: { role: true } } } });
+  if (!stored?.isActive) throw forbidden();
+  const participant = await tx.courseGroupParticipant.findFirst({ where: { groupId: input.groupId, userId: stored.id, role: "student", group: { courseId: input.courseId } } });
+  if (!participant) throw forbidden();
+  const user: CurrentUser = { id: stored.id, email: stored.email, name: stored.name, firstName: stored.firstName, lastName: stored.lastName, roles: stored.roles.map(value => value.role.key) as CurrentUser["roles"] };
+  await assertCanViewCourse(user, input.courseId);
+  const metadata = { ...input.metadata, completedWithoutAnswering: true } as JsonInput;
+  const existing = await tx.activityAttempt.findFirst({ where: { activityId: input.activityId, groupId: input.groupId, userId: input.userId, pluginKey: input.pluginKey, pluginAttemptRef: input.pluginAttemptRef, lifecycle: { in: ["submitted", "graded"] } } });
+  if (existing) return { id: existing.id };
+  const attempt = await startActivityAttemptInternal(user, { ...input, metadata, now }, tx, true);
+  await submitActivityAttempt(user, { attemptId: attempt.id, pluginAttemptRef: input.pluginAttemptRef, metadata, now }, tx);
+  return { id: attempt.id };
 }
 
 export async function getActivityAttemptAvailability(user: CurrentUser, input: ActivityAttemptAvailabilityInput) {
@@ -2050,7 +2080,8 @@ async function assertAttemptCanStart(
   context: Awaited<ReturnType<typeof resolveAssignedActivityAttemptContext>>,
   now: Date,
   assessmentMode: ActivityAttemptAssessmentMode,
-  db: Pick<typeof prisma, "activityAttempt"> = prisma
+  db: Pick<typeof prisma, "activityAttempt"> = prisma,
+  completedDeferredSubmission = false
 ) {
   const availableUntil = context.groupActivity.availableUntil;
   const item = context.gradebookItem;
@@ -2060,7 +2091,7 @@ async function assertAttemptCanStart(
     throw new AppError(400, "GRADES_RELEASED", "No more attempts are allowed after grades have been released.");
   }
 
-  if (availableUntil && now > availableUntil) {
+  if (!completedDeferredSubmission && availableUntil && now > availableUntil) {
     throw new AppError(400, "ATTEMPT_DUE_DATE_PASSED", "No more attempts are allowed after the due date.");
   }
 

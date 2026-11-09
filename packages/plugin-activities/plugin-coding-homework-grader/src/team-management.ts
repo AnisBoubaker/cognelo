@@ -1,3 +1,4 @@
+import { homeworkQuestionsEnabled } from "./question-policy";
 import { randomUUID } from "node:crypto";
 import { prisma as coreDb, Prisma } from "@cognelo/db";
 import { AppError, assertCanGradeGroup, deleteActivitySubmission, enqueueBackgroundJob, lockActivityTeamwork, lockStudentGroupingWorkspaces, teamworkTransaction } from "@cognelo/core";
@@ -37,6 +38,7 @@ export async function resetHomeworkStudentChallenges(scope: HomeworkTeacherScope
   const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({ where: { id: submissionId, activityId: scope.activityId, kind: "final" } });
   if (!submission) throw new AppError(404, "HOMEWORK_SUBMISSION_NOT_FOUND", "The submission was not found.");
   await assertCanGradeGroup(scope.user, scope.courseId, submission.groupId);
+  if (!homeworkQuestionsEnabled(submission.metadata)) throw new AppError(409, "HOMEWORK_QUESTIONS_DISABLED", "This submission has no challenge questions to reset.");
   await coreDb.$transaction(async tx => {
     await lockActivityTeamwork(tx, scope.activityId);
     const sql = teamworkTransaction(tx);

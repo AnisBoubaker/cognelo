@@ -4,6 +4,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { AppError } from "./errors";
 import { enqueueBackgroundJob } from "./background-jobs";
+import { recordDeferredActivitySubmission } from "./gradebook";
 import { randomUUID } from "node:crypto";
 
 export type TeamworkDatabase = { $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: unknown[]): Promise<T>; $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number> };
@@ -15,7 +16,7 @@ export function activityTeamAssignment(metadata: unknown): ActivityTeamAssignmen
 }
 export function activityTeamworkEnabled(metadata: unknown) { return object(object(metadata).allGroupsAssignment).teamworkEnabled === true; }
 export function teamworkTransaction(tx: TeamworkDatabase): PluginTeamworkTransaction {
-  return { query: <T>(query: TemplateStringsArray, ...values: unknown[]) => tx.$queryRaw<T>(query, ...values), execute: (query, ...values) => tx.$executeRaw(query, ...values) };
+  return { ...( "activityAttempt" in tx && !("$transaction" in tx) ? { recordDeferredSubmission: (input: Parameters<typeof recordDeferredActivitySubmission>[0]) => recordDeferredActivitySubmission(input, tx as Prisma.TransactionClient) } : {}), query: <T>(query: TemplateStringsArray, ...values: unknown[]) => tx.$queryRaw<T>(query, ...values), execute: (query, ...values) => tx.$executeRaw(query, ...values) };
 }
 export async function lockActivityTeamwork(tx: TeamworkDatabase, activityId: string) {
   await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${`activity-teamwork:${activityId}`}, 0))`;
@@ -108,19 +109,16 @@ export async function notifyActivityTeamMembershipChanges(tx: Prisma.Transaction
   for (const activity of applicable) {
     const handler = getActivityTeamworkHandler(activity.activityType.key);
     if (!handler) throw new AppError(409, "ACTIVITY_TEAMWORK_UNAVAILABLE", "The team workspace service is unavailable. Try again before changing memberships.");
-    const result = await handler.membershipChanged({ user, courseId, groupId, groupingId, activityId: activity.id,
-      assignment: activityTeamworkEnabled(activity.metadata) ? activityTeamAssignment(activity.groupAssignments[0]?.metadata) : null,
-      changes, emptyTeamIds, membershipToken, teamWorkspaceEpochs, ...(options.groupingRemoved ? { groupingRemoved: true } : {}),
-      transaction: teamworkTransaction(tx), enqueue: async job => { await enqueueBackgroundJob(job, tx); } });
     const coreAttempts = await tx.activityAttempt.findMany({ where: { courseId, groupId, activityId: activity.id, participantId: { in: changedIds }, lifecycle: { in: ["started", "submitted", "graded"] }, metadata: { path: ["teamwork", "groupingId"], equals: groupingId } }, select: { id: true } });
-    const withdrawn = [...(result.withdrawAttemptIds ?? []), ...coreAttempts.map(attempt => attempt.id)];
-    if (withdrawn.length) {
+    const withdraw = async (ids: string[]) => {
       const { deleteActivitySubmission } = await import("./gradebook");
-      for (const attemptId of new Set(withdrawn)) {
+      for (const attemptId of new Set(ids)) {
         const attempt = await tx.activityAttempt.findFirst({ where: { id: attemptId, courseId, groupId, activityId: activity.id, participantId: { in: changedIds }, lifecycle: { not: "deleted" } }, select: { id: true } });
         if (attempt) await deleteActivitySubmission(user, courseId, { attemptId, reason: "Team membership changed; previous workspace participation was withdrawn." }, { allowStartedReplacement: true, transaction: tx, membershipChange: { groupId, participantIds: changedIds } });
       }
-    }
+    };
+    // Revoke previous participation before the plugin may publish a completed hand-in in the new workspace.
+    await withdraw(coreAttempts.map(attempt => attempt.id));
     // A teacher may have entered an override before challenge answering created
     // a core attempt. Such an active grade belongs to the old participation too.
     if (activityTeamworkEnabled(activity.metadata) && activityTeamAssignment(activity.groupAssignments[0]?.metadata)?.groupingId === groupingId) {
@@ -134,6 +132,11 @@ export async function notifyActivityTeamMembershipChanges(tx: Prisma.Transaction
         await tx.grade.delete({ where: { id: grade.id } });
       }
     }
+    const result = await handler.membershipChanged({ user, courseId, groupId, groupingId, activityId: activity.id,
+      assignment: activityTeamworkEnabled(activity.metadata) ? activityTeamAssignment(activity.groupAssignments[0]?.metadata) : null,
+      changes, emptyTeamIds, membershipToken, teamWorkspaceEpochs, ...(options.groupingRemoved ? { groupingRemoved: true } : {}),
+      transaction: teamworkTransaction(tx), enqueue: async job => { await enqueueBackgroundJob(job, tx); } });
+    await withdraw(result.withdrawAttemptIds ?? []);
   }
 }
 

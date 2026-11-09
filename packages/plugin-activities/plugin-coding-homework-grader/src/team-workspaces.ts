@@ -1,3 +1,5 @@
+import { completeFileOnlyHomework } from "./file-only-submission";
+import { homeworkQuestionsEnabled } from "./question-policy";
 import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import path from "node:path";
@@ -70,7 +72,8 @@ export async function createMemberSubmission(sql: TeamSql, enqueue: Enqueue, wor
   await sql.execute`INSERT INTO "PluginCodingHomeworkSubmissionFile" (id,"submissionId",path,"languageKey","sizeBytes",sha256,"storedName",metadata)
     SELECT gen_random_uuid()::text,${id},path,"languageKey","sizeBytes",sha256,"storedName",metadata FROM "PluginCodingHomeworkSubmissionFile" WHERE "submissionId"=${source.id}`;
   await sql.execute`UPDATE "PluginCodingHomeworkWorkspaceMember" SET "currentSubmissionId"=${id} WHERE id=${member.id}`;
-  if (shared && source.status === "challenge_ready") await copySharedQuestions(sql, source.id, id);
+  if (!homeworkQuestionsEnabled(source.metadata)) await completeFileOnlyHomework(sql, workspace.courseId, child);
+  else if (shared && source.status === "challenge_ready") await copySharedQuestions(sql, source.id, id);
   else if (!shared) await enqueueTeamQuestions(sql, enqueue, workspace, child);
   return { ...member, currentSubmissionId: id };
 }
