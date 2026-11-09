@@ -3,10 +3,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { AppError } from "@cognelo/core";
+import { AppError, contentIndexRevision, openStoredMaterial } from "@cognelo/core";
 import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "./db-client";
-import { normalizeCodingHomeworkSubmissionRequirements, validateCodingHomeworkArchive } from "./validation";
+import { normalizeCodingHomeworkSubmissionRequirements, validateCodingHomeworkArchive, codingHomeworkSubmissionReadiness } from "./validation";
 import { readCodingHomeworkZip } from "./zip";
 
 const PREVIEW_GROUP_ID = "__course__";
@@ -61,6 +61,7 @@ export async function runCodingHomeworkPreflight(scope: PreflightScope, input: u
       status: summary.isValid ? "structure_valid" : "invalid_structure",
       structureValidationSummary: summary as Prisma.InputJsonValue,
       metadata: {
+        requirementsFingerprint: contentIndexRevision(requirements),
         expiresAt,
         originalName: parsed.fileName,
         temporary: true
@@ -77,6 +78,7 @@ export async function runCodingHomeworkPreflight(scope: PreflightScope, input: u
     data: {
       zipAttachmentId: attachment.id,
       metadata: {
+        requirementsFingerprint: contentIndexRevision(requirements),
         expiresAt,
         originalName: parsed.fileName,
         temporary: true,
@@ -87,6 +89,7 @@ export async function runCodingHomeworkPreflight(scope: PreflightScope, input: u
 
   return {
     preflight: {
+      originalName: parsed.fileName,
       id: submission.id,
       activityId: submission.activityId,
       groupId: submission.groupId,
@@ -159,4 +162,28 @@ async function createPreflightAttachment(
 
 function fileStorageDir() {
   return path.join(process.cwd(), "../../storage/coding-homework-grader/preflight");
+}
+
+/** Teacher simulations can read only that teacher's unexpired course preflight artifact. */
+export async function readHomeworkSimulationPreflight(scope: PreflightScope, preflightId: string, acknowledgeIncomplete: boolean) {
+  const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({ where: { id: preflightId, activityId: scope.activityId, userId: scope.user.id, groupId: PREVIEW_GROUP_ID, kind: "preflight" } });
+  const metadata = submission?.metadata as Record<string, unknown> | undefined;
+  if (!submission || !metadata || typeof metadata.expiresAt !== "string" || !Number.isFinite(Date.parse(metadata.expiresAt)) || Date.parse(metadata.expiresAt) <= Date.now()) throw new AppError(409, "HOMEWORK_PREFLIGHT_REQUIRED", "Upload and check a ZIP before simulating its submission.");
+  const requirements = await getCourseActivityRequirements(scope.activityId);
+  if (metadata.requirementsFingerprint !== contentIndexRevision(requirements)) throw new AppError(409, "HOMEWORK_PREFLIGHT_CHANGED", "The submission requirements changed. Check the ZIP again before simulating submission.");
+  const attachment = await prisma.pluginCodingHomeworkAttachment.findFirst({ where: { id: submission.zipAttachmentId ?? "", ownerKind: "submission", ownerId: submission.id, kind: "submission_zip" } });
+  if (!attachment || !/^[a-zA-Z0-9._-]+$/.test(attachment.storedName)) throw new AppError(409, "HOMEWORK_PREFLIGHT_REQUIRED", "The checked ZIP is no longer available. Upload it again.");
+  const handle = await openStoredMaterial(path.dirname(fileStorageDir()), ["preflight"], attachment.storedName);
+  let bytes: Buffer;
+  try { if ((await handle.stat()).size > requirements.maxArchiveBytes) throw new AppError(413, "HOMEWORK_FILE_LIMIT", "The ZIP exceeds the configured upload limit."); bytes = await handle.readFile(); }
+  finally { await handle.close(); }
+  if (BigInt(bytes.length) !== attachment.sizeBytes || createHash("sha256").update(bytes).digest("hex") !== attachment.sha256) throw new AppError(409, "HOMEWORK_FILE_CHANGED", "The checked ZIP could not be verified. Upload it again.");
+  const archive = readCodingHomeworkZip(bytes, requirements);
+  const summary = await validateCodingHomeworkArchive({ archiveSizeBytes: bytes.length, entries: archive.entries, requirements, zipDiagnostics: archive.diagnostics });
+  const readiness = codingHomeworkSubmissionReadiness(summary);
+  if (!readiness.canSubmit) throw new AppError(400, "HOMEWORK_FILES_INVALID", "Resolve the file requirements or safety issues before simulating submission.", { issues: readiness.blocking });
+  if (readiness.requiresAcknowledgement && !acknowledgeIncomplete) throw new AppError(409, "HOMEWORK_INCOMPLETE_ACKNOWLEDGEMENT_REQUIRED", "Confirm that you want to simulate submission of incomplete work.", { issues: readiness.incomplete });
+  return { sources: archive.entries.filter(entry => !entry.isDirectory && entry.content && summary.validFiles.includes(entry.path) && /\.(c|h)$/i.test(entry.path))
+    .map(entry => ({ path: entry.path, content: entry.content!.toString("utf8"), languageKey: requirements.languageKey })),
+    fingerprint: contentIndexRevision({ id: submission.id, sha256: attachment.sha256, requirements }), incomplete: readiness.requiresAcknowledgement };
 }

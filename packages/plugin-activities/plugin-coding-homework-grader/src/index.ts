@@ -17,9 +17,10 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
     {
       key: "coding-homework-grader",
       assessmentFlow: "deferred",
+      preparationMediaFields: ["assignmentMarkdown"],
       supportsTeamwork: true,
       usesMaterialEmbeddings: true,
-      authoring: { settingsTab: true, simulationTab: true },
+      authoring: {},
       name: "Programming Homework",
       description: "Programming assignment submission and grading workflow.",
       defaultCategoryIds: ["programming"],
@@ -67,7 +68,8 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
       configSchema: z.object({
         gradingMode: z.enum(["manual", "automated", "hybrid"]).default("manual"),
         maxAttempts: z.number().int().min(1).max(100).default(3),
-        repositoryTemplateUrl: z.string().url().optional()
+        repositoryTemplateUrl: z.string().url().optional(),
+        assignmentMarkdown: z.string().max(50000).optional()
       })
     }
   ]

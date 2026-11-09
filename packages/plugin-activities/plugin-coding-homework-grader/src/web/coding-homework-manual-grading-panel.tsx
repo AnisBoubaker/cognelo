@@ -65,7 +65,9 @@ export function CodingHomeworkManualGradingPanel({ embedded = false, locale, rea
     await onOverrideGrade({ score: parsedScore, maxScore: row.maxScore, reason: feedback.trim() || null, feedbackText: feedback.trim() || null });
   }
 
-  const tabs = [{ key: "questions" as const, label: copy.questionsAndAnswers }, { key: "files" as const, label: copy.submittedFiles }];
+  const hasQuestions = Boolean(selectedAttempt?.questions.length);
+  const activeTab = hasQuestions ? tab : "files";
+  const tabs = [...(hasQuestions ? [{ key: "questions" as const, label: copy.questionsAndAnswers }] : []), { key: "files" as const, label: copy.submittedFiles }];
   return <section className="dialog-panel answer-overlay test-review-overlay homework-review-panel" role={embedded ? undefined : "dialog"}
     aria-modal={embedded ? undefined : true} aria-label={embedded ? undefined : t("courseDetail.reviewAndGrade")} onMouseDown={event => event.stopPropagation()}>
     <DialogHeader className="section-heading" closeLabel={t("common.close")} onClose={embedded ? undefined : onClose} closeDisabled={busy}>
@@ -97,13 +99,13 @@ export function CodingHomeworkManualGradingPanel({ embedded = false, locale, rea
       <div className="homework-review-content">
         <div className="tab-strip" role="tablist" aria-label={copy.reviewTabs} onKeyDown={event => {
           if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-          event.preventDefault(); const next = event.key === "Home" ? "questions" : event.key === "End" ? "files" : tab === "questions" ? "files" : "questions";
+          event.preventDefault(); const next = !hasQuestions ? "files" : event.key === "Home" ? "questions" : event.key === "End" ? "files" : activeTab === "questions" ? "files" : "questions";
           setTab(next); event.currentTarget.querySelector<HTMLButtonElement>(`#${CSS.escape(`${id}-${next}-tab`)}`)?.focus();
         }}>
           {tabs.map(item => <button key={item.key} type="button" role="tab" id={`${id}-${item.key}-tab`} aria-controls={`${id}-${item.key}-panel`}
-            aria-selected={tab === item.key} tabIndex={tab === item.key ? 0 : -1} onClick={() => setTab(item.key)}>{item.label}</button>)}
+            aria-selected={activeTab === item.key} tabIndex={activeTab === item.key ? 0 : -1} onClick={() => setTab(item.key)}>{item.label}</button>)}
         </div>
-        <div id={`${id}-questions-panel`} role="tabpanel" aria-labelledby={`${id}-questions-tab`} hidden={tab !== "questions"}>
+        <div id={`${id}-questions-panel`} role="tabpanel" aria-labelledby={`${id}-questions-tab`} hidden={activeTab !== "questions"}>
           <div className="homework-challenge-list">{selectedAttempt.questions.map((question, index) => {
             const fn = question.submissionFunctionId ? functionsById.get(question.submissionFunctionId) : undefined;
             const file = fn ? selectedAttempt.files.find(file => file.id === fn.fileId) : undefined;
@@ -114,8 +116,8 @@ export function CodingHomeworkManualGradingPanel({ embedded = false, locale, rea
           })}</div>
           {!selectedAttempt.questions.length && <p className="muted">{t("courseDetail.noAnswers")}</p>}
         </div>
-        <div id={`${id}-files-panel`} role="tabpanel" aria-labelledby={`${id}-files-tab`} hidden={tab !== "files"}>
-          {tab === "files" && <HomeworkFileViewer key={selectedAttempt.id} files={selectedAttempt.files} readFile={readFile} locale={locale} submitted />}
+        <div id={`${id}-files-panel`} role="tabpanel" aria-labelledby={`${id}-files-tab`} hidden={activeTab !== "files"}>
+          {activeTab === "files" && <HomeworkFileViewer key={selectedAttempt.id} files={selectedAttempt.files} readFile={readFile} locale={locale} submitted />}
         </div>
       </div>
       {readOnly ? <aside className="inline-panel muted">{t("courseDetail.attemptReviewReadOnly")}</aside> : <form className="inline-panel stack homework-review-grading" onSubmit={submitOverride}>

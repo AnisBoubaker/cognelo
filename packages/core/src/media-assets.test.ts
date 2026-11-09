@@ -23,6 +23,8 @@ const groups = vi.hoisted(() => ({
   getGroupAssignedActivity: vi.fn()
 }));
 
+const activityDefinition = vi.hoisted(() => vi.fn());
+vi.mock("@cognelo/activity-sdk", () => ({ getActivityDefinition: activityDefinition }));
 vi.mock("@cognelo/db", () => ({ prisma: db, Prisma: {} }));
 vi.mock("./authorization", () => authorization);
 vi.mock("./groups", () => groups);
@@ -35,7 +37,7 @@ let storageRoot = "";
 
 describe("media asset references", () => {
   beforeEach(async () => {
-    vi.clearAllMocks();
+    vi.clearAllMocks(); activityDefinition.mockReturnValue(undefined);
     storageRoot = await mkdtemp(path.join(tmpdir(), "cognelo-media-test-"));
     process.env.MEDIA_STORAGE_ROOT = storageRoot;
     db.$transaction.mockImplementation(async (callback) => callback(db));
@@ -207,6 +209,25 @@ describe("media asset references", () => {
       "asset-1",
       { hasSafeExamBrowserAccess: vi.fn().mockResolvedValue(true) }
     )).resolves.toMatchObject({ byteSize: 4, mimeType: "image/png", originalName: "diagram.png" });
+  });
+
+  it("allows only explicitly declared deferred preparation images before SEB", async () => {
+    const storageKey = `blobs/sha256/aa/bb/${"c".repeat(64)}`;
+    await mkdir(path.dirname(path.join(storageRoot, storageKey)), { recursive: true }); await writeFile(path.join(storageRoot, storageKey), "test");
+    db.mediaAsset.findUnique.mockResolvedValue({ id: "asset123", status: "active", createdById: "teacher", expiresAt: null, originalName: "diagram.png",
+      blob: { storageKey, mimeType: "image/png" }, references: [{ activity: { id: "activity", courseId: "course" } }] });
+    db.courseGroupActivity.findMany.mockResolvedValue([{ activityId: "activity", groupId: "group" }]);
+    activityDefinition.mockReturnValue({ assessmentFlow: "deferred", preparationMediaFields: ["assignmentMarkdown"] });
+    const assigned = { activityType: { key: "deferred-fixture" }, assignment: { metadata: { assessmentMode: "summative", requireSafeExamBrowser: true } }, config: { assignmentMarkdown: "![Diagram](/api/media-assets/asset123/content)" } };
+    groups.getGroupAssignedActivity.mockResolvedValue(assigned);
+    const proof = vi.fn().mockResolvedValue(false), user = { id: "student", roles: ["student"] } as never;
+    await expect(getMediaAssetForDelivery(user, "asset123", { hasSafeExamBrowserAccess: proof })).resolves.toMatchObject({ byteSize: 4 }); expect(proof).not.toHaveBeenCalled();
+    groups.getGroupAssignedActivity.mockResolvedValue({ ...assigned, assignment: { ...assigned.assignment, availableFrom: new Date(Date.now() + 60_000) } });
+    await expect(getMediaAssetForDelivery(user, "asset123", { hasSafeExamBrowserAccess: proof })).rejects.toMatchObject({ status: 403 });
+    groups.getGroupAssignedActivity.mockResolvedValue({ ...assigned, config: { questionMarkdown: assigned.config.assignmentMarkdown } });
+    await expect(getMediaAssetForDelivery(user, "asset123", { hasSafeExamBrowserAccess: proof })).rejects.toMatchObject({ status: 403 });
+    groups.getGroupAssignedActivity.mockResolvedValue(assigned); activityDefinition.mockReturnValue({ preparationMediaFields: ["assignmentMarkdown"] });
+    await expect(getMediaAssetForDelivery(user, "asset123", { hasSafeExamBrowserAccess: proof })).rejects.toMatchObject({ status: 403 });
   });
 
   it("restricts the maintenance dashboard to administrators", async () => {

@@ -26,3 +26,4 @@ export * from "./ai-model-picker";
 export { SideNavigation, sideNavigationItemId, type SideNavigationItem } from "./side-navigation";
 
 export * from "./activity-reference-authoring";
+export * from "./toggle-switch";

@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { prisma } from "@cognelo/db";
 import type { ApplicationTimeSettingsDto } from "@cognelo/contracts";
 import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
@@ -26,21 +27,21 @@ for (const team of [false, true]) test(`homework deadline and recorded lateness 
       await responseJson(await teacherApi.post(settingsPath, { data: { ...settings.general, assessmentMode: "summative", teamworkEnabled: true, groupAssignments: settings.groups.map(group => ({ ...group, teamGroupingId: grouping.id, allowIndividualSubmission: false })) } }));
     }
     await page.goto(`/courses/${data.courseId}/activities/${activityId}`);
-    await page.getByRole("tab", { name: "Settings", exact: true }).click();
+    await openHomeworkEditorSection(page, "Submission");
     const panel = page.locator(".homework-deadline-settings");
     const date = panel.getByLabel("Submission deadline (America/Toronto)", { exact: true });
     await expect(date).toHaveValue("");
     await date.fill("2030-01-15T09:30");
-    await panel.getByRole("checkbox", { name: "Allow late submissions", exact: true }).check();
-    await panel.getByRole("checkbox", { name: "Limit the late-submission period", exact: true }).check();
+    await panel.getByRole("switch", { name: "Allow late submissions", exact: true }).check();
+    await panel.getByRole("switch", { name: "Limit the late-submission period", exact: true }).check();
     await panel.getByLabel("Days", { exact: true }).fill("1"); await panel.getByLabel("Hours", { exact: true }).fill("2"); await panel.getByLabel("Minutes", { exact: true }).fill("15");
-    await page.getByRole("tab", { name: "Reference materials", exact: true }).click(); await page.getByRole("tab", { name: "Settings", exact: true }).click();
+    await page.getByRole("tab", { name: "Reference materials", exact: true }).click(); await openHomeworkEditorSection(page, "Submission");
     await expect(date).toHaveValue("2030-01-15T09:30");
     await panel.getByRole("button", { name: "Save deadline settings", exact: true }).click();
     await expect(panel.getByText("Everything is saved.", { exact: true })).toBeVisible();
     const saved = await responseJson<{ submissionPolicy: { deadline: string; allowLate: boolean; lateLimitMinutes: number } }>(await teacherApi.get(`${teacherPath}/workflow-settings`));
     expect(saved.submissionPolicy).toEqual({ deadline: "2030-01-15T14:30:00.000Z", allowLate: true, lateLimitMinutes: 1575 });
-    await page.reload(); await page.getByRole("tab", { name: "Settings", exact: true }).click(); await expect(date).toHaveValue("2030-01-15T09:30");
+    await page.reload(); await openHomeworkEditorSection(page, "Submission"); await expect(date).toHaveValue("2030-01-15T09:30");
     await panel.screenshot({ path: `tmp/homework-deadline-settings-${team}.png` });
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
@@ -72,7 +73,7 @@ for (const team of [false, true]) test(`homework deadline and recorded lateness 
     await studentPage.reload(); await expect(studentPage.getByText("Late by 1 day, 2 hours, 15 minutes", { exact: true })).toBeVisible();
     const managed = await responseJson<{ submissions: Array<{ id: string; submissionTiming: unknown }> }>(await teacherApi.get(`${teacherPath}/manage-submissions`));
     expect(managed.submissions.find(value => value.id === submitted.submission.id)?.submissionTiming).toEqual(timing);
-    await page.reload(); await page.getByRole("tab", { name: "Activity", exact: true }).click();
+    await page.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}?report=overview`);
     await expect(page.getByText("Late by 1 day, 2 hours, 15 minutes", { exact: true })).toBeVisible();
     // Changing policy cannot reclassify a frozen hand-in, nor prevent its challenge phase.
     await policy(false, null);

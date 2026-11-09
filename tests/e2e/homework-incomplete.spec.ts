@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { prisma } from "@cognelo/db";
 import { test, expect } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
@@ -12,6 +13,7 @@ test("teacher selects private solution signatures and student explicitly acknowl
     id = await createCourseActivity(data, { activityTypeKey: "coding-homework-grader", title: "Incomplete C homework", config: {} });
     const base = `/api/courses/${data.courseId}/activities/${id}/coding-homework-grader`;
     await teacherPage.goto(`/courses/${data.courseId}/activities/${id}`);
+    await openHomeworkEditorSection(teacherPage, "Teacher solution");
     const solution = teacherPage.locator("section").filter({ has: teacherPage.getByRole("heading", { name: "Private teacher solution", exact: true }) }).last();
     await expect(solution.locator('input[type="file"][accept=".zip"]')).toBeEnabled();
     await solution.locator('input[type="file"][accept=".zip"]').setInputFiles({ name: "teacher.zip", mimeType: "application/zip", buffer: createStoredZip([{ path: "src/main.c", contents: "int add(int values[], int count) { return count; }" }]) });
@@ -22,15 +24,16 @@ test("teacher selects private solution signatures and student explicitly acknowl
     await teacherPage.getByRole("button", { name: "Save", exact: true }).click();
     await expect(teacherPage.getByText("Programming homework saved.", { exact: true })).toBeVisible();
     await teacherPage.reload();
+    await openHomeworkEditorSection(teacherPage, "Teacher solution");
     await expect(fn).toBeChecked();
     expect(await responseJson(await teacherApi.get(`${base}/authoring`))).toMatchObject({ requirements: { requirements: { requiredFunctions: [{ name: "add", filePath: "src/main.c", returnType: "int", parameterTypes: ["int*", "int"] }] } } });
     await responseJson(await teacherApi.post(`/api/courses/${data.courseId}/groups/${data.groupId}/activities`, { data: { activityId: id, metadata: { assessmentMode: "summative" }, gradebookSettings: { maxAttempts: 1, attemptLimitMode: "max_attempts", pointsPossible: 100 } } }));
     await teacherPage.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Generate embeddings", exact: true }).click();
     await expect(teacherPage.locator(".activity-reference-materials").getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
-    await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
-    await teacherPage.getByRole("button", { name: "Enable final submissions", exact: true }).click();
-    await expect(teacherPage.getByRole("button", { name: "Disable final submissions", exact: true })).toBeVisible();
+    await openHomeworkEditorSection(teacherPage, "Submission");
+    await teacherPage.getByRole("switch", { name: "Accept final submissions", exact: true }).click();
+    await expect(teacherPage.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeChecked();
     const assigned = `/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${id}`;
     await studentPage.goto(assigned);
     await expect(studentPage.locator('input[type="file"][multiple]')).toBeEnabled();

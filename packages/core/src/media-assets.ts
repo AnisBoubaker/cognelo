@@ -1,3 +1,4 @@
+import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { createHash, randomUUID } from "node:crypto";
 import { access, link, mkdir, readdir, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -201,8 +202,14 @@ async function canDeliverActiveAsset(
         if (courseActivityHidesAfterAttempts(assignedActivity.metadata)) {
           await assertActivityContentAccess(user, courseId, assignment.groupId, assignment.activityId);
         }
+        const definition = assignedActivity.activityType?.key ? getActivityDefinition(assignedActivity.activityType.key) : null;
+        const now = Date.now();
+        const preparationAvailable = (!assignedActivity.assignment.availableFrom || now >= new Date(assignedActivity.assignment.availableFrom).getTime())
+          && (!assignedActivity.assignment.availableUntil || now < new Date(assignedActivity.assignment.availableUntil).getTime());
+        const preparationImage = preparationAvailable && definition?.assessmentFlow === "deferred" && (definition.preparationMediaFields ?? []).some(field =>
+          extractMediaAssetIds((assignedActivity.config as Record<string, unknown> | null)?.[field]).has(asset.id));
         if (
-          assignmentRequiresSafeExamBrowser(assignedActivity.assignment.metadata) &&
+          assignmentRequiresSafeExamBrowser(assignedActivity.assignment.metadata) && !preparationImage &&
           !(await options.hasSafeExamBrowserAccess?.({
             courseId,
             groupId: assignment.groupId,

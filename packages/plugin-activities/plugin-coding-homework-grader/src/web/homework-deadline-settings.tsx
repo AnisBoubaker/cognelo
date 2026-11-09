@@ -1,7 +1,7 @@
 "use client";
 import { createPortal } from "react-dom";
 import { useEffect, useId, useRef, useState } from "react";
-import { EditActionBar, ProgressDialog, getEditActionBarCopy, useApplicationTime, useNotifications, useUnsavedChangesGuard, toZonedDateTimeInput, fromZonedDateTimeInput } from "@cognelo/activity-ui";
+import { EditActionBar, ProgressDialog, ToggleSwitch, getEditActionBarCopy, useApplicationTime, useNotifications, useUnsavedChangesGuard, toZonedDateTimeInput, fromZonedDateTimeInput } from "@cognelo/activity-ui";
 import { homeworkSubmissionPolicySchema, type HomeworkSubmissionPolicy } from "../submission-policy";
 import type { CodingHomeworkLocale } from "./messages";
 import { body, type HomeworkRequest } from "./workflow-types";
@@ -49,9 +49,9 @@ export function HomeworkDeadlineSettings({ policy, request, locale, onSaved, onD
       <input id={`${id}-deadline`} type="datetime-local" value={draft.deadline} disabled={busy} onChange={event => update("deadline", event.currentTarget.value)} />
       <p className="muted">{copy.optional}</p>
     </div>
-    <label className="homework-choice"><input type="checkbox" checked={draft.allowLate} disabled={busy || !draft.deadline} onChange={event => update("allowLate", event.currentTarget.checked)} />{copy.allowLate}</label>
+    <ToggleSwitch locale={locale} label={copy.allowLate} checked={draft.allowLate} disabled={busy || !draft.deadline} onChange={checked => update("allowLate", checked)} />
     {draft.deadline && draft.allowLate && <>
-      <label className="homework-choice"><input type="checkbox" checked={draft.limited} disabled={busy} onChange={event => update("limited", event.currentTarget.checked)} />{copy.limitLate}</label>
+      <ToggleSwitch locale={locale} label={copy.limitLate} checked={draft.limited} disabled={busy} onChange={checked => update("limited", checked)} />
       {draft.limited && <div className="row wrap">{([['days', copy.days, 3650], ['hours', copy.hours, 23], ['minutes', copy.minutes, 59]] as const).map(([key, label, max]) => <div className="field" key={key}>
         <label htmlFor={`${id}-${key}`}>{label}</label><input id={`${id}-${key}`} type="number" min={0} max={max} step={1} value={draft[key]} disabled={busy} onChange={event => update(key, event.currentTarget.value)} />
       </div>)}</div>}

@@ -202,6 +202,11 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
       return;
     }
 
+    if (assignment.settings.questionGenerationEnabled === undefined) {
+      const current = await transaction.pluginBankCodingHomeworkAssignment.findUnique({ where: { bankActivityId: owner.ownerId }, select: { settings: true } });
+      const saved = normalizeObject(current?.settings).questionGenerationEnabled;
+      if (typeof saved === "boolean") assignment.settings.questionGenerationEnabled = saved;
+    }
     await transaction.pluginBankCodingHomeworkAssignment.upsert({
       where: { bankActivityId: owner.ownerId },
       create: {

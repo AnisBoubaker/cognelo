@@ -39,7 +39,7 @@ import {
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import { TestActivityView, type TestStudentItemRendererContext } from "@/components/test-activity-view";
 import { TestManualGradingPanel } from "@/components/test-manual-grading-panel";
-import { useActivityEditorGradingPortalTarget, useActivityEditorSimulationPortalTarget, useActivityEditorSettingsPortalTarget } from "@/components/activity-editor-tabs";
+import { useActivityEditorGradingPortalTarget } from "@/components/activity-editor-tabs";
 import { createStandaloneActivityDraftHost } from "@/lib/activity-response-draft-host";
 import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
 import { isTestItemAnswered } from "@/lib/test-item-answer-status";
@@ -415,8 +415,6 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
 }
 
 function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeof CodingHomeworkGraderActivityView>) {
-  const authoringSimulationPortalTarget = useActivityEditorSimulationPortalTarget();
-  const authoringSettingsPortalTarget = useActivityEditorSettingsPortalTarget();
   const {
     activityRouteCourseId,
     groupId,
@@ -467,8 +465,8 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
       return undefined;
     }
     return {
-      run: (activityId: string, input: Parameters<typeof codingHomeworkClient.runCoursePreflight>[2]) =>
-        groupId ? codingHomeworkClient.runGroupPreflight(courseId, groupId, activityId, input) : codingHomeworkClient.runCoursePreflight(courseId, activityId, input)
+      run: (activityId: string, input: Parameters<typeof codingHomeworkClient.runCoursePreflight>[2], signal?: AbortSignal) =>
+        groupId ? codingHomeworkClient.runGroupPreflight(courseId, groupId, activityId, input, signal) : codingHomeworkClient.runCoursePreflight(courseId, activityId, input, signal)
     };
   }, [codingHomeworkClient, courseId, groupId]);
   const submissionClient = useMemo(() => {
@@ -503,8 +501,6 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
         ? `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityProps.activity.id}/coding-homework-grader/provided-files-download`
         : `/courses/${courseId}/activities/${activityProps.activity.id}/coding-homework-grader/provided-files-download`)}
       submittedFilesUrl={groupId ? apiAbsoluteUrl(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityProps.activity.id}/coding-homework-grader/submitted-download`) : undefined}
-      authoringSimulationPortalTarget={authoringSimulationPortalTarget}
-      authoringSettingsPortalTarget={authoringSettingsPortalTarget}
       workflowRequest={workflowRequest}
       authoringClient={authoringClient}
       preflightClient={preflightClient}

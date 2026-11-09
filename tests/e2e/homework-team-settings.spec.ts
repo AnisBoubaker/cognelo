@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { readFile } from "node:fs/promises";
 import { unzipSync } from "fflate";
 import type { StudentGroupingDto } from "@cognelo/contracts";
@@ -47,8 +48,8 @@ test("team configuration uses core section settings and permits independent unte
     await responseJson(await teacherApi.patch(`${course}/activities/${activityId}`, { data: { metadata: { allGroupsAssignment: { teamworkEnabled: false } } } }));
     expect((await readSettings()).general.teamworkEnabled).toBe(true);
     const authoring = `${course}/activities/${activityId}/coding-homework-grader`;
-    await page.goto(`/courses/${data.courseId}/activities/${activityId}`); await page.getByRole("tab", { name: "Settings", exact: true }).click();
-    const separate = page.getByRole("checkbox", { name: "Generate separate challenge questions for each team member", exact: true });
+    await page.goto(`/courses/${data.courseId}/activities/${activityId}`); await openHomeworkEditorSection(page, "Question Generation");
+    const separate = page.getByRole("switch", { name: "Generate separate challenge questions for each team member", exact: true });
     await expect(separate).toBeVisible(); await expect(separate).not.toBeChecked();
     const pdf = textPdf("Download the assignment before joining your team.");
     await responseJson(await teacherApi.post(`${authoring}/assignment-pdf`, { data: { fileName: "statement.pdf", mimeType: "application/pdf", base64: pdf.toString("base64") } }));

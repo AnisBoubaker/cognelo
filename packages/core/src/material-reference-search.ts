@@ -19,11 +19,12 @@ export async function createPreparedActivityReferenceSearch(scope: { user: Curre
   const author: CurrentUser = { ...preparer, roles: preparer.roles.map(value => value.role.key) as CurrentUser["roles"] };
   await assertCanManageCourse(author, scope.courseId);
   const privateSearch = await createPreparedMaterialSearch(author, scope.courseId, hiddenIds, scope.groupId, selection);
-  return { search: async (query: string, limit = 3) => {
+  return { search: async (query: string, limit = 3, signal?: AbortSignal) => {
+    signal?.throwIfAborted();
     const count = Math.max(1, Math.min(limit, 20));
     // The second lookup reuses the cached query vector rather than racing the same embedding request.
-    const publicMatches = await publicSearch.search(query, count);
-    const privateMatches = await privateSearch.search(query, count);
+    const publicMatches = await publicSearch.search(query, count, signal);
+    const privateMatches = await privateSearch.search(query, count, signal);
     return [...publicMatches, ...privateMatches].sort((left, right) => right.score - left.score).slice(0, count);
   } };
 }

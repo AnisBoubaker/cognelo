@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { prisma } from "@cognelo/db";
 import { homeworkModelFixture } from "./fixtures/homework-model";
 import { test, expect } from "./fixtures/bank-course";
@@ -35,9 +36,9 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
     expect(model.embeddingTexts.length).toBe(1);
     await prisma.aiAgentConnection.update({ where: { id: connection.id }, data: { model: "new-question-model" } });
     expect(await responseJson(await teacherApi.get(`${authoring}/workflow-settings`))).toMatchObject({ statuses: { [resource.id]: { state: "ready" } } });
-    await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
-    await teacherPage.getByRole("button", { name: "Enable final submissions", exact: true }).click();
-    await expect(teacherPage.getByRole("button", { name: "Disable final submissions", exact: true })).toBeVisible();
+    await openHomeworkEditorSection(teacherPage, "Submission");
+    await teacherPage.getByRole("switch", { name: "Accept final submissions", exact: true }).click();
+    await expect(teacherPage.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeChecked();
     expect((await teacherApi.put(`${authoring}/workflow-settings`, { data: { selected: [] } })).status()).toBe(409);
     await studentPage.goto(assigned.replace(/^\/api/, ""));
     await expect(studentPage.getByRole("heading", { name: "Prepare your work", exact: true })).toBeVisible();

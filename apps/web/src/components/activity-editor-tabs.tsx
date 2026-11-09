@@ -359,7 +359,7 @@ export function ActivityEditorTabs({ children, toolbar, concepts, prerequisites,
           </section>
         )}
       </div>
-      {showReferenceMaterialsTab ? <div id="activity-editor-references-panel" role="tabpanel" aria-labelledby="activity-editor-references-tab" hidden={activeTab !== "references"} ref={referenceMaterialsPortalRef}>{materialReferences && <ActivityMaterialReferences key={materialReferences.activityId} {...materialReferences} locale={locale} onStateChange={setReferenceState} />}</div> : null}
+      {showReferenceMaterialsTab ? <div id="activity-editor-references-panel" role="tabpanel" aria-labelledby="activity-editor-references-tab" hidden={activeTab !== "references"} ref={referenceMaterialsPortalRef}>{materialReferences && <ActivityMaterialReferences active={activeTab === "references"} key={materialReferences.activityId} {...materialReferences} locale={locale} onStateChange={setReferenceState} />}</div> : null}
       {showSimulationTab ? <div id="activity-editor-simulation-panel" role="tabpanel" aria-labelledby="activity-editor-simulation-tab" hidden={activeTab !== "simulation"} ref={simulationPortalRef} /> : null}
       {showSettingsTab ? <div id="activity-editor-settings-panel" role="tabpanel" aria-labelledby="activity-editor-settings-tab" hidden={activeTab !== "settings"} ref={settingsPortalRef} /> : null}
       {showGradingTab ? <div role="tabpanel" hidden={activeTab !== "grading"} ref={gradingPortalRef} /> : null}

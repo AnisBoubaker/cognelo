@@ -219,7 +219,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     </>}
     <HomeworkAnswerConfirmation open={confirmingAnswers && !completed && !timedAutoSubmit && !busy} questions={questions} answers={answers} locale={locale}
       onCancel={() => setConfirmingAnswers(false)} onConfirm={() => { setConfirmingAnswers(false); void submitAnswers(); }} />
-    {completed && <p role="status">{copy.submitted}</p>}
+    {completed && <p role="status">{active?.questionGenerationEnabled === false ? copy.fileOnlySubmitted : copy.submitted}</p>}
     </>}
     <ProgressDialog open={busy !== null} title={busy ?? copy.loading} progressLabel={busy ?? copy.loading} onCancel={() => controller.current?.abort()} cancelLabel={copy.cancel} />
   </section>;

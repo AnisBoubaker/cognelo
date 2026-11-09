@@ -6,7 +6,8 @@ import { HomeworkDownloads } from "./homework-downloads";
 import { HomeworkChallengeQuestion } from "./homework-challenge-question";
 import { HomeworkAnswerConfirmation } from "./homework-answer-confirmation";
 import { createPortal } from "react-dom";
-import { HomeworkSubmissionManagement } from "./homework-submission-management";
+import { homeworkEditorCopy } from "./editor-copy";
+import { homeworkQuestionsEnabled } from "../question-policy";
 import { reconcileTeacherSolutionRequirements, type TeacherSolutionSelection } from "../teacher-solution-selection";
 import { HomeworkStudentWorkspace } from "./homework-student-workspace";
 import { HomeworkSolutionSelector, HomeworkTeacherWorkflow } from "./homework-teacher-workflow";
@@ -19,7 +20,7 @@ import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import {
-  EditActionBar,
+  EditActionBar, SideNavigation, sideNavigationItemId, ToggleSwitch, RichTextEditor,
   MarkdownRenderer,
   ProgressDialog,
   getEditActionBarCopy,
@@ -73,7 +74,7 @@ type AuthoringClient = {
 };
 
 type PreflightClient = {
-  run: (activityId: string, input: { base64: string; fileName: string; mimeType?: string }) => Promise<CodingHomeworkPreflightResult>;
+  run: (activityId: string, input: { base64: string; fileName: string; mimeType?: string }, signal?: AbortSignal) => Promise<CodingHomeworkPreflightResult>;
 };
 
 type SubmissionClient = {
@@ -97,8 +98,6 @@ type CodingHomeworkGraderActivityViewProps = {
   submittedFilesUrl?: string;
   authoringClient?: AuthoringClient;
   workflowRequest?: HomeworkRequest;
-  authoringSimulationPortalTarget?: HTMLElement | null;
-  authoringSettingsPortalTarget?: HTMLElement | null;
   solutionRequest?: HomeworkRequest;
   canManage: boolean;
   course?: { id: string; title?: string } | null;
@@ -176,8 +175,6 @@ function LegacyCodingHomeworkActivityView({
   providedFilesUrl,
   authoringClient,
   workflowRequest,
-  authoringSettingsPortalTarget,
-  authoringSimulationPortalTarget,
   solutionRequest,
   canManage,
   locale = "en",
@@ -187,27 +184,31 @@ function LegacyCodingHomeworkActivityView({
   onSubmitted,
   timedAutoSubmit
 }: CodingHomeworkGraderActivityViewProps) {
-  const { timeZone } = useApplicationTime();
   const copy: CodingHomeworkCopy = codingHomeworkMessages[locale] ?? codingHomeworkMessages.en;
   const actionCopy = getEditActionBarCopy(locale);
   const notifications = useNotifications();
   const [managementRevision, setManagementRevision] = useState(0);
-  const teamCopy = homeworkWorkflowCopy(locale);
+  const teamCopy = homeworkWorkflowCopy(locale), editor = homeworkEditorCopy(locale);
+  const [authoringTab, setAuthoringTab] = useState<"activity" | "solution" | "questions" | "submission" | "simulation">("activity");
+  const authoringTabs = ["activity", "solution", "questions", "submission", ...(workflowRequest && preflightClient ? ["simulation"] : [])] as Array<typeof authoringTab>;
+  const [questionPortalTarget, setQuestionPortalTarget] = useState<HTMLDivElement | null>(null), [submissionPortalTarget, setSubmissionPortalTarget] = useState<HTMLDivElement | null>(null);
+  const [questionPolicyLocked, setQuestionPolicyLocked] = useState(Boolean(workflowRequest));
+  const preflightController = useRef<AbortController | null>(null);
+  useEffect(() => () => preflightController.current?.abort(), []);
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description);
   const [assignment, setAssignment] = useState<CodingHomeworkAssignmentRecord>(() => defaultAuthoring(activity).assignment);
+  const questionsEnabled = homeworkQuestionsEnabled(assignment.settings);
   const [assignmentPdf, setAssignmentPdf] = useState<CodingHomeworkAttachmentRecord | null>(null);
   const [requirementDraft, setRequirementDraft] = useState<RequirementDraft>(() => requirementsToDraft(defaultRequirements));
   const [requirementsUpload, setRequirementsUpload] = useState<CodingHomeworkAttachmentRecord | null>(null);
   const [providedFiles, setProvidedFiles] = useState<CodingHomeworkAttachmentRecord[]>([]);
   const [loading, setLoading] = useState(Boolean(canManage && authoringClient));
+  const loadedAuthoringId = useRef<string | null>(null);
+  const [authoringLoadError, setAuthoringLoadError] = useState(false), [authoringReload, setAuthoringReload] = useState(0);
   const [workflowSettingsDirty, setWorkflowSettingsDirty] = useState(false);
-  const [documentationPreview, setDocumentationPreview] = useState<CodingHomeworkDocumentationPreview | null>(null);
-  const [loadingDocumentation, setLoadingDocumentation] = useState(false);
-  const [showDocumentationProgress, setShowDocumentationProgress] = useState(false);
-  const [creatingSnapshot, setCreatingSnapshot] = useState(false);
-  const [extractingDocumentation, setExtractingDocumentation] = useState(false);
   const [preflightResult, setPreflightResult] = useState<CodingHomeworkPreflightResult | null>(null);
+  useEffect(() => { preflightController.current?.abort(); setPreflightResult(null); setAuthoringTab("activity"); }, [activity.id]);
   const [runningPreflight, setRunningPreflight] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
@@ -234,6 +235,7 @@ function LegacyCodingHomeworkActivityView({
       setRequirementDraft(nextRequirementDraft);
       setRequirementsUpload(record.requirementsUpload);
       setProvidedFiles(record.providedFiles);
+      setManagementRevision(value => value + 1);
       savedSnapshotRef.current = serializeSnapshot({
         assignment: record.assignment,
         description: nextDescription,
@@ -265,16 +267,18 @@ function LegacyCodingHomeworkActivityView({
       return;
     }
 
-    setLoading(true);
+    setAuthoringLoadError(false); setLoading(loadedAuthoringId.current !== activity.id);
     authoringClient
       .get(activity.id)
       .then((record) => {
         if (!cancelled) {
+          loadedAuthoringId.current = activity.id;
           applyAuthoring(record, activity.title, activity.description);
         }
       })
       .catch((error) => {
         if (!cancelled) {
+          setAuthoringLoadError(true);
           notifications.error(error instanceof Error ? error.message : copy.saveError);
         }
       })
@@ -287,7 +291,7 @@ function LegacyCodingHomeworkActivityView({
     return () => {
       cancelled = true;
     };
-  }, [activity, applyAuthoring, authoringClient, canManage, copy.saveError, notifications]);
+  }, [activity, applyAuthoring, authoringClient, canManage, copy.saveError, notifications, authoringReload]);
 
   useEffect(() => {
     let cancelled = false;
@@ -356,41 +360,6 @@ function LegacyCodingHomeworkActivityView({
     };
   }, [activity.id, applyChallengeQuestions, canManage, challengeQuestions.length, latestSubmissionId, latestSubmissionStatus, submissionClient]);
 
-  const loadDocumentationPreview = useCallback(
-    async (options?: { notify?: boolean }) => {
-      if (!authoringClient?.getDocumentationPreview) {
-        setDocumentationPreview(null);
-        return;
-      }
-
-      setLoadingDocumentation(true);
-      setShowDocumentationProgress(Boolean(options?.notify));
-      try {
-        const preview = await authoringClient.getDocumentationPreview(activity.id);
-        setDocumentationPreview(preview);
-        if (options?.notify) {
-          notifications.success(copy.documentationUpdated);
-        }
-      } catch (error) {
-        notifications.error(error instanceof Error ? error.message : copy.saveError);
-      } finally {
-        setLoadingDocumentation(false);
-        setShowDocumentationProgress(false);
-      }
-    },
-    [activity.id, authoringClient, copy.documentationUpdated, copy.saveError, notifications]
-  );
-
-  useEffect(() => {
-    if (!canManage || !authoringClient?.getDocumentationPreview) {
-      setDocumentationPreview(null);
-      setLoadingDocumentation(false);
-      return;
-    }
-
-    void loadDocumentationPreview();
-  }, [authoringClient, canManage, loadDocumentationPreview]);
-
   const currentSnapshot = useMemo(
     () =>
       serializeSnapshot({
@@ -445,7 +414,8 @@ function LegacyCodingHomeworkActivityView({
           config: {
             ...(activity.config ?? {}),
             languageKey: assignment.languageKey,
-            questionCount: assignment.questionCount
+            questionCount: assignment.questionCount,
+            assignmentMarkdown: assignment.promptMarkdown
           }
         });
         const record = await authoringClient.save(activity.id, {
@@ -588,48 +558,6 @@ function LegacyCodingHomeworkActivityView({
     }
   }
 
-  async function createDocumentationSnapshot() {
-    if (!authoringClient?.createDocumentationSnapshot) {
-      return;
-    }
-
-    setCreatingSnapshot(true);
-    try {
-      const result = await authoringClient.createDocumentationSnapshot(activity.id);
-      setDocumentationPreview(result.preview);
-      notifications.success(copy.documentationSnapshotCreated);
-    } catch (error) {
-      notifications.error(error instanceof Error ? error.message : copy.documentationSnapshotError);
-    } finally {
-      setCreatingSnapshot(false);
-    }
-  }
-
-  async function extractDocumentationSources() {
-    const snapshotId = documentationPreview?.latestSnapshot?.id;
-    if (!authoringClient?.extractDocumentation || !snapshotId) {
-      return;
-    }
-
-    setExtractingDocumentation(true);
-    try {
-      const result = await authoringClient.extractDocumentation(activity.id, { snapshotId });
-      setDocumentationPreview((current) =>
-        current
-          ? {
-              ...current,
-              latestSnapshot: result.snapshot
-            }
-          : current
-      );
-      notifications.success(copy.extractionCompleted);
-    } catch (error) {
-      notifications.error(error instanceof Error ? error.message : copy.extractionError);
-    } finally {
-      setExtractingDocumentation(false);
-    }
-  }
-
   async function runPreflight(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -637,15 +565,18 @@ function LegacyCodingHomeworkActivityView({
       return;
     }
 
+    if (preflightController.current) return;
+    const pending = new AbortController(); preflightController.current = pending;
     setRunningPreflight(true);
     try {
-      const result = await preflightClient.run(activity.id, await fileToUploadInput(file));
+      const result = await preflightClient.run(activity.id, await fileToUploadInput(file), pending.signal);
+      if (pending.signal.aborted) return;
       setPreflightResult(result);
       notifications[result.summary.isValid ? "success" : "error"](result.summary.isValid ? copy.preflightReady : copy.preflightInvalid);
     } catch (error) {
-      if (!isActivityContentClosedError(error)) notifications.error(error instanceof Error ? error.message : copy.preflightError);
+      if (!pending.signal.aborted && !isActivityContentClosedError(error)) notifications.error(error instanceof Error ? error.message : copy.preflightError);
     } finally {
-      setRunningPreflight(false);
+      preflightController.current = null; setRunningPreflight(false);
     }
   }
 
@@ -801,68 +732,45 @@ function LegacyCodingHomeworkActivityView({
     <p className="muted">{copy.generationInstructionsHelp}</p>
   </div>;
   const teamQuestionField = (locked: boolean) => <div className="stack">
-    <label className="homework-choice"><input type="checkbox" checked={assignment.settings.separateTeamQuestions === true} disabled={loading || saving || locked} onChange={event => { const separateTeamQuestions = event.currentTarget.checked; setAssignment(current => ({ ...current, settings: { ...current.settings, separateTeamQuestions } })); }} /> {teamCopy.separateTeamQuestions}</label>
+    <ToggleSwitch locale={locale} label={teamCopy.separateTeamQuestions} checked={assignment.settings.separateTeamQuestions === true} disabled={loading || saving || locked} onChange={separateTeamQuestions => setAssignment(current => ({ ...current, settings: { ...current.settings, separateTeamQuestions } }))} />
     <p className="muted">{locked ? teamCopy.questionPolicyLocked : teamCopy.sharedQuestionsHelp}</p>
   </div>;
   const generationSettings = (locked: boolean) => <section className="stack">
     {generationInstructionsField}
     {teamQuestionField(locked)}
-    <EditActionBar isDirty={hasUnsavedChanges} isSaving={saving} savedLabel={actionCopy.saved} unsavedLabel={actionCopy.unsaved}
-      saveLabel={copy.save} savingLabel={actionCopy.saving} cancelLabel={actionCopy.cancel} onCancel={discardChanges}
-      onSave={() => saveHomework()} saveDisabled={!authoringClient || !onSave} />
-  </section>;
-  const workflowSettings = workflowRequest ? <HomeworkTeacherWorkflow key="homework-settings" request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} settingsPortalTarget={authoringSettingsPortalTarget} generationSettings={loading ? null : generationSettings} managementRevision={managementRevision} onDirtyChange={setWorkflowSettingsDirty} /> : null;
 
-  if (loading) {
+  </section>;
+  const workflowSettings = workflowRequest ? <HomeworkTeacherWorkflow key={activity.id} request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges} questionPortalTarget={questionPortalTarget} submissionPortalTarget={submissionPortalTarget} questionsEnabled={questionsEnabled} onQuestionPolicyLockedChange={setQuestionPolicyLocked} generationSettings={loading ? null : generationSettings} managementRevision={managementRevision} onDirtyChange={setWorkflowSettingsDirty} /> : null;
+
+  if (loading || (canManage && authoringClient && loadedAuthoringId.current !== activity.id)) {
     return (
       <><section className="section stack">
-        <p>{copy.loading}</p>
+        <p role="status">{authoringLoadError ? editor.loadError : copy.loading}</p>
+        {authoringLoadError && <button type="button" onClick={() => setAuthoringReload(value => value + 1)}><ActionIcon name="refresh" />{teamCopy.refresh}</button>}
       </section>{workflowSettings}</>
     );
   }
 
-  const teacherLongRunningTitle = uploadingPdf
-    ? copy.uploadPdf
-    : importingRequirements
-      ? copy.importRequirements
-      : uploadingProvidedFile
-        ? copy.uploadProvidedFile
-        : creatingSnapshot
-          ? copy.documentationSnapshot
-          : extractingDocumentation
-            ? copy.extractDocumentation
-            : showDocumentationProgress
-              ? copy.preview
-              : runningPreflight
-                ? copy.preflight
-                : saving
-                  ? copy.save
-                  : null;
+  const teacherLongRunningTitle = uploadingPdf ? copy.uploadPdf : importingRequirements ? copy.importRequirements
+    : uploadingProvidedFile ? copy.uploadProvidedFile : deletingProvidedFileId ? copy.removeProvidedFile
+    : runningPreflight ? copy.preflight : saving ? copy.save : null;
 
   const teacherProgress = <ProgressDialog
+        cancelLabel={actionCopy.cancel} onCancel={runningPreflight ? () => preflightController.current?.abort() : undefined}
         open={teacherLongRunningTitle !== null}
         title={teacherLongRunningTitle ?? copy.save}
         progressLabel={teacherLongRunningTitle ?? copy.save}
         eyebrow={activity.title}
-        message={
-          creatingSnapshot || extractingDocumentation || showDocumentationProgress
-            ? copy.documentation
-            : undefined
-        }
+
       />;
 
-  return (
-    <>
-      <form className="section stack" onSubmit={saveForm}>
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">{copy.teacherSetup}</p>
-          <h2>{copy.authoringTitle}</h2>
-        </div>
-      </div>
-
-      <div className="coding-homework-authoring-grid">
-        <section className="stack">
+  return <>
+    <div className="settings-layout homework-authoring-layout">
+      <SideNavigation ariaLabel={editor.navigation} items={authoringTabs.map(id => ({ id, label: editor[id], isActive: authoringTab === id }))}
+        tabs={{ idPrefix: "homework-editor", panelId: "homework-authoring-panel", onSelect: id => setAuthoringTab(id as typeof authoringTab) }} />
+      <div id="homework-authoring-panel" role="tabpanel" aria-labelledby={sideNavigationItemId("homework-editor", authoringTab)} className="settings-content homework-authoring-panel">
+        <form className="section stack" onSubmit={saveForm}>
+          <section className="stack" hidden={authoringTab !== "activity"}><h2>{editor.activity}</h2>
           <div className="field">
             <label htmlFor="coding-homework-title">{copy.title}</label>
             <input id="coding-homework-title" value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -877,14 +785,23 @@ function LegacyCodingHomeworkActivityView({
               placeholder={copy.activityDescription}
             />
           </div>
+            <div className="field">
+              <label htmlFor="coding-homework-language">{editor.language}</label>
+              <select
+                id="coding-homework-language"
+                value={assignment.languageKey}
+                onChange={(event) => {
+                  const languageKey = event.target.value;
+                  setAssignment((current) => ({ ...current, languageKey }));
+                  setRequirementDraft((current) => ({ ...current }));
+                }}
+              >
+                <option value="c">C</option>
+              </select>
+            </div>
           <div className="field">
             <label htmlFor="coding-homework-prompt">{copy.prompt}</label>
-            <textarea
-              id="coding-homework-prompt"
-              rows={14}
-              value={assignment.promptMarkdown}
-              onChange={(event) => setAssignment((current) => ({ ...current, promptMarkdown: event.target.value }))}
-            />
+            <RichTextEditor id="coding-homework-prompt" ariaLabel={copy.prompt} locale={locale} value={assignment.promptMarkdown} minHeight={260} disabled={saving} onChange={promptMarkdown => setAssignment(current => ({ ...current, promptMarkdown }))} />
           </div>
           <div className="field">
             <label>{copy.assignmentPdf}</label>
@@ -899,10 +816,9 @@ function LegacyCodingHomeworkActivityView({
               ) : null}
             </div>
             {assignmentPdf && activityFileUrl ? (
-              <figure className="homework-pdf-preview">
-                <figcaption className="muted">{copy.preview}</figcaption>
-                <iframe src={activityFileUrl(assignmentPdf.id)} title={`${copy.assignmentPdf}: ${assignmentPdf.originalName}`} />
-              </figure>
+              <details className="homework-pdf-disclosure"><summary>{editor.pdfPreview}</summary><figure className="homework-pdf-preview">
+                <iframe loading="lazy" src={activityFileUrl(assignmentPdf.id)} title={`${copy.assignmentPdf}: ${assignmentPdf.originalName}`} />
+              </figure></details>
             ) : null}
           </div>
           <div className="field">
@@ -928,52 +844,8 @@ function LegacyCodingHomeworkActivityView({
               </div>
             ) : <span className="muted">{copy.noProvidedFiles}</span>}
           </div>
-        </section>
-
-        <section className="stack">
-          <div className="settings-grid">
-            <div className="field">
-              <label htmlFor="coding-homework-language">{copy.language}</label>
-              <select
-                id="coding-homework-language"
-                value={assignment.languageKey}
-                onChange={(event) => {
-                  const languageKey = event.target.value;
-                  setAssignment((current) => ({ ...current, languageKey }));
-                  setRequirementDraft((current) => ({ ...current }));
-                }}
-              >
-                <option value="c">C</option>
-              </select>
-            </div>
-            <NumberField
-              id="coding-homework-question-count"
-              label={copy.questionCount}
-              max={20}
-              min={1}
-              value={assignment.questionCount}
-              onChange={(questionCount) => setAssignment((current) => ({ ...current, questionCount }))}
-            />
-            <NumberField
-              id="coding-homework-candidate-limit"
-              label={copy.candidateLimit}
-              max={50}
-              min={1}
-              value={assignment.candidateLimit}
-              onChange={(candidateLimit) => setAssignment((current) => ({ ...current, candidateLimit }))}
-            />
-            <NumberField
-              id="coding-homework-retrieved-examples"
-              label={copy.retrievedExamples}
-              max={20}
-              min={1}
-              value={assignment.retrievedExampleCount}
-              onChange={(retrievedExampleCount) => setAssignment((current) => ({ ...current, retrievedExampleCount }))}
-            />
-          </div>
-
-          {!workflowRequest && <>{generationInstructionsField}{teamQuestionField(false)}</>}
-
+          </section>
+          <section className="stack" hidden={authoringTab !== "solution"}><h2>{editor.solution}</h2>
           {(solutionRequest ?? workflowRequest) && <HomeworkSolutionSelector request={(solutionRequest ?? workflowRequest)!} locale={locale} onSolutionChanged={reconcileSolution} requirements={draftToRequirements(requirementDraft, assignment.languageKey)} onChange={requirements => setRequirementDraft(requirementsToDraft(requirements))} />}
           <div className="section-subheading">
             <h3>{copy.requirements}</h3>
@@ -983,28 +855,6 @@ function LegacyCodingHomeworkActivityView({
             </label>
           </div>
           {requirementsUpload ? <p className="muted">{requirementsUpload.originalName}</p> : null}
-          <div className="settings-grid">
-            <div className="field">
-              <label htmlFor="coding-homework-max-file-count">{copy.maxFileCount}</label>
-              <input
-                id="coding-homework-max-file-count"
-                min={1}
-                type="number"
-                value={requirementDraft.maxFileCount}
-                onChange={(event) => setRequirementDraft((current) => ({ ...current, maxFileCount: readNumber(event.target.value, 1) }))}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="coding-homework-max-archive">{copy.maxArchiveMb}</label>
-              <input
-                id="coding-homework-max-archive"
-                min={1}
-                type="number"
-                value={requirementDraft.maxArchiveMb}
-                onChange={(event) => setRequirementDraft((current) => ({ ...current, maxArchiveMb: readNumber(event.target.value, 1) }))}
-              />
-            </div>
-          </div>
           <TextAreaField
             id="coding-homework-required-files"
             label={copy.requiredFiles}
@@ -1037,82 +887,74 @@ function LegacyCodingHomeworkActivityView({
               onChange={(event) => setRequirementDraft((current) => ({ ...current, allowedExtensionsText: event.target.value }))}
             />
           </div>
-        </section>
-      </div>
-
-      <section className="stack">
-        <h3>{copy.preview}</h3>
-        <div className="preview-panel">
-          <MarkdownRenderer markdown={assignment.promptMarkdown || description} />
-        </div>
-      </section>
-
-      {authoringClient?.getDocumentationPreview && !workflowRequest ? (
-        <section className="stack">
-          <div className="section-subheading">
-            <div>
-              <h3>{copy.documentation}</h3>
-              {documentationPreview ? (
-                <p className="muted">{formatMessage(copy.resourceCount, { count: documentationPreview.resourceCount })}</p>
-              ) : null}
+          </section>
+          <section className="stack" hidden={authoringTab !== "questions"}><h2>{editor.questions}</h2>
+            <ToggleSwitch locale={locale} label={editor.enabled} checked={questionsEnabled} disabled={loading || saving || questionPolicyLocked} onChange={questionGenerationEnabled => setAssignment(current => ({ ...current, settings: { ...current.settings, questionGenerationEnabled } }))} />
+            {questionPolicyLocked && <p role="status">{editor.locked}</p>}
+            <p className="muted">{questionsEnabled ? editor.modeChange : editor.disabledHelp}</p>
+            <div className="stack" hidden={!questionsEnabled}>
+              <div className="settings-grid">
+            <NumberField
+              id="coding-homework-question-count"
+              label={copy.questionCount}
+              max={20}
+              min={1}
+              value={assignment.questionCount}
+              onChange={(questionCount) => setAssignment((current) => ({ ...current, questionCount }))}
+            />
+            <NumberField
+              id="coding-homework-candidate-limit"
+              label={copy.candidateLimit}
+              max={50}
+              min={1}
+              value={assignment.candidateLimit}
+              onChange={(candidateLimit) => setAssignment((current) => ({ ...current, candidateLimit }))}
+            />
+            <NumberField
+              id="coding-homework-retrieved-examples"
+              label={copy.retrievedExamples}
+              max={20}
+              min={1}
+              value={assignment.retrievedExampleCount}
+              onChange={(retrievedExampleCount) => setAssignment((current) => ({ ...current, retrievedExampleCount }))}
+            />
+              </div>
+              {!workflowRequest && generationSettings(false)}
+              <div ref={setQuestionPortalTarget} />
             </div>
-            <div className="inline-actions">
-              <button className="button secondary" disabled={loadingDocumentation} type="button" onClick={() => void loadDocumentationPreview({ notify: true })}>
-                <ActionIcon name="visible" />
-                {loadingDocumentation ? "..." : copy.preview}
-              </button>
-              <button
-                className="button secondary"
-                disabled={creatingSnapshot || loadingDocumentation || !documentationPreview?.anchor}
-                type="button"
-                onClick={() => void createDocumentationSnapshot()}
-              >
-                <ActionIcon name="snapshot" />
-                {creatingSnapshot ? "..." : copy.documentationSnapshot}
-              </button>
-              {authoringClient.extractDocumentation ? (
-                <button
-                  className="button secondary"
-                  disabled={extractingDocumentation || !documentationPreview?.latestSnapshot}
-                  type="button"
-                  onClick={() => void extractDocumentationSources()}
-                >
-                  <ActionIcon name="extract" />
-                  {extractingDocumentation ? "..." : copy.extractDocumentation}
-                </button>
-              ) : null}
+          </section>
+          <section className="stack" hidden={authoringTab !== "submission"}><h2>{editor.submission}</h2>
+          <div className="settings-grid">
+            <div className="field">
+              <label htmlFor="coding-homework-max-file-count">{copy.maxFileCount}</label>
+              <input
+                id="coding-homework-max-file-count"
+                min={1}
+                type="number"
+                value={requirementDraft.maxFileCount}
+                onChange={(event) => setRequirementDraft((current) => ({ ...current, maxFileCount: readNumber(event.target.value, 1) }))}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="coding-homework-max-archive">{copy.maxArchiveMb}</label>
+              <input
+                id="coding-homework-max-archive"
+                min={1}
+                type="number"
+                value={requirementDraft.maxArchiveMb}
+                onChange={(event) => setRequirementDraft((current) => ({ ...current, maxArchiveMb: readNumber(event.target.value, 1) }))}
+              />
             </div>
           </div>
-          {!documentationPreview?.anchor ? <p className="muted">{copy.documentationAnchorMissing}</p> : null}
-          {documentationPreview?.resources.length ? (
-            <ul className="documentation-resource-list">
-              {documentationPreview.resources.map((resource) => (
-                <li key={`${resource.itemId}-${resource.orderIndex}`}>
-                  <span>{resource.title}</span>
-                  <span className="muted">{resource.path.length ? resource.path.join(" / ") : resource.sourceKind}</span>
-                </li>
-              ))}
-            </ul>
-          ) : documentationPreview?.anchor ? (
-            <p className="muted">{copy.noPriorResources}</p>
-          ) : null}
-          {documentationPreview?.latestSnapshot ? (
-            <p className="muted">
-              {copy.latestSnapshot}: {formatZonedDateTime(new Date(documentationPreview.latestSnapshot.createdAt), timeZone, undefined, { dateStyle: "medium", timeStyle: "medium" })}
-              {extractionDocumentCount(documentationPreview.latestSnapshot.metadata) !== null
-                ? ` · ${formatMessage(copy.documentCount, { count: extractionDocumentCount(documentationPreview.latestSnapshot.metadata) as number })}`
-                : ""}
-            </p>
-          ) : null}
-        </section>
-      ) : null}
 
-      {preflightClient ? (
-        <section className="stack">
-          <h3>{copy.preflight}</h3>
-          <PreflightPanel copy={copy} preflightResult={preflightResult} runningPreflight={runningPreflight} onUpload={runPreflight} />
-        </section>
-      ) : null}
+            {!workflowRequest && <p className="muted">{editor.courseOnly}</p>}
+            <div ref={setSubmissionPortalTarget} />
+          </section>
+          {workflowRequest && preflightClient && <section hidden={authoringTab !== "simulation"}>
+            <HomeworkSimulation key={activity.id} request={workflowRequest} locale={locale} questionsEnabled={questionsEnabled} hasUnsavedChanges={hasUnsavedChanges || workflowSettingsDirty} preflightResult={preflightResult}
+              preflight={<PreflightPanel copy={copy} disabled={hasUnsavedChanges} preflightResult={preflightResult} runningPreflight={runningPreflight} onUpload={runPreflight} />} />
+          </section>}
+          <div hidden={authoringTab === "simulation"}>
       <EditActionBar
         isDirty={hasUnsavedChanges}
         isSaving={saving}
@@ -1125,13 +967,13 @@ function LegacyCodingHomeworkActivityView({
         onSave={() => saveHomework()}
         saveDisabled={!authoringClient || !onSave}
       />
-      </form>
-      {workflowRequest && <HomeworkSubmissionManagement request={workflowRequest} locale={locale} onChanged={() => setManagementRevision(value => value + 1)} />}
-      {workflowSettings}
-      {workflowRequest && authoringSimulationPortalTarget ? createPortal(<HomeworkSimulation key={activity.id} request={workflowRequest} locale={locale} hasUnsavedChanges={hasUnsavedChanges || workflowSettingsDirty} />, authoringSimulationPortalTarget) : null}
-      {authoringSettingsPortalTarget ? createPortal(teacherProgress, authoringSettingsPortalTarget.ownerDocument.body) : teacherProgress}
-    </>
-  );
+          </div>
+        </form>
+      </div>
+    </div>
+    {workflowSettings}
+    {teacherLongRunningTitle && createPortal(teacherProgress, document.body)}
+  </>;
 }
 
 function PreflightPanel({
@@ -1154,6 +996,7 @@ function PreflightPanel({
           {runningPreflight ? "..." : copy.preflightUpload}
           <input accept="application/zip,.zip" disabled={disabled || runningPreflight} hidden type="file" onChange={onUpload} />
         </label>
+        {preflightResult?.preflight.originalName && <span className="muted">{preflightResult.preflight.originalName}</span>}
         {preflightResult ? (
           <span className={preflightResult.summary.isValid ? "status-pill is-enabled" : "status-pill is-disabled"}>
             {preflightResult.summary.isValid ? copy.preflightReady : copy.preflightInvalid}
@@ -1524,13 +1367,4 @@ function readString(value: unknown, fallback: string) {
 
 function formatMessage(template: string, params: Record<string, string | number>) {
   return Object.entries(params).reduce((current, [key, value]) => current.replaceAll(`{${key}}`, String(value)), template);
-}
-
-function extractionDocumentCount(metadata: Record<string, unknown>) {
-  const extraction = metadata.extraction;
-  if (!extraction || typeof extraction !== "object" || Array.isArray(extraction)) {
-    return null;
-  }
-  const count = (extraction as { documentCount?: unknown }).documentCount;
-  return typeof count === "number" ? count : null;
 }

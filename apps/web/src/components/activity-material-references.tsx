@@ -9,7 +9,7 @@ import { useContentFolders } from "@/lib/use-content-folders";
 import { useAuth } from "@/components/auth-provider";
 import { ActivityMaterialReferencePreview } from "./activity-material-reference-preview";
 
-export function ActivityMaterialReferences({ courseId, activityId, locale, onStateChange }: { courseId: string; activityId: string; locale: string; onStateChange: (state: ActivityReferenceAuthoringState) => void }) {
+export function ActivityMaterialReferences({ courseId, activityId, locale, onStateChange, active = true }: { active?: boolean; courseId: string; activityId: string; locale: string; onStateChange: (state: ActivityReferenceAuthoringState) => void }) {
   const copy = materialReferenceCopy(locale), actions = getEditActionBarCopy(locale), notifications = useNotifications(), { user } = useAuth();
   const [data, setData] = useState<ActivityMaterialReferencesView | null>(null), [selected, setSelected] = useState<string[]>([]), [query, setQuery] = useState("");
   const [busy, setBusy] = useState<"save" | "prepare" | null>(null), [progress, setProgress] = useState<number | null>(null), [currentMaterial, setCurrentMaterial] = useState("");
@@ -33,6 +33,7 @@ export function ActivityMaterialReferences({ courseId, activityId, locale, onSta
     window.addEventListener("focus", focus);
     return () => { version.current++; controller.current?.abort(); window.removeEventListener("focus", focus); };
   }, [refresh, report]);
+  useEffect(() => { if (active) void refresh(false).catch(report); }, [active, refresh, report]);
   const dirty = Boolean(data && JSON.stringify([...selected].sort()) !== JSON.stringify([...data.selected].sort()));
   draftDirty.current = dirty;
   const selectedCount = data?.selected.length ?? 0;

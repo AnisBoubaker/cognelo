@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { prisma } from "@cognelo/db";
 import { test, expect } from "./fixtures/bank-course";
 import { createAuthenticatedApi } from "./fixtures/auth";
@@ -62,8 +63,8 @@ test("teachers inspect the exact prepared text with pagination and no model call
     await expect(panel).toContainText("FIRST_PASSAGE");
     expect(model.requests).toHaveLength(requestsBefore);
     await panel.getByRole("button", { name: "Close", exact: true }).click();
-    await page.getByRole("tab", { name: "Settings", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Enable final submissions", exact: true })).toBeDisabled();
+    await openHomeworkEditorSection(page, "Submission");
+    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeDisabled();
     expect(await prisma.activityAttempt.count({ where: { activityId: id } })).toBe(0);
   } finally { await page.close(); await student.dispose(); await model.close(); }
 });

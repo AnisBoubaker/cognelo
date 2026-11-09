@@ -155,6 +155,7 @@ export type CodingHomeworkPreflightSummary = {
 
 export type CodingHomeworkPreflightResult = {
   preflight: {
+    originalName?: string;
     id: string;
     activityId: string;
     groupId: string;
@@ -438,9 +439,9 @@ export function createCodingHomeworkGraderClient(request: Requester) {
         method: "POST",
         body: JSON.stringify(input ?? {})
       }),
-    runCoursePreflight: (courseId: string, activityId: string, input: CodingHomeworkUploadInput) =>
+    runCoursePreflight: (courseId: string, activityId: string, input: CodingHomeworkUploadInput, signal?: AbortSignal) =>
       request<CodingHomeworkPreflightResult>(`/courses/${courseId}/activities/${activityId}/coding-homework-grader/preflight`, {
-        method: "POST",
+        method: "POST", signal,
         body: JSON.stringify(input)
       }),
     previewGroupDocumentation: (courseId: string, groupId: string, activityId: string) =>
@@ -462,11 +463,11 @@ export function createCodingHomeworkGraderClient(request: Requester) {
           body: JSON.stringify(input ?? {})
         }
       ),
-    runGroupPreflight: (courseId: string, groupId: string, activityId: string, input: CodingHomeworkUploadInput) =>
+    runGroupPreflight: (courseId: string, groupId: string, activityId: string, input: CodingHomeworkUploadInput, signal?: AbortSignal) =>
       request<CodingHomeworkPreflightResult>(
         `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-homework-grader/preflight`,
         {
-          method: "POST",
+          method: "POST", signal,
           body: JSON.stringify(input)
         }
       ),

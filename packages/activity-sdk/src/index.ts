@@ -121,6 +121,8 @@ export type ActivityDefinition = {
   supportsTeamwork?: boolean;
   /** Preparation is available before the explicit, plugin-owned assessment start. */
   assessmentFlow?: "deferred";
+  /** Top-level config Markdown fields whose images belong to pre-answering preparation. Deferred activities only. */
+  preparationMediaFields?: readonly string[];
   /** Allowlisted learner config. Omission fails closed to an empty config. */
   studentConfig?: (config: Record<string, unknown>) => Record<string, unknown>;
   /** Opt-in reference solution, served only through the host's release gate. */

@@ -1,6 +1,6 @@
 # Programming Homework editor and optional questions
 
-Status: implementation in progress, November 9, 2026.
+Status: implemented and locally validated, November 9, 2026.
 
 ## Approved layout
 
@@ -25,9 +25,9 @@ Use shared SideNavigation, RichTextEditor, EditActionBar, notifications and canc
 ## Implementation checkpoints
 
 - [x] Optional-question policy and immediate individual/team completion through core gradebook services.
-- [ ] Preflight-owned simulation with validation, explicit acknowledgement, cancellation and private output.
-- [ ] Shared left-tab authoring, WYSIWYG assignment, collapsed PDF and common toggle control.
-- [ ] Focused unit/E2E regressions, documentation review and incremental commits.
+- [x] Preflight-owned simulation with validation, explicit acknowledgement, cancellation and private output.
+- [x] Shared left-tab authoring, WYSIWYG assignment, collapsed PDF and common toggle control.
+- [x] Focused unit/E2E regressions, documentation review and incremental commits.
 
 No production deployment or testing is part of this task. Preserve all stable plugin/API/storage identifiers and keep private archives, credentials and generated clients out of Git.
 
@@ -40,3 +40,23 @@ Hand-in freezes its effective question policy. File-only hand-in publishes immut
 Core exposes `recordDeferredActivitySubmission` and a transaction-bound SDK `recordDeferredSubmission` callback. Only trusted server code that already authorized and froze the evidence may call it. It checks the deferred activity/provider, active enrolled learner, attempt limits and grade-release policy, preserves ordinary core lifecycle/knowledge snapshots, and can record existing frozen work after its availability end without opening an answering session. Ordinary `startActivityAttempt` date checks are unchanged. No public endpoint accepts this completion mode.
 
 Backend validation: 172 targeted unit tests and core/plugin typechecks passed. Five distinct local E2Es passed: file-only individual hand-in/retry/SEB/incomplete acknowledgement/cancellation/automatic recovery; file-only team late join, leave/rejoin, grade withdrawal and cancellation; normal individual challenges; both common and individual team question modes. Tests use disposable local courses and controlled model fixtures.
+
+## ZIP simulation and editor details
+
+Teacher preflight uploads retain a private temporary artifact with a 24-hour expiry, original filename and normalized requirements fingerprint. Simulation requires that teacher's course preflight ID, verifies its stored identity/size/hash and current requirements, and reruns static checks. Missing requirements require explicit acknowledgement; blocking file rules remain blocking. A changed requirements set requires another Check ZIP. The teacher can cancel the confirmation or generation. Reference query embeddings accept the same cancellation signal. Previous completed results survive cancellation, while a new ZIP/activity clears them.
+
+The main edit draft covers basic fields, teacher requirements and question settings. Generation-model and deadline controls retain their explicit independent save/discard boundaries; their nested action bars are not sticky so they cannot overlap the main bar. Tabs remain mounted; preflight requests abort on activity change. RichTextEditor uses the public `config.assignmentMarkdown` mirror for core media retention/copy/version support. Teacher solution and instructions remain private. The PDF uses a native collapsed disclosure. File-only Review and grade opens Submitted files directly.
+
+Existing saved identifiers, model choices and upload paths remain unchanged. This delivery adds no database schema migration or environment variable. The previously committed display-name migration still applies during the ordinary upgrade path.
+
+## Validation and handoff
+
+- Full unit suite: **338 files / 1,948 tests passed**. All workspace typechecks, plugin boundaries and API/web production builds passed. Focused lint has no errors; three pre-existing warnings remain in the shared editor/legacy answering renderer.
+- **27 distinct local E2E scenarios passed** across the final and regression runs. Coverage includes bank/course authoring, PDF bytes/collapsed preview, shared WYSIWYG and image retention/student access before SEB, top/left tabs and draft retention, reference Save/Cancel and lock refresh, core model reuse/freshness/privacy, duplication, ordinary and incomplete hand-in, per-section team policy and both question-sharing modes, deadlines/lateness, file-only completion/SEB bypass/idempotency/automatic cutoff, late joins and leave/rejoin with grade withdrawal, cancellation, private ZIP simulation and other AI provider consumers.
+- Simulation proves that questions target the uploaded ZIP rather than a different private solution, follow course French despite English UI, exclude unchanged provided helpers, keep private retrieved content hidden, and stop/discard cancelled generation. Security unit checks cover foreign/missing/expired preflights, stale requirements, changed bytes, unsafe stored paths, acknowledgement and blocking file rules. No learner attempt or grade is created by simulation.
+- Draft checks include saving a mode change while a generation-model choice is unsaved: hidden inactive model edits do not block file-only simulation, and re-enabling retains them. Same-activity saves keep panels mounted. Returning to References refreshes submission locks without discarding selection drafts. Failed initial authoring loads offer Refresh and cannot expose an empty saveable form.
+- Desktop/mobile Activity, Question Generation and Simulation screenshots were inspected. UI tests use isolated local courses and controlled AI endpoints, so these results validate integration/policy delivery rather than real-provider question quality. No production tests or deployment were performed.
+
+Implementation choices: changing question mode closes final submissions until explicitly reopened; upload limits live in Submission; Simulation/operational course settings remain course-scoped; checked ZIPs use the existing 24-hour temporary preflight lifetime. Existing/new activities default to questions enabled. The user explicitly chose switches for editor settings while item selection and incomplete-work acknowledgement remain checkboxes.
+
+Root and plugin README/memory/architecture/index, the authoring handbook, media/material reference contracts and the approved homework workflow were reviewed and updated. Material extraction ownership remains unchanged. No documentation verification gap remains. Backend completion is committed as `940e392`; the subsequent editor/ZIP-simulation commit completes this delivery.

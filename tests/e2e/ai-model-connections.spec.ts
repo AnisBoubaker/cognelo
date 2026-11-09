@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { prisma } from "@cognelo/db";
 import { test, expect } from "./fixtures/bank-course";
 import { createAuthenticatedApi } from "./fixtures/auth";
@@ -89,8 +90,8 @@ for (const provider of ["codex", "ollama"] as const) test(`homework selects ${pr
     await expect(courseModel.getByText("Model in use: vectors-a", { exact: true })).toBeVisible();
     await page.goto(`/courses/${data.courseId}/activities/${activityId}`);
     const referencePanel = page.locator(".activity-reference-materials");
-    await page.getByRole("tab", { name: "Settings", exact: true }).click();
-    const settingsPanel = page.locator(".homework-workflow-settings");
+    await openHomeworkEditorSection(page, "Question Generation");
+    const settingsPanel = page.locator(".homework-workflow-questions");
     await settingsPanel.getByLabel("AI connection", { exact: true }).selectOption(model.connection.id);
     await settingsPanel.getByLabel("Model", { exact: true }).selectOption("alternate-text");
     await settingsPanel.getByRole("button", { name: "Save model choice", exact: true }).click();

@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { prisma } from "@cognelo/db";
 import { test, expect } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
@@ -15,25 +16,25 @@ test("homework questions use course language and teacher policy, and show submit
     const base = `/api/courses/${data.courseId}/activities/${activityId}/coding-homework-grader`;
     const instruction = "PRIVATE_TEACHER_POLICY: Ask only concrete tracing questions. Use inputs 2 and 3. Never ask about complexity.";
     await teacherPage.goto(`/courses/${data.courseId}/activities/${activityId}`);
-    await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
-    const settings = teacherPage.locator(".homework-workflow-settings");
+    await openHomeworkEditorSection(teacherPage, "Question Generation");
+    const settings = teacherPage.locator(".homework-workflow-questions");
     await expect(settings.getByLabel("AI question-generation instructions", { exact: true })).toBeEnabled();
     await settings.getByLabel("AI question-generation instructions", { exact: true }).fill(instruction);
-    await expect(settings.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+    await expect(teacherPage.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
     let releaseSave = () => {};
     const saveGate = new Promise<void>(resolve => { releaseSave = resolve; });
     await teacherPage.route(`**${base}/authoring`, async route => {
       if (route.request().method() === "PUT") await saveGate;
       await route.continue().catch(() => {});
     });
-    await settings.getByRole("button", { name: "Save", exact: true }).click();
+    await teacherPage.getByRole("button", { name: "Save", exact: true }).click();
     try { await expect(teacherPage.getByRole("dialog", { name: "Save", exact: true })).toBeVisible(); }
     finally { releaseSave(); }
     await teacherPage.unroute(`**${base}/authoring`);
 
     await expect(teacherPage.getByText("Programming homework saved.", { exact: true })).toBeVisible();
     await teacherPage.reload();
-    await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
+    await openHomeworkEditorSection(teacherPage, "Question Generation");
     await expect(settings.getByLabel("AI question-generation instructions", { exact: true })).toHaveValue(instruction);
     await responseJson(await teacherApi.put(`${base}/workflow-settings`, { data: { selected: [] } }));
     await responseJson(await teacherApi.post(`${base}/prepare-references`, { data: {} }));

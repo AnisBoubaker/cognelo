@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { test, expect } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
 import { createAuthenticatedApi } from "./fixtures/auth";
@@ -13,6 +14,7 @@ for (const owner of ["bank", "course"] as const) test(`${owner} homework solutio
   const pagePath = owner === "course" ? `/courses/${data.courseId}/activities/${id}` : `/activity-banks/${data.activityBankId}/activities/${id}`;
   const base = `/api${pagePath}/coding-homework-grader`;
   await page.goto(pagePath);
+  await openHomeworkEditorSection(page, "Teacher solution");
   const selector = page.locator(".homework-solution-selector");
   const zipInput = selector.locator('input[type="file"][accept=".zip"]');
   const fileInput = selector.locator('input[type="file"][multiple]');
@@ -49,7 +51,9 @@ for (const owner of ["bank", "course"] as const) test(`${owner} homework solutio
   const replacedRevision = solution.revision;
   await selector.getByRole("checkbox", { name: "int helper(void) main.c", exact: true }).check();
   await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.getByText("Programming homework saved.", { exact: true })).toBeVisible();
+  await openHomeworkEditorSection(page, "Activity");
   await page.getByLabel("Description", { exact: true }).fill("An unrelated unsaved description.");
+  await openHomeworkEditorSection(page, "Teacher solution");
   await selector.getByRole("button", { name: "Remove function: main.c:helper", exact: true }).click();
   await expect(selector.getByRole("checkbox", { name: "int helper(void) main.c", exact: true })).toHaveCount(0);
   await expect(page.getByLabel("Description", { exact: true })).toHaveValue("An unrelated unsaved description.");
@@ -59,6 +63,7 @@ for (const owner of ["bank", "course"] as const) test(`${owner} homework solutio
   await fileInput.setInputFiles({ name: "other.h", mimeType: "text/plain", buffer: Buffer.from("int other(void);\n") });
   await expect(selector.getByRole("checkbox", { name: "other.h", exact: true })).toBeVisible();
   await page.reload();
+  await openHomeworkEditorSection(page, "Teacher solution");
   await expect(selector.getByRole("checkbox", { name: "other.h", exact: true })).toBeVisible();
   await expect(selector.getByRole("button", { name: "Remove function: main.c:helper", exact: true })).toHaveCount(0);
   await selector.getByRole("button", { name: "Remove file: main.h", exact: true }).click();
@@ -82,6 +87,11 @@ for (const owner of ["bank", "course"] as const) test(`${owner} homework solutio
   await expect(selector.getByRole("checkbox", { name: "first.h", exact: true })).toBeVisible();
   saved = await responseJson<CodingHomeworkAuthoringRecord>(await teacherApi.get(`${base}/authoring`));
   expect(saved.requirements.requirements.requiredFunctions).toEqual([]);
+  if (owner === "bank") {
+    await responseJson(await teacherApi.put(`${base}/authoring`, { data: { assignment: { ...saved.assignment, settings: { questionGenerationEnabled: false } }, requirements: saved.requirements.requirements } }));
+    await responseJson(await teacherApi.put(`${base}/authoring`, { data: { assignment: { ...saved.assignment, settings: {} }, requirements: saved.requirements.requirements } }));
+    expect(await responseJson(await teacherApi.get(`${base}/authoring`))).toMatchObject({ assignment: { settings: { questionGenerationEnabled: false } } });
+  }
 });
 
 test("assignment PDFs render as PDF bytes in bank/course previews and student downloads", async ({ bankCourse: data, teacherApi, teacherPage: page }) => {
@@ -101,8 +111,10 @@ test("assignment PDFs render as PDF bytes in bank/course previews and student do
       expect(file.status()).toBe(200); expect(file.headers()["content-type"]).toBe("application/pdf"); expect(file.headers()["content-disposition"]).toContain("inline"); expect(await file.body()).toEqual(bytes);
       const previewLoaded = page.waitForResponse(response => response.url().includes(`/activity-file?attachmentId=${attachmentId}`));
       await page.goto(pagePath);
+      await expect(page.locator(".homework-pdf-preview iframe")).toBeHidden();
+      await page.getByText("Preview assignment PDF", { exact: true }).click();
       expect((await previewLoaded).headers()["content-type"]).toBe("application/pdf");
-      await expect(page.locator(".homework-pdf-preview figcaption")).toHaveText("Preview");
+      await expect(page.locator(".homework-pdf-disclosure")).toHaveAttribute("open");
       await expect(page.locator(".homework-pdf-preview iframe")).toBeVisible();
       const previewFrame = await (await page.locator(".homework-pdf-preview iframe").elementHandle())!.contentFrame();
       await previewFrame!.waitForLoadState("load");

@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { homeworkModelFixture } from "./fixtures/homework-model";
 import type { Locator, Page, Request } from "@playwright/test";
 import { prisma } from "@cognelo/db";
@@ -676,11 +677,14 @@ test.describe.serial("authoring and completing every activity type", () => {
       typeName: "Programming Homework"
     });
 
-    await expect(teacherPage.getByRole("heading", { name: "Programming Homework authoring" })).toBeVisible();
+    await expect(teacherPage.locator(".homework-authoring-panel").getByRole("heading", { name: "Activity", exact: true })).toBeVisible();
     await teacherPage.getByLabel("Title", { exact: true }).fill(title);
     await teacherPage.getByLabel("Description").fill("Submit a small C program and explain its behavior.");
-    await teacherPage.getByLabel("Assignment text").fill("Implement `main` in `main.c`, then submit the project ZIP.");
+    await teacherPage.locator(".rich-text-editor").getByRole("tab", { name: "Markdown", exact: true }).click();
+    await teacherPage.locator(".rich-text-editor textarea").fill("Implement `main` in `main.c`, then submit the project ZIP.");
+    await openHomeworkEditorSection(teacherPage, "Question Generation");
     await teacherPage.getByRole("spinbutton", { name: "Questions", exact: true }).fill("1");
+    await openHomeworkEditorSection(teacherPage, "Teacher solution");
     await teacherPage.getByLabel("Required files").fill("main.c");
     await teacherPage.getByLabel("Required functions").fill("main");
     await teacherPage.getByLabel("Allowed extensions").fill(".c");

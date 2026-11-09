@@ -39,3 +39,5 @@ Dialog dismissal is intentionally icon-only: use the shared persistent [dialog h
 `tests/e2e/edit-action-bar-messages.spec.ts` checks compact width, unchanged Messages placement, non-overlapping and clickable Save/Cancel controls, actual discard/save behavior, and no horizontal overflow at desktop/tablet/mobile widths and in right-to-left layout.
 
 `tests/e2e/action-buttons.spec.ts` checks matching computed appearance and semantic icons across core/admin/plugin actions, disabled and keyboard-focus behavior, actual save/cancel flows, and login legibility. `workspace-layout.spec.ts` covers desktop/mobile page layout, while rich-text and activity regressions exercise toolbar, dialog, and learner controls.
+
+Boolean settings in activity editors use the shared `ToggleSwitch` On/Off control (`role="switch"`), following the user’s preference. Item selections and explicit acknowledgement controls remain checkboxes. These inputs are settings controls, separate from the outlined action-button recipe.

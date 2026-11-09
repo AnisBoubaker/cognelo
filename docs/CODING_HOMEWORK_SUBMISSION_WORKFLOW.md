@@ -21,13 +21,13 @@ Remaining reasonable implementation choices are authorized and must be recorded 
 
 ## Model-selection update — November 2, 2026
 
-The user expanded the provider requirement: choose any configured supported model directly in homework, and reuse a saved connection/token across multiple models. The initial delivery placed an embedding selector in Reference materials; the November 6 shared-reference update below moves it to Course settings. Settings retains a separate question-generation selector. The previously approved OpenAI embedding model remains a backward-compatible default, not a provider restriction. OpenAI-compatible/Codex and Ollama embedding APIs are supported; Claude generation requires a separate embedding-capable connection. Changing the generation model does not invalidate indexes. Changing the embedding model requires preparation again, reusing compatible cached vectors. New hand-ins freeze their chosen generation model so later settings changes do not change queued work. Model catalogues are entered manually rather than fetched from providers. See [AI connections](AI_MODEL_CONNECTIONS.md).
+The user expanded the provider requirement: choose any configured supported model directly in homework, and reuse a saved connection/token across multiple models. The initial delivery placed an embedding selector in Reference materials; the November 6 shared-reference update below moves it to Course settings. The Question Generation left section now holds the separate question-generation selector. The previously approved OpenAI embedding model remains a backward-compatible default, not a provider restriction. OpenAI-compatible/Codex and Ollama embedding APIs are supported; Claude generation requires a separate embedding-capable connection. Changing the generation model does not invalidate indexes. Changing the embedding model requires preparation again, reusing compatible cached vectors. New hand-ins freeze their chosen generation model so later settings changes do not change queued work. Model catalogues are entered manually rather than fetched from providers. See [AI connections](AI_MODEL_CONNECTIONS.md).
 
 ## Shared references update — November 6, 2026
 
 The entire reference-material selection/preparation/preview UI belongs to core, activated by an activity capability. Its Reference materials tab has an independent Save/Cancel bar, search, folder expansion, hidden labels and readiness. Generate embeddings is part of this tab. The embedding connection/model is configured once for the course and reused across subscribing activities; the activity retains only its question-generation model. Enabled homework keeps pinned references, while disabled activities must prepare against a changed course model before opening. See [shared reference services](ACTIVITY_MATERIAL_REFERENCES.md).
 
-A course-only **Simulation** tab generates teacher-visible sample questions from the saved private solution using the real question generator. It respects saved instructions, the course language and prepared references, excludes unchanged provided code, supports Cancel and creates no student academic records. Results are transient.
+The November 9 [editor update](PROGRAMMING_HOMEWORK_EDITOR.md) places course-only **Simulation** in Activity’s left navigation and generates from an uploaded preflight ZIP after explicit simulated-hand-in confirmation, including incomplete acknowledgement when needed. It respects saved instructions, the course language and prepared references, excludes unchanged provided code, supports Cancel and creates no student academic records. Results are transient.
 
 ## Scope
 
@@ -64,6 +64,8 @@ The follow-up clarifications above specify C signature matching and acknowledgem
 The student sees only two resource download buttons when available: the assignment statement and one ZIP of the provided files. Individual attachment names are not listed.
 
 ## Final submission and challenge workflow
+
+Question generation defaults to enabled. When explicitly disabled, file hand-in completes immediately as submitted, ungraded work without AI/embeddings or an answering timer/SEB phase. The question-enabled stages below remain the default; see [optional-question policy](PROGRAMMING_HOMEWORK_EDITOR.md).
 
 | Stage | Agreed behavior |
 | --- | --- |

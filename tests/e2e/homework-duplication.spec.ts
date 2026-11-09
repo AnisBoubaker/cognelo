@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { prisma } from "@cognelo/db";
 import { prisma as homeworkDb } from "../../packages/plugin-activities/plugin-coding-homework-grader/src/db-client";
 import { test, expect } from "./fixtures/bank-course";
@@ -110,14 +111,15 @@ test("course duplication retains homework design and prepared references without
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await expect(page.getByRole("checkbox", { name: "Shared C reference", exact: true })).toBeChecked();
     await expect(page.locator(".activity-reference-materials")).toContainText("chosen-vectors");
-    await page.getByRole("tab", { name: "Settings", exact: true }).click();
-    await expect(page.locator(".homework-workflow-settings").getByLabel("Model", { exact: true })).toHaveValue("chosen-questions");
+    await openHomeworkEditorSection(page, "Question Generation");
+    await expect(page.locator(".homework-workflow-questions").getByLabel("Model", { exact: true })).toHaveValue("chosen-questions");
     await expect(page.getByLabel("Students processed at once (1–4)")).toHaveValue("3");
-    await expect(page.getByRole("button", { name: "Enable final submissions", exact: true })).toBeEnabled();
+    await openHomeworkEditorSection(page, "Submission");
+    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeEnabled();
     const opened = page.waitForResponse(response => response.request().method() === "PUT" && response.url().endsWith("/workflow-settings"));
-    await page.getByRole("button", { name: "Enable final submissions", exact: true }).click();
+    await page.getByRole("switch", { name: "Accept final submissions", exact: true }).click();
     expect((await opened).ok()).toBe(true);
-    await expect(page.getByRole("button", { name: "Disable final submissions", exact: true })).toBeVisible();
+    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeChecked();
     expect(model.requests).toHaveLength(modelCalls);
     expect(await homeworkDb.pluginCodingHomeworkDocumentationSnapshot.findUnique({ where: { id: copiedSnapshot.id } })).not.toBeNull();
     const provided = await api.get(`${copyBase}/activity-file?attachmentId=${copiedAuthoring.providedFiles[0].id}`);

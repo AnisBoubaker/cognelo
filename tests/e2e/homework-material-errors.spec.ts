@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { prisma } from "@cognelo/db";
 import { test, expect } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
@@ -33,8 +34,8 @@ test("ZIP reference extraction reports named failures in notification history an
     const toast = page.locator('section[role="alert"]').filter({ hasText: "Executable archive:" });
     await expect(toast).toContainText("no readable source/text files");
     await expect(page.getByRole("dialog", { name: "Preparing reference materials…", exact: true })).toBeHidden();
-    await page.getByRole("tab", { name: "Settings", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Enable final submissions", exact: true })).toBeDisabled();
+    await openHomeworkEditorSection(page, "Submission");
+    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeDisabled();
     expect(model.embeddingTexts).toHaveLength(2);
     expect(model.embeddingTexts.join("\n")).not.toContain("should not reach embeddings");
     const firstIndex = await prisma.contentMaterialIndex.findFirstOrThrow({ where: { resourceId: starter } });
@@ -51,11 +52,11 @@ test("ZIP reference extraction reports named failures in notification history an
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await page.getByRole("button", { name: "Generate embeddings", exact: true }).click();
     await expect(page.locator(".activity-reference-materials").getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
-    await page.getByRole("tab", { name: "Settings", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Enable final submissions", exact: true })).toBeEnabled();
+    await openHomeworkEditorSection(page, "Submission");
+    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeEnabled();
     expect(model.embeddingTexts).toHaveLength(3);
     expect(await prisma.contentMaterialIndex.count({ where: { resourceId: starter } })).toBe(1);
-    await page.getByRole("button", { name: "Enable final submissions", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Disable final submissions", exact: true })).toBeVisible();
+    await page.getByRole("switch", { name: "Accept final submissions", exact: true }).click();
+    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeChecked();
   } finally { await model.close(); }
 });

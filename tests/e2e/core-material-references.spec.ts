@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { prisma } from "@cognelo/db";
 import { test, expect } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
@@ -33,7 +34,7 @@ test("core references save in their own tab and share course embeddings across a
     await expect(panel.getByRole("button", { name: "Generate embeddings", exact: true })).toBeDisabled();
     await panel.getByRole("button", { name: "Cancel", exact: true }).click(); await expect(hiddenChoice).not.toBeChecked();
     await hiddenChoice.check();
-    await page.getByRole("tab", { name: "Settings", exact: true }).click(); await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
+    await openHomeworkEditorSection(page, "Submission"); await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await expect(hiddenChoice).toBeChecked();
     await panel.getByRole("button", { name: "Save", exact: true }).click(); await expect(panel.getByText("Everything is saved.", { exact: true })).toBeVisible();
     expect((await responseJson<{ selected: string[] }>(await api.get(base))).selected.sort()).toEqual([visible.id, hidden.id].sort());

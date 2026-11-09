@@ -1,3 +1,4 @@
+import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { prisma } from "@cognelo/db";
 import type { StudentGroupingDto } from "@cognelo/contracts";
 import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
@@ -5,7 +6,7 @@ import { test, expect } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
 import { createAuthenticatedApi, createAuthenticatedApiWithCredentials, credentialsFor } from "./fixtures/auth";
 
-test("file-only homework completes without AI, embeddings or SEB and keeps incomplete/cancellation/deadline rules", async ({ bankCourse: data, teacherApi: api, studentPage: page }) => {
+test("file-only homework completes without AI, embeddings or SEB and keeps incomplete/cancellation/deadline rules", async ({ bankCourse: data, teacherApi: api, teacherPage, studentPage: page }) => {
   const student = await createAuthenticatedApi("student");
   try {
     const course = `/api/courses/${data.courseId}`;
@@ -31,8 +32,21 @@ test("file-only homework completes without AI, embeddings or SEB and keeps incom
     expect((await api.post(`${base}/manage-submissions`, { data: { action: "reset-challenges", submissionId: first.submission.id, reason: "No challenges exist" } })).status()).toBe(409);
     await page.goto(endpoint.replace(/^\/api/, "").replace(/\/coding-homework-grader$/, ""));
     await expect(page.getByRole("heading", { name: "Submitted work", exact: true })).toBeVisible();
+    await expect(page.getByText("Your work has been submitted for teacher grading.", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Answer challenge questions", exact: true })).toHaveCount(0);
+    await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${id}`);
+    await teacherPage.getByRole("button", { name: /^Actions for / }).click();
+    await teacherPage.getByRole("menuitem", { name: "Review and grade", exact: true }).click();
+    const review = teacherPage.getByRole("dialog", { name: "Review and grade", exact: true });
+    await expect(review.getByRole("tab", { name: "Submitted files", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(review.getByRole("tab", { name: "Questions and answers", exact: true })).toHaveCount(0);
+    await expect(review.locator(".homework-submitted-file-content")).toContainText("int main");
+    await review.locator(".review-chat-toolbar").getByRole("button", { name: "Close", exact: true }).click();
+    await teacherPage.goto(`/courses/${data.courseId}/activities/${id}`); await openHomeworkEditorSection(teacherPage, "Question Generation");
+    await expect(teacherPage.getByRole("switch", { name: "Generate challenge questions", exact: true })).toBeDisabled();
     await responseJson(await api.delete(`${base}/manage-submissions`, { data: { submissionId: first.submission.id, reason: "Permit another hand-in" } }));
+    await teacherPage.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(teacherPage.getByRole("switch", { name: "Generate challenge questions", exact: true })).toBeEnabled();
     expect(await prisma.activityAttempt.findUniqueOrThrow({ where: { id: first.submission.coreAttemptId } })).toMatchObject({ lifecycle: "deleted" });
     const deadline = new Date(Date.now() - 1000).toISOString();
     // Only disposable fixture timestamps are moved, simulating a draft saved before its cutoff.

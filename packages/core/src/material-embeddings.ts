@@ -166,8 +166,8 @@ export async function createPreparedMaterialSearch(user: CurrentUser, courseId: 
   if (rows.reduce((sum, row) => sum + row.dimensions, 0) > 20_000_000) throw new AppError(413, "REFERENCE_SELECTION_TOO_LARGE", "Choose fewer reference materials for this embedding model.");
   if (rows.length !== new Set(chunks.map(chunk => chunk.vectorId)).size || rows.some(row => row.dimensions !== rows[0].dimensions || row.values.byteLength !== row.dimensions * 4)) throw new AppError(409, "EMBEDDING_INDEX_INCOMPATIBLE", "The prepared vector set is incomplete or incompatible.");
   const vectors = new Map(rows.map(row => [row.id, decodeVector(row.values)]));
-  return { search: async (query: string, limit = 3) => {
-    const [{ values }] = await provider.embedTexts([query.slice(0, 2000)]);
+  return { search: async (query: string, limit = 3, signal?: AbortSignal) => {
+    const [{ values }] = await provider.embedTexts([query.slice(0, 2000)], signal);
     if (rows.length && values.length !== rows[0].dimensions) throw new AppError(409, "EMBEDDING_INDEX_INCOMPATIBLE", "The query model does not match the prepared reference vectors.");
     return chunks.flatMap(chunk => {
       const vector = vectors.get(chunk.vectorId); if (!vector) return [];

@@ -6988,3 +6988,24 @@ button:hover > .disclosure-indicator {
   .activity-reference-row { gap: 6px; }
   .activity-reference-row .metadata-badge { max-width: 100%; white-space: normal; }
 }
+
+/* Shared boolean editor setting; selection checkboxes keep their compact native form. */
+.toggle-switch { display: inline-flex; align-items: center; gap: 10px; width: fit-content; max-width: 100%; cursor: pointer; }
+.toggle-switch input[type="checkbox"] { appearance: none; position: relative; flex: 0 0 42px; width: 42px; height: 24px; min-height: 0; padding: 0; margin: 0; border-radius: 999px; border: 1px solid var(--muted); background: var(--surface); cursor: inherit; transition: background .15s; }
+.toggle-switch input[type="checkbox"]::after { content: ""; position: absolute; width: 16px; height: 16px; top: 3px; left: 3px; border-radius: 50%; background: var(--muted); transition: transform .15s; }
+.toggle-switch input[type="checkbox"]:checked { background: var(--brand-blue); border-color: var(--brand-blue); }
+.toggle-switch input[type="checkbox"]:checked::after { background: white; transform: translateX(18px); }
+.toggle-switch-label { font-weight: 600; overflow-wrap: anywhere; }
+.toggle-switch-state { color: var(--muted); }
+.toggle-switch.is-disabled { cursor: not-allowed; opacity: .65; }
+@media (prefers-reduced-motion: reduce) { .toggle-switch input[type="checkbox"], .toggle-switch input[type="checkbox"]::after { transition: none; } }
+.homework-authoring-layout .settings-content { min-width: 0; }
+.homework-authoring-panel { min-width: 0; }
+.homework-authoring-panel > .section { margin: 0; }
+.homework-authoring-panel .homework-pdf-preview { margin: 12px 0 0; }
+.homework-authoring-panel details > summary { cursor: pointer; font-weight: 600; }
+
+.homework-authoring-panel [hidden] { display: none !important; }
+
+.homework-authoring-panel .homework-workflow-questions .edit-action-bar,
+.homework-authoring-panel .homework-deadline-settings .edit-action-bar { position: static; }

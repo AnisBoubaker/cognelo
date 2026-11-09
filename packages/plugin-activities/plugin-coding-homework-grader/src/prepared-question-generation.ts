@@ -40,7 +40,7 @@ export async function generatePreparedHomeworkQuestions(input: {
     const functionIndex = candidates.length ? index % candidates.length : null;
     const candidate = functionIndex !== null ? candidates[functionIndex] : null;
     const source = candidate?.functionCode ?? fallbackSource.slice(0, 20_000);
-    const matches = indexes.length ? await search.search(source.slice(0, 1800) || String(settings.promptMarkdown).slice(0, 1800), Number(settings.retrievedExampleCount ?? 3)) : [];
+    const matches = indexes.length ? await search.search(source.slice(0, 1800) || String(settings.promptMarkdown).slice(0, 1800), Number(settings.retrievedExampleCount ?? 3), signal) : [];
     const context = makeStudentQuestionContext({ code: source, filePath: candidate?.sourcePath, functionName: candidate?.functionName, truncated: !candidate && fallbackSource.length > 20_000, languageKey: String(settings.languageKey ?? "c") });
     const excludedNames = unchangedProvidedFunctionNames(providedCode, comparison.eligible);
     const questionRequest = { excludedProvidedFunctionNames: excludedNames.slice(0, 100), assignment: settings.promptMarkdown, submittedFunction: candidate?.functionName,
