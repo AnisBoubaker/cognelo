@@ -51,7 +51,7 @@ export function categorizeProcessingError(error: unknown): CodingHomeworkProcess
     at: new Date().toISOString(),
     category: categoryForError(code, status),
     code,
-    message: error instanceof Error ? error.message : "Coding homework processing failed.",
+    message: error instanceof Error ? error.message : "Programming homework processing failed.",
     retryable: retryableForError(code, status),
     ...(status ? { status } : {})
   };

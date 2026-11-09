@@ -7,7 +7,7 @@ Status: implemented and locally validated, November 6, 2026.
 - Activities opt into a core-owned Reference materials tab. The entire tree, readiness/preview/preparation UI and Save/Cancel boundary are shared, rather than implemented by each plugin.
 - The teacher selects course content, including explicitly selected hidden resources. Visible preceding material remains the default; choosing a folder includes all descendants. Improve navigation/readability and preserve drafts across tabs.
 - The embedding connection/model belongs to the course. Compatible existing material indexes/vectors remain reusable by every subscribing activity. Activity question-generation models remain independent.
-- Coding Homework adds a teacher-only Simulation tab that generates sample challenge questions from the saved private teacher solution. It must not create student drafts, hand-ins, attempts or grades.
+- Programming Homework adds a teacher-only Simulation tab that generates sample challenge questions from the saved private teacher solution. It must not create student drafts, hand-ins, attempts or grades.
 
 ## Implementation boundaries
 

@@ -22,7 +22,7 @@ import { toStudentChallengeQuestionRecord } from "./generation";
 const activeWhere = (scope: HomeworkStudentScope) => ({ activityId: scope.activityId, groupId: scope.groupId, userId: scope.user.id, kind: "final" as const });
 export async function handInHomework(scope: HomeworkStudentScope, input: unknown, automatic?: AutomaticHomeworkHandIn) {
   const activity = automatic ? await coreDb.activity.findFirstOrThrow({ where: { id: scope.activityId, courseId: scope.courseId }, include: { activityType: true } }) : await assertHomeworkStudentScope(scope);
-  if (activity.activityType.key !== "coding-homework-grader") throw new AppError(404, "HOMEWORK_NOT_FOUND", "Coding Homework was not found.");
+  if (activity.activityType.key !== "coding-homework-grader") throw new AppError(404, "HOMEWORK_NOT_FOUND", "Programming Homework was not found.");
   if (activityTeamworkEnabled(activity.metadata)) return (await import("./team-submissions")).handInTeamHomework(scope, input, automatic);
   const data = z.object({ expectedRevision: z.number().int().min(0), acknowledgeIncomplete: z.boolean().default(false), locale: z.enum(["en", "fr", "zh", "ar"]).default("en") }).strict().parse(input);
   const availability = automatic ? null : await getActivityAttemptAvailability(scope.user, scope);

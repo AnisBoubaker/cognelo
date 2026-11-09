@@ -37,7 +37,7 @@ test("homework separates references and settings, keeps drafts across tabs, and 
     await page.getByRole("tab", { name: "Activity", exact: true }).click();
     await expect(page.getByLabel("Description", { exact: true })).toHaveValue("Keep this unsaved assignment description.");
     await page.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(page.getByText("Coding homework saved.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Programming homework saved.", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await expect(referenceB).not.toBeChecked();
 

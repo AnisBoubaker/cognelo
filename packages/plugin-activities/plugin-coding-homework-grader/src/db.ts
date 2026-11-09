@@ -371,9 +371,16 @@ WHERE (requirements->>'maxArchiveBytes')::bigint > 26214400 OR (requirements->>'
         `CREATE INDEX IF NOT EXISTS "PluginCodingHomeworkSubmission_shared_source_idx" ON "PluginCodingHomeworkSubmission"("sharedSourceId")`
       ]
     }
+    ,{
+      id: "202611080010_programming_homework_display_name",
+      statements: [
+        `UPDATE "ActivityType" SET name='Programming Homework' WHERE key='coding-homework-grader' AND name IS DISTINCT FROM 'Programming Homework'`,
+        `UPDATE "ActivityPluginInstallation" SET name='Programming Homework' WHERE key='coding-homework-grader' AND name IS DISTINCT FROM 'Programming Homework'`
+      ]
+    }
   ],
   notes: [
-    "Coding Homework Grader owns assignment prompts, uploaded artifacts, documentation snapshots, extracted reference functions, submissions, challenge questions, and teacher review records in plugin tables.",
+    "Programming Homework owns assignment prompts, uploaded artifacts, documentation snapshots, extracted reference functions, submissions, challenge questions, and teacher review records in plugin tables.",
     "Core gradebook tables only store generic attempt and grade metadata; plugin-specific submission files, generated questions, answers, and review payloads stay in this namespace.",
     "C is the first planned parser target, but language keys and JSON requirement payloads keep the schema open for later language adapters."
   ]

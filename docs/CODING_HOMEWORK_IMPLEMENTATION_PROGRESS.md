@@ -1,5 +1,6 @@
-# Coding Homework implementation checkpoint
+# Programming Homework implementation checkpoint
 
+The current display name is **Programming Homework**; legacy `coding-homework-grader` identifiers remain stable. See the [naming compatibility contract](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md#display-name-and-compatibility).
 **Status: implemented and locally validated on November 1, 2026.** No production deployment or production testing was performed. This is the resumable record requested by the user; the [approved workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) and [plugin reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md) are the canonical behavior documents.
 
 ## Delivered

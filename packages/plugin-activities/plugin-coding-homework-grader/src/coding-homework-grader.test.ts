@@ -4,10 +4,10 @@ import { codingHomeworkGraderDatabaseModule } from "./db";
 import { codingHomeworkGraderServerPlugin } from "./server";
 
 describe("coding homework grader plugin manifest", () => {
-  it("is registered under the renamed plugin and activity keys", () => {
+  it("keeps its stable keys while using the Programming Homework display name", () => {
     expect(codingHomeworkGraderPlugin.key).toBe("coding-homework-grader");
     expect(codingHomeworkGraderPlugin.activities[0]?.key).toBe("coding-homework-grader");
-    expect(codingHomeworkGraderPlugin.activities[0]?.name).toBe("Coding Homework Grader");
+    expect(codingHomeworkGraderPlugin.activities[0]?.name).toBe("Programming Homework");
     expect(codingHomeworkGraderServerPlugin.routes?.map((route) => route.path)).toEqual([
       "coding-homework-grader/simulation",
       "coding-homework-grader/workflow-settings",

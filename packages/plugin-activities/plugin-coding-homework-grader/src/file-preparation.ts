@@ -37,7 +37,7 @@ export function decodeHomeworkUpload(base64: string, maxBytes: number) {
 }
 export async function assertHomeworkStudentScope(scope: HomeworkStudentScope) {
   const activity = await getGroupAssignedActivity(scope.user, scope.courseId, scope.groupId, scope.activityId);
-  if (activity.activityType.key !== "coding-homework-grader") throw new AppError(404, "HOMEWORK_NOT_FOUND", "Coding Homework was not found.");
+  if (activity.activityType.key !== "coding-homework-grader") throw new AppError(404, "HOMEWORK_NOT_FOUND", "Programming Homework was not found.");
   const now = Date.now();
   if (activity.assignment.availableFrom && now < activity.assignment.availableFrom.getTime()
     || activity.assignment.availableUntil && now >= activity.assignment.availableUntil.getTime()) throw new AppError(403, "GROUP_ACTIVITY_NOT_AVAILABLE", "This activity is not currently available.");

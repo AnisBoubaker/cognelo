@@ -1,6 +1,10 @@
-# Coding Homework Grader detailed reference
+# Programming Homework detailed reference
 
 The [approved workflow](../../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) records product choices; the [progress record](../../../../docs/CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md) records local validation and commits. Version-2 preparation is the current student workflow. Legacy ZIP/analysis helpers remain for historical records and tests, but the old final-ZIP POST rejects new submissions.
+
+## Display name and compatibility
+
+The activity and plugin are displayed as **Programming Homework**, with localized picker/default-title/authoring labels. Course, section and activity-bank type badges resolve the same localized display name, including for existing activities. Internal `coding-homework-grader` identifiers remain unchanged. Plugin manifest migration `202611080010_programming_homework_display_name` updates existing `ActivityType` and `ActivityPluginInstallation` names without changing IDs, activation, assignments or teacher-authored titles. It is an idempotent data-only update, applied by `npm run db:migrate:all`; no schema or environment changes. New demo seed titles use the new name; do not reseed a deployed installation.
 
 ## Current state
 
@@ -67,7 +71,7 @@ The duplicate starts with final submissions disabled. Core section/student assig
 
 ## Seed Fixture
 
-The root Prisma seed creates `Coding homework grader: INF-155 TP1 Labyrinthe` as a complete dev fixture in Programming 101 / Section A. It reads `tmp/INF155-A2023-TP1.pdf` with `pdftotext`, attaches a copied PDF to the activity when the local file exists, uses `tmp/FichiersFournis` to build starter-file documentation, and stores bank/course plugin authoring rows, required ZIP structure/functions, a ready group documentation snapshot, a summative group assignment, and a gradebook item. Challenge question generation uses a course teacher/owner's configured question-authoring AI connection (or explicit homework model override); the seed does not point teacher question authoring at the local Ollama fallback.
+The root Prisma seed creates `Programming Homework: INF-155 TP1 Labyrinthe` as a complete dev fixture in Programming 101 / Section A. It reads `tmp/INF155-A2023-TP1.pdf` with `pdftotext`, attaches a copied PDF to the activity when the local file exists, uses `tmp/FichiersFournis` to build starter-file documentation, and stores bank/course plugin authoring rows, required ZIP structure/functions, a ready group documentation snapshot, a summative group assignment, and a gradebook item. Challenge question generation uses a course teacher/owner's configured question-authoring AI connection (or explicit homework model override); the seed does not point teacher question authoring at the local Ollama fallback.
 
 ## Legacy pipeline implementation (historical records)
 
@@ -75,23 +79,23 @@ The phased implementation plan lives in:
 
 - `docs/CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md`
 
-Phase 0 captured stable service contracts for the future implementation in `src/algorithm.ts`. Phase 1 renamed the package, plugin key, activity key, and localized picker metadata to Coding Homework Grader.
+Phase 0 captured stable service contracts for the future implementation in `src/algorithm.ts`. Phase 1 renamed the package, plugin key, activity key, and localized picker metadata to Coding Homework Grader. The later display-only name is Programming Homework; those internal identifiers remain stable.
 
 Phase 2 added the plugin-owned Prisma schema, generated client, and activation migration manifest. The plugin tables are registered through `src/db.ts` so the existing plugin activation/deactivation flow can create, back up, and restore them.
 
 Phase 3 added teacher authoring routes and UI. Teachers can edit assignment Markdown, upload an assignment PDF, edit/import structure requirements, preview the assignment text, and save bank-owned or course-owned plugin records. Assigning a bank activity to a course copies the bank assignment, requirement set, and safe attachment records into course-owned plugin rows so later bank edits and course edits diverge.
 
-Duplicating a bank-owned Coding Homework Grader activity copies its assignment, requirement set, and attachment records through the platform bank-duplication hook. Attachment rows are independent while continuing to reference the same stored immutable files. Moving retains the activity ID and all plugin-owned authoring rows.
+Duplicating a bank-owned Programming Homework activity copies its assignment, requirement set, and attachment records through the platform bank-duplication hook. Attachment rows are independent while continuing to reference the same stored immutable files. Moving retains the activity ID and all plugin-owned authoring rows.
 
 Phase 4 added prior-documentation preview and snapshot routes. Course activity authoring can show visible content resources that appear before the activity in the content tree and can write a `PluginCodingHomeworkDocumentationSnapshot` row with anchor metadata, included resource metadata, and a stable content-tree fingerprint. Activity bank authoring does not show this preview because banks have no course content tree.
 
-Phase 5 added extraction from snapshot resources through the shared content type plugin server interface. The Coding Homework Grader calls core's generic content extraction dispatcher and stores extracted documents plus diagnostics in `PluginCodingHomeworkDocumentationSnapshot.metadata.extraction`; text/file/PDF/GitHub-specific extraction logic stays in the owning content type plugins.
+Phase 5 added extraction from snapshot resources through the shared content type plugin server interface. The Programming Homework plugin calls core's generic content extraction dispatcher and stores extracted documents plus diagnostics in `PluginCodingHomeworkDocumentationSnapshot.metadata.extraction`; text/file/PDF/GitHub-specific extraction logic stays in the owning content type plugins.
 
 Phase 6 added `src/parsers.ts` with the language-neutral parser registry and first C parser adapter. It extracts C function definitions, emits deterministic normalized AST text, records source lines and code, and returns recoverable diagnostics for broken or unsupported files.
 
 Phase 7 added `src/zip.ts`, `src/validation.ts`, and `src/preflight.ts`. Students and teachers can upload a temporary ZIP for structure validation against teacher requirements; the service separates missing required items, unsupported files, parser diagnostics, ignored files, valid files, and valid functions. Preflight creates plugin-owned `PluginCodingHomeworkSubmission` rows with `kind = preflight` and temporary attachment metadata, but it does not create a core attempt, gradebook record, challenge questions, or a final submission.
 
-Phase 8 should not create a Coding Homework Grader-only vector database. Content resources belong to content type plugins, so content plugins should own extraction/chunking and invalidation decisions behind the shared content type plugin server interface, while production vector persistence/search should move to shared platform pgvector tables. The Coding Homework Grader should request similarity over prior course content through core/content-plugin dispatchers and store only the audit metadata it needs for selected references, nearest examples, generated questions, and submissions.
+Phase 8 should not create a Programming Homework-only vector database. Content resources belong to content type plugins, so content plugins should own extraction/chunking and invalidation decisions behind the shared content type plugin server interface, while production vector persistence/search should move to shared platform pgvector tables. The Programming Homework plugin should request similarity over prior course content through core/content-plugin dispatchers and store only the audit metadata it needs for selected references, nearest examples, generated questions, and submissions.
 
 Phase 8 added `src/reference-search.ts` and the `coding-homework-grader/reference-search` route. Reference search reads a documentation snapshot's included content resources, calls core's generic vector search dispatcher, and stores the latest search audit metadata on the snapshot. The plugin does not read or own prior-content vector tables.
 

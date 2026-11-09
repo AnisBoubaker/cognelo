@@ -35,7 +35,7 @@ For a specific plugin, begin with its package README and `PROJECT_MEMORY.md`. Th
 Activity plugin entry points:
 
 - [Programming Exercises](../packages/plugin-activities/plugin-coding-exercises/README.md)
-- [Coding Homework Grader](../packages/plugin-activities/plugin-coding-homework-grader/README.md)
+- [Programming Homework](../packages/plugin-activities/plugin-coding-homework-grader/README.md)
 - [MCQ](../packages/plugin-activities/plugin-mcq/README.md)
 - [Parsons](../packages/plugin-activities/plugin-parsons/README.md)
 - [Web Design Coding Exercises](../packages/plugin-activities/plugin-web-design-coding-exercises/README.md)
@@ -49,9 +49,9 @@ Open these only when changing or reviewing the named area:
 
 - [Atomic AI grading and interruption recovery](AI_GRADING_RUNS.md)
 - [AI feedback, grading, and challenges](AI_FEEDBACK_GRADING_CHALLENGES_IMPLEMENTATION_PLAN.md)
-- [Coding Homework Grader](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md)
-- [Coding Homework implementation progress](CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md): resumable implementation checklist, assumptions, validation and incremental commits.
-- [Coding Homework approved submission workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md): approved workflow, indexing/freshness policy, implementation assumptions and acceptance.
+- [Programming Homework](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md)
+- [Programming Homework implementation progress](CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md): resumable implementation checklist, assumptions, validation and incremental commits.
+- [Programming Homework approved submission workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md): approved workflow, indexing/freshness policy, implementation assumptions and acceptance.
 - [Content-type plugins](CONTENT_TYPE_PLUGIN_IMPLEMENTATION_PLAN.md)
 - [Course content tree](COURSE_CONTENT_TREE_IMPLEMENTATION_PLAN.md)
 - [Reopening student submissions](SUBMISSION_CONTINUATION.md)

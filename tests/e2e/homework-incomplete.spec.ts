@@ -20,7 +20,7 @@ test("teacher selects private solution signatures and student explicitly acknowl
     await fn.check(); await fn.uncheck();
     await solution.getByRole("button", { name: "Select functions with AI", exact: true }).click(); await expect(fn).toBeChecked();
     await teacherPage.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(teacherPage.getByText("Coding homework saved.", { exact: true })).toBeVisible();
+    await expect(teacherPage.getByText("Programming homework saved.", { exact: true })).toBeVisible();
     await teacherPage.reload();
     await expect(fn).toBeChecked();
     expect(await responseJson(await teacherApi.get(`${base}/authoring`))).toMatchObject({ requirements: { requirements: { requiredFunctions: [{ name: "add", filePath: "src/main.c", returnType: "int", parameterTypes: ["int*", "int"] }] } } });

@@ -1,8 +1,8 @@
-# Coding Homework submission workflow
+# Programming Homework submission workflow
 
 **Decision date: November 1, 2026. Status: implemented for local acceptance testing; see the progress record for completed checks.**
 
-This is the canonical record of the user's choices for the next Coding Homework delivery. It supersedes conflicting proposed behavior in the older [implementation plan](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md), particularly ZIP-only preparation, timing the entire upload/generation workflow, and rejecting every incomplete submission. The [plugin reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md) describes the current implementation. No production deployment is implied.
+This is the canonical record of the user's choices for the next Programming Homework delivery. It supersedes conflicting proposed behavior in the older [implementation plan](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md), particularly ZIP-only preparation, timing the entire upload/generation workflow, and rejecting every incomplete submission. The [plugin reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md) describes the current implementation. No production deployment is implied.
 
 ## Implementation clarifications — November 1, 2026
 
@@ -131,11 +131,11 @@ Hand-in records a compact manifest of hashes/function names, **not a copy of the
 ## Material selection, indexing and reuse
 
 - The teacher chooses course materials to use as question-generation references.
-- By default select **visible course material before the Coding Homework activity in course-content order**. Hidden material is offered but unchecked by default, including material inside hidden folders.
+- By default select **visible course material before the Programming Homework activity in course-content order**. Hidden material is offered but unchecked by default, including material inside hidden folders.
 - Checking a folder explicitly includes **all material within it, recursively**, including hidden material.
 - The teacher explicitly runs **Generate embeddings** before being allowed to enable final submissions.
 - Changing the selection requires rebuilding/validating the homework's prepared reference selection before enabling submissions. Reuse existing compatible vectors; generate only missing, changed or stale embeddings.
-- Do not pay to generate another embedding for unchanged, compatible material merely because a different Coding Homework selects that same material.
+- Do not pay to generate another embedding for unchanged, compatible material merely because a different Programming Homework selects that same material.
 - The material-selection UI should expose which selected sources are ready for reuse and which need generation/refresh, including repository freshness. This was requested as part of understanding what needs preparation.
 - Teachers can inspect the saved indexed text from Reference materials, including the exact pinned version for prepared homework. Obvious unreadable link shells must fail before embedding generation; indexing does not establish complete pedagogical coverage of arbitrary websites. The preview is read-only and makes no model calls.
 - Once final submissions are enabled, **do not regenerate embeddings for that enabled workflow**. Keep the prepared reference/index version stable even if a shared cache is later rebuilt for another homework. Pinning references must preserve reuse without letting another activity's refresh change an active workflow.

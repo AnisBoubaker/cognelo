@@ -1,4 +1,4 @@
-# Plugin: Coding Homework Grader
+# Plugin: Programming Homework
 
 `@cognelo/plugin-coding-homework-grader` provides C homework preparation, immutable hand-in, queued challenge questions, timed/SEB answering and teacher grading, individually or in teams.
 
@@ -27,6 +27,8 @@ Students may submit some or all challenge answers blank. Manual submission first
 Teacher **Review and grade** uses the shared wide dialog, with an aligned toolbar and separate Questions and answers / Submitted files tabs. Submitted files use the same read-only left-tab viewer and load on demand for the selected learner/submission. Numbered question cards show the submitted code and answer, including an explicit unanswered state. Grade and feedback stay beside the content on wide screens; historical/formative review remains read-only.
 
 **Preview indexed text** in Reference materials lets teachers inspect the saved passages used for question generation. Prepared homework shows its pinned reference version; unprepared material shows its latest saved index. The preview is read-only, paginated, private to course managers and makes no AI calls. Check that the expected teaching content is present; extraction does not guarantee completeness for every website.
+
+The display name is **Programming Homework** (French: **Devoir de programmation**). The package, plugin/activity keys, API routes and database identifiers retain `coding-homework-grader` for compatibility. Existing teacher-authored activity titles are preserved.
 
 ## Read by topic
 

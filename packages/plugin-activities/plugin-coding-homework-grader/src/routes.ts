@@ -305,7 +305,7 @@ export const codingHomeworkReprocessRoute: PluginRouteDefinition = {
         throw new AppError(404, "CODING_HOMEWORK_SUBMISSION_NOT_FOUND", "The requested submission was not found.");
       }
       if (submission.status === "ready_for_grading" || submission.status === "graded") {
-        throw new AppError(409, "CODING_HOMEWORK_SUBMISSION_LOCKED", "Completed coding homework submissions cannot be reprocessed.");
+        throw new AppError(409, "CODING_HOMEWORK_SUBMISSION_LOCKED", "Completed programming homework submissions cannot be reprocessed.");
       }
       if (submission.status === "invalid_structure") {
         throw new AppError(400, "CODING_HOMEWORK_SUBMISSION_INVALID_STRUCTURE", "Fix the submission structure before reprocessing.");

@@ -369,7 +369,7 @@ async function assertCanGenerateQuestions(scope: GenerationScope) {
   if (await canManageCourse(scope.user, scope.courseId)) {
     return;
   }
-  throw new AppError(403, "FORBIDDEN", "Only course staff can generate coding homework challenge questions.");
+  throw new AppError(403, "FORBIDDEN", "Only course staff can generate programming homework challenge questions.");
 }
 
 async function resolveAiConnection(scope: GenerationScope, kind: GenerationOptions["aiConnectionKind"], settings: unknown) {

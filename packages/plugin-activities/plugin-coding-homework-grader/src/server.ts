@@ -92,7 +92,7 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
   grading: {
     gradeAttempt: async ({ activityId, pluginAttemptRef }) => {
       if (!pluginAttemptRef) {
-        throw new AppError(400, "CODING_HOMEWORK_SUBMISSION_REF_REQUIRED", "Coding homework grading requires a submission reference.");
+        throw new AppError(400, "CODING_HOMEWORK_SUBMISSION_REF_REQUIRED", "Programming homework grading requires a submission reference.");
       }
       const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({
         where: {
@@ -104,11 +104,11 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
         }
       });
       if (!submission) {
-        throw new AppError(404, "CODING_HOMEWORK_SUBMISSION_NOT_FOUND", "The coding homework submission was not found.");
+        throw new AppError(404, "CODING_HOMEWORK_SUBMISSION_NOT_FOUND", "The programming homework submission was not found.");
       }
       const review = submission.reviews[0];
       if (!review || review.score === null || review.maxScore === null) {
-        throw new AppError(409, "CODING_HOMEWORK_MANUAL_GRADE_REQUIRED", "This coding homework submission requires manual grading.");
+        throw new AppError(409, "CODING_HOMEWORK_MANUAL_GRADE_REQUIRED", "This programming homework submission requires manual grading.");
       }
       return {
         rawScore: review.score,

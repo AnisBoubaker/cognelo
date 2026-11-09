@@ -31,7 +31,7 @@ for (const owner of ["bank", "course"] as const) test(`${owner} homework solutio
   });
   expect(geometry.width).toBeLessThanOrEqual(20); expect(geometry.height).toBeLessThanOrEqual(20); expect(geometry.sameLine).toBe(true);
   await fileChoice.check(); await selector.getByRole("checkbox", { name: "int add(int) Solution/main.c", exact: true }).check();
-  await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.getByText("Coding homework saved.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.getByText("Programming homework saved.", { exact: true })).toBeVisible();
 
   // Finder-created resource forks look like C files but contain binary NUL bytes.
   await upload([
@@ -48,7 +48,7 @@ for (const owner of ["bank", "course"] as const) test(`${owner} homework solutio
   expect(solution.files.map(file => file.path)).toEqual(["main.c", "main.h"]);
   const replacedRevision = solution.revision;
   await selector.getByRole("checkbox", { name: "int helper(void) main.c", exact: true }).check();
-  await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.getByText("Coding homework saved.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.getByText("Programming homework saved.", { exact: true })).toBeVisible();
   await page.getByLabel("Description", { exact: true }).fill("An unrelated unsaved description.");
   await selector.getByRole("button", { name: "Remove function: main.c:helper", exact: true }).click();
   await expect(selector.getByRole("checkbox", { name: "int helper(void) main.c", exact: true })).toHaveCount(0);

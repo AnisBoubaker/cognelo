@@ -122,7 +122,7 @@ function normalizeProcessingPayload(payload: Record<string, unknown>): CodingHom
   const activityId = typeof payload.activityId === "string" ? payload.activityId.trim() : "";
   const user = normalizeUser(payload.user);
   if (!submissionId || !courseId || !groupId || !activityId || !user) {
-    throw new NonRetryableBackgroundJobError("Coding homework submission processing job payload is invalid.", "CODING_HOMEWORK_JOB_PAYLOAD_INVALID");
+    throw new NonRetryableBackgroundJobError("Programming homework submission processing job payload is invalid.", "CODING_HOMEWORK_JOB_PAYLOAD_INVALID");
   }
   return {
     activityId,

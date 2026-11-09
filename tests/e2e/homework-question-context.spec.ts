@@ -31,7 +31,7 @@ test("homework questions use course language and teacher policy, and show submit
     finally { releaseSave(); }
     await teacherPage.unroute(`**${base}/authoring`);
 
-    await expect(teacherPage.getByText("Coding homework saved.", { exact: true })).toBeVisible();
+    await expect(teacherPage.getByText("Programming homework saved.", { exact: true })).toBeVisible();
     await teacherPage.reload();
     await teacherPage.getByRole("tab", { name: "Settings", exact: true }).click();
     await expect(settings.getByLabel("AI question-generation instructions", { exact: true })).toHaveValue(instruction);

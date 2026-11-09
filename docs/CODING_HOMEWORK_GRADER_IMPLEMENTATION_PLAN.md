@@ -1,5 +1,6 @@
-# Coding Homework Grader Implementation Plan
+# Programming Homework Implementation Plan
 
+The current display name is **Programming Homework**; legacy `coding-homework-grader` identifiers remain stable. See the [naming compatibility contract](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md#display-name-and-compatibility).
 This plan describes the phased implementation of the new Coding Homework Grader activity plugin.
 
 The [approved November 1, 2026 workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) is implemented for local testing: persistent individual-file/ZIP preparation, private solution-derived static validation, prepared reusable material references, manual submission opening, immutable hand-in, bounded durable generation, explicit SEB/timed answering and teacher cancellation. See the [progress record](CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md) for exact acceptance runs and remaining final checks. Historical phases below describe the prior pipeline where they conflict with the approved workflow.

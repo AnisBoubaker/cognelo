@@ -55,7 +55,7 @@ This document preserves detailed Coding Homework Grader decisions. Load only the
 - Pgvector migration is intentionally deferred until vector-size/model decisions are made. Pending decisions include embedding provider/model key, dimensions, multi-model table strategy, whether submitted functions share the common vector tables, index type, content fingerprint invalidation, and sync vs background indexing.
 - Activity-bank authoring intentionally does not show documentation preview or snapshot actions because banks do not have a course content tree.
 - Phase 1 renamed the scaffold package to `@cognelo/plugin-coding-homework-grader`, the plugin and activity keys to `coding-homework-grader`, and the plugin database namespace to `plugin_coding_homework_grader`.
-- The picker display name is Coding Homework Grader and the activity remains in the Programming category.
+- The picker originally used Coding Homework Grader. Since November 8, 2026 it uses Programming Homework (Devoir de programmation in French), still in the Programming category; all internal identifiers remain stable.
 - Phase 0 added `src/algorithm.ts` with stable TypeScript-facing contracts for source files, submission requirements, structure validation summaries, parser adapters, AST functions, embeddings, candidate selection, and challenge question generation.
 - The first parser implementation should target C, but the contracts are intentionally language-neutral so future parser adapters can support additional languages.
 - The research prototype in `tmp/challenge-questions/scripts` is reference material only. Production plugin code must not import, execute, or otherwise depend on files under `tmp`.

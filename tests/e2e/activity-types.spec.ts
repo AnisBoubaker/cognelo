@@ -665,7 +665,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await verifyContinuation();
   });
 
-  test("teacher authors a Coding Homework assignment and the student completes ZIP and challenge stages", async ({ teacherPage, studentPage }) => {
+  test("teacher authors a Programming Homework assignment and the student completes ZIP and challenge stages", async ({ teacherPage, studentPage }) => {
     test.setTimeout(240_000);
     if (!data) throw new Error("The activity suite was not provisioned.");
     const model = await homeworkModelFixture(data);
@@ -673,19 +673,19 @@ test.describe.serial("authoring and completing every activity type", () => {
     const title = `E2E authored coding homework ${data.token}`;
     const bankActivityId = await createBankActivityThroughUi(teacherPage, data, {
       category: "Programming",
-      typeName: "Coding Homework Grader"
+      typeName: "Programming Homework"
     });
 
-    await expect(teacherPage.getByRole("heading", { name: "Coding Homework Grader authoring" })).toBeVisible();
+    await expect(teacherPage.getByRole("heading", { name: "Programming Homework authoring" })).toBeVisible();
     await teacherPage.getByLabel("Title", { exact: true }).fill(title);
     await teacherPage.getByLabel("Description").fill("Submit a small C program and explain its behavior.");
     await teacherPage.getByLabel("Assignment text").fill("Implement `main` in `main.c`, then submit the project ZIP.");
-    await teacherPage.getByLabel("Questions").fill("1");
+    await teacherPage.getByRole("spinbutton", { name: "Questions", exact: true }).fill("1");
     await teacherPage.getByLabel("Required files").fill("main.c");
     await teacherPage.getByLabel("Required functions").fill("main");
     await teacherPage.getByLabel("Allowed extensions").fill(".c");
     await teacherPage.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(teacherPage.getByText("Coding homework saved.", { exact: true })).toBeVisible();
+    await expect(teacherPage.getByText("Programming homework saved.", { exact: true })).toBeVisible();
     await publishCurrentBankActivity(teacherPage);
 
     const assignedHomework = await copyAndAssignBankActivity(data, {
@@ -701,7 +701,17 @@ test.describe.serial("authoring and completing every activity type", () => {
       await responseJson(await homeworkApi.put(`${base}/workflow-settings`, { data: { selected: [] } }));
       await responseJson(await homeworkApi.post(`${base}/prepare-references`, { data: {} }));
       await responseJson(await homeworkApi.put(`${base}/workflow-settings`, { data: { enabled: true } }));
+      await responseJson(await homeworkApi.post(`/api/courses/${data.courseId}/content/activities`, { data: {
+        activityId: assignedHomework.activityId, parentId: null, titleSnapshot: title, isVisible: true, position: 0, metadata: { e2e: true }
+      } }));
     } finally { await homeworkApi.dispose(); }
+
+    for (const destination of [`/activity-banks/${data.activityBankId}`, `/courses/${data.courseId}?tab=content`]) {
+      await teacherPage.goto(destination);
+      const row = teacherPage.getByRole("link", { name: title, exact: true })
+        .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' table-main ')][1]");
+      await expect(row.locator(".metadata-badge.is-activity-type")).toHaveText("Programming Homework");
+    }
 
     const submissionZip = createStoredZip([
       {
@@ -731,6 +741,7 @@ test.describe.serial("authoring and completing every activity type", () => {
       .getByText(title, { exact: true })
       .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' table-main ')][1]");
     await expect(homeworkRow.getByText("Submitted", { exact: true })).toBeVisible();
+    await expect(homeworkRow.locator(".metadata-badge.is-activity-type")).toHaveText("Programming Homework");
     const verifyContinuation = await reopenLatestSubmission(data, title);
     await openStudentActivity(studentPage, data, title);
     await expect(studentPage.locator('textarea[id^="answer-"]').first()).toHaveValue("The main function prints a greeting and exits successfully.");

@@ -1149,7 +1149,7 @@ async function main() {
     id: CODING_HOMEWORK_BANK_ACTIVITY_ID,
     bankId: programmingBasicsBank.id,
     activityTypeId: codingHomeworkType.id,
-    title: "Coding homework grader: INF-155 TP1 Labyrinthe",
+    title: "Programming Homework: INF-155 TP1 Labyrinthe",
     description: "Submit the C labyrinth solver project as a ZIP, then answer generated challenge questions.",
     lifecycle: "published",
     config: codingHomeworkConfig,
@@ -1707,7 +1707,7 @@ async function main() {
   await prisma.activity.upsert({
     where: { id: CODING_HOMEWORK_ACTIVITY_ID },
     update: {
-      title: "Coding homework grader: INF-155 TP1 Labyrinthe",
+      title: "Programming Homework: INF-155 TP1 Labyrinthe",
       description: "Submit the C labyrinth solver project as a ZIP, then answer generated challenge questions.",
       lifecycle: "published",
       config: codingHomeworkConfig,
@@ -1727,7 +1727,7 @@ async function main() {
       id: CODING_HOMEWORK_ACTIVITY_ID,
       courseId: course.id,
       activityTypeId: codingHomeworkType.id,
-      title: "Coding homework grader: INF-155 TP1 Labyrinthe",
+      title: "Programming Homework: INF-155 TP1 Labyrinthe",
       description: "Submit the C labyrinth solver project as a ZIP, then answer generated challenge questions.",
       lifecycle: "published",
       config: codingHomeworkConfig,
@@ -2378,7 +2378,7 @@ async function main() {
   await prisma.gradebookItem.upsert({
     where: { groupActivityId: codingHomeworkAssignment.id },
     update: {
-      titleSnapshot: "Coding homework grader: INF-155 TP1 Labyrinthe",
+      titleSnapshot: "Programming Homework: INF-155 TP1 Labyrinthe",
       pointsPossible: 100,
       gradingMode: "points",
       attemptLimitMode: "max_attempts",
@@ -2391,7 +2391,7 @@ async function main() {
       groupId: group.id,
       groupActivityId: codingHomeworkAssignment.id,
       activityId: CODING_HOMEWORK_ACTIVITY_ID,
-      titleSnapshot: "Coding homework grader: INF-155 TP1 Labyrinthe",
+      titleSnapshot: "Programming Homework: INF-155 TP1 Labyrinthe",
       pointsPossible: 100,
       gradingMode: "points",
       attemptLimitMode: "max_attempts",

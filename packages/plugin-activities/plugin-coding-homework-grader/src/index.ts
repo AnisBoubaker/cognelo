@@ -11,7 +11,7 @@ export * from "./web/coding-homework-manual-grading-panel";
 export const codingHomeworkGraderPlugin: ActivityPlugin = {
   key: "coding-homework-grader",
   packageName: "@cognelo/plugin-coding-homework-grader",
-  name: "Coding Homework Grader",
+  name: "Programming Homework",
   db: codingHomeworkGraderDatabaseModule,
   activities: [
     {
@@ -20,7 +20,7 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
       supportsTeamwork: true,
       usesMaterialEmbeddings: true,
       authoring: { settingsTab: true, simulationTab: true },
-      name: "Coding Homework Grader",
+      name: "Programming Homework",
       description: "Programming assignment submission and grading workflow.",
       defaultCategoryIds: ["programming"],
       icon: "file-code",
@@ -40,24 +40,24 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
       },
       i18n: {
         en: {
-          name: "Coding Homework Grader",
+          name: "Programming Homework",
           description: "Programming assignment submission and grading workflow.",
-          defaultTitle: "Coding Homework Grader"
+          defaultTitle: "Programming Homework"
         },
         fr: {
-          name: "Correcteur de devoirs de programmation",
-          description: "Flux futur pour la remise et l'évaluation des devoirs de programmation.",
-          defaultTitle: "Correcteur de devoirs de programmation"
+          name: "Devoir de programmation",
+          description: "Remise et évaluation des devoirs de programmation.",
+          defaultTitle: "Devoir de programmation"
         },
         zh: {
-          name: "编程作业评分器",
-          description: "未来用于编程作业提交与评分的流程。",
-          defaultTitle: "编程作业评分器"
+          name: "编程作业",
+          description: "编程作业提交与评分流程。",
+          defaultTitle: "编程作业"
         },
         ar: {
-          name: "مصَحح واجبات البرمجة",
-          description: "سير عمل مستقبلي لتسليم واجبات البرمجة وتصحيحها.",
-          defaultTitle: "مصَحح واجبات البرمجة"
+          name: "واجب البرمجة",
+          description: "سير عمل لتسليم واجبات البرمجة وتصحيحها.",
+          defaultTitle: "واجب البرمجة"
         }
       },
       defaultConfig: {
