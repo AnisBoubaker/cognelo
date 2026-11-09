@@ -27,3 +27,5 @@ export { SideNavigation, sideNavigationItemId, type SideNavigationItem } from ".
 
 export * from "./activity-reference-authoring";
 export * from "./toggle-switch";
+
+export * from "./help-tooltip";

@@ -6854,7 +6854,6 @@ button:hover > .disclosure-indicator {
 .content-resource-body .markdown-renderer, .text-material-page .markdown-renderer, .content-resource-dialog .markdown-renderer { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .content-resource-dialog { --dialog-padding: 16px; } }
 
-.date-time-zone-label { grid-column: 1 / -1; }
 
 /* Core activity chat: one shared treatment for learners, teachers and review. */
 .dialog-panel.activity-chat-dialog {
@@ -7012,3 +7011,17 @@ button:hover > .disclosure-indicator {
 
 .homework-authoring-panel [hidden] { display: none !important; }
 .activity-stage-duration { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+
+.help-label { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.help-label > :is(h1,h2,h3,h4,h5,h6,label,strong) { margin: 0; min-width: 0; }
+.help-label > .field { flex: 1; }
+.help-label > label { font-weight: 600; }
+button.help-tooltip-trigger { display: inline-flex; flex: 0 0 24px; align-items: center; justify-content: center; width: 24px; min-width: 24px; height: 24px; min-height: 24px; padding: 2px; margin: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); box-shadow: none; vertical-align: middle; }
+button.help-tooltip-trigger:hover, button.help-tooltip-trigger:focus-visible { color: var(--brand-blue); background: color-mix(in srgb, var(--brand-blue), transparent 92%); transform: none; }
+.help-tooltip-content { position: fixed; z-index: 1200; max-width: calc(100vw - 24px); max-height: min(420px, calc(100dvh - 24px)); overflow: auto; overflow-wrap: anywhere; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface, white); color: var(--ink, #162148); font-size: 14px; font-weight: 400; line-height: 1.5; box-shadow: 0 8px 28px rgb(13 27 71 / 18%); white-space: normal; }
+.help-tooltip-content p { margin: 0; }
+.help-tooltip-content p + p { margin-top: 8px; }
+
+.toggle-switch > label.toggle-switch-label { margin: 0; cursor: inherit; }
+
+.activity-stage-schedule legend { display: flex; align-items: center; gap: 6px; max-width: 100%; }

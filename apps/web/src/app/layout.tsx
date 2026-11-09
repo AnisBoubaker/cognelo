@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { AppHelpProvider } from "@/components/app-help-provider";
 import { AppTimeProvider } from "@/components/application-time-provider";
 import { AuthProvider } from "@/components/auth-provider";
 import { AppDialogProvider } from "@/components/dialog-provider";
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <AuthProvider>
           <I18nProvider>
+            <AppHelpProvider>
             <AppTimeProvider>
             <AppNotificationProvider>
               <AppDialogProvider>
@@ -35,6 +37,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </AppDialogProvider>
             </AppNotificationProvider>
             </AppTimeProvider>
+            </AppHelpProvider>
           </I18nProvider>
         </AuthProvider>
       </body>
