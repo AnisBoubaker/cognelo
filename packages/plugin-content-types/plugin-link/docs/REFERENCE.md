@@ -24,13 +24,15 @@ Generation uses the teacher’s configured question-authoring AI agent. The cour
 
 ### One-level same-domain sources
 
+Private-summary explanations and link-following limits use shared contextual help after their labels, accessible through hover, keyboard focus or touch. The included/unavailable/omitted source report remains visible.
+
 The optional **Follow one level of same domain links** checkbox is unchecked by default and saved in the private settings row. The browser sends its current unsaved value with generation; toggling it alone never fetches a page. It does not affect the public link target or embedding hooks.
 
 After the main URL passes its HTTP 200 check, the server parses HTML anchors, respects the first HTML `base` URL, resolves relative URLs against the final response URL, removes fragments, deduplicates destinations, and excludes the root URL. Only HTTP(S) links with the exact same hostname as the final main page are candidates; subdomains and lookalike suffixes are excluded. Anchor-only, credential-bearing, and non-web URLs are excluded. Plain-text sources have no discovered links. Redirects of linked pages must remain on that hostname, with every hop passing the usual public-address/DNS-pinning checks. This blocks off-domain redirects before any request to the new host.
 
 At most **20 directly linked pages**, in document order, are fetched, with at most **three concurrent requests** and a **30-second total linked-page budget** (in addition to the main-page check). Each request retains its 10-second timeout, three-redirect limit, supported-content checks, and 2 MiB body/decompression limit. No child links are traversed. Redirects resolving to an already included page are deduplicated in the AI source set.
 
-A failed main-page check aborts generation before AI. Unreadable/blocked/failed children are counted and skipped while retaining successful content. The UI reports included, unavailable, and omitted-page counts and whether source text was shortened; the 20-page limit is visible next to the checkbox. The main page plus every successful unique child is supplied in one AI request, with each page’s text and URL (without query/fragment) delimited separately. The prompt requests one combined summary in the course language and the existing total word limit. Combined extracted source text is capped at **200,000 characters**, divided equally across successful pages when needed; each page retains its original 24,000-character extraction limit.
+A failed main-page check aborts generation before AI. Unreadable/blocked/failed children are counted and skipped while retaining successful content. The UI reports included, unavailable, and omitted-page counts and whether source text was shortened; the 20-page limit is available in the checkbox’s contextual help. The main page plus every successful unique child is supplied in one AI request, with each page’s text and URL (without query/fragment) delimited separately. The prompt requests one combined summary in the course language and the existing total word limit. Combined extracted source text is capped at **200,000 characters**, divided equally across successful pages when needed; each page retains its original 24,000-character extraction limit.
 
 ## Migration and verification
 

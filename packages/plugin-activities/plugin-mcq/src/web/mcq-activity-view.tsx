@@ -1,11 +1,11 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { DialogHeader, getDialogCloseLabel } from "@cognelo/activity-ui";
 
 import { ActionIcon, isActivityContentClosedError } from "@cognelo/activity-ui";
 
 import { useApplicationTime } from "@cognelo/activity-ui";
-
 
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
@@ -706,8 +706,8 @@ export function McqActivityView({
       <>
       <form className="section stack" onSubmit={saveMcq}>
         <div className="stack">
-          <h2>{copy.authoringTitle}</h2>
-          <p className="muted">{copy.authoringHelp}</p>
+          <HelpLabel help={<>{copy.authoringHelp}</>}><h2>{copy.authoringTitle}</h2></HelpLabel>
+
         </div>
 
         <div className="field">
@@ -733,7 +733,7 @@ export function McqActivityView({
             <div className="stack" style={{ marginTop: 16 }}>
               <KnowledgeGenerationModeField locale={locale} />
               <div className="field">
-                <label htmlFor="mcq-ai-instructions">{copy.aiInstructions}</label>
+                <HelpLabel help={copy.generateHelp}><label htmlFor="mcq-ai-instructions">{copy.aiInstructions}</label></HelpLabel>
                 <textarea
                   id="mcq-ai-instructions"
                   maxLength={4000}
@@ -767,7 +767,7 @@ export function McqActivityView({
                   ))}
                 </select>
               </div>
-              <p className="muted">{copy.generateHelp}</p>
+
               <div className="row">
                 <button type="button" disabled={generating || description.trim().length < 10} onClick={requestMcqGeneration}>
                   <ActionIcon name="generate" />
@@ -800,23 +800,20 @@ export function McqActivityView({
           </div>
         ) : null}
 
-        <label style={{ alignItems: "flex-start", display: "flex", gap: 12 }}>
+        <HelpLabel help={copy.randomizeChoicesHelp}><label style={{ alignItems: "flex-start", display: "flex", gap: 12 }}>
           <input
             checked={randomizeChoices}
             type="checkbox"
             style={{ flex: "0 0 auto", marginTop: 4, minHeight: 0, width: "auto" }}
             onChange={(event) => setRandomizeChoices(event.target.checked)}
           />
-          <span className="stack" style={{ gap: 4 }}>
-            <strong>{copy.randomizeChoices}</strong>
-            <span className="muted">{copy.randomizeChoicesHelp}</span>
-          </span>
-        </label>
+          <span>{copy.randomizeChoices}</span>
+        </label></HelpLabel>
 
         <section className="inline-panel stack">
           <div>
-            <h3>{copy.aiFeedbackSection}</h3>
-            <p className="muted">{copy.aiFeedbackHelp}</p>
+            <HelpLabel help={<>{copy.aiFeedbackHelp}</>}><h3>{copy.aiFeedbackSection}</h3></HelpLabel>
+
           </div>
           <label className="checkbox-row">
             <input checked={aiFeedbackEnabled} type="checkbox" onChange={(event) => setAiFeedbackEnabled(event.target.checked)} />

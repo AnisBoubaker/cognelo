@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { DialogCloseButton, DialogHeader, getDialogCloseLabel } from "@cognelo/activity-ui";
 
@@ -1454,10 +1455,10 @@ export function CodingExerciseActivityView({
               title={t("generateRubric")}
               message={<div className="stack">
                 <div className="field">
-                  <label htmlFor={rubricGuidanceId}>{t("rubricGuidanceLabel")}</label>
+                  <HelpLabel help={<>{t("rubricGuidanceHelp")}</>}><label htmlFor={rubricGuidanceId}>{t("rubricGuidanceLabel")}</label></HelpLabel>
                   <textarea id={rubricGuidanceId} autoFocus rows={5} maxLength={8000}
                     value={rubricGuidanceDraft} onChange={(event) => setRubricGuidanceDraft(event.target.value)} />
-                  <p className="muted">{t("rubricGuidanceHelp")}</p>
+
                 </div>
                 {privateConfig.aiFeedback.criteria.length ? <p>{t("replaceRubricMessage")}</p> : null}
               </div>}
@@ -1509,11 +1510,13 @@ export function CodingExerciseActivityView({
               >
                 <DialogHeader closeLabel={getDialogCloseLabel(locale)} onClose={() => setTestGenerationDialogOpen(false)}>
                   <p className="eyebrow">{t("generateTests")}</p>
-                  <h2 id="coding-generation-tests-title">{t("generateTestsDialogTitle")}</h2></DialogHeader>
-                  <p className="muted" id="coding-generation-tests-description">{t("generateTestsDialogMessage")}</p>
+                  <HelpLabel help={<>{t("generateTestsDialogMessage")}</>}><h2 id="coding-generation-tests-title">{t("generateTestsDialogTitle")}</h2></HelpLabel></DialogHeader>
+                  <span className="sr-only" id="coding-generation-tests-description">{t("generateTestsDialogMessage")}</span>
 
                 <div className="field">
-                  <label htmlFor="coding-generation-test-mode">{t("testGenerationMode")}</label>
+                  <HelpLabel help={<>
+                    {t(testGenerationMode === "add" ? "addTestsMessage" : "replaceTestsMessage")}
+                  </>}><label htmlFor="coding-generation-test-mode">{t("testGenerationMode")}</label></HelpLabel>
                   <select
                     id="coding-generation-test-mode"
                     aria-describedby="coding-generation-test-mode-help"
@@ -1523,9 +1526,9 @@ export function CodingExerciseActivityView({
                     <option value="add">{t("addGeneratedTests")}</option>
                     <option value="replace">{t("replaceGeneratedTests")}</option>
                   </select>
-                  <p className="muted" id="coding-generation-test-mode-help">
+                  <span className="sr-only" id="coding-generation-test-mode-help">
                     {t(testGenerationMode === "add" ? "addTestsMessage" : "replaceTestsMessage")}
-                  </p>
+                  </span>
                 </div>
                 <div className="form-grid two-columns">
                   <div className="field">
@@ -1593,10 +1596,8 @@ export function CodingExerciseActivityView({
           </div>
 
           <div className="stack">
-            <label className="editor-section-label">{t("referenceSolution")}</label>
-            <p className="muted" style={{ margin: 0 }}>
-              {t("referenceSolutionHelp")}
-            </p>
+            <HelpLabel help={<>{t("referenceSolutionHelp")}</>}><label className="editor-section-label">{t("referenceSolution")}</label></HelpLabel>
+
             <CodeEditor
               value={referenceSolution}
               onChange={(value) => {
@@ -1617,13 +1618,8 @@ export function CodingExerciseActivityView({
           </div>
 
           <div className="stack">
-            <label className="editor-section-label">{t("templateSource")}</label>
-            <p className="muted" style={{ margin: 0 }}>
-              {t("templateSourceHelp")}
-            </p>
-            <p className="muted" style={{ margin: 0 }}>
-              {t("templateVisibleLinesHelp")}
-            </p>
+            <HelpLabel help={<><p>{t("templateSourceHelp")}</p><p>{t("templateVisibleLinesHelp")}</p></>}><label className="editor-section-label">{t("templateSource")}</label></HelpLabel>
+
             <CodeEditor
               value={privateConfig.templateSource || buildCodingExerciseTemplateSource("", "")}
               onChange={(value) => {
@@ -1678,8 +1674,8 @@ export function CodingExerciseActivityView({
 
           {renderAuthoringGrading(<div className="stack">
             <div>
-              <h2>{t("gradingTitle")}</h2>
-              <p className="muted">{t("gradingHelp")}</p>
+              <HelpLabel help={<>{t("gradingHelp")}</>}><h2>{t("gradingTitle")}</h2></HelpLabel>
+
             </div>
             <div className="settings-layout coding-exercise-grading-layout">
               <aside className="settings-nav coding-exercise-grading-nav" aria-label={t("gradingSections")} role="tablist">
@@ -1760,8 +1756,8 @@ export function CodingExerciseActivityView({
 
             <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
               <div>
-                <h3>{t("rubricTitle")}</h3>
-                <p className="muted">{t("rubricHelp")}</p>
+                <HelpLabel help={<>{t("rubricHelp")}</>}><h3>{t("rubricTitle")}</h3></HelpLabel>
+
               </div>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                 <h4>{t("rubricCriteria")}</h4>
@@ -1852,8 +1848,8 @@ export function CodingExerciseActivityView({
 
             <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
               <div>
-                <h3>{t("aiFeedbackTitle")}</h3>
-                <p className="muted">{t("aiFeedbackHelp")}</p>
+                <HelpLabel help={<>{t("aiFeedbackHelp")}</>}><h3>{t("aiFeedbackTitle")}</h3></HelpLabel>
+
               </div>
               <label className="checkbox-row">
                 <input
@@ -1959,7 +1955,11 @@ export function CodingExerciseActivityView({
                       <textarea rows={3} value={test.input} onChange={(event) => updateSampleTest(index, "input", event.target.value)} />
                     </div>
                     <div className="field">
-                      <label htmlFor={`sample-output-match-mode-${index}`}>{t("outputMatchMode")}</label>
+                      <HelpLabel help={<>{test.outputMatchMode === "contains_lines"
+                          ? t("outputMatchContainsLinesHelp")
+                          : test.outputMatchMode === "regex"
+                            ? t("outputMatchRegexHelp")
+                            : t("outputMatchExactHelp")}</>}><label htmlFor={`sample-output-match-mode-${index}`}>{t("outputMatchMode")}</label></HelpLabel>
                       <select
                         id={`sample-output-match-mode-${index}`}
                         value={test.outputMatchMode}
@@ -1969,13 +1969,7 @@ export function CodingExerciseActivityView({
                         <option value="contains_lines">{t("outputMatchContainsLines")}</option>
                         <option value="regex">{t("outputMatchRegex")}</option>
                       </select>
-                      <p className="muted" style={{ margin: 0 }}>
-                        {test.outputMatchMode === "contains_lines"
-                          ? t("outputMatchContainsLinesHelp")
-                          : test.outputMatchMode === "regex"
-                            ? t("outputMatchRegexHelp")
-                            : t("outputMatchExactHelp")}
-                      </p>
+
                     </div>
                     {test.outputMatchMode === "contains_lines" ? (
                       <label className="row" style={{ alignItems: "center", gap: 8 }}>
@@ -1993,10 +1987,8 @@ export function CodingExerciseActivityView({
                       <textarea rows={3} value={test.output} onChange={(event) => updateSampleTest(index, "output", event.target.value)} />
                     </div>
                     <div className="stack">
-                      <label className="editor-section-label">{t("testHarnessCode")}</label>
-                      <p className="muted" style={{ margin: 0 }}>
-                        {t("testHarnessCodeHelp")}
-                      </p>
+                      <HelpLabel help={<>{t("testHarnessCodeHelp")}</>}><label className="editor-section-label">{t("testHarnessCode")}</label></HelpLabel>
+
                       <CodeEditor
                         value={test.testCode}
                         onChange={(value) => updateSampleTest(index, "testCode", value)}
@@ -2013,13 +2005,13 @@ export function CodingExerciseActivityView({
 
           <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-              <h3>{t("hiddenTests")}</h3>
+              <HelpLabel help={<>{t("hiddenTestsHelp")}</>}><h3>{t("hiddenTests")}</h3></HelpLabel>
               <button type="button" className="button secondary" disabled={!config.language} onClick={addHiddenTest}>
                 <ActionIcon name="add" />
                 {t("addHiddenTest")}
               </button>
             </div>
-            <p className="muted">{t("hiddenTestsHelp")}</p>
+
             {hiddenTests.map((test, index) => (
               <section key={test.id} className="stack" style={{ border: "1px solid rgba(13, 27, 71, 0.08)", borderRadius: 12, padding: 16 }}>
                 <button
@@ -2060,7 +2052,11 @@ export function CodingExerciseActivityView({
                       <textarea rows={3} value={test.stdin} onChange={(event) => updateHiddenTest(index, "stdin", event.target.value)} />
                     </div>
                     <div className="field">
-                      <label htmlFor={`hidden-output-match-mode-${index}`}>{t("outputMatchMode")}</label>
+                      <HelpLabel help={<>{test.outputMatchMode === "contains_lines"
+                          ? t("outputMatchContainsLinesHelp")
+                          : test.outputMatchMode === "regex"
+                            ? t("outputMatchRegexHelp")
+                            : t("outputMatchExactHelp")}</>}><label htmlFor={`hidden-output-match-mode-${index}`}>{t("outputMatchMode")}</label></HelpLabel>
                       <select
                         id={`hidden-output-match-mode-${index}`}
                         value={test.outputMatchMode}
@@ -2070,13 +2066,7 @@ export function CodingExerciseActivityView({
                         <option value="contains_lines">{t("outputMatchContainsLines")}</option>
                         <option value="regex">{t("outputMatchRegex")}</option>
                       </select>
-                      <p className="muted" style={{ margin: 0 }}>
-                        {test.outputMatchMode === "contains_lines"
-                          ? t("outputMatchContainsLinesHelp")
-                          : test.outputMatchMode === "regex"
-                            ? t("outputMatchRegexHelp")
-                            : t("outputMatchExactHelp")}
-                      </p>
+
                     </div>
                     {test.outputMatchMode === "contains_lines" ? (
                       <label className="row" style={{ alignItems: "center", gap: 8 }}>
@@ -2098,10 +2088,8 @@ export function CodingExerciseActivityView({
                       />
                     </div>
                     <div className="stack">
-                      <label className="editor-section-label">{t("testHarnessCode")}</label>
-                      <p className="muted" style={{ margin: 0 }}>
-                        {t("testHarnessCodeHelp")}
-                      </p>
+                      <HelpLabel help={<>{t("testHarnessCodeHelp")}</>}><label className="editor-section-label">{t("testHarnessCode")}</label></HelpLabel>
+
                       <CodeEditor
                         value={test.testCode}
                         onChange={(value) => updateHiddenTest(index, "testCode", value)}

@@ -18,6 +18,8 @@ Student prompts may contain long reading passages up to 30,000 characters. The M
 
 ## Authoring Model
 
+Teacher background guidance is attached to its heading or label through shared contextual help. The circled question mark follows the text on the same line; hover/focus reveals the explanation and click/tap pins it. Preserve input/heading accessible names, description associations and draft/save behavior. Errors and warnings continue through existing notifications. See [the shared contract](../../../../docs/CONTEXTUAL_HELP.md).
+
 The main MCQ source is written as text.
 
 - `##` headings define questions

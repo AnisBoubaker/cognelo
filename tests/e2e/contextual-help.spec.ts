@@ -79,3 +79,35 @@ test("contextual guidance is available across teacher workspaces and administrat
     }
   } finally { await context.close(); await admin.dispose(); }
 });
+
+test("activity help preserves MCQ choice settings and the visible Parsons group editor", async ({ bankCourse: data, teacherPage: page }) => {
+  page.setDefaultTimeout(10_000);
+  const mcqId = await createCourseActivity(data, { activityTypeKey: "mcq", title: "Choice settings", config: { source: "## Which value is even?\n- [x] 2\n- [ ] 3", randomizeChoices: false } });
+  await page.goto(`/courses/${data.courseId}/activities/${mcqId}`);
+  const choices = page.getByRole("checkbox", { name: "Randomize choices", exact: true });
+  await expect(choices).toBeVisible();
+  await page.getByRole("button", { name: "Help: Randomize choices", exact: true }).hover();
+  await expect(page.getByRole("tooltip")).toContainText("random order");
+  await page.keyboard.press("Escape"); await choices.check();
+  await page.getByRole("button", { name: "Save multiple choice questions", exact: true }).click();
+  await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
+  await page.reload(); await expect(choices).toBeChecked();
+
+  const parsonsId = await createCourseActivity(data, { activityTypeKey: "parsons-problem", title: "Group settings", config: {
+    prompt: "Reorder these lines.", solution: "value = 2\nprint(value)", language: "python", stripIndentation: false,
+    groups: [{ id: "group-1", label: "First pair", startLine: 0, endLine: 1, orderSensitive: true }], precedenceRules: []
+  } });
+  await page.goto(`/courses/${data.courseId}/activities/${parsonsId}`);
+  await page.locator(".parsons-group-box").filter({ hasText: "First pair" }).click();
+  const group = page.getByRole("textbox", { name: "Group label", exact: true });
+  await expect(group).toHaveValue("First pair"); await group.fill("Edited pair");
+  await page.getByRole("button", { name: "Help: Line groups", exact: true }).hover();
+  await expect(page.getByRole("tooltip")).toBeVisible();
+  await expect(page.getByRole("tooltip").getByRole("textbox")).toHaveCount(0);
+  await expect(group).toBeVisible(); await page.keyboard.press("Escape");
+  const flexible = page.getByRole("checkbox", { name: "Allow the lines inside this group to move freely", exact: true });
+  await flexible.check(); await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
+  await page.reload(); await page.locator(".parsons-group-box").filter({ hasText: "Edited pair" }).click();
+  await expect(group).toHaveValue("Edited pair"); await expect(flexible).toBeChecked();
+});

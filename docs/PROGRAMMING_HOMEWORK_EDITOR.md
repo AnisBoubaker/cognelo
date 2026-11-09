@@ -15,6 +15,8 @@ The core top tabs are Activity, Concepts and Reference materials. Reference mate
 
 Use shared SideNavigation, RichTextEditor, EditActionBar, notifications and cancellable progress. Keep drafts mounted across navigation and Save/Cancel available in edit sections. Use On/Off switches for boolean settings; keep checkboxes for selecting files/functions/materials. This preference applies to activity editing generally.
 
+Teacher explanations use shared contextual help immediately after the associated heading or label on the same line, including solution selection, simulation, question policy and the scheduling link. Routine date displays silently use the configured timezone. Preserve student instructions, structural-check results, submission warnings and confirmations. See [contextual help](CONTEXTUAL_HELP.md).
+
 ## Approved workflow choices
 
 - Existing and new homework defaults to question generation enabled. Lock its switch while active final hand-ins exist. Preserve prior records and hidden question settings.

@@ -52,7 +52,8 @@ for (const owner of ["bank", "course"] as const) test(`${owner} homework solutio
   await selector.getByRole("checkbox", { name: "int helper(void) main.c", exact: true }).check();
   await selector.getByRole("tab", { name: "main.h", exact: true }).click();
   await expect(selector.getByRole("checkbox", { name: "int helper(void) main.c", exact: true })).toHaveCount(0);
-  await expect(selector.getByText("Upload source files to list their function definitions. Headers and files without definitions can still be required.", { exact: true })).toBeVisible();
+  await expect(selector.getByText("No function definitions.", { exact: true })).toBeVisible();
+  await selector.getByRole("button", { name: "Help: Required functions and signatures", exact: true }).hover(); await expect(page.getByRole("tooltip")).toContainText("Headers and files without definitions can still be required."); await page.keyboard.press("Escape");
   await selector.getByRole("tab", { name: "main.c", exact: true }).click();
   await expect(selector.getByRole("checkbox", { name: "int helper(void) main.c", exact: true })).toBeChecked();
   await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");

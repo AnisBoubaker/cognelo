@@ -1,4 +1,6 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
+
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionIcon, AppDateTime, MarkdownRenderer, ProgressDialog, useActivityReferenceAuthoring, useDialogs, useNotifications } from "@cognelo/activity-ui";
@@ -34,7 +36,7 @@ export function HomeworkSimulation({ request, locale, hasUnsavedChanges, questio
     catch (error) { if (!pending.signal.aborted && version.current === current) notifications.error(error instanceof Error ? error.message : copy.error); }
     finally { if (controller.current === pending) { controller.current = null; setBusy(false); } }
   }
-  return <div className="stack homework-simulation"><h2>{copy.title}</h2><p className="muted">{copy.help}</p>
+  return <div className="stack homework-simulation"><HelpLabel help={<>{copy.help}</>}><h2>{copy.title}</h2></HelpLabel>
     {preflight}
     {dirty && <p role="status">{copy.saveFirst}</p>}{missingReferences && <p role="status">{copy.prepareFirst}</p>}
     {!preflightResult && <p>{copy.empty}</p>}

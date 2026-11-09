@@ -1,4 +1,6 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
+
 import { useEffect, useId, useRef, useState } from "react";
 import { ActionIcon, ProgressDialog, SideNavigation, sideNavigationItemId, useDialogs } from "@cognelo/activity-ui";
 import type { CodingHomeworkLocale } from "./messages";
@@ -62,7 +64,7 @@ export function HomeworkSolutionSelector({ request, locale, requirements, onChan
     await run(async signal => apply(await request<Solution>("teacher-solution", body("DELETE", { ...input, expectedRevision: current.current?.revision }, signal))));
   }
   return <section className="stack homework-solution-selector">
-    <h3>{copy.solution}</h3><p className="muted">{copy.solutionHelp}</p><p className="muted">{copy.solutionFilesHelp}</p>
+    <HelpLabel help={<><p>{copy.solutionHelp}</p><p>{copy.solutionFilesHelp}</p>{solution?.locked && <p>{copy.solutionLocked}</p>}</>}><h3>{copy.solution}</h3></HelpLabel>
     <div className="row wrap">
       <label className="button secondary" aria-disabled={disabled}><ActionIcon name="upload" /> {copy.upload}<input disabled={disabled} type="file" accept=".c,.h" multiple hidden onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void upload(files, false); }} /></label>
       <label className="button secondary" aria-disabled={disabled}><ActionIcon name="upload" /> {copy.solutionZip}<input disabled={disabled} type="file" accept=".zip" hidden onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void upload(files, true); }} /></label>
@@ -71,7 +73,6 @@ export function HomeworkSolutionSelector({ request, locale, requirements, onChan
       {error && <button type="button" className="secondary" disabled={busy} onClick={() => void run(async signal => apply(await request<Solution>("teacher-solution", { signal })))}><ActionIcon name="refresh" /> {copy.refresh}</button>}
     </div>
     {error && <p className="error" role="alert">{error}</p>}
-    {solution?.locked && <p className="muted">{copy.solutionLocked}</p>}
     {solution?.files.length ? <>
       <div className="homework-solution-browser">
         <div className="stack"><h4>{copy.requiredFiles}</h4>
@@ -82,11 +83,11 @@ export function HomeworkSolutionSelector({ request, locale, requirements, onChan
           }))} tabs={{ idPrefix: navigationId, panelId: `${navigationId}-signatures`, onSelect: setSelectedPath }} />
         </div>
         <div className="stack homework-solution-signatures" role="tabpanel" id={`${navigationId}-signatures`} aria-labelledby={activePath ? sideNavigationItemId(navigationId, activePath) : undefined}>
-          <h4>{copy.requiredFunctions}</h4>
+          <HelpLabel help={copy.solutionNoFunctions}><h4>{copy.requiredFunctions}</h4></HelpLabel>
           {visibleFunctions.length ? <ul className="homework-solution-list">{visibleFunctions.map(fn => <li className="homework-solution-row" key={fn.key}>
             <label className="homework-choice"><input type="checkbox" disabled={disabled} checked={selected.has(fn.key)} onChange={event => select(event.target.checked ? [...selected, fn.key] : [...selected].filter(key => key !== fn.key))} /><span className="homework-choice-text"><code>{fn.signature ? `${fn.signature.returnType} ${fn.functionName}(${fn.signature.parameterTypes.join(", ") || "void"})` : fn.functionName}</code><span className="sr-only">{fn.sourcePath}</span></span></label>
             <button type="button" className="secondary icon-button" disabled={disabled} aria-label={`${copy.removeFunction}: ${fn.key}`} title={`${copy.removeFunction}: ${fn.key}`} onClick={() => void remove({ kind: "function", key: fn.key })}><ActionIcon name="remove" /></button>
-          </li>)}</ul> : <p className="muted">{copy.solutionNoFunctions}</p>}
+          </li>)}</ul> : <p className="muted">{copy.solutionNoDefinitions}</p>}
         </div>
       </div>
     </> : solution && <p className="muted">{copy.solutionEmpty}</p>}

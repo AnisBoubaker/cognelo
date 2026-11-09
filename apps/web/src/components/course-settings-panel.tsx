@@ -180,7 +180,7 @@ export function CourseSettingsPanel({
                 onChange={selection => { setStudentSupportAgentId(selection?.connectionId ?? ""); setSupportModel(selection?.model ?? ""); }}
                 labels={{ connection: t("courseDetail.studentSupportAgent"), model: t("settings.aiAgentModel"), inherit: t("courseDetail.noAiAgentSelected"), unavailable: t("settings.aiModelUnavailable"), noModels: t("settings.aiNoGenerationModels") }} />
 
-              <HelpLabel help={<>{t("courseDetail.assessmentFeedbackAgentHelp")}</>}><label className="checkbox-row">
+              <HelpLabel help={t("courseDetail.automaticFeedbackEnabledHelp")}><label className="checkbox-row">
                 <input
                   checked={automaticFeedbackEnabled}
                   type="checkbox"
@@ -188,11 +188,10 @@ export function CourseSettingsPanel({
                 />
                 <span>
                   <strong>{t("courseDetail.automaticFeedbackEnabled")}</strong>
-                  <span className="muted">{t("courseDetail.automaticFeedbackEnabledHelp")}</span>
                 </span>
               </label></HelpLabel>
 
-              <AiModelPicker connections={aiAgentConnections} purpose="generation" value={pickerValue(assessmentFeedbackAgentId, feedbackModel)} disabled={!automaticFeedbackEnabled}
+              <AiModelPicker connectionHelp={t("courseDetail.assessmentFeedbackAgentHelp")} connections={aiAgentConnections} purpose="generation" value={pickerValue(assessmentFeedbackAgentId, feedbackModel)} disabled={!automaticFeedbackEnabled}
                 onChange={selection => { setAssessmentFeedbackAgentId(selection?.connectionId ?? ""); setFeedbackModel(selection?.model ?? ""); }}
                 labels={{ connection: t("courseDetail.assessmentFeedbackAgent"), model: t("settings.aiAgentModel"), inherit: t("courseDetail.noAiAgentSelected"), unavailable: t("settings.aiModelUnavailable"), noModels: t("settings.aiNoGenerationModels") }} />
 

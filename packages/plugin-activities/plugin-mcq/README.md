@@ -2,6 +2,8 @@
 
 `@cognelo/plugin-mcq` provides a text-first multiple-choice and multiple-select activity. Teachers author one portable Markdown-like source document; learners receive accessible choice controls and deterministic answer-key grading.
 
+Teacher editing guidance uses shared [contextual help](../../../docs/CONTEXTUAL_HELP.md): a circled question mark after the associated title or label, on the same row, with hover, keyboard and touch access.
+
 Gradebook attempt review and grading use core grade scope, so explicit course teachers/admins work course-wide while section teachers/TAs are limited to assigned sections; authoring and release remain course-management operations.
 
 Teachers can [reopen the last submission](../../../docs/SUBMISSION_CONTINUATION.md) so its saved answers can be continued using the original start and current effective settings.

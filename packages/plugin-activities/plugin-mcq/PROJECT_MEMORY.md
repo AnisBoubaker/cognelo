@@ -57,3 +57,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - The shared [learner grading details](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md) display Test-child comments and plugin-declared student feedback under the parent release/content-access policy. Keep private result/configuration/analytics out of the public feedback envelope.
 
 - For [cancellable AI grading](../../../docs/AI_GRADING_RUNS.md), `deferPublication` writes private artifacts as `staged`. Keep ordinary report/history queries restricted to completed artifacts. Publish only through `aiFeedback.publishEvaluation` using the host transaction; cancellation never deletes immutable evidence or changes formative behavior.
+
+- Teacher authoring explanations use shared `HelpLabel`/`HelpTooltip` after their title or label on the same row. Preserve native field names, descriptions, unsaved drafts and existing notifications. Keep learner instructions and required confirmations visible. See [contextual help](../../../docs/CONTEXTUAL_HELP.md).

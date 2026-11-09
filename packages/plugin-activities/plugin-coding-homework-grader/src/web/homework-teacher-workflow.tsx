@@ -1,4 +1,6 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
+
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { ActionIcon, AiModelPicker, ToggleSwitch } from "@cognelo/activity-ui";
@@ -18,10 +20,10 @@ export function HomeworkTeacherWorkflow({ workflow, locale, busy, questionPortal
   const ready = !questionsEnabled || (references ? references.loaded && references.prepared && !references.dirty : settings?.prepared);
   const questionPanel = <div className="stack homework-workflow-questions">
     {!settings && <p>{copy.loading}</p>}
-    {settings && draft && <section className="stack homework-ai-model-selection"><h4>{copy.questionModelTitle}</h4>
+    {settings && draft && <section className="stack homework-ai-model-selection"><HelpLabel help={<>{copy.questionModelHelp}</>}><h4>{copy.questionModelTitle}</h4></HelpLabel>
       <AiModelPicker connections={settings.ai.connections} value={draft.questionAi} purpose="generation" onChange={questionAi => update({ questionAi })} disabled={busy}
         labels={{ connection: copy.aiConnection, model: copy.aiModel, inherit: copy.aiCourseDefault, unavailable: copy.aiUnavailable, noModels: copy.aiNoGenerationModels }} />
-      <p className="muted">{copy.questionModelHelp}</p>
+
       {!changed && settings.ai.question.resolved && <p className="muted">{copy.aiInUse}: {settings.ai.question.resolved.model}</p>}
       {!changed && settings.ai.question.error && <p role="status">{settings.ai.question.error}</p>}
       <div className="row wrap">
@@ -36,8 +38,7 @@ export function HomeworkTeacherWorkflow({ workflow, locale, busy, questionPortal
       <ToggleSwitch locale={locale} label={edit.finalSubmissions} checked={draft.enabled} disabled={busy || (!draft.enabled && !ready)} onChange={enabled => update({ enabled })} />
       <p role="status">{draft.enabled !== settings.enabled ? draft.enabled ? edit.pendingOpening : edit.pendingClosing : draft.enabled ? copy.enabledHelp : questionsEnabled ? ready ? copy.prepared : copy.needsPreparation : edit.disabledHelp}</p>
       {questionsEnabled && references?.dirty && <p className="muted">{copy.saveFirst}</p>}
-      <p className="muted">{edit.schedulingHelp}</p>
-      {schedulingUrl && <a className="button secondary" href={schedulingUrl}><ActionIcon name="settings" />{edit.scheduling}</a>}
+      {schedulingUrl && <HelpLabel help={edit.schedulingHelp}><a className="button secondary" href={schedulingUrl}><ActionIcon name="settings" />{edit.scheduling}</a></HelpLabel>}
     </>}
   </div>;
   return <>{questionPortalTarget && createPortal(questionPanel, questionPortalTarget)}{submissionPortalTarget && createPortal(submissionPanel, submissionPortalTarget)}</>;

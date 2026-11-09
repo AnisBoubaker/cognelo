@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { DialogHeader, getDialogCloseLabel } from "@cognelo/activity-ui";
 
@@ -797,7 +798,7 @@ export function ParsonsActivityView({
               </select>
             </div>
             <div className="field">
-              <label htmlFor="activity-description">{t("parsons.activityDescription")}</label>
+              <HelpLabel help={<>{t("parsons.generateHelp")}</>}><label htmlFor="activity-description">{t("parsons.activityDescription")}</label></HelpLabel>
               <textarea id="activity-description" value={description} onChange={(event) => setDescription(event.target.value)} />
             </div>
             {aiGenerationClient ? (
@@ -807,7 +808,7 @@ export function ParsonsActivityView({
                   <ActionIcon name="generate" />
                   {generating ? t("parsons.generating") : t("parsons.generate")}
                 </button>
-                <p className="muted">{t("parsons.generateHelp")}</p>
+
               </div>
             ) : null}
 
@@ -858,8 +859,7 @@ export function ParsonsActivityView({
               <div className="row wrap parsons-group-toolbar">
                 <div className="stack stack-tight">
                   <p className="eyebrow">{t("parsons.groupsEyebrow")}</p>
-                  <h3>{t("parsons.groupsTitle")}</h3>
-                  <p className="muted">{t("parsons.groupsText")}</p>
+                  <HelpLabel help={<><p>{t("parsons.groupsText")}</p><p>{t("parsons.groupSelectionHint")}</p></>}><h3>{t("parsons.groupsTitle")}</h3></HelpLabel>
                 </div>
                 <div className="row wrap">
                   <button className="secondary" type="button" onClick={createGroupFromSelection}>
@@ -905,13 +905,10 @@ export function ParsonsActivityView({
                       </div>
                     ))}
                 </div>
-              ) : (
-                <p className="muted">{t("parsons.groupSelectionHint")}</p>
-              )}
+              ) : null}
 
               <div className="stack">
-                <h3>{t("parsons.precedenceTitle")}</h3>
-                <p className="muted">{t("parsons.precedenceText")}</p>
+                <HelpLabel help={t("parsons.precedenceText")}><h3>{t("parsons.precedenceTitle")}</h3></HelpLabel>
                 {precedenceDraft ? (
                   <div className="parsons-precedence-editor">
                     <div className="field">

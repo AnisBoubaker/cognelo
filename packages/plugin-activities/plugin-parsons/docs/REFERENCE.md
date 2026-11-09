@@ -118,6 +118,8 @@ Summative submissions do not show correctness feedback during the activity. When
 
 ## UX Notes
 
+Teacher background guidance is attached to its heading or label through shared contextual help. The circled question mark follows the text on the same line; hover/focus reveals the explanation and click/tap pins it. Preserve input/heading accessible names, description associations and draft/save behavior. Errors and warnings continue through existing notifications. See [the shared contract](../../../../docs/CONTEXTUAL_HELP.md).
+
 Previous submissions are available before the next timed start. When mounted in history mode, load submitted records without ensuring an answering attempt. Returning to New attempt keeps the explicit start gate.
 
 The compound Test adapter persists the optional `hasAnswer` field in generic item state: initialization/reset sets it false and a move/indent sets it true. The state schema preserves this marker through grading and reopening. `hasParsonsAnswer` reads it without evaluating order or indentation. Pre-marker drafts with saved blocks count as answered because their earlier interaction history is unavailable. The final review itself never checks correctness.

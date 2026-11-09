@@ -33,7 +33,7 @@ for (const team of [false, true]) test(`homework deadline and recorded lateness 
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}?settings=1`);
     const dialog = page.getByRole("dialog", { name: "Deadline homework", exact: true });
     const panel = dialog.locator(".activity-stage-schedule");
-    const date = panel.getByLabel("File submission — deadline (America/Toronto)", { exact: true });
+    const date = panel.getByLabel("File submission — deadline", { exact: true });
     await expect(date).toHaveValue("");
     await date.fill("2030-01-15"); await panel.locator('[id="stage-files-general-deadline-time"]').fill("09:30");
     await panel.getByRole("switch", { name: "File submission — Allow late submissions", exact: true }).check();

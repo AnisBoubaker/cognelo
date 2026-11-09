@@ -104,6 +104,8 @@ Reusable bank Tests use the same lifecycle at child granularity. Adding a coding
 
 ## Authoring UX
 
+Teacher background guidance is attached to its heading or label through shared contextual help. The circled question mark follows the text on the same line; hover/focus reveals the explanation and click/tap pins it. Preserve input/heading accessible names, description associations and draft/save behavior. Errors and warnings continue through existing notifications. See [the shared contract](../../../../docs/CONTEXTUAL_HELP.md).
+
 The teacher authoring UI is a form surface and must stay registered with the shared `useUnsavedChangesGuard` hook from `@cognelo/activity-ui`. Any future coding-exercise authoring tabs or settings panels should do the same so navigation can offer continue editing, save and leave, or discard and leave.
 
 At creation time, a Programming Exercise starts with the owning Subject's optional single programming-language default in course, bank, course-Test, and reusable-bank-Test contexts. Subject and exercise choices are the unique programming languages reported by the configured Judge0 instance; runtime versions and compiler variants collapse into a stable language key, while Python 2 and Python 3 remain distinct. A missing Subject value or the explicit multiple-languages value overlays an empty public `language` field and shows `--- Choose ---`. The authoring UI prevents saving until a language is chosen, while server validation rejects generation, test validation, execution, and submission without one. The creation layer never mutates registered defaults, rewrites existing activities, or replaces the saved language of copied activities.

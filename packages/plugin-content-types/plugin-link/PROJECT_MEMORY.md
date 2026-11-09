@@ -22,3 +22,5 @@
 
 - Own `indexing.policy` and `indexing.prepare`; core supplies authorized embedding storage and search. Never call a sibling plugin. Prepared semantic indexes remain outside public resource metadata. See [service contract](../../../docs/MATERIAL_EMBEDDING_SERVICES.md).
 - Embedding readiness must not come from page chrome alone. Prefer main/article lesson text, exclude navigation/interactive chrome, retain static lesson text in hidden panels/slides, reject absent non-heading/non-link content and recognizable loading/access shells, and validate every declared slide source before storage. Avoid arbitrary minimum word counts that reject short code/math lessons. The extraction-policy revision invalidates old cached link readiness at the next preparation; already pinned submissions remain immutable. These checks cannot prove full coverage of arbitrary dynamic sites.
+
+- Settings explanations use the shared circled help control after their label on the same row; source counts and generation outcomes remain visible and errors use existing notifications. See [contextual help](../../../docs/CONTEXTUAL_HELP.md).

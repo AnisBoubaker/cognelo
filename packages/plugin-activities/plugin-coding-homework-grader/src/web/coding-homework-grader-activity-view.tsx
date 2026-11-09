@@ -1,4 +1,6 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
+
 import { useHomeworkWorkflowDraft } from "./homework-workflow-draft";
 import { homeworkWorkflowCopy } from "./workflow-copy";
 
@@ -16,7 +18,6 @@ import type { HomeworkRequest } from "./workflow-types";
 import { ActionIcon, isActivityContentClosedError } from "@cognelo/activity-ui";
 
 import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
-
 
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
@@ -737,14 +738,13 @@ function LegacyCodingHomeworkActivityView({
   }
 
   const generationInstructionsField = <div className="field">
-    <label htmlFor="coding-homework-generation-instructions">{copy.generationInstructions}</label>
+    <HelpLabel help={<>{copy.generationInstructionsHelp}</>}><label htmlFor="coding-homework-generation-instructions">{copy.generationInstructions}</label></HelpLabel>
     <textarea id="coding-homework-generation-instructions" rows={5} maxLength={12000} disabled={loading || saving} value={assignment.generationInstructions}
       onChange={event => { const generationInstructions = event.currentTarget.value; setAssignment(current => ({ ...current, generationInstructions })); }} />
-    <p className="muted">{copy.generationInstructionsHelp}</p>
+
   </div>;
   const teamQuestionField = (locked: boolean) => <div className="stack">
-    <ToggleSwitch locale={locale} label={teamCopy.separateTeamQuestions} checked={assignment.settings.separateTeamQuestions === true} disabled={loading || saving || locked} onChange={separateTeamQuestions => setAssignment(current => ({ ...current, settings: { ...current.settings, separateTeamQuestions } }))} />
-    <p className="muted">{locked ? teamCopy.questionPolicyLocked : teamCopy.sharedQuestionsHelp}</p>
+    <ToggleSwitch locale={locale} label={teamCopy.separateTeamQuestions} help={locked ? teamCopy.questionPolicyLocked : teamCopy.sharedQuestionsHelp} checked={assignment.settings.separateTeamQuestions === true} disabled={loading || saving || locked} onChange={separateTeamQuestions => setAssignment(current => ({ ...current, settings: { ...current.settings, separateTeamQuestions } }))} />
   </div>;
   const generationSettings = (locked: boolean) => <section className="stack">
     {generationInstructionsField}
@@ -833,13 +833,13 @@ function LegacyCodingHomeworkActivityView({
             ) : null}
           </div>
           <div className="field">
-            <label>{copy.providedFiles}</label>
+            <HelpLabel help={<>{copy.providedFilesHelp}</>}><label>{copy.providedFiles}</label></HelpLabel>
             <div className="inline-actions">
               <label className="button secondary">
                 {uploadingProvidedFile ? "..." : copy.uploadProvidedFile}
                 <input hidden type="file" onChange={uploadProvidedFile} />
               </label>
-              <span className="muted">{copy.providedFilesHelp}</span>
+
             </div>
             {providedFiles.length ? (
               <div className="stack">
@@ -901,10 +901,9 @@ function LegacyCodingHomeworkActivityView({
             />
           </div>
           </section>
-          <section className="stack" hidden={authoringTab !== "questions"}><h2>{editor.questions}</h2>
+          <section className="stack" hidden={authoringTab !== "questions"}><HelpLabel help={questionPolicyLocked ? editor.locked : questionsEnabled ? editor.modeChange : editor.disabledHelp}><h2>{editor.questions}</h2></HelpLabel>
             <ToggleSwitch locale={locale} label={editor.enabled} checked={questionsEnabled} disabled={loading || saving || questionPolicyLocked} onChange={questionGenerationEnabled => { workflow.update({ enabled: false }); setAssignment(current => ({ ...current, settings: { ...current.settings, questionGenerationEnabled } })); }} />
-            {questionPolicyLocked && <p role="status">{editor.locked}</p>}
-            <p className="muted">{questionsEnabled ? editor.modeChange : editor.disabledHelp}</p>
+
             <div className="stack" hidden={!questionsEnabled}>
               <div className="settings-grid">
             <NumberField

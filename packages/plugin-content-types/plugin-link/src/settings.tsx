@@ -1,4 +1,5 @@
 "use client";
+import { HelpLabel } from "@cognelo/activity-ui";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ActionIcon, ProgressDialog } from "@cognelo/activity-ui";
@@ -145,13 +146,13 @@ export function LinkContentSettingsForm({ resourceId, title, url, metadata, loca
       <div className="field"><label htmlFor="settings-link-description">{labels.description}</label><textarea id="settings-link-description" value={typeof metadata.description === "string" ? metadata.description : ""} onChange={(event) => onMetadataChange({ ...metadata, description: event.target.value })} maxLength={2000} rows={3} /></div>
       <label className="checkbox-row"><input type="checkbox" checked={metadata.openInNewTab !== false} onChange={(event) => onMetadataChange({ ...metadata, openInNewTab: event.target.checked })} />{labels.newTab}</label>
       <div className="field">
-        <label htmlFor="settings-link-summary">{labels.summary}</label>
+        <HelpLabel help={<>{labels.summaryHelp}</>}><label htmlFor="settings-link-summary">{labels.summary}</label></HelpLabel>
         <textarea id="settings-link-summary" rows={5} maxLength={20_000} disabled={!loaded || generating} value={typeof metadata.internalSummary === "string" ? metadata.internalSummary : ""} onChange={(event) => onMetadataChange({ ...metadata, internalSummary: event.target.value })} />
-        <p className="muted">{labels.summaryHelp}</p>
+
       </div>
       <div className="field">
-        <label className="checkbox-row"><input type="checkbox" checked={followSameDomainLinks} disabled={!loaded || generating} onChange={(event) => onMetadataChange({ ...metadata, summaryFollowSameDomainLinks: event.target.checked })} />{labels.followLinks}</label>
-        <p className="muted">{labels.followHelp.replace("{limit}", String(MAX_SUMMARY_LINKED_PAGES))}</p>
+        <HelpLabel help={<>{labels.followHelp.replace("{limit}", String(MAX_SUMMARY_LINKED_PAGES))}</>}><label className="checkbox-row"><input type="checkbox" checked={followSameDomainLinks} disabled={!loaded || generating} onChange={(event) => onMetadataChange({ ...metadata, summaryFollowSameDomainLinks: event.target.checked })} />{labels.followLinks}</label></HelpLabel>
+
       </div>
       <div className="row" style={{ alignItems: "end" }}>
         <div className="field" style={{ maxWidth: "12rem" }}><label htmlFor="settings-link-max-words">{labels.maxWords}</label><input id="settings-link-max-words" type="number" min={1} max={2000} required disabled={!loaded || generating} value={Number.isFinite(maxWords) ? maxWords : ""} onChange={(event) => onMetadataChange({ ...metadata, summaryMaxWords: event.target.valueAsNumber })} /></div>
