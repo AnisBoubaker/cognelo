@@ -126,7 +126,7 @@ export const codingHomeworkAuthoringRoute: PluginRouteDefinition = {
       return getCodingHomeworkAuthoring(await resolveOwner(context));
     },
     PUT: async ({ context, readJson }) => {
-      return saveCodingHomeworkAuthoring(await resolveOwner(context), await readJson());
+      return saveCodingHomeworkAuthoring(await resolveOwner(context), await readJson(), context.courseId ? { user: context.user, courseId: context.courseId, activityId: context.activity.id } : undefined);
     }
   }
 };

@@ -47,6 +47,8 @@ The display name is **Programming Homework** (French: **Devoir de programmation*
 
 ## Boundaries
 
+Course authoring can save the assignment, structural requirements and explicit workflow-setting changes in one private transaction. Connection authorization, readiness and submission locks still apply; existing workflow endpoints remain supported.
+
 Private solutions and processing diagnostics are teacher-only. Model prompts, retrieved reference excerpts, credentials and filesystem paths stay server-side. Learners receive explicit public projections. Requirements use bounded static C normalization without compilation or execution; typedef spellings remain significant. Generated Prisma clients are ignored local artifacts; track schemas/migrations and regenerate through the normal database commands.
 
 Duplicating within a course retains independent authoring, attachments, private solutions, model choices and the same reference-material selection and prepared indexes. The copy owns a separate reference snapshot while reusing the immutable indexes, so deleting the original does not break it. Final submissions start disabled; course assignments/delivery policy and student work are not copied. Bank transfers still reset course-specific references and model choices. See [duplication](docs/REFERENCE.md#duplication-within-a-course). Student view remains inspection-only. Teacher review/grading respects course and section staff capabilities; authoring and submission opening require course management. The activity does not advertise a released student-solution capability.

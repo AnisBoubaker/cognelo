@@ -1,3 +1,4 @@
+import { homeworkWorkflowDraftSchema, type HomeworkWorkflowDraftInput } from "./workflow-contract";
 import { homeworkQuestionsEnabled } from "./question-policy";
 import { snapshotProvidedCode } from "./provided-code";
 import { getHomeworkQuestionConnection, storedHomeworkAiSelection } from "./ai-selection";
@@ -8,7 +9,7 @@ import { AppError, updateBackgroundJobConcurrency, getAiAgentConnectionForUser, 
   createCourseEmbeddingProvider, lockCourseMaterialEmbeddingSettings, materialEmbeddingSelectionIdentity, teamworkTransaction } from "@cognelo/core";
 import { prisma, type Prisma } from "./db-client";
 import { json, record } from "./file-preparation";
-import { homeworkSubmissionPolicySchema, readHomeworkSubmissionPolicy } from "./submission-policy";
+import { readHomeworkSubmissionPolicy } from "./submission-policy";
 
 export type HomeworkTeacherScope = { user: CurrentUser; courseId: string; activityId: string };
 export const workflowSettingKeys = ["workflowVersion", "submissionsEnabled", "preparedSnapshotId", "referenceMaterialIds", "embeddingConnectionId", "generationConcurrency", "embeddingAi", "questionGenerationAi", "submissionPolicy"] as const;
@@ -44,11 +45,8 @@ export async function finishHomeworkMaterialPreparation(scope: HomeworkTeacherSc
   const current = await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId }, select: { settings: true } });
   return { prepared: result.prepared, snapshotId: record(current?.settings).preparedSnapshotId };
 }
-export async function updateHomeworkWorkflowSettings(scope: HomeworkTeacherScope, input: unknown) {
-  const initial = await assignment(scope);
-  const data = z.object({ selected: z.array(z.string().min(1)).max(100).optional(), concurrency: z.number().int().min(1).max(4).optional(), enabled: z.boolean().optional(),
-    embeddingAi: AiModelSelectionSchema.nullable().optional(), questionGenerationAi: AiModelSelectionSchema.nullable().optional(), submissionPolicy: homeworkSubmissionPolicySchema.optional() }).strict().parse(input);
-  if (data.embeddingAi !== undefined) throw new AppError(409, "COURSE_EMBEDDING_SETTINGS_REQUIRED", "Set the embedding model in Course settings → AI. It is shared by all activities.");
+export async function prepareHomeworkWorkflowUpdate(scope: HomeworkTeacherScope, data: HomeworkWorkflowDraftInput, questionsEnabled?: boolean) {
+  await assertCanManageCourse(scope.user, scope.courseId);
   let questionSelection: Record<string, unknown> | null | undefined;
   if (data.questionGenerationAi !== undefined) {
     if (data.questionGenerationAi) {
@@ -57,27 +55,43 @@ export async function updateHomeworkWorkflowSettings(scope: HomeworkTeacherScope
       await getCourseAiAgentConnection(scope.user, scope.courseId, selection, "generation"); questionSelection = selection;
     } else questionSelection = null;
   }
-  if (data.selected) await saveActivityMaterialReferences(scope, { selected: data.selected });
-  const references = data.enabled === true && homeworkQuestionsEnabled(initial.settings) ? await getActivityMaterialReferences(scope) : null;
-  await prisma.$transaction(async tx => {
-    await lockHomeworkSettings(tx, scope.activityId);
-    const current = await tx.pluginCodingHomeworkAssignment.findUniqueOrThrow({ where: { activityId: scope.activityId } }), settings = record(current.settings);
-    const next: Record<string, unknown> = { ...settings, workflowVersion: 2, ...(data.concurrency ? { generationConcurrency: data.concurrency } : {}) };
-    if (data.submissionPolicy !== undefined) next.submissionPolicy = data.submissionPolicy;
-    if (questionSelection !== undefined) { if (questionSelection) next.questionGenerationAi = questionSelection; else delete next.questionGenerationAi; }
-    if (data.concurrency) await updateBackgroundJobConcurrency("coding-homework-grader", scope.activityId, data.concurrency, tx);
-    if (data.enabled === true && settings.submissionsEnabled !== true) {
-      if (homeworkQuestionsEnabled(next)) {
+  const needsReferences = data.enabled === true && (questionsEnabled ?? homeworkQuestionsEnabled((await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId }, select: { settings: true } }))?.settings));
+  const references = needsReferences ? await getActivityMaterialReferences(scope) : null;
+  return { data, questionSelection, references };
+}
+export async function applyHomeworkWorkflowUpdate(scope: HomeworkTeacherScope, prepared: Awaited<ReturnType<typeof prepareHomeworkWorkflowUpdate>>, tx: Prisma.TransactionClient) {
+  await lockHomeworkSettings(tx, scope.activityId);
+  const { data, questionSelection, references } = prepared;
+  const current = await tx.pluginCodingHomeworkAssignment.findUniqueOrThrow({ where: { activityId: scope.activityId } }), settings = record(current.settings);
+  const next: Record<string, unknown> = { ...settings, workflowVersion: 2, ...(data.concurrency ? { generationConcurrency: data.concurrency } : {}) };
+  if (data.submissionPolicy !== undefined) next.submissionPolicy = data.submissionPolicy;
+  if (questionSelection !== undefined) { if (questionSelection) next.questionGenerationAi = questionSelection; else delete next.questionGenerationAi; }
+  if (data.concurrency) await updateBackgroundJobConcurrency("coding-homework-grader", scope.activityId, data.concurrency, tx);
+  if (data.enabled === true && settings.submissionsEnabled !== true) {
+    if (homeworkQuestionsEnabled(next)) {
       await getHomeworkQuestionConnection(scope, next);
-      const revision = contentIndexRevision({ selected: Array.isArray(settings.referenceMaterialIds) ? settings.referenceMaterialIds : null, preparedId: settings.preparedSnapshotId ?? null, locked: false });
+      const revision = contentIndexRevision({ selected: Array.isArray(settings.referenceMaterialIds) ? settings.referenceMaterialIds : null, preparedId: settings.preparedSnapshotId ?? null, locked: references?.locked ?? false });
       if (!references?.prepared || revision !== references.revision) throw new AppError(409, "HOMEWORK_EMBEDDINGS_REQUIRED", "Prepare the saved reference selection before enabling submissions.");
+      // A mode change closes the gate before this helper runs. Reopening an already
+      // locked snapshot needs a separate save, so freshness cannot be bypassed.
+      if (references.locked) throw new AppError(409, "HOMEWORK_SUBMISSIONS_REOPEN_REQUIRED", "Save the question-generation change with submissions closed, then reopen them.");
       await lockCourseMaterialEmbeddingSettings(tx, scope.courseId);
       if (references.selected.length && materialEmbeddingSelectionIdentity((await createCourseEmbeddingProvider(scope.user, scope.courseId)).selection) !== references.embedding.identity) throw new AppError(409, "COURSE_EMBEDDING_MODEL_CHANGED", "The course embedding model changed. Prepare the reference selection again.");
       await snapshotProvidedCode(scope.activityId, tx);
-      }
-      next.submissionsEnabled = true;
-    } else if (data.enabled === false) next.submissionsEnabled = false;
-    await tx.pluginCodingHomeworkAssignment.update({ where: { activityId: scope.activityId }, data: { settings: json(next) } });
-  }, { timeout: 30_000 });
+    }
+    next.submissionsEnabled = true;
+  } else if (data.enabled === false) next.submissionsEnabled = false;
+  await tx.pluginCodingHomeworkAssignment.update({ where: { activityId: scope.activityId }, data: { settings: json(next) } });
+}
+export async function updateHomeworkWorkflowSettings(scope: HomeworkTeacherScope, input: unknown) {
+  await assignment(scope);
+  const data = homeworkWorkflowDraftSchema.extend({ selected: z.array(z.string().min(1)).max(100).optional(), embeddingAi: AiModelSelectionSchema.nullable().optional() }).parse(input);
+  if (data.embeddingAi !== undefined) throw new AppError(409, "COURSE_EMBEDDING_SETTINGS_REQUIRED", "Set the embedding model in Course settings → AI. It is shared by all activities.");
+  const prepared = await prepareHomeworkWorkflowUpdate(scope, data);
+  if (data.selected) {
+    await saveActivityMaterialReferences(scope, { selected: data.selected });
+    if (prepared.references) prepared.references = await getActivityMaterialReferences(scope);
+  }
+  await prisma.$transaction(tx => applyHomeworkWorkflowUpdate(scope, prepared, tx), { timeout: 30_000 });
   return getHomeworkWorkflowSettings(scope);
 }

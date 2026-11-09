@@ -1,3 +1,4 @@
+import type { HomeworkWorkflowDraftInput } from "../workflow-contract";
 import type { StudentQuestionContext } from "../question-context";
 export type CodingHomeworkAttachmentRecord = {
   id: string;
@@ -391,6 +392,7 @@ export type CodingHomeworkStudentAssignment = {
 };
 
 export type CodingHomeworkAuthoringInput = {
+  workflow?: HomeworkWorkflowDraftInput;
   assignment: Omit<CodingHomeworkAssignmentRecord, "id" | "createdAt" | "updatedAt">;
   requirements: CodingHomeworkAuthoringSubmissionRequirements;
 };

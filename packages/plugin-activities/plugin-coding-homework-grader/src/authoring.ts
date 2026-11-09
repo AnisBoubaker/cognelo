@@ -1,7 +1,8 @@
+import { homeworkWorkflowDraftSchema } from "./workflow-contract";
 import { homeworkQuestionsEnabled } from "./question-policy";
 import { codingHomeworkAttachmentPath } from "./attachment-storage";
 export { codingHomeworkAttachmentPath } from "./attachment-storage";
-import { getHomeworkReferenceSelection, lockHomeworkSettings, workflowSettingKeys, type HomeworkTeacherScope } from "./workflow-settings";
+import { getHomeworkReferenceSelection, lockHomeworkSettings, workflowSettingKeys, prepareHomeworkWorkflowUpdate, applyHomeworkWorkflowUpdate, type HomeworkTeacherScope } from "./workflow-settings";
 import { copyHomeworkTeacherSolution, lockHomeworkTeacherSolution } from "./teacher-solution";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -53,7 +54,8 @@ const assignmentInputSchema = z.object({
 
 export const codingHomeworkAuthoringInputSchema = z.object({
   assignment: assignmentInputSchema,
-  requirements: codingHomeworkSubmissionRequirementsSchema
+  requirements: codingHomeworkSubmissionRequirementsSchema,
+  workflow: homeworkWorkflowDraftSchema.optional()
 });
 
 export const codingHomeworkFileUploadInputSchema = z.object({
@@ -147,8 +149,10 @@ export async function getCodingHomeworkAuthoring(owner: OwnerContext) {
   };
 }
 
-export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: unknown) {
+export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: unknown, scope?: HomeworkTeacherScope) {
   const parsed = codingHomeworkAuthoringInputSchema.parse(input);
+  if (parsed.workflow && (!scope || owner.ownerKind !== "course_activity" || scope.activityId !== owner.ownerId)) throw new AppError(400, "COURSE_CONTEXT_REQUIRED", "Workflow settings require a matching course activity.");
+  const workflow = parsed.workflow && scope ? await prepareHomeworkWorkflowUpdate(scope, parsed.workflow, typeof parsed.assignment.settings.questionGenerationEnabled === "boolean" ? parsed.assignment.settings.questionGenerationEnabled : undefined) : null;
   const assignment = parsed.assignment;
   const requirements = parsed.requirements;
   if (assignment.settings.questionGenerationEnabled !== undefined && typeof assignment.settings.questionGenerationEnabled !== "boolean") throw new AppError(400, "HOMEWORK_QUESTION_POLICY_INVALID", "Choose whether to generate challenge questions.");
@@ -167,7 +171,7 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
         const { homeworkTeamworkService } = await import("./team-workspaces");
         if (await homeworkTeamworkService.hasActiveSubmissions({ activityId: owner.ownerId, transaction: teamworkTransaction(transaction) })) throw new AppError(409, "HOMEWORK_QUESTION_POLICY_LOCKED", "Cancel active submissions before changing question generation or team question sharing.");
       }
-      if (questionModeChanged) protectedSettings.submissionsEnabled = false;
+      if (questionModeChanged || parsed.workflow?.enabled === false) protectedSettings.submissionsEnabled = false;
       for (const key of workflowSettingKeys) { delete assignment.settings[key]; if (protectedSettings[key] !== undefined) assignment.settings[key] = protectedSettings[key]; }
       if (protectedSettings.submissionsEnabled) {
         const currentRequirements = await transaction.pluginCodingHomeworkSubmissionRequirementSet.findUnique({ where: { activityId: owner.ownerId } });
@@ -199,6 +203,7 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
           requirements: requirements as Prisma.InputJsonValue
         }
       });
+      if (workflow && scope) await applyHomeworkWorkflowUpdate(scope, workflow, transaction);
       return;
     }
 
@@ -233,7 +238,7 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
         requirements: requirements as Prisma.InputJsonValue
       }
     });
-  });
+  }, { timeout: 30_000 });
 
   return getCodingHomeworkAuthoring(owner);
 }
