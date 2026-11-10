@@ -1,22 +1,24 @@
 import { randomUUID } from "node:crypto";
 import type { SubmissionStageActivationChange, SubmissionStageActivationScope, PluginTeamworkTransaction } from "@cognelo/activity-sdk/server";
-import { AppError, NonRetryableBackgroundJobError, lockActivityTeamwork, teamworkTransaction, contentIndexRevision, createCourseEmbeddingProvider, getActivityMaterialReferences, lockCourseMaterialEmbeddingSettings, materialEmbeddingSelectionIdentity, snapshotAiModelSelection, type BackgroundJobRecord } from "@cognelo/core";
+import { configuredActivityStageActivations, AppError, NonRetryableBackgroundJobError, lockActivityTeamwork, teamworkTransaction, contentIndexRevision, createCourseEmbeddingProvider, getActivityMaterialReferences, lockCourseMaterialEmbeddingSettings, materialEmbeddingSelectionIdentity, snapshotAiModelSelection, type BackgroundJobRecord } from "@cognelo/core";
 import { prisma as coreDb } from "@cognelo/db";
 import { prisma } from "./db-client";
 import { getHomeworkQuestionConnection } from "./ai-selection";
 import { record } from "./file-preparation";
 import { homeworkQuestionsEnabled } from "./question-policy";
-import { questionStageLocksReferences, homeworkStageEnabled } from "./stage-activation-state";
+import { questionStageLocksReferences, homeworkStageEnabled, homeworkStageConfiguration } from "./stage-activation-state";
 import { codingHomeworkProcessingQueue, codingHomeworkSubmissionProcessingHandlerKey } from "./processing-constants";
 
 type Scope = Omit<SubmissionStageActivationScope, "enabled">;
-type Prepared = { references: Awaited<ReturnType<typeof getActivityMaterialReferences>> | null };
+type Prepared = { references: Awaited<ReturnType<typeof getActivityMaterialReferences>> | null; previousQuestionsEnabled?: boolean };
 type Submission = { id: string; groupId: string; userId: string; kind: string; status: string; metadata: unknown; documentationSnapshotId: string | null; workspaceId: string | null; sharedSourceId: string | null; workspaceMemberId: string | null };
 export const homeworkStageHoldUntil = new Date("9999-01-01T00:00:00.000Z");
 
 export async function prepareHomeworkStageActivation(scope: Scope): Promise<Prepared> {
   const assignment = await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: scope.activityId }, select: { settings: true } });
-  return { references: homeworkQuestionsEnabled(assignment?.settings) ? await getActivityMaterialReferences(scope) : null };
+  const settings = record(assignment?.settings);
+  const previous = await configuredActivityStageActivations(prisma, scope.activityId, homeworkStageConfiguration(settings));
+  return { references: homeworkQuestionsEnabled(settings) ? await getActivityMaterialReferences(scope) : null, previousQuestionsEnabled: previous.questions };
 }
 export async function validateHomeworkQuestionActivation(scope: Scope, settings: Record<string, unknown>, references: Prepared["references"], sql: PluginTeamworkTransaction) {
   const revision = contentIndexRevision({ selected: Array.isArray(settings.referenceMaterialIds) ? settings.referenceMaterialIds : null, preparedId: settings.preparedSnapshotId ?? null, locked: questionStageLocksReferences(settings) });
@@ -34,9 +36,11 @@ export async function applyHomeworkStageActivation(input: SubmissionStageActivat
   const [assignment] = await sql.query<Array<{ settings: unknown }>>`SELECT settings FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${input.activityId}`;
   const settings = record(assignment.settings), questionsEnabled = Boolean(input.enabled.questions) && homeworkQuestionsEnabled(settings);
   const references = (input.prepared as Prepared | undefined)?.references ?? null;
+  // An unprepared legacy homework with its old file gate closed must remain editable.
+  const preserveClosedLegacy = settings.questionsStageEnabled === undefined && (input.prepared as Prepared | undefined)?.previousQuestionsEnabled === true && !input.enabled.files && typeof settings.preparedSnapshotId !== "string";
   let model: Awaited<ReturnType<typeof validateHomeworkQuestionActivation>> | null = null;
-  if (questionsEnabled && !questionStageLocksReferences(settings)) model = await validateHomeworkQuestionActivation(input, settings, references, sql);
-  const next = { ...settings, submissionsEnabled: Boolean(input.enabled.files), questionsStageEnabled: questionsEnabled, workflowVersion: 2 };
+  if (questionsEnabled && !questionStageLocksReferences(settings) && !preserveClosedLegacy) model = await validateHomeworkQuestionActivation(input, settings, references, sql);
+  const next = { ...settings, submissionsEnabled: Boolean(input.enabled.files), ...(!preserveClosedLegacy || !questionsEnabled ? { questionsStageEnabled: questionsEnabled } : {}), workflowVersion: 2 };
   await sql.execute`UPDATE "PluginCodingHomeworkAssignment" SET settings=${JSON.stringify(next)}::jsonb,"updatedAt"=NOW() WHERE "activityId"=${input.activityId}`;
 
   // Preparing a draft while closed must not consume its optional stage duration.
