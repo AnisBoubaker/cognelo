@@ -1,4 +1,4 @@
-import { configuredActivityStageActivations, configuredSubmissionStageActivations, submissionStageActivationResolver, getActivitySubmissionStageConfiguration, legacyGeneralStagePolicies, legacyStageSafeExamBrowserPolicies, activitySubmissionStageSafeExamBrowser, compatibleStageSecurityPolicies, assertActivitySafeExamBrowserSupported, legacySectionStageOverrides, readSubmissionStagePolicies, validateSubmissionStagePolicies } from "./activity-submission-stages";
+import { configuredActivityStageActivations, configuredSubmissionStageActivations, submissionStageActivationResolver, getActivitySubmissionStageConfiguration, legacyGeneralStagePolicies, legacyStageSafeExamBrowserPolicies, normalizeSubmissionStageAssignmentMetadata, activitySubmissionStageSafeExamBrowser, compatibleStageSecurityPolicies, assertActivitySafeExamBrowserSupported, legacySectionStageOverrides, readSubmissionStagePolicies, validateSubmissionStagePolicies } from "./activity-submission-stages";
 import { getActivitySubmissionStagesHandler } from "@cognelo/activity-sdk/server";
 import { enqueueBackgroundJob } from "./background-jobs";
 import { teamworkTransaction } from "./activity-teamwork";
@@ -1308,20 +1308,7 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
 
   const assignmentMetadata = asMetadataRecord(data.metadata as Prisma.JsonValue);
   const courseAssignmentRule = getCourseWideAssignmentMetadata(activity.metadata);
-  if (getActivityDefinition(activity.activityType?.key ?? "")?.submissionStages?.length) {
-    const raw = input && typeof input === "object" ? (input as { metadata?: Record<string, unknown> }).metadata ?? {} : {};
-    const overrides = mergeSubmissionStagePolicies(
-      Object.prototype.hasOwnProperty.call(raw, "timeLimitMinutes") ? legacyGeneralStagePolicies(activity.activityType.key, assignmentMetadata.timeLimitMinutes) : {},
-      Object.prototype.hasOwnProperty.call(raw, "requireSafeExamBrowser") ? legacyStageSafeExamBrowserPolicies(activity.activityType.key, assignmentMetadata.requireSafeExamBrowser) : {},
-      readSubmissionStagePolicies(assignmentMetadata.submissionStages)
-    );
-    assignmentMetadata.submissionStages = mergeSubmissionStagePolicies(
-      legacyGeneralStagePolicies(activity.activityType.key, courseAssignmentRule?.timeLimitMinutes),
-      legacyStageSafeExamBrowserPolicies(activity.activityType.key, courseAssignmentRule?.requireSafeExamBrowser ?? false),
-      courseAssignmentRule?.submissionStages, overrides
-    ) as Prisma.JsonValue;
-    assignmentMetadata.submissionStageOverrides = overrides as Prisma.JsonValue;
-  }
+  Object.assign(assignmentMetadata, normalizeSubmissionStageAssignmentMetadata(activity.activityType?.key ?? "", activity.metadata, assignmentMetadata));
   if (
     !Object.prototype.hasOwnProperty.call(assignmentMetadata, "timeLimitMinutes") &&
     courseAssignmentRule &&
@@ -1412,6 +1399,7 @@ export async function updateGroupActivityAssignment(
     throw new AppError(400, "COURSE_WIDE_GROUP_ACTIVITY_LOCKED", "This activity is assigned to all groups from the course.");
   }
 
+  if (data.metadata) Object.assign(data.metadata, normalizeSubmissionStageAssignmentMetadata(assignment.activity?.activityType?.key ?? "", assignment.activity?.metadata, data.metadata, assignment.metadata));
   const applyStageActivation = await prepareSectionStageActivation(user, courseId, assignment.activity);
   validateSubmissionStagePolicies(assignment.activity?.activityType?.key ?? "", readSubmissionStagePolicies(effectiveMetadata.submissionStages));
   return prisma.$transaction(async (tx) => {

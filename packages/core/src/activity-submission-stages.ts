@@ -72,6 +72,33 @@ export function legacyStageSafeExamBrowserPolicies(typeKey: string, required: un
   const stage = getActivityDefinition(typeKey)?.submissionStages?.find(stage => stage.assessment);
   return stage && typeof required === "boolean" ? { [stage.id]: { requireSafeExamBrowser: required } } : {};
 }
+/** Section metadata endpoints may echo an older materialized map; rebuild its override source. */
+export function normalizeSubmissionStageAssignmentMetadata(typeKey: string, activityMetadata: unknown, value: unknown, previousValue?: unknown) {
+  const metadata = record(value), previous = record(previousValue);
+  const assessment = getActivityDefinition(typeKey)?.submissionStages?.find(stage => stage.assessment);
+  if (!getActivityDefinition(typeKey)?.submissionStages?.length) return metadata;
+  const rule = record(record(activityMetadata).allGroupsAssignment);
+  const requested = readSubmissionStagePolicies(metadata.submissionStages);
+  const previousStages = readSubmissionStagePolicies(previous.submissionStages);
+  const legacy = mergeSubmissionStagePolicies(
+    Object.prototype.hasOwnProperty.call(metadata, "timeLimitMinutes") ? legacyGeneralStagePolicies(typeKey, metadata.timeLimitMinutes) : {},
+    Object.prototype.hasOwnProperty.call(metadata, "requireSafeExamBrowser") ? legacyStageSafeExamBrowserPolicies(typeKey, metadata.requireSafeExamBrowser) : {}
+  );
+  const overrides = mergeSubmissionStagePolicies(legacy, requested);
+  // Older clients edit scalar controls while echoing an unchanged stage map.
+  // A changed explicit stage value still takes precedence over its legacy scalar.
+  if (assessment && previousValue !== undefined) for (const key of ["timeLimitMinutes", "requireSafeExamBrowser"] as const) {
+    if (Object.prototype.hasOwnProperty.call(metadata, key) && metadata[key] !== previous[key]
+      && requested[assessment.id]?.[key] === previousStages[assessment.id]?.[key]
+      && legacy[assessment.id]?.[key] !== undefined) {
+      overrides[assessment.id] = { ...overrides[assessment.id], [key]: legacy[assessment.id]![key] };
+    }
+  }
+  return { ...metadata, submissionStageOverrides: overrides, submissionStages: mergeSubmissionStagePolicies(
+    legacyGeneralStagePolicies(typeKey, rule.timeLimitMinutes), legacyStageSafeExamBrowserPolicies(typeKey, rule.requireSafeExamBrowser ?? false),
+    readSubmissionStagePolicies(rule.submissionStages), overrides
+  ) };
+}
 export function legacySectionStageOverrides(typeKey: string, value: unknown, fields?: readonly string[]): SubmissionStagePolicies {
   const metadata = record(value);
   const assessment = getActivityDefinition(typeKey)?.submissionStages?.find(stage => stage.assessment);

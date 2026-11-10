@@ -3,10 +3,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ definition: vi.fn(), configuration: vi.fn() }));
 vi.mock("@cognelo/activity-sdk", () => ({ getActivityDefinition: mocks.definition }));
 vi.mock("@cognelo/activity-sdk/server", () => ({ getActivitySubmissionStagesHandler: () => ({ configuration: mocks.configuration }) }));
-import { assertActivitySafeExamBrowserSupported, activitySubmissionStageSafeExamBrowser, activityAssessmentStageAssignment, getActivitySubmissionStageConfiguration, resolveActivitySubmissionStage, validateSubmissionStagePolicies, initialSubmissionStageMetadata, assertActivitySubmissionStageEnabled, configuredSubmissionStageActivations, submissionStageActivationResolver } from "./activity-submission-stages";
+import { normalizeSubmissionStageAssignmentMetadata, assertActivitySafeExamBrowserSupported, activitySubmissionStageSafeExamBrowser, activityAssessmentStageAssignment, getActivitySubmissionStageConfiguration, resolveActivitySubmissionStage, validateSubmissionStagePolicies, initialSubmissionStageMetadata, assertActivitySubmissionStageEnabled, configuredSubmissionStageActivations, submissionStageActivationResolver } from "./activity-submission-stages";
 const activity = { id: "activity", activityType: { key: "staged" } }, names = { en: "First", fr: "Première", zh: "第一", ar: "الأولى" };
 beforeEach(() => { vi.clearAllMocks(); mocks.definition.mockReturnValue({ submissionStages: [{ id: "files", names, allowsLateSubmissions: true }, { id: "questions", names, assessment: true }] }); mocks.configuration.mockResolvedValue({ defaults: { files: { deadline: "2030-01-01T10:00:00.000Z" } } }); });
 describe("core stage capability resolution", () => {
+  it("rebuilds direct section overrides instead of retaining an echoed stale activation map", async () => {
+    const course = { allGroupsAssignment: { submissionStages: { files: { enabled: false }, questions: { enabled: false } } } };
+    const before = normalizeSubmissionStageAssignmentMetadata("staged", course, { assessmentMode: "summative", submissionStages: { files: { enabled: true } } });
+    const after = normalizeSubmissionStageAssignmentMetadata("staged", course, { ...before, submissionStages: { files: { enabled: false } } }, before);
+    expect(after).toMatchObject({ submissionStageOverrides: { files: { enabled: false } }, submissionStages: { files: { enabled: false }, questions: { enabled: false } } });
+    const policy = await resolveActivitySubmissionStage({ ...activity, metadata: course }, { metadata: after }, "files");
+    expect(policy.policy.enabled).toBe(false);
+  });
+  it("honors legacy scalar edits when a section client echoes unchanged canonical values", () => {
+    const before = { timeLimitMinutes: 20, requireSafeExamBrowser: true, submissionStages: { questions: { timeLimitMinutes: 20, requireSafeExamBrowser: true } } };
+    const after = normalizeSubmissionStageAssignmentMetadata("staged", {}, { ...before, timeLimitMinutes: 40, requireSafeExamBrowser: false }, before);
+    expect(after).toMatchObject({ submissionStageOverrides: { questions: { timeLimitMinutes: 40, requireSafeExamBrowser: false } } });
+    const explicit = normalizeSubmissionStageAssignmentMetadata("staged", {}, { ...before, timeLimitMinutes: 40, submissionStages: { questions: { timeLimitMinutes: 25 } } }, before);
+    expect(explicit).toMatchObject({ submissionStageOverrides: { questions: { timeLimitMinutes: 25 } } });
+  });
   it("lets an activity or one stage disallow SEB and ignores incompatible stored flags", async () => {
     const declaration = mocks.definition.getMockImplementation()!();
     mocks.definition.mockReturnValue({ ...declaration, submissionStages: declaration.submissionStages.map((stage: { id: string }) => ({ ...stage, ...(stage.id === "files" ? { supportsSafeExamBrowser: false } : {}) })) });
