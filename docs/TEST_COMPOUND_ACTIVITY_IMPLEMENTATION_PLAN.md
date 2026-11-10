@@ -481,6 +481,8 @@ The optional [activity content closure policy](ACTIVITY_CONTENT_ACCESS.md) also 
 
 Learner countdowns use the server's remaining seconds anchored to browser monotonic elapsed time (`performance.now()`), never the device wall clock. Every policy response refreshes that anchor, including live extensions and Until exceptions. Automatic submission deferred by the server, or interrupted by a request failure, waits at least 20 seconds before retrying. The server rechecks live expiry after claiming submission. Claim acquisition, autosaves, and recovery coordinate on the parent row so a queued save cannot change recovered responses.
 
+An autosave reaching an already completed item returns its existing submitted snapshot successfully without applying the incoming state. This lets trailing browser saves drain safely. Verify unchanged stored evidence when testing this boundary; an HTTP success response does not mean the late edit was accepted.
+
 Opening or refreshing a teacher's Student results, in-progress feed, or gradebook checks started Tests in that reader's authorized course/section/activity scope. There is no cron job or scheduled recovery worker. Recovery resolves current General/section/team/student timing and the Until cap from the original start; untimed or extended attempts remain open. It allows 30 seconds after expiry for ordinary browser submission and skips a processing submission claim unless it is more than 30 minutes old.
 
 A serializable transaction locks the parent and Test authoring, freezes the current submission revision/manifest, preserves each saved response unchanged, creates empty submitted rows for never-opened exercises, and marks the parent submitted at its effective deadline. It records the actual recovery time separately in `timeoutRecovery` and an actor-attributed `test_timeout_recovered` course audit event. It creates no grade, changes no start time, and is idempotent. Serialization conflicts are retried on a subsequent results read. When an in-progress row disappears, the teacher UI reloads the detailed results once so recovered work appears as awaiting grading.
@@ -604,6 +606,8 @@ Teacher-triggered AI assessment is integrated at the parent attempt boundary. Te
 Until the final item is implemented, imported Test provenance is retained but the generic single-activity synchronization action is hidden and rejected for Test shells so it cannot update only the shell and leave composition stale.
 
 ## Verification Strategy
+
+The focused [exam-window acceptance matrix](../tests/e2e/test-exam-window.spec.ts) verifies three-hour Tests with buffered opening/closing dates, late starts, 240/270-minute accommodations, individual/team precedence and visibility exclusions. Six-question C scenarios cover SEB authorization, real compilation, saved-answer resume and automatic submission at duration or calendar expiry. The fixture uses generic disposable content; imported course/exam records remain outside the test mutation scope. See [browser test instructions](../tests/e2e/README.md).
 
 Each phase requires:
 
