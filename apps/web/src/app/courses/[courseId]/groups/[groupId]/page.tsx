@@ -199,7 +199,7 @@ export default function CourseGroupPage() {
             // and upcoming assignments must remain locked without aborting the whole overview.
             .filter(
               (assignment) =>
-                !assignmentRequiresSafeExamBrowser(assignment.metadata) &&
+                !assignmentRequiresSafeExamBrowser(assignment.metadata, assignment.activity.activityType.key) &&
                 (!assignment.availableFrom || new Date(assignment.availableFrom).getTime() <= serverNow())
             )
             .map(async (assignment) => ({

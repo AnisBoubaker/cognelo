@@ -18,10 +18,13 @@ describe("Safe Exam Browser assignment metadata", () => {
     expect(assignmentRequiresSafeExamBrowser({ requireSafeExamBrowser: false })).toBe(false);
     expect(assignmentRequiresSafeExamBrowser({})).toBe(false);
     expect(assignmentRequiresSafeExamBrowser(null)).toBe(false);
+    expect(assignmentRequiresSafeExamBrowser({ assessmentMode: "summative", submissionStages: { files: { requireSafeExamBrowser: true }, questions: { requireSafeExamBrowser: false } } })).toBe(true);
+    expect(assignmentRequiresSafeExamBrowser({ assessmentMode: "summative", submissionStages: { files: { requireSafeExamBrowser: false } } })).toBe(false);
+    expect(assignmentRequiresSafeExamBrowser({ assessmentMode: "formative", submissionStages: { files: { requireSafeExamBrowser: true } } })).toBe(false);
   });
 
   it("does not probe protected submission history from the ordinary course overview", () => {
-    expect(groupPageSource).toContain("!assignmentRequiresSafeExamBrowser(assignment.metadata)");
+    expect(groupPageSource).toContain("!assignmentRequiresSafeExamBrowser(assignment.metadata, assignment.activity.activityType.key)");
     expect(groupPageSource).toContain(
       "(!assignment.availableFrom || new Date(assignment.availableFrom).getTime() <= serverNow())"
     );

@@ -1,3 +1,4 @@
+import { getActivityDefinition } from "@cognelo/activity-sdk";
 export type SafeExamBrowserWindow = {
   SafeExamBrowser?: {
     version?: string;
@@ -9,9 +10,14 @@ export type SafeExamBrowserWindow = {
   setTimeout: (callback: () => void, delay: number) => number;
 };
 
-export function assignmentRequiresSafeExamBrowser(metadata: unknown) {
-  return Boolean(metadata) && typeof metadata === "object" &&
-    (metadata as Record<string, unknown>).requireSafeExamBrowser === true;
+export function assignmentRequiresSafeExamBrowser(metadata: unknown, activityTypeKey?: string) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return false;
+  const definition = activityTypeKey ? getActivityDefinition(activityTypeKey) : undefined;
+  if (definition?.supportsSafeExamBrowser === false) return false;
+  const value = metadata as Record<string, unknown>;
+  const stages = value.submissionStages && typeof value.submissionStages === "object" && !Array.isArray(value.submissionStages) ? value.submissionStages as Record<string, unknown> : {};
+  const assessment = definition?.submissionStages?.find(stage => stage.assessment);
+  return value.requireSafeExamBrowser === true && assessment?.supportsSafeExamBrowser !== false || value.assessmentMode === "summative" && Object.entries(stages).some(([id, stage]) => definition?.submissionStages?.find(item => item.id === id)?.supportsSafeExamBrowser !== false && stage && typeof stage === "object" && (stage as Record<string, unknown>).requireSafeExamBrowser === true);
 }
 
 export async function readSafeExamBrowserProof(browserWindow: SafeExamBrowserWindow) {

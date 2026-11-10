@@ -121,6 +121,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
   const [savedAssessmentMode, setSavedAssessmentMode] = useState<AssignedActivityAssessmentMode | null>(null);
   const isTest = activity.activityType.key === "test";
   const supportsTeamwork = getActivityDefinition(activity.activityType.key)?.supportsTeamwork === true;
+  const supportsSafeExamBrowser = getActivityDefinition(activity.activityType.key)?.supportsSafeExamBrowser !== false;
   const supportsAiFeedback = getActivityDefinition(activity.activityType.key)?.grading?.supportsAiFeedback === true;
 
   useEffect(() => {
@@ -237,7 +238,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
         releaseSolution: draft.releaseSolution,
         hideAfterAttempts: draft.hideAfterAttempts,
         confirmSummativeToFormative: convertsSummativeToFormative,
-        requireSafeExamBrowser: draft.assessmentMode === "summative" && draft.general.requireSafeExamBrowser,
+        requireSafeExamBrowser: !submissionStages.length && supportsSafeExamBrowser && draft.assessmentMode === "summative" && draft.general.requireSafeExamBrowser,
         gradeChallengesEnabled: draft.assessmentMode === "summative" && draft.general.gradeChallengesEnabled,
         gradebookSettings: buildGradebookSettings(draft.general),
         contentPlacement: {
@@ -254,19 +255,19 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
           exceptions: group.assigned ? group.exceptions.map((exception) => ({
             teamId: exception.teamId, participantId: exception.participantId,
             submissionStages: stagePoliciesForSave(exception.submissionStages, timeZone),
-            overrideFields: exception.overrideFields.filter((field) => (!submissionStages.length || field !== "timeLimit") && (allowedGroupFields ? allowedGroupFields(field) : true)),
+            overrideFields: exception.overrideFields.filter((field) => (!submissionStages.length || (field !== "timeLimit" && field !== "requireSafeExamBrowser")) && (supportsSafeExamBrowser || field !== "requireSafeExamBrowser") && (allowedGroupFields ? allowedGroupFields(field) : true)),
             availableFrom: toIsoOrNull(exception.availableFrom, timeZone), availableUntil: toIsoOrNull(exception.availableUntil, timeZone),
-            timeLimitMinutes: buildTimeLimitMinutes(exception), requireSafeExamBrowser: exception.requireSafeExamBrowser,
+            timeLimitMinutes: buildTimeLimitMinutes(exception), requireSafeExamBrowser: !submissionStages.length && supportsSafeExamBrowser && exception.requireSafeExamBrowser,
             gradeChallengesEnabled: exception.gradeChallengesEnabled, gradebookSettings: buildGradebookSettings(exception),
             contentPlacement: { isVisible: exception.isVisible, metadata: {} }
           })) : [],
           overrideFields: group.assigned
-            ? group.overrideFields.filter((field) => (!submissionStages.length || field !== "timeLimit") && (allowedGroupFields ? allowedGroupFields(field) : true))
+            ? group.overrideFields.filter((field) => (!submissionStages.length || (field !== "timeLimit" && field !== "requireSafeExamBrowser")) && (supportsSafeExamBrowser || field !== "requireSafeExamBrowser") && (allowedGroupFields ? allowedGroupFields(field) : true))
             : [],
           availableFrom: toIsoOrNull(group.availableFrom, timeZone),
           availableUntil: toIsoOrNull(group.availableUntil, timeZone),
           timeLimitMinutes: buildTimeLimitMinutes(group),
-          requireSafeExamBrowser: draft.assessmentMode === "summative" && group.requireSafeExamBrowser,
+          requireSafeExamBrowser: !submissionStages.length && supportsSafeExamBrowser && draft.assessmentMode === "summative" && group.requireSafeExamBrowser,
           gradeChallengesEnabled: draft.assessmentMode === "summative" && group.gradeChallengesEnabled,
           gradebookSettings: buildGradebookSettings(group),
           contentPlacement: {
@@ -312,7 +313,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
   ];
 
   return (
-    <StageScheduleContext.Provider value={{ stages: submissionStages, general: draft?.general.submissionStages ?? {}, timeZone, locale }}>
+    <StageScheduleContext.Provider value={{ stages: submissionStages, supportsSafeExamBrowser, summative: draft?.assessmentMode === "summative", general: draft?.general.submissionStages ?? {}, timeZone, locale }}>
     <form className="activity-settings-form" onSubmit={saveSettings}>
           <div className="activity-settings-layout">
             <nav aria-label={t("courseDetail.activitySettingsNavigation")} className="activity-settings-nav" role="tablist">
@@ -766,9 +767,11 @@ function SummativeFields({
   onChange: (update: Partial<AssignmentValueDraft>) => void;
 }) {
   const { t } = useI18n();
+  const stageContext = useStageSchedule();
+  const staged = stageContext.stages.length > 0 || stageContext.supportsSafeExamBrowser === false;
   return (
     <div className="stack activity-summative-settings">
-      <HelpLabel help={t("groupPage.requireSafeExamBrowserHelp")}><label className="checkbox-row" htmlFor={`${idPrefix}-seb`}>
+      {!staged && <HelpLabel help={t("groupPage.requireSafeExamBrowserHelp")}><label className="checkbox-row" htmlFor={`${idPrefix}-seb`}>
         <input
           checked={value.requireSafeExamBrowser}
           disabled={disabled}
@@ -779,7 +782,7 @@ function SummativeFields({
         <span>
           {t("groupPage.requireSafeExamBrowser")}
         </span>
-      </label></HelpLabel>
+      </label></HelpLabel>}
       <HelpLabel help={t("groupPage.gradeChallengesEnabledHelp")}><label className="checkbox-row" htmlFor={`${idPrefix}-grade-challenges`}>
         <input
           checked={value.gradeChallengesEnabled}
@@ -812,6 +815,8 @@ function GroupSummativeOverrides({
   onToggle: (field: ActivityAssignmentOverrideField, checked: boolean) => void;
 }) {
   const { t } = useI18n();
+  const stageContext = useStageSchedule();
+  const staged = stageContext.stages.length > 0 || stageContext.supportsSafeExamBrowser === false;
   const fields: Array<{ field: ActivityAssignmentOverrideField; label: string }> = [
     { field: "requireSafeExamBrowser", label: t("groupPage.requireSafeExamBrowser") },
     { field: "gradeChallenges", label: t("groupPage.gradeChallengesEnabled") },
@@ -822,7 +827,7 @@ function GroupSummativeOverrides({
   ];
   return (
     <>
-      {fields.map(({ field, label }) => (
+      {fields.filter(({ field }) => !staged || field !== "requireSafeExamBrowser").map(({ field, label }) => (
         <OverrideField
           checked={group.overrideFields.includes(field)}
           disabled={disabled}

@@ -31,3 +31,4 @@ export * from "./toggle-switch";
 export * from "./help-tooltip";
 
 export * from "./submission-stage-activation";
+export * from "./submission-stage-access";

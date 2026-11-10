@@ -6,7 +6,7 @@ import { HomeworkFileViewer } from "./homework-file-viewer";
 import { HomeworkChallengeQuestion } from "./homework-challenge-question";
 import { HomeworkAnswerConfirmation } from "./homework-answer-confirmation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SubmissionStageWaiting, ActionIcon, MarkdownRenderer, ProgressDialog, AppDateTime, useServerNow, useDialogs, useNotifications, isActivityContentClosedError } from "@cognelo/activity-ui";
+import { SubmissionStageAccessGate, isSubmissionStageAccessError, SubmissionStageWaiting, ActionIcon, MarkdownRenderer, ProgressDialog, AppDateTime, useServerNow, useDialogs, useNotifications, isActivityContentClosedError } from "@cognelo/activity-ui";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import type { CodingHomeworkLocale } from "./messages";
 import type { CodingHomeworkStudentAssignment, CodingHomeworkStudentChallengeQuestionRecord } from "./client";
@@ -26,6 +26,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   const [confirmingAnswers, setConfirmingAnswers] = useState(false);
   const [checkedPreparation, setCheckedPreparation] = useState<HomeworkPreparation | null>(null);
   const [submittedCheck, setSubmittedCheck] = useState<Pick<HomeworkPreparation, "validation" | "readiness"> | null>(null);
+  const [fileAccessRequired, setFileAccessRequired] = useState(false), [questionAccessRequired, setQuestionAccessRequired] = useState(false);
   const preparationLoad = useRef(0);
   const runtimeRefresh = useRef(onAssessmentStarted); runtimeRefresh.current = onAssessmentStarted;
   const activeSubmissionId = useRef<string | null>(null);
@@ -33,7 +34,8 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   preparationRef.current = preparation;
   const controller = useRef<AbortController | null>(null), dirty = useRef(false), answersRef = useRef(answers), saveQueue = useRef(Promise.resolve()), timeoutHandled = useRef<number | string | null>(null);
   answersRef.current = answers;
-  const showError = useCallback((reason: unknown) => { if (!isActivityContentClosedError(reason) && !(reason instanceof DOMException && reason.name === "AbortError")) { notifications.error(reason instanceof Error ? reason.message : copy.error); } }, [copy.error, notifications]);
+  const accessRequested = useRef(onAssessmentAccessRequested); accessRequested.current = onAssessmentAccessRequested;
+  const showError = useCallback((reason: unknown) => { if (isSubmissionStageAccessError(reason)) { accessRequested.current?.(); return; } if (!isActivityContentClosedError(reason) && !(reason instanceof DOMException && reason.name === "AbortError")) { notifications.error(reason instanceof Error ? reason.message : copy.error); } }, [copy.error, notifications]);
   const refresh = useCallback(async (reloadPreparation = true) => {
     const requestVersion = ++workspaceLoad.current;
     const state = await request<HomeworkWorkspace>("workspace");
@@ -47,10 +49,15 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
       runtimeRefresh.current?.(); // Refresh the host's runtime; a new team has no old answering timer.
     }
     setWorkspace(state);
-    if (state.teamwork?.canSubmit !== false && !state.submission && (reloadPreparation || changed || participationChanged || (state.teamwork && preparationRef.current?.draft.revision !== state.teamwork.draftRevision))) {
+    if (state.teamwork?.canSubmit !== false && !state.submission && (reloadPreparation || !preparationRef.current || changed || participationChanged || (state.teamwork && preparationRef.current?.draft.revision !== state.teamwork.draftRevision))) {
       const version = ++preparationLoad.current;
-      const prepared = await request<HomeworkPreparation>("preparation");
-      if (preparationLoad.current === version && contextKey.current === nextKey) setPreparation(prepared);
+      try {
+        const prepared = await request<HomeworkPreparation>("preparation");
+        if (preparationLoad.current === version && contextKey.current === nextKey) { setPreparation(prepared); setFileAccessRequired(false); }
+      } catch (reason) {
+        if (!isSubmissionStageAccessError(reason)) throw reason;
+        if (preparationLoad.current === version && contextKey.current === nextKey) { setPreparation(null); setFileAccessRequired(true); }
+      }
     }
   }, [request]);
   useEffect(() => { let mounted = true; void Promise.all([refresh(), request<CodingHomeworkStudentAssignment>("assignment").then(value => { if (mounted) setAssignment(value); })]).catch(reason => { if (mounted) showError(reason); }); return () => { mounted = false; controller.current?.abort(); }; }, [request, refresh, showError]);
@@ -68,7 +75,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   useEffect(() => {
     if (!active?.started || questions.length) return;
     const pending = new AbortController();
-    void request<{ questions: CodingHomeworkStudentChallengeQuestionRecord[] }>("answering", { signal: pending.signal }).then(result => { if (!pending.signal.aborted) loadQuestions(result); }).catch(reason => { if (!pending.signal.aborted) showError(reason); });
+    void request<{ questions: CodingHomeworkStudentChallengeQuestionRecord[] }>("answering", { signal: pending.signal }).then(result => { if (!pending.signal.aborted) { loadQuestions(result); setQuestionAccessRequired(false); } }).catch(reason => { if (!pending.signal.aborted) { if (isSubmissionStageAccessError(reason)) setQuestionAccessRequired(true); else showError(reason); } });
     return () => pending.abort();
   }, [active?.started, active?.id, request, questions.length, loadQuestions, showError]);
 
@@ -156,6 +163,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
       <p>{workspace.teamwork.teamId ? copy.teamWorkspaceHelp : copy.individualAllowed}</p>
     </div>}
     <h3>{active ? copy.readOnly : copy.prepare}</h3>
+    {!active && fileAccessRequired && <SubmissionStageAccessGate locale={locale} onRequestAccess={onAssessmentAccessRequested} />}
     {active ? <><p>{copy.frozen}</p><div className="row wrap">
       {submittedFilesUrl && <a className="button secondary" href={`${submittedFilesUrl}?submissionId=${encodeURIComponent(active.id)}`}><ActionIcon name="download" /> {copy.downloadSubmittedWork}</a>}
       <button type="button" className="secondary" disabled={Boolean(busy)} onClick={() => void run(copy.checkingSubmission, async signal => { setSubmittedCheck(await request("submitted-check", body("POST", { submissionId: active.id }, signal))); }, false)}><ActionIcon name="check" /> {copy.checkSubmission}</button>
@@ -164,7 +172,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
         <p className="row"><ActionIcon name={submittedCheck.readiness.canSubmit && !submittedCheck.readiness.requiresAcknowledgement ? "check" : "alert"} /><strong>{submittedCheck.readiness.canSubmit && !submittedCheck.readiness.requiresAcknowledgement ? copy.structureValid : copy.structureInvalid}</strong></p>
         {submittedCheck.validation.issues.length > 0 && <ul>{submittedCheck.validation.issues.map((issue, index) => <li key={index}>{issue.message}</li>)}</ul>}
       </div>}
-    </> : !submissionWindow.closed ? <>
+    </> : !submissionWindow.closed && !fileAccessRequired ? <>
       <div className="row">
         <label className="button secondary"><ActionIcon name="upload" /> {copy.upload}<input type="file" multiple hidden disabled={!preparation || Boolean(busy)} onChange={event => { void upload(event.target.files, false); event.target.value = ""; }} /></label>
         <label className="button secondary"><ActionIcon name="upload" /> {copy.zip}<input type="file" accept=".zip" hidden disabled={!preparation || Boolean(busy)} onChange={event => { void upload(event.target.files, true); event.target.value = ""; }} /></label>
@@ -175,12 +183,12 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
         }}><ActionIcon name="remove" /> {copy.removeAllFiles}</button>
       </div>
     </> : null}
-    <HomeworkFileViewer key={`${workspace?.teamwork?.contextKey ?? "individual"}:${active?.id ?? "draft"}`} files={files} request={request} locale={locale} submitted={Boolean(active)} revision={active ? undefined : preparation?.draft.revision} busy={Boolean(busy)}
+    {(active || !fileAccessRequired) && <HomeworkFileViewer key={`${workspace?.teamwork?.contextKey ?? "individual"}:${active?.id ?? "draft"}`} files={files} request={request} locale={locale} submitted={Boolean(active)} revision={active ? undefined : preparation?.draft.revision} busy={Boolean(busy)}
       onDelete={!active && preparation && !submissionWindow.closed ? async path => {
         if (!await dialogs.confirm({ title: copy.removeFile, message: copy.removePreparedFileConfirm.replace("{path}", path), confirmLabel: copy.remove, confirmVariant: "danger" })) return;
         invalidateCheck();
         await run(copy.remove, async signal => { setPreparation(await request("preparation", body("DELETE", { ...(workspace?.teamwork ? { contextKey: workspace.teamwork.contextKey } : {}), path, expectedRevision: preparation.draft.revision }, signal))); });
-      } : undefined} />
+      } : undefined} />}
     {!active && preparation && <section className="stack homework-structure-check">
       <p className="muted">{copy.structuralHelp}</p>
       <div><button type="button" className="secondary" disabled={!files.length || Boolean(busy)} onClick={() => {
@@ -213,6 +221,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
       </div>
     </div>}
     {active?.status === "challenge_ready" && !questions.length && !awaitingQuestions && <><p>{copy.answerHelp}</p><button type="button" onClick={() => void start()}><ActionIcon name="open" /> {copy.answer}</button></>}
+    {questionAccessRequired && !questions.length && <SubmissionStageAccessGate locale={locale} onRequestAccess={onAssessmentAccessRequested} />}
     {questions.length > 0 && <><h3>{copy.answers}</h3><p className="muted">{copy.autoSave}</p>
       <div className="homework-challenge-list">{questions.map((question, index) => <HomeworkChallengeQuestion key={question.id}
         question={question} number={index + 1} total={questions.length} locale={locale} value={answers[question.id] ?? ""}
