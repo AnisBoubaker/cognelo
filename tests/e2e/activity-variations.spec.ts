@@ -234,7 +234,7 @@ async function runMockedVariation(page: Page, input: {
   await page.getByRole("button", { name: `Actions for ${input.sourceTitle}` }).click();
   await page.getByRole("menuitem", { name: "Create variation", exact: true }).click();
   const authoring = page.getByRole("dialog", { name: "Create an activity variation" });
-  await authoring.getByLabel("Optional AI instructions").fill(input.instructions);
+  await authoring.getByLabel("Optional AI instructions", { exact: true }).fill(input.instructions);
   await authoring.getByRole("button", { name: "Create variation", exact: true }).click();
 
   const progress = page.getByRole("dialog", { name: "Create an activity variation" });

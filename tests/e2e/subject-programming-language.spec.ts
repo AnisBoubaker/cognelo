@@ -33,7 +33,7 @@ test.describe.serial("subject programming-language defaults", () => {
     if (!data) throw new Error("The activity suite was not provisioned.");
     await mockProgrammingLanguages(page);
     await page.goto(`/subjects/${data.subjectId}/edit`);
-    const language = page.getByLabel("Default programming language");
+    const language = page.getByLabel("Default programming language", { exact: true });
     await expect(language).toHaveValue("cpp");
     await expect(language.getByRole("option", { name: "Multiple programming languages" })).toHaveCount(1);
     await expect(language.getByRole("option", { name: "Bash" })).toHaveCount(1);

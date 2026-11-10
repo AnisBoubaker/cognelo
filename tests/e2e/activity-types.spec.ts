@@ -80,14 +80,16 @@ async function verifySharedRichTextEditorLayout(page: Page, field: Locator) {
   await field.getByRole("tab", { name: "Visual" }).click();
 
   const resizeHandle = editor.getByRole("separator", { name: "Resize editor" });
+  // Coordinate-based dragging must begin inside the viewport, clear of sticky actions.
+  await resizeHandle.evaluate(element => element.scrollIntoView({ block: "center" }));
   const resizeHandleBox = await resizeHandle.boundingBox();
   if (!resizeHandleBox) throw new Error("The rich-text editor resize handle was not measurable.");
   await page.mouse.move(resizeHandleBox.x + resizeHandleBox.width / 2, resizeHandleBox.y + resizeHandleBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(resizeHandleBox.x + resizeHandleBox.width / 2, resizeHandleBox.y + resizeHandleBox.height / 2 + 90);
   await page.mouse.up();
+  await expect.poll(async () => (await visualPanel.boundingBox())?.height ?? 0).toBeGreaterThan((initialVisualBox?.height ?? 0) + 70);
   const resizedVisualBox = await visualPanel.boundingBox();
-  expect(resizedVisualBox?.height ?? 0).toBeGreaterThan((initialVisualBox?.height ?? 0) + 70);
   await field.getByRole("tab", { name: "Markdown" }).click();
   const resizedMarkdownBox = await markdownPanel.boundingBox();
   expect(Math.abs((resizedVisualBox?.height ?? 0) - (resizedMarkdownBox?.height ?? 0))).toBeLessThanOrEqual(2);
@@ -175,7 +177,7 @@ test.describe.serial("authoring and completing every activity type", () => {
       "- [x] 42",
       "- [ ] 36"
     ].join("\n"));
-    await teacherPage.getByLabel("Randomize choices").check();
+    await teacherPage.getByLabel("Randomize choices", { exact: true }).check();
     await teacherPage.getByRole("button", { name: "Save multiple choice questions" }).click();
     await expect(teacherPage.getByText("Multiple choice questions activity saved.", { exact: true })).toBeVisible();
     await publishCurrentBankActivity(teacherPage);
@@ -205,7 +207,7 @@ test.describe.serial("authoring and completing every activity type", () => {
 
     await expect(teacherPage.getByRole("heading", { name: "Configure the problem" })).toBeVisible();
     await teacherPage.getByLabel("Activity title").fill(parsonsTitle);
-    await teacherPage.getByLabel("Activity description").fill("Rebuild a one-line Python greeting.");
+    await teacherPage.getByLabel("Activity description", { exact: true }).fill("Rebuild a one-line Python greeting.");
     await teacherPage.getByLabel("Prompt", { exact: true }).fill("Submit the Python statement that prints the E2E greeting.");
     await teacherPage.getByLabel("Reference solution", { exact: true }).fill("print('E2E Parsons')");
     await teacherPage.getByRole("button", { name: "Save", exact: true }).click();
@@ -370,7 +372,7 @@ test.describe.serial("authoring and completing every activity type", () => {
       mimeType: "image/png",
       buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
     });
-    await addImageDialog.getByLabel("Alternative text").fill("Velocity formula diagram");
+    await addImageDialog.getByLabel("Alternative text", { exact: true }).fill("Velocity formula diagram");
     await addImageDialog.getByLabel("Title (optional)").fill("Terminal velocity");
     await addImageDialog.getByLabel("Size basis").selectOption("container-percent");
     await addImageDialog.getByLabel("Width (% of container)").fill("60");
@@ -381,7 +383,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     const editImageDialog = teacherPage.getByRole("dialog", { name: "Edit image" });
     await expect(editImageDialog.getByLabel("Size basis")).toHaveValue("container-percent");
     await expect(editImageDialog.getByLabel("Width (% of container)")).toHaveValue("60");
-    await editImageDialog.getByLabel("Alternative text").fill("Terminal velocity formula diagram");
+    await editImageDialog.getByLabel("Alternative text", { exact: true }).fill("Terminal velocity formula diagram");
     await editImageDialog.getByRole("button", { name: "Update image" }).click();
     await promptField.getByRole("tab", { name: "Markdown" }).click();
     const markdownPrompt = promptField.getByRole("textbox", { name: "Prompt" });
@@ -392,7 +394,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(markdownPrompt).toHaveValue(/!\[Terminal velocity formula diagram\]\(\/api\/media-assets\/[a-z0-9]+\/content#cognelo-size=container:60 "Terminal velocity"\)/);
     await teacherPage
       .getByText("Reference solution", { exact: true })
-      .locator("..")
+      .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' stack ')][1]")
       .getByRole("textbox")
       .fill(solution);
     await teacherPage.getByRole("tab", { name: "Grading", exact: true }).click();
@@ -404,14 +406,14 @@ test.describe.serial("authoring and completing every activity type", () => {
     await sampleTestEditor.getByRole("textbox").nth(0).fill("Visible greeting", { timeout: 10_000 });
     await sampleTestEditor.getByRole("textbox").nth(1).fill("Ada", { timeout: 10_000 });
     await sampleTestEditor.getByRole("textbox").nth(2).fill("Hello, Ada!", { timeout: 10_000 });
-    const sampleOutputMatchMode = sampleTestEditor.getByLabel("Output matching");
+    const sampleOutputMatchMode = sampleTestEditor.getByLabel("Output matching", { exact: true });
     await sampleOutputMatchMode.selectOption("contains_lines");
     await expect(sampleOutputMatchMode).toHaveValue("contains_lines");
     await sampleTestEditor.getByLabel("Require lines in this order").check();
     await teacherPage.getByRole("button", { name: "Add hidden test" }).click();
     const hiddenTestToggle = teacherPage.getByRole("button", { name: "Hidden test 1" });
     await expect(hiddenTestToggle).toBeVisible({ timeout: 10_000 });
-    const hiddenTests = teacherPage.getByRole("heading", { name: "Hidden tests" }).locator("..").locator("..");
+    const hiddenTests = teacherPage.getByRole("heading", { name: "Hidden tests" }).locator("xpath=ancestor::section[1]");
     await hiddenTests.getByRole("textbox").nth(2).fill("Grace", { timeout: 10_000 });
     await hiddenTests.getByRole("textbox").nth(3).fill("Hello, Grace!", { timeout: 10_000 });
     await teacherPage.getByRole("button", { name: "Save coding exercise" }).click();

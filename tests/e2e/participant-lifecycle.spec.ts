@@ -114,18 +114,18 @@ test.describe.serial("participant import and group lifecycle", () => {
     await group.getByRole("button", { name: destinationGroupTitle, exact: true }).click();
     await group.getByRole("button", { name: "Import CSV", exact: true }).click();
     let dialog = page.getByRole("dialog", { name: "Import students from CSV" });
-    await dialog.getByLabel("CSV file").setInputFiles({
+    await dialog.getByLabel("CSV file", { exact: true }).setInputFiles({
       name: "invalid-participants.csv",
       mimeType: "text/csv",
       buffer: Buffer.from(`Duplicate,One,${firstEmail},1\nDuplicate,Two,${firstEmail},2\n`)
     });
     await expect(dialog.getByRole("alert")).toContainText("occurs more than once");
-    await expect(dialog.getByRole("button", { name: "Import students" })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "Import students", exact: true })).toBeDisabled();
     await dialog.getByRole("button", { name: "Cancel" }).click();
 
     await group.getByRole("button", { name: "Import CSV", exact: true }).click();
     dialog = page.getByRole("dialog", { name: "Import students from CSV" });
-    await dialog.getByLabel("CSV file").setInputFiles({
+    await dialog.getByLabel("CSV file", { exact: true }).setInputFiles({
       name: "participants.csv",
       mimeType: "text/csv",
       buffer: Buffer.from([
@@ -149,7 +149,7 @@ test.describe.serial("participant import and group lifecycle", () => {
       await route.continue();
     });
 
-    await dialog.getByRole("button", { name: "Import students" }).click();
+    await dialog.getByRole("button", { name: "Import students", exact: true }).click();
     await firstRequest;
     const progress = page.getByRole("dialog", { name: "Import students from CSV" }).last();
     await expect(progress).toContainText("Importing 1 of 2 students...");
@@ -172,7 +172,7 @@ test.describe.serial("participant import and group lifecycle", () => {
     await teacherPage.getByRole("menuitem", { name: "Delete", exact: true }).click();
     const deletion = teacherPage.getByRole("dialog", { name: "Delete group" });
     await deletion.getByText("Move participants to another group", { exact: true }).click();
-    await deletion.getByLabel("Destination group").selectOption(destinationGroupId);
+    await deletion.getByLabel("Destination group", { exact: true }).selectOption(destinationGroupId);
     await deletion.getByRole("button", { name: "Continue" }).click();
     await expect(originalGroup).toHaveCount(0);
     await groupCard(teacherPage, destinationGroupTitle).getByRole("button", { name: destinationGroupTitle, exact: true }).click();

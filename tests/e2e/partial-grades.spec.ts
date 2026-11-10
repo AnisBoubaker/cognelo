@@ -105,7 +105,7 @@ test.describe("partial grade safeguards", () => {
 
     await page.getByRole("button", { name: "Export grades", exact: true }).click();
     const exportDialog = page.getByRole("dialog", { name: "Export activity grades" });
-    await exportDialog.getByLabel("File name").fill("partial-grade-exclusion");
+    await exportDialog.getByLabel("File name", { exact: true }).fill("partial-grade-exclusion");
     const downloadPromise = page.waitForEvent("download");
     await exportDialog.getByRole("button", { name: "Export grades", exact: true }).click();
     const download = await downloadPromise;

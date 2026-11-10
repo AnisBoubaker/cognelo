@@ -22,16 +22,16 @@ test.describe.serial("course lifecycle settings", () => {
     await page.goto(`/courses/${data.courseId}?tab=settings&section=general`);
     await page.getByLabel("Title", { exact: true }).fill(archivedTitle);
     await page.getByLabel("Description").fill("Updated through the general course settings workflow.");
-    await page.getByLabel("Publication status").selectOption("archived");
-    await page.getByLabel("Student content layout").selectOption("folder_tabs");
+    await page.getByLabel("Publication status", { exact: true }).selectOption("archived");
+    await page.getByLabel("Student content layout", { exact: true }).selectOption("folder_tabs");
     await page.getByRole("button", { name: "Save course" }).click();
     await expect(page.getByRole("status")).toContainText("General course settings saved.");
     await page.reload();
     await page.getByRole("tab", { name: "Settings" }).click();
     await expect(page.getByLabel("Title", { exact: true })).toHaveValue(archivedTitle);
     await expect(page.getByLabel("Description")).toHaveValue("Updated through the general course settings workflow.");
-    await expect(page.getByLabel("Publication status")).toHaveValue("archived");
-    await expect(page.getByLabel("Student content layout")).toHaveValue("folder_tabs");
+    await expect(page.getByLabel("Publication status", { exact: true })).toHaveValue("archived");
+    await expect(page.getByLabel("Student content layout", { exact: true })).toHaveValue("folder_tabs");
 
     await page.goto("/courses");
     const courseCard = page.getByRole("link").filter({ hasText: archivedTitle });
@@ -39,8 +39,8 @@ test.describe.serial("course lifecycle settings", () => {
 
     await page.goto(`/courses/${data.courseId}?tab=settings&section=general`);
     await page.getByLabel("Title", { exact: true }).fill(data.courseTitle);
-    await page.getByLabel("Publication status").selectOption("published");
-    await page.getByLabel("Student content layout").selectOption("accordion");
+    await page.getByLabel("Publication status", { exact: true }).selectOption("published");
+    await page.getByLabel("Student content layout", { exact: true }).selectOption("accordion");
     await page.getByRole("button", { name: "Save course" }).click();
     await expect(page.getByRole("status")).toContainText("General course settings saved.");
   });

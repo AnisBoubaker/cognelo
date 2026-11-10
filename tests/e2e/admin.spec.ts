@@ -18,7 +18,7 @@ test.describe("administrator workflows", () => {
     await dialog.getByLabel("First name").fill("E2E");
     await dialog.getByLabel("Last name").fill("Learner");
     await dialog.getByLabel("Email").fill(email);
-    await dialog.getByLabel("Initial password").fill("Temporary123!");
+    await dialog.getByLabel("Initial password", { exact: true }).fill("Temporary123!");
     await dialog.getByLabel("Student").check();
     await dialog.getByRole("button", { name: "Save" }).click();
     await expect(dialog).toBeHidden();
@@ -35,7 +35,7 @@ test.describe("administrator workflows", () => {
 
     await page.getByRole("complementary", { name: "Settings" }).getByRole("link", { name: /Email delivery/ }).click();
     await expect(page.getByRole("heading", { name: "Email delivery" })).toBeVisible();
-    await expect(page.getByLabel("Delivery method")).toBeVisible();
+    await expect(page.getByLabel("Delivery method", { exact: true })).toBeVisible();
 
     await page.getByRole("complementary", { name: "Settings" }).getByRole("link", { name: /Maintenance/ }).click();
     await expect(page.getByRole("heading", { name: "Rich-text media" })).toBeVisible();

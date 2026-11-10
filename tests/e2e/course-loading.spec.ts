@@ -27,7 +27,7 @@ test.describe("independent course workspace loading", { tag: "@regression" }, ()
     await actions.click();
     await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
     const settings = page.getByRole("dialog", { name: title, exact: true });
-    await settings.getByLabel("Enable activity messaging").check();
+    await settings.getByLabel("Enable activity messaging", { exact: true }).check();
     await settings.getByRole("button", { name: "Save settings", exact: true }).click();
     await expect(settings).toBeHidden();
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -69,7 +69,7 @@ test.describe("independent course workspace loading", { tag: "@regression" }, ()
       await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
       const settings = page.getByRole("dialog", { name: data.title, exact: true });
       await settings.getByLabel("Assessment mode").selectOption("summative");
-      await settings.getByLabel("Limit the time for each attempt").check();
+      await settings.getByLabel("Limit the time for each attempt", { exact: true }).check();
       await settings.getByLabel("Time limit (minutes)", { exact: true }).fill("45");
 
       let releaseContent!: () => void;

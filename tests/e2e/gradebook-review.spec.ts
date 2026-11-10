@@ -72,7 +72,7 @@ test.describe("consistent gradebook review actions", () => {
     await expect(totalGrade).toBeVisible();
     const gradePositions = await Promise.all([automaticGrade, rubricGrade, totalGrade].map(async (field) => (await field.boundingBox())?.y));
     expect(new Set(gradePositions).size).toBe(1);
-    const finalGrade = dialog.getByLabel(/Final grade \(out of/);
+    const finalGrade = dialog.getByRole("spinbutton", { name: /^Final grade \(out of/ });
     await expect(finalGrade).toBeVisible();
 
     const totalBefore = await totalGrade.inputValue();

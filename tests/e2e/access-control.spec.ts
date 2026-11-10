@@ -112,7 +112,9 @@ test.describe.serial("global and course role boundaries", () => {
     await expect(page.getByRole("button", { name: "Add user" })).toHaveCount(0);
 
     await page.goto("/settings/plugins");
-    await expect(page.getByText("Plugin settings are available to administrators.")).toBeVisible();
+    await page.getByRole("button", { name: "Help: Plugin availability", exact: true }).hover();
+    await expect(page.getByRole("tooltip")).toContainText("Plugin settings are available to administrators.");
+    await page.keyboard.press("Escape");
 
     await page.goto("/settings/email");
     await expect(page.getByText("Email delivery settings are available to administrators.")).toBeVisible();

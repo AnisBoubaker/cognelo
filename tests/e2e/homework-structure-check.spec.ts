@@ -49,8 +49,10 @@ test("students explicitly check structure, acknowledge gaps, and recheck after c
     await expect(panel.getByRole("alert")).toHaveCount(0); await expect(acknowledgement).toHaveCount(0); await expect(submit).toHaveCount(0);
     await check.click();
     // Wrong arithmetic still passes the explicitly structural check.
-    await expect(panel.getByRole("status")).toContainText("Structure is valid.");
-    await expect(panel.getByRole("status").locator("svg")).toBeVisible();
+    const validStructure = panel.getByRole("status").filter({ hasText: "Structure is valid." });
+    await expect(validStructure).toBeVisible();
+    await expect(validStructure.locator("svg")).toBeVisible();
+    await expect(panel.getByRole("status").filter({ hasText: "Your work has not been submitted" })).toBeVisible();
     await expect(submit).toBeEnabled(); await expect(acknowledgement).toHaveCount(0);
     await panel.screenshot({ path: "tmp/homework-structure-valid.png" });
     await submit.click();

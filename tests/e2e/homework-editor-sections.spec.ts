@@ -26,7 +26,7 @@ test("Programming Homework keeps core top tabs and shared left sections, rich te
   await editor.getByRole("button", { name: "Add image", exact: true }).click();
   const image = page.getByRole("dialog", { name: "Add image", exact: true });
   await image.getByLabel("Image file").setInputFiles({ name: "diagram.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64") });
-  await image.getByLabel("Alternative text").fill("Assignment diagram"); await image.getByRole("button", { name: "Insert image", exact: true }).click(); await expect(image).toBeHidden();
+  await image.getByLabel("Alternative text", { exact: true }).fill("Assignment diagram"); await image.getByRole("button", { name: "Insert image", exact: true }).click(); await expect(image).toBeHidden();
   await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.getByText("Programming homework saved.", { exact: true })).toBeVisible();
   const authored = await responseJson<{ assignment: { promptMarkdown: string } }>(await api.get(`${base}/authoring`));
   const assetId = authored.assignment.promptMarkdown.match(/\/api\/media-assets\/([a-z0-9]+)\/content/)![1];

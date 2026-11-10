@@ -183,8 +183,8 @@ test.describe.serial("knowledge graph authoring and activity targets", () => {
     await page.goto(`/subjects/${subjectId}/edit`);
     await page.getByRole("tab", { name: "Knowledge graph" }).click();
     await page.getByText("Generate knowledge graph with AI", { exact: true }).click();
-    await page.getByLabel("Generation mode").selectOption("iterate");
-    await page.getByLabel("AI directions (optional)").fill("Add one extension while preserving all existing targets.");
+    await page.getByLabel("Generation mode", { exact: true }).selectOption("iterate");
+    await page.getByLabel("AI directions (optional)", { exact: true }).fill("Add one extension while preserving all existing targets.");
     await page.getByRole("button", { name: "Iterate on graph" }).click();
     await generationStarted;
     const progress = page.getByRole("dialog", { name: "Generating..." });

@@ -205,7 +205,7 @@ export async function createBankActivityThroughUi(
 }
 
 export async function publishCurrentBankActivity(page: Page) {
-  await page.getByLabel("Publication status").selectOption("published");
+  await page.getByLabel("Publication status", { exact: true }).selectOption("published");
   await expect(page.getByText("Publication status updated.", { exact: true })).toBeVisible();
 }
 
@@ -294,7 +294,7 @@ export async function createCourseTestThroughUi(
     .getByRole("textbox")
     .first()
     .fill("Complete every required activity, then submit the Test.");
-  await page.getByLabel("Time limit in minutes (optional)").fill("30");
+  await page.getByLabel("Default course time limit in minutes (optional)", { exact: true }).fill("30");
   await page.getByLabel("Navigation").selectOption("free");
   await page.getByLabel("Allow students to resume an unfinished attempt").check();
   await page.getByRole("button", { name: "Save test settings" }).click();

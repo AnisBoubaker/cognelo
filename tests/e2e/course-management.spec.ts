@@ -90,8 +90,8 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await expect(settings.getByRole("tab", { name: "Exceptions" })).toBeVisible();
     await expect(settings.getByRole("combobox", { name: "Folder" })).toHaveCount(0);
     await settings.getByRole("tab", { name: "Group assignment" }).click();
-    await expect(settings.getByLabel("Assigned")).not.toBeChecked();
-    await settings.getByLabel("Assigned").check();
+    await expect(settings.getByLabel("Assigned", { exact: true })).not.toBeChecked();
+    await settings.getByLabel("Assigned", { exact: true }).check();
     await expect(settings.getByRole("checkbox", { name: "Folder" })).toHaveCount(0);
     await expect(settings.getByRole("checkbox", { name: "Points possible" })).toHaveCount(0);
     const firstOverrideCheckbox = settings.locator(".activity-override-toggle input[type='checkbox']").first();
@@ -203,10 +203,10 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await (await openGradebookActions(page, activityTitle)).getByRole("menuitem", { name: "Export grades", exact: true }).click();
     let exportDialog = page.getByRole("dialog", { name: "Export activity grades" });
     await expect(exportDialog.getByLabel("Format")).toHaveValue("csv");
-    await expect(exportDialog.getByLabel("File name")).toHaveValue(
+    await expect(exportDialog.getByLabel("File name", { exact: true })).toHaveValue(
       new RegExp(`^${escapeRegex(data.courseTitle)}-${escapeRegex(data.groupTitle)}-${escapeRegex(activityTitle)}-\\d{4}-\\d{2}-\\d{2}`)
     );
-    await exportDialog.getByLabel("File name").fill(`E2E grades ${data.token}`);
+    await exportDialog.getByLabel("File name", { exact: true }).fill(`E2E grades ${data.token}`);
     const csvDownloadPromise = page.waitForEvent("download");
     await exportDialog.getByRole("button", { name: "Export grades", exact: true }).click();
     const csvDownload = await csvDownloadPromise;
@@ -220,7 +220,7 @@ test.describe.serial("course, group, participant, attempt, and gradebook workflo
     await (await openGradebookActions(page, activityTitle)).getByRole("menuitem", { name: "Export grades", exact: true }).click();
     exportDialog = page.getByRole("dialog", { name: "Export activity grades" });
     await exportDialog.getByLabel("Format").selectOption("xlsx");
-    await exportDialog.getByLabel("File name").fill(`E2E grades ${data.token}`);
+    await exportDialog.getByLabel("File name", { exact: true }).fill(`E2E grades ${data.token}`);
     const xlsxDownloadPromise = page.waitForEvent("download");
     await exportDialog.getByRole("button", { name: "Export grades", exact: true }).click();
     const xlsxDownload = await xlsxDownloadPromise;

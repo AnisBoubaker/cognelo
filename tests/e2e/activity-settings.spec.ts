@@ -226,7 +226,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
     await expect(settings.getByRole("button", { name: "Cancel", exact: true }).last()).toBeVisible();
     await expect(settings.getByRole("button", { name: "Save settings", exact: true })).toBeVisible();
     await expect(settings.getByLabel("Assessment mode")).toHaveValue("formative");
-    await expect(settings.getByLabel("Limit the time for each attempt")).not.toBeChecked();
+    await expect(settings.getByLabel("Limit the time for each attempt", { exact: true })).not.toBeChecked();
     await expect(settings.locator(".activity-summative-settings")).toHaveCount(0);
     await expect(settings.getByLabel("Folder")).toHaveCount(0);
 
@@ -349,7 +349,7 @@ test.describe.serial("activity settings inheritance, overrides, and student beha
 
     const timeLimit = overrideCard(settings, "Time limit");
     await enableOverride(timeLimit);
-    await expect(timeLimit.getByLabel("Limit the time for each attempt")).toBeChecked();
+    await expect(timeLimit.getByLabel("Limit the time for each attempt", { exact: true })).toBeChecked();
     await expect(timeLimit.getByLabel("Time limit (minutes)")).toHaveValue("45");
     await timeLimit.getByLabel("Time limit (minutes)").fill("20");
 

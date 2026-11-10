@@ -128,7 +128,9 @@ test("Test AI grading uses matching question templates and authoritative questio
     const dialog = page.getByRole("dialog", { name: "Prepare batch AI grading", exact: true });
     await expect(dialog.getByRole("textbox", { name: "AI instructions", exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("checkbox", { name: "Update AI instructions in the activity settings", exact: true })).toHaveCount(0);
-    await expect(dialog.getByText("Each question uses its own saved AI grading instructions.", { exact: true })).toBeVisible();
+    await dialog.getByRole("button", { name: "Help: Prepare batch AI grading", exact: true }).hover();
+    await expect(page.getByRole("tooltip")).toContainText("Each question uses its own saved AI grading instructions.");
+    await page.keyboard.press("Escape");
     await expect(dialog.getByRole("checkbox")).toHaveCount(1);
     await expect(dialog.getByText("Complete question feedback: 2", { exact: true })).toBeVisible();
     await dialog.getByRole("checkbox").check();

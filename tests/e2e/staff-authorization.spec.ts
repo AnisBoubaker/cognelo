@@ -140,8 +140,8 @@ test.describe.serial("explicit course teachers and section-scoped staff", () => 
 
       await page.getByRole("tab", { name: "Participants", exact: true }).click();
       await page.getByRole("button", { name: "Add course staff", exact: true }).click();
-      const staffForm = page.locator("form").filter({ has: page.getByLabel("Existing account email") });
-      await staffForm.getByLabel("Existing account email").fill(current.unrelatedTeacher.email);
+      const staffForm = page.locator("form").filter({ has: page.getByLabel("Existing account email", { exact: true }) });
+      await staffForm.getByLabel("Existing account email", { exact: true }).fill(current.unrelatedTeacher.email);
       await staffForm.getByLabel("Course role").selectOption("teacher");
       await staffForm.getByRole("button", { name: "Add course staff", exact: true }).click();
       const temporaryStaffRow = page.locator(".table-row").filter({ hasText: current.unrelatedTeacher.email });

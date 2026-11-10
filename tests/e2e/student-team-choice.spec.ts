@@ -54,7 +54,10 @@ test.describe("automatic assignment and student team choices", { tag: "@regressi
       await dialog.getByLabel("Slots for Blue", { exact: true }).fill("1");
       await dialog.getByLabel("Slots for Green", { exact: true }).fill("1");
       await dialog.getByRole("button", { name: "Apply to grouping", exact: true }).click();
-      await expect(page.getByText("Each student can join one team per grouping. Unassigned: 1.", { exact: true })).toBeVisible();
+      await expect(page.getByText("Unassigned: 1", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Help: Student assignments", exact: true }).hover();
+      await expect(page.getByRole("tooltip")).toContainText("Each student can join one team per grouping. Unassigned: 1.");
+      await page.keyboard.press("Escape");
       await page.getByRole("button", { name: "Save grouping", exact: true }).click();
       await expect(page.getByText("Everything is saved.", { exact: true })).toBeVisible();
       let saved = (await responseJson<{ groupings: StudentGroupingDto[] }>(await api.get(staffPath(data)))).groupings[0]!;

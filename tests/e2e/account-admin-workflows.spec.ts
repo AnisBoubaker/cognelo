@@ -155,7 +155,7 @@ test.describe.serial("administrator settings integrations", () => {
       const row = page.locator(".ai-agent-row").filter({ hasText: connectionName });
       await expect(row).toBeVisible();
 
-      await page.getByLabel("AI agent for question authoring").selectOption({
+      await page.getByLabel("AI agent for question authoring", { exact: true }).selectOption({
         label: `${connectionName} · ollama`
       });
       await page.getByRole("button", { name: "Save AI preferences" }).click();
@@ -224,7 +224,9 @@ test.describe.serial("administrator settings integrations", () => {
       smtpUsername: "mailer"
     });
     expect(savedBody?.smtpPassword).toBe("");
-    await expect(page.getByText("A secret is already stored", { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "Help: SMTP password", exact: true }).hover();
+    await expect(page.getByRole("tooltip")).toContainText("A secret is already stored");
+    await page.keyboard.press("Escape");
 
     await page.getByLabel("Test recipient email").fill("recipient@example.invalid");
     await page.getByRole("button", { name: "Send test email" }).click();
