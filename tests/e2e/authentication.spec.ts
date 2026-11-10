@@ -1,4 +1,4 @@
-import { expect, loginThroughUi, test, createAuthenticatedApi, credentialsFor } from "./fixtures/auth";
+import { expect, loginThroughUi, test } from "./fixtures/auth";
 
 test.describe("authentication", () => {
   test("redirects anonymous users from protected pages", async ({ page }) => {
@@ -118,23 +118,19 @@ test.describe("authentication", () => {
 
 
 for (const mode of ["login", "activate"] as const) test(`shows a session error when the browser rejects the ${mode} cookie`, async ({ page }) => {
-  const api = await createAuthenticatedApi("teacher");
-  try {
-    const result = await api.get("/api/users/me"), accepted = await result.json();
-    expect(result.ok()).toBe(true);
-    // Model accepted credentials with no retained Set-Cookie, as on incompatible HTTP transports.
-    await page.route(`**/api/auth/${mode}`, route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(accepted) }));
-    await page.goto("/login");
-    if (mode === "activate") await page.getByRole("button", { name: "First-time access", exact: true }).click();
-    const credentials = credentialsFor("teacher");
-    await page.getByLabel("Email", { exact: true }).fill(credentials.email);
-    await page.getByLabel("Password", { exact: true }).fill(credentials.password);
-    if (mode === "activate") await page.getByLabel("Confirm password", { exact: true }).fill(credentials.password);
-    await page.locator("form").getByRole("button", { name: mode === "login" ? "Sign in" : "Activate account", exact: true }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "Your browser could not keep your sign-in session." })).toBeVisible();
-    await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByLabel("Email", { exact: true })).toHaveValue(credentials.email);
-    await page.getByRole("button", { name: "Messages", exact: true }).click();
-    await expect(page.getByRole("region", { name: "Recent messages", exact: true })).toContainText("Your browser could not keep your sign-in session.");
-  } finally { await api.dispose(); }
+  const credentials = { email: "cookie-probe@example.test", password: "LocalCookieProbe123!" };
+  const accepted = { user: { id: "cookie-probe", email: credentials.email, name: "Cookie probe", firstName: "Cookie", lastName: "Probe", roles: [], mustChangePassword: false, emailVerified: true } };
+  // Accept the credentials without setting a browser cookie; no account is created or changed.
+  await page.route(`**/api/auth/${mode}`, route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(accepted) }));
+  await page.goto("/login");
+  if (mode === "activate") await page.getByRole("button", { name: "First-time access", exact: true }).click();
+  await page.getByLabel("Email", { exact: true }).fill(credentials.email);
+  await page.getByLabel("Password", { exact: true }).fill(credentials.password);
+  if (mode === "activate") await page.getByLabel("Confirm password", { exact: true }).fill(credentials.password);
+  await page.locator("form").getByRole("button", { name: mode === "login" ? "Sign in" : "Activate account", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Your browser could not keep your sign-in session." })).toBeVisible();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByLabel("Email", { exact: true })).toHaveValue(credentials.email);
+  await page.getByRole("button", { name: "Messages", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Recent messages", exact: true })).toContainText("Your browser could not keep your sign-in session.");
 });
