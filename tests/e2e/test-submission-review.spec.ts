@@ -96,7 +96,10 @@ for (const navigationMode of ["free", "sequential"] as const) {
     await studentPage.getByRole("button", { name: "Previous activity", exact: true }).click();
     await expect(studentPage.getByLabel("Five", { exact: true })).toBeChecked();
     await studentPage.getByRole("button", { name: "Next activity", exact: true }).click();
+    await expect(studentPage.getByRole("heading", { name: "Second exercise", exact: true })).toBeVisible();
     await studentPage.getByRole("button", { name: "Next activity", exact: true }).click();
+    await expect(studentPage.getByRole("heading", { name: "Arrange the program", exact: true })).toBeVisible();
+    await expect(studentPage.getByRole("button", { name: "Move block down", exact: true }).first()).toBeEnabled();
     await studentPage.getByRole("button", { name: "Submit the test", exact: true }).click();
     await expect(review.getByText("2 of 3 exercises answered", { exact: true })).toBeVisible();
     if (navigationMode === "free") {

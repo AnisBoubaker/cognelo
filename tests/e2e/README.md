@@ -61,6 +61,8 @@ The Playwright suite covers the platform's critical browser journeys with real A
 
 Browser interactions use accessible roles, labels, and visible text. Direct structural selectors are limited to stable editor surfaces that cannot be uniquely addressed or verified through an accessible name. Teardown invokes the public activity and bank deletion routes first so plugin-private records receive their lifecycle hooks, then uses direct database access only as an exact-ID fallback for records created by that test run. Stateful tests provision disposable, currently available scenarios through authenticated public API routes because durable seed courses can legitimately have expired availability dates. The ZIP-upload path builds its fixture in memory instead of committing a binary archive.
 
+After navigating between Test exercises, wait for the destination heading and saved-response controls before the next navigation or final-review action. Consecutive clicks against an unchanged footer can target the same exercise while its navigation is still completing.
+
 `test-manual-feedback.spec.ts` covers numbered Test activity navigation, shared rubric/narrative editing, legacy and recovered answers without execution, partial review, explicit item overrides, student navigation and unsaved-draft isolation, stale/foreign/student rejection, history restrictions, release visibility, and preservation of source/execution/timing. It uses real review and grading APIs without a model call.
 
 ## Run locally
