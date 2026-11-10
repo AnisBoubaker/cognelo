@@ -1,4 +1,5 @@
 import { activityAssessmentStageAssignment } from "./activity-submission-stages";
+import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { Prisma, prisma } from "@cognelo/db";
 import { ActivityBroadcastMessageInputSchema, ActivityMessageDeletionInputSchema, ActivityMessageTestItemContextSchema, LearnerActivityMessageInputSchema, type ActivityMessageDeletionInput, type ActivityMessageTestItemInput, type ActivityMessageTestItemContext, type CurrentUser } from "@cognelo/contracts";
 import { assignmentAttemptExpiresAt, assignmentTimeLimitMinutes, courseActivityMessagingEnabled, courseActivityTwoWayMessagingEnabled } from "./activity-assignment-policy";
@@ -498,6 +499,7 @@ export async function listActiveConversations(
       participantId: true,
       attemptNumber: true,
       lastSeenAt: true,
+      activity: { select: { activityType: { select: { key: true } } } },
       attempt: { select: { lifecycle: true } }
     },
     orderBy: [{ lastSeenAt: "desc" }, { id: "desc" }]
@@ -519,6 +521,7 @@ export async function listActiveConversations(
   const seenParticipants = new Set<string>();
   return conversations.filter((conversation) => {
     const lifecycle = conversation.attempt?.lifecycle ?? lifecycleByAttempt.get(conversationAttemptKey(conversation));
+    if (getActivityDefinition(conversation.activity?.activityType.key ?? "")?.assessmentFlow === "deferred" && lifecycle !== "started") return false;
     if (lifecycle && lifecycle !== "started") return false;
     const participantKey = `${conversation.groupId}:${conversation.participantId}`;
     if (seenParticipants.has(participantKey)) return false;

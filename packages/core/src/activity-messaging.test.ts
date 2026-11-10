@@ -28,6 +28,8 @@ const contentAccess = vi.hoisted(() => ({ assertActivityContentAccess: vi.fn() }
 vi.mock("./activity-content-access", () => contentAccess);
 const gradebook = vi.hoisted(() => ({ getActivityAttemptAvailability: vi.fn() }));
 const groups = vi.hoisted(() => ({ getGroupAssignedActivity: vi.fn() }));
+const capabilities = vi.hoisted(() => ({ getActivityDefinition: vi.fn() }));
+vi.mock("@cognelo/activity-sdk", () => capabilities);
 
 vi.mock("@cognelo/db", async () => ({ prisma: db, Prisma: (await import("@prisma/client")).Prisma }));
 vi.mock("./authorization", () => authorization);
@@ -63,6 +65,7 @@ const enabledMetadata = { allGroupsAssignment: { messagingEnabled: true } };
 describe("activity attempt messaging", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    capabilities.getActivityDefinition.mockReturnValue(undefined);
     db.$transaction.mockImplementation((callback) => typeof callback === "function" ? callback(tx) : Promise.all(callback));
     groups.getGroupAssignedActivity.mockResolvedValue({
       id: "activity-1",
@@ -242,6 +245,15 @@ describe("activity attempt messaging", () => {
     db.activityConversation.findMany.mockResolvedValue([{ id: "conversation-1", groupId: "group-1", groupActivityId: "assignment-1", participantId: "participant-1", attemptNumber: 1, attempt: null }]);
     db.activityAttempt.findMany.mockResolvedValue([{ groupActivityId: "assignment-1", participantId: "participant-1", attemptNumber: 1, lifecycle: "submitted" }]);
     expect(await listActiveConversations("course-1", "activity-1", null, now)).toEqual([]);
+  });
+  it("does not treat deferred preparation as answering, while retaining started attempts", async () => {
+    capabilities.getActivityDefinition.mockReturnValue({ assessmentFlow: "deferred" });
+    const preparing = { id: "preparing", groupId: "group-1", groupActivityId: "assignment-1", participantId: "participant-1", attemptNumber: 1, attempt: null, activity: { activityType: { key: "generic-deferred" } } };
+    const answering = { ...preparing, id: "answering", participantId: "participant-2", attempt: { lifecycle: "started" } };
+    db.activityConversation.findMany.mockResolvedValue([preparing, answering]); db.activityAttempt.findMany.mockResolvedValue([]);
+    expect(await listActiveConversations("course-1", "activity-1", null, now)).toEqual([answering]);
+    capabilities.getActivityDefinition.mockReturnValue(undefined);
+    expect(await listActiveConversations("course-1", "activity-1", null, now)).toEqual([preparing, answering]);
   });
 
   it("returns only a revision and unread count during the existing learner heartbeat", async () => {
