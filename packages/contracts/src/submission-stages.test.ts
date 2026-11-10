@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { SubmissionStagePoliciesSchema, defaultSubmissionStagePolicy, mergeSubmissionStagePolicies, submissionStageWindow } from "./submission-stages";
 const instant = Date.parse("2030-01-01T12:00:00Z"), date = (minutes: number) => new Date(instant + minutes * 60_000).toISOString();
 describe("submission-stage scheduling", () => {
+  it("stores explicit activation independently of dates and preserves it through inheritance", () => {
+    expect(SubmissionStagePoliciesSchema.parse({ files: { enabled: false }, questions: { enabled: true } })).toEqual({ files: { enabled: false }, questions: { enabled: true } });
+    expect(SubmissionStagePoliciesSchema.safeParse({ files: { enabled: "true" } }).success).toBe(false);
+    expect(SubmissionStagePoliciesSchema.safeParse({ files: { enabled: null } }).success).toBe(false);
+    expect(mergeSubmissionStagePolicies({ files: { enabled: false, deadline: date(5) } }, { files: { enabled: true } })).toEqual({ files: { enabled: true, deadline: date(5) } });
+    expect(submissionStageWindow({ ...defaultSubmissionStagePolicy, enabled: false, deadline: date(-1) }, null, null, instant).closed).toBe(true);
+  });
   for (const stage of [null, -10, 10, 30]) for (const overall of [null, -10, 10, 30]) {
     it(`resolves stage ${stage} and overall ${overall} independently, including exact boundaries`, () => {
       const policy = { ...defaultSubmissionStagePolicy, deadline: stage === null ? null : date(stage) };

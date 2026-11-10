@@ -1,4 +1,4 @@
-import { activityAssessmentStageAssignment } from "./activity-submission-stages";
+import { activityAssessmentStageAssignment, assertActivitySubmissionStageEnabled } from "./activity-submission-stages";
 import { studentTestFeedback } from "./student-test-feedback";
 import { escapeCsvCell } from "./csv";
 import { getActivityDefinition, getActivityPlugin, getActivityPluginForActivityType } from "@cognelo/activity-sdk";
@@ -176,6 +176,8 @@ async function startActivityAttemptInternal(user: CurrentUser, input: StartActiv
         }
       });
     }
+    const assessmentStage = getActivityDefinition(context.groupActivity.activity.activityType?.key ?? "")?.submissionStages?.find(stage => stage.assessment);
+    if (!completedDeferredSubmission && assessmentStage) await assertActivitySubmissionStageEnabled(context.groupActivity.activity, context.groupActivity, assessmentStage.id);
     await assertAttemptCanStart(context, now, assessmentMode, tx, completedDeferredSubmission);
     const latestAttempt = await tx.activityAttempt.findFirst({
       where: {

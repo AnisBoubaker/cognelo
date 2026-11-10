@@ -29,3 +29,5 @@ export * from "./activity-reference-authoring";
 export * from "./toggle-switch";
 
 export * from "./help-tooltip";
+
+export * from "./submission-stage-activation";

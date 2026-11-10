@@ -363,13 +363,32 @@ export type ActivityMaterialReferencesService = {
   write: (input: { user: CurrentUser; courseId: string; activityId: string; selected: string[]; prepared?: Omit<PreparedActivityMaterialReferences, "id">; transaction: PluginTeamworkTransaction }) => Promise<void>;
 };
 
+export type SubmissionStageActivationScope = {
+  user: CurrentUser;
+  courseId: string;
+  activityId: string;
+  /** Any configured General/assigned-section/exception activation, excluding unavailable stages. */
+  enabled: Record<string, boolean>;
+};
+export type SubmissionStageActivationChange = SubmissionStageActivationScope & {
+  prepared: unknown;
+  transaction: PluginTeamworkTransaction;
+  /** Resolve current enrollment and inherited activation inside the host transaction. */
+  isEnabled: (input: { groupId: string; userId: string; stageId: string }) => Promise<boolean>;
+  enqueue: (job: { queue: string; handlerKey: string; payload: Record<string, unknown>; metadata?: Record<string, unknown>; idempotencyKey?: string; maxAttempts?: number; runAfter?: Date }) => Promise<void>;
+};
+
 export type ServerActivityPlugin = {
   key: string;
   materialReferences?: ActivityMaterialReferencesService;
   submissionStages?: {
     activityTypeKeys: readonly string[];
     /** Legacy defaults and enabled stages; no plugin-private records cross this boundary. */
-    configuration: (input: { activityId: string }) => Promise<{ activeStageIds?: string[]; defaults?: Record<string, { deadline?: string | null; timeLimitMinutes?: number | null; allowLate?: boolean; lateLimitMinutes?: number | null }> }>;
+    configuration: (input: { activityId: string }) => Promise<{ activeStageIds?: string[]; defaults?: Record<string, { enabled?: boolean; deadline?: string | null; timeLimitMinutes?: number | null; allowLate?: boolean; lateLimitMinutes?: number | null }> }>;
+    /** Read-only readiness validation before the host opens its settings transaction. */
+    prepareActivation?: (input: Omit<SubmissionStageActivationScope, "enabled">) => Promise<unknown>;
+    /** Persist plugin locks and release waiting work atomically with core settings. */
+    activationChanged?: (input: SubmissionStageActivationChange) => Promise<void>;
   };
   /** Private workspace lifecycle, invoked by core without knowing plugin tables. */
   teamwork?: {
@@ -384,7 +403,7 @@ export type ServerActivityPlugin = {
       membershipToken: string;
       teamWorkspaceEpochs: Record<string, string>;
       transaction: PluginTeamworkTransaction;
-      enqueue: (job: { queue: string; handlerKey: string; payload: Record<string, unknown>; metadata?: Record<string, unknown>; idempotencyKey?: string; maxAttempts?: number }) => Promise<void>;
+      enqueue: (job: { queue: string; handlerKey: string; payload: Record<string, unknown>; metadata?: Record<string, unknown>; idempotencyKey?: string; maxAttempts?: number; runAfter?: Date }) => Promise<void>;
     }) => Promise<{ withdrawAttemptIds?: string[] }>;
   };
   /** Read-only projection of a host-authorized submitted attempt. */

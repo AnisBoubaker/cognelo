@@ -1,3 +1,4 @@
+import type { PluginTeamworkTransaction } from "@cognelo/activity-sdk/server";
 import { z } from "zod";
 import { AiModelSelectionSchema, type CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
@@ -6,7 +7,7 @@ import { AppError } from "./errors";
 import { getAiAgentConnectionForUser, listAiAgentConnections, snapshotAiModelSelection, type StoredAiModelSelection } from "./ai-agents";
 import { createCourseEmbeddingProvider } from "./material-embeddings";
 
-export async function lockCourseMaterialEmbeddingSettings(tx: Pick<Prisma.TransactionClient, "$queryRaw">, courseId: string) {
+export async function lockCourseMaterialEmbeddingSettings(tx: { $queryRaw: PluginTeamworkTransaction["query"] }, courseId: string) {
   await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(${`course-material-embedding:${courseId}`}, 0))`;
 }
 export async function readCourseMaterialEmbeddingSelection(courseId: string): Promise<StoredAiModelSelection | undefined> {

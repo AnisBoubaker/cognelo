@@ -1,5 +1,6 @@
 import { lockActivityTeamwork } from "./activity-teamwork";
 import { withActivityAuthoringChange } from "./activity-authoring-live";
+import { initialSubmissionStageMetadata } from "./activity-submission-stages";
 import { getActivityDefinition, getActivityPluginForActivityType, isCoreActivityType, listActivityDefinitions } from "@cognelo/activity-sdk";
 import { ActivityInputSchema, ActivityUpdateSchema, CourseActivityBankSyncSchema, CourseActivityDuplicateSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
@@ -117,7 +118,7 @@ export async function createActivity(user: CurrentUser, courseId: string, input:
         description: data.description,
         lifecycle: data.lifecycle,
         config: mergedConfig as Prisma.InputJsonValue,
-        metadata: data.metadata as Prisma.InputJsonValue,
+        metadata: initialSubmissionStageMetadata(data.activityTypeKey, data.metadata) as Prisma.InputJsonValue,
         position: data.position,
         createdById: user.id,
         knowledgeConcepts: { create: conceptSelectionCreates(knowledgeConceptSelections) }
@@ -192,11 +193,11 @@ async function createCourseActivityFromBankVersion(
         description: data.description || version.description,
         lifecycle: data.lifecycle,
         config: version.config as Prisma.InputJsonValue,
-        metadata: {
+        metadata: initialSubmissionStageMetadata(version.activityType.key, {
           ...((version.metadata as Record<string, unknown> | null) ?? {}),
           ...(data.metadata ?? {}),
           activityVersionNumber: version.versionNumber
-        } as Prisma.InputJsonValue,
+        }) as Prisma.InputJsonValue,
         position: data.position,
         createdById: user.id,
         knowledgeConcepts: { create: conceptSelectionCreates(selectionsFromStoredLinks(version.knowledgeConcepts)) }
@@ -340,7 +341,7 @@ export async function duplicateCourseActivity(user: CurrentUser, courseId: strin
         description: source.description,
         lifecycle: "draft",
         config: source.config as Prisma.InputJsonValue,
-        metadata: metadata as Prisma.InputJsonValue,
+        metadata: initialSubmissionStageMetadata(source.activityType.key, metadata) as Prisma.InputJsonValue,
         position: (lastActivity?.position ?? -1) + 1,
         createdById: user.id,
         knowledgeConcepts: {

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const SubmissionStageIdSchema = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
 export const SubmissionStagePolicySchema = z.object({
+  enabled: z.boolean().optional(),
   deadline: z.string().datetime({ offset: true }).nullable(),
   timeLimitMinutes: z.number().int().min(1).max(1440).nullable(),
   allowLate: z.boolean(),
@@ -10,7 +11,9 @@ export const SubmissionStagePolicySchema = z.object({
 export const SubmissionStagePoliciesSchema = z.record(SubmissionStageIdSchema, SubmissionStagePolicySchema.partial()).refine(value => Object.keys(value).length <= 20, "At most 20 stages are allowed.");
 export type SubmissionStagePolicy = z.infer<typeof SubmissionStagePolicySchema>;
 export type SubmissionStagePolicies = z.infer<typeof SubmissionStagePoliciesSchema>;
-export const defaultSubmissionStagePolicy: SubmissionStagePolicy = { deadline: null, timeLimitMinutes: null, allowLate: false, lateLimitMinutes: null };
+// Missing activation values preserve historical stage behavior; new course activities
+// persist explicit false values until the teacher activates each stage.
+export const defaultSubmissionStagePolicy: SubmissionStagePolicy = { enabled: true, deadline: null, timeLimitMinutes: null, allowLate: false, lateLimitMinutes: null };
 
 export function mergeSubmissionStagePolicies(...sources: Array<SubmissionStagePolicies | undefined>): SubmissionStagePolicies {
   const result: SubmissionStagePolicies = {};

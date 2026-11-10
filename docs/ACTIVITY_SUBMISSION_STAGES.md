@@ -2,6 +2,19 @@
 
 Status: implemented and locally validated, November 9, 2026.
 
+## Stage activation follow-up
+
+Implementation is complete; final regression validation is in progress. Core Activity settings owns a separate activation switch for every declared submission stage, with the ordinary General/section/team/student inheritance. A plugin's workflow option (such as Generate challenge questions) determines which stages exist; activation independently controls when students may begin them. Teachers can configure an inactive stage in advance. Student stage actions stay visible but disabled with an Awaiting teacher activation status.
+
+Draft file preparation remains available before file hand-in activation. File hand-in may be activated while question generation remains closed: files freeze normally and wait without AI calls or answering time. Activating the question stage releases waiting work through the bounded durable queue. Turning it off blocks new generation/answering starts; already-started answering attempts may finish under their existing timing. Activation never extends calendar cutoffs or restarts a stage clock.
+
+New course activities and copies start with explicit inactive stage flags. Historical records without flags retain their prior behavior. Core invokes plugin readiness and transactional activation hooks through the shared server contract; only the plugin interprets or queues its private submissions. No plugin talks directly to another plugin.
+
+- [x] Shared contract, inheritance, generic hooks and start enforcement.
+- [x] Programming Homework waiting/release workflow, individual/team/cancellation support.
+- [x] Shared teacher controls, student inactive actions and localized statuses.
+- [ ] Unit/API/E2E regressions, docs and incremental commits.
+
 ## Accepted behavior
 
 Plugins may declare ordered submission stages, including the first stage, using stable IDs and localized names. Core owns the scheduling UI, deadlines, optional stage time limits, and assignment inheritance. Plugins own evidence, stage transitions and jobs; core never reads plugin tables directly.
@@ -18,7 +31,7 @@ Scheduling background explanations use shared help immediately after the relevan
 
 - Scheduling configuration is stored as generic assignment metadata, with a plugin service supplying legacy defaults and active-stage configuration. Saving shared settings materializes those defaults in core; explicit null clears a saved field.
 - Stage schedule overrides are independently merged by stage/field under General → section → prioritized team → student rules.
-- File preparation duration, when configured, starts on the first accepted file upload; no academic attempt is created. Question duration starts at explicit Answer and uses the existing core attempt.
+- File preparation duration, when configured, starts on the first accepted file upload while the stage is active, or on activation for an existing nonempty draft; no academic attempt is created. Question duration starts at explicit Answer and uses the existing core attempt.
 - Active stage timers retain their start across navigation, refresh and policy edits. Teacher cancellation or deletion of the latest individual hand-in permits a fresh preparation stage; reopening answers preserves the frozen code and original answering start.
 - Stage names and count come from the declared list. Inactive stages retain saved configuration without exposing controls or starting timers.
 

@@ -1,4 +1,7 @@
-import { getActivitySubmissionStageConfiguration, legacyGeneralStagePolicies, legacySectionStageOverrides, readSubmissionStagePolicies, validateSubmissionStagePolicies } from "./activity-submission-stages";
+import { configuredActivityStageActivations, configuredSubmissionStageActivations, submissionStageActivationResolver, getActivitySubmissionStageConfiguration, legacyGeneralStagePolicies, legacySectionStageOverrides, readSubmissionStagePolicies, validateSubmissionStagePolicies } from "./activity-submission-stages";
+import { getActivitySubmissionStagesHandler } from "@cognelo/activity-sdk/server";
+import { enqueueBackgroundJob } from "./background-jobs";
+import { teamworkTransaction } from "./activity-teamwork";
 import { mergeSubmissionStagePolicies, type SubmissionStagePolicies } from "@cognelo/contracts";
 import { assertMaterialStorageUnchanged } from "./material-storage";
 import { projectStudentActivity } from "./student-activity";
@@ -362,8 +365,12 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   const stageConfiguration = await getActivitySubmissionStageConfiguration(activity);
   const stagePolicies = mergeSubmissionStagePolicies(stageConfiguration.defaults, legacyGeneralStagePolicies(activity.activityType?.key ?? "", data.timeLimitMinutes), getCourseWideAssignmentMetadata(activity.metadata)?.submissionStages, data.submissionStages);
   validateSubmissionStagePolicies(activity.activityType?.key ?? "", stagePolicies, data.availableFrom, stageConfiguration.stages.filter(stage => stage.active).map(stage => stage.id));
+  const stageHandler = getActivitySubmissionStagesHandler(activity.activityType?.key ?? "");
+  const activationScope = { user, courseId, activityId, enabled: configuredSubmissionStageActivations(stageConfiguration, stagePolicies, data.groupAssignments ?? []) };
+  const preparedActivation = await stageHandler?.prepareActivation?.(activationScope);
 
   return prisma.$transaction(async (tx) => {
+    if (stageHandler?.activationChanged && !supportsTeamwork) await lockActivityTeamwork(tx, activityId);
     if (supportsTeamwork) {
       await lockActivityTeamwork(tx, activityId);
       const current = await tx.activity.findUniqueOrThrow({ where: { id: activityId }, select: { metadata: true } });
@@ -624,6 +631,15 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
       })
     );
 
+    if (stageHandler?.activationChanged) {
+      const savedAssignments = await tx.courseGroupActivity.findMany({ where: { activityId }, include: { assignmentExceptions: true } });
+      const enabled = configuredSubmissionStageActivations(stageConfiguration, stagePolicies, savedAssignments.map(assignment => ({ assigned: true,
+        submissionStages: readSubmissionStagePolicies(asMetadataRecord(assignment.metadata).submissionStages),
+        exceptions: assignment.assignmentExceptions.map(exception => ({ submissionStages: readSubmissionStagePolicies(asMetadataRecord(exception.settings).submissionStages) })) })));
+      await stageHandler.activationChanged({ ...activationScope, enabled, prepared: preparedActivation,
+        transaction: teamworkTransaction(tx), isEnabled: submissionStageActivationResolver(tx, activityId, stageConfiguration),
+        enqueue: async job => { await enqueueBackgroundJob(job, tx); } });
+    }
     return tx.activity.findFirst({
       where: { id: activityId, courseId },
       include: { activityType: true, bankActivity: true, activityVersion: true }
@@ -1252,6 +1268,17 @@ export async function removeGroupParticipant(user: CurrentUser, courseId: string
   return { ok: true };
 }
 
+async function prepareSectionStageActivation(user: CurrentUser, courseId: string, activity: { id: string; activityType: { key: string } }) {
+  const handler = getActivitySubmissionStagesHandler(activity?.activityType?.key ?? "");
+  if (!handler?.activationChanged) return null;
+  const scope = { user, courseId, activityId: activity.id }, configuration = await getActivitySubmissionStageConfiguration(activity);
+  const prepared = await handler.prepareActivation?.(scope);
+  return async (tx: Prisma.TransactionClient) => handler.activationChanged!({ ...scope, prepared,
+    enabled: await configuredActivityStageActivations(tx, activity.id, configuration),
+    transaction: teamworkTransaction(tx), isEnabled: submissionStageActivationResolver(tx, activity.id, configuration),
+    enqueue: async job => { await enqueueBackgroundJob(job, tx); } });
+}
+
 export async function assignActivityToGroup(user: CurrentUser, courseId: string, groupId: string, input: unknown) {
   await assertCanManageCourse(user, courseId);
   await assertGroupBelongsToCourse(courseId, groupId);
@@ -1281,7 +1308,10 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
     assignmentMetadata.timeLimitMinutes = normalizeTimeLimitMinutes(courseAssignmentRule.timeLimitMinutes);
   }
 
+  const applyStageActivation = await prepareSectionStageActivation(user, courseId, activity);
+  validateSubmissionStagePolicies(activity.activityType?.key ?? "", readSubmissionStagePolicies(assignmentMetadata.submissionStages));
   return prisma.$transaction(async (tx) => {
+    if (applyStageActivation) await lockActivityTeamwork(tx, activity.id);
     if (getActivityDefinition(activity.activityType?.key ?? "")?.supportsTeamwork) {
       await lockActivityTeamwork(tx, activity.id);
       const current = await tx.activity.findUniqueOrThrow({ where: { id: activity.id } });
@@ -1323,6 +1353,7 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
       placement: data.contentPlacement
     });
 
+    await applyStageActivation?.(tx);
     return assignment;
   });
 }
@@ -1358,7 +1389,10 @@ export async function updateGroupActivityAssignment(
     throw new AppError(400, "COURSE_WIDE_GROUP_ACTIVITY_LOCKED", "This activity is assigned to all groups from the course.");
   }
 
+  const applyStageActivation = await prepareSectionStageActivation(user, courseId, assignment.activity);
+  validateSubmissionStagePolicies(assignment.activity?.activityType?.key ?? "", readSubmissionStagePolicies(effectiveMetadata.submissionStages));
   return prisma.$transaction(async (tx) => {
+    if (applyStageActivation) await lockActivityTeamwork(tx, assignment.activityId);
     if (getActivityDefinition(assignment.activity?.activityType?.key ?? "")?.supportsTeamwork) {
       await lockActivityTeamwork(tx, assignment.activityId);
       const current = await tx.courseGroupActivity.findUniqueOrThrow({ where: { id: assignmentId }, include: { activity: true } });
@@ -1380,7 +1414,7 @@ export async function updateGroupActivityAssignment(
       previousMode,
       nextMode
     });
-    return tx.courseGroupActivity.update({
+    const updated = await tx.courseGroupActivity.update({
       where: { id: assignmentId },
       data: {
         availableFrom: data.availableFrom !== undefined ? parseDateInput(data.availableFrom) : undefined,
@@ -1395,6 +1429,8 @@ export async function updateGroupActivityAssignment(
         }
       }
     });
+    await applyStageActivation?.(tx);
+    return updated;
   });
 }
 

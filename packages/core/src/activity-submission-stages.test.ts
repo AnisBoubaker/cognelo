@@ -3,10 +3,39 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ definition: vi.fn(), configuration: vi.fn() }));
 vi.mock("@cognelo/activity-sdk", () => ({ getActivityDefinition: mocks.definition }));
 vi.mock("@cognelo/activity-sdk/server", () => ({ getActivitySubmissionStagesHandler: () => ({ configuration: mocks.configuration }) }));
-import { activityAssessmentStageAssignment, getActivitySubmissionStageConfiguration, resolveActivitySubmissionStage, validateSubmissionStagePolicies } from "./activity-submission-stages";
+import { activityAssessmentStageAssignment, getActivitySubmissionStageConfiguration, resolveActivitySubmissionStage, validateSubmissionStagePolicies, initialSubmissionStageMetadata, assertActivitySubmissionStageEnabled, configuredSubmissionStageActivations, submissionStageActivationResolver } from "./activity-submission-stages";
 const activity = { id: "activity", activityType: { key: "staged" } }, names = { en: "First", fr: "Première", zh: "第一", ar: "الأولى" };
 beforeEach(() => { vi.clearAllMocks(); mocks.definition.mockReturnValue({ submissionStages: [{ id: "files", names, allowsLateSubmissions: true }, { id: "questions", names, assessment: true }] }); mocks.configuration.mockResolvedValue({ defaults: { files: { deadline: "2030-01-01T10:00:00.000Z" } } }); });
 describe("core stage capability resolution", () => {
+  it("requires explicit activation for new generic staged activities without changing ordinary metadata", () => {
+    expect(initialSubmissionStageMetadata("staged", { custom: "retained" })).toEqual({ custom: "retained", allGroupsAssignment: { submissionStages: { files: { enabled: false }, questions: { enabled: false } } } });
+    mocks.definition.mockReturnValue({});
+    expect(initialSubmissionStageMetadata("ordinary", { custom: "retained" })).toEqual({ custom: "retained" });
+  });
+  it("retains legacy activation, applies overrides independently and keeps timing while a stage is off", async () => {
+    expect((await assertActivitySubmissionStageEnabled(activity, { metadata: {} }, "questions")).policy.enabled).toBe(true);
+    const assignment = { metadata: { timeLimitMinutes: 10, submissionStages: { questions: { enabled: false } } } };
+    await expect(assertActivitySubmissionStageEnabled(activity, assignment, "questions")).rejects.toMatchObject({ code: "SUBMISSION_STAGE_NOT_ACTIVATED" });
+    expect((await activityAssessmentStageAssignment(activity, assignment)).metadata.timeLimitMinutes).toBe(10);
+    expect((await resolveActivitySubmissionStage(activity, applyAssignmentExceptions(assignment, { submissionStages: { questions: { enabled: true } } }), "questions")).policy.enabled).toBe(true);
+  });
+  it("counts only available stages and assigned overrides when preparing plugin delivery", async () => {
+    const configuration = await getActivitySubmissionStageConfiguration(activity);
+    const general = { files: { enabled: false }, questions: { enabled: false } };
+    expect(configuredSubmissionStageActivations(configuration, general, [{ assigned: false, submissionStages: { questions: { enabled: true } } }])).toEqual({ files: false, questions: false });
+    expect(configuredSubmissionStageActivations(configuration, general, [{ assigned: true, exceptions: [{ submissionStages: { questions: { enabled: true } } }] }])).toEqual({ files: false, questions: true });
+    configuration.stages[1].active = false;
+    expect(configuredSubmissionStageActivations(configuration, { questions: { enabled: true } }, [])).toMatchObject({ questions: false });
+  });
+  it("resolves transactional per-student activation and rejects missing enrollment", async () => {
+    const configuration = await getActivitySubmissionStageConfiguration(activity), query = vi.fn();
+    query.mockResolvedValueOnce([{ activityMetadata: { allGroupsAssignment: { submissionStages: { questions: { enabled: false } } } }, assignmentMetadata: { submissionStages: { questions: { enabled: true } } }, assignmentId: "assignment", participantId: "participant" }]);
+    query.mockResolvedValueOnce([{ settings: { submissionStages: { questions: { enabled: false } } } }]);
+    const enabled = submissionStageActivationResolver({ $queryRaw: query }, activity.id, configuration);
+    expect(await enabled({ groupId: "section", userId: "student", stageId: "questions" })).toBe(false);
+    query.mockResolvedValueOnce([]);
+    expect(await enabled({ groupId: "foreign-section", userId: "student", stageId: "questions" })).toBe(false);
+  });
   it("uses plugin names, ordered IDs and active stages, without concrete plugin imports", async () => {
     mocks.configuration.mockResolvedValue({ activeStageIds: ["files"] });
     expect((await getActivitySubmissionStageConfiguration(activity)).stages).toMatchObject([{ id: "files", names, active: true }, { id: "questions", active: false }]);

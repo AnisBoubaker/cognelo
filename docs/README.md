@@ -62,7 +62,7 @@ Open these only when changing or reviewing the named area:
 - [Role authorization and multi-teacher E2E plan](ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md)
 - [Student groupings and teams](STUDENT_GROUPINGS.md)
 - [Team activity submissions](TEAM_ACTIVITY_SUBMISSIONS.md): approved shared-workspace, membership, individual challenge and grading rules; implementation checkpoints.
-- [Submission stages and scheduling](ACTIVITY_SUBMISSION_STAGES.md): plugin-declared phases, core deadlines/time limits, homework compatibility and test coverage.
+- [Submission stages and scheduling](ACTIVITY_SUBMISSION_STAGES.md): plugin-declared phases, independent teacher activation, core deadlines/time limits, homework compatibility and test coverage.
 - [Activity assignment exceptions and live settings](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)
 - [Activity messaging](ACTIVITY_MESSAGING.md)
 - [Student solution release](ACTIVITY_SOLUTIONS.md)

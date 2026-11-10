@@ -1,11 +1,57 @@
 import { assignmentTimeLimitException } from "./activity-assignment-policy";
 import { randomUUID } from "node:crypto";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
-import { getActivitySubmissionStagesHandler } from "@cognelo/activity-sdk/server";
+import { getActivitySubmissionStagesHandler, type PluginTeamworkTransaction } from "@cognelo/activity-sdk/server";
 import { SubmissionStagePoliciesSchema, defaultSubmissionStagePolicy, mergeSubmissionStagePolicies, submissionStageWindow, type SubmissionStagePolicies, type SubmissionStagePolicy } from "@cognelo/contracts";
 import { AppError } from "./errors";
 const record = (v: unknown): Record<string, unknown> => v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
 export function readSubmissionStagePolicies(value: unknown): SubmissionStagePolicies { return SubmissionStagePoliciesSchema.parse(value ?? {}); }
+/** New placements start closed; older records without these keys retain legacy defaults. */
+export function initialSubmissionStageMetadata(typeKey: string, value: unknown) {
+  const metadata = record(value), stages = getActivityDefinition(typeKey)?.submissionStages ?? [];
+  if (!stages.length) return metadata;
+  const rule = record(metadata.allGroupsAssignment);
+  return { ...metadata, allGroupsAssignment: { ...rule, submissionStages: mergeSubmissionStagePolicies(
+    readSubmissionStagePolicies(rule.submissionStages), Object.fromEntries(stages.map(stage => [stage.id, { enabled: false }]))
+  ) } };
+}
+export function configuredSubmissionStageActivations(configuration: Awaited<ReturnType<typeof getActivitySubmissionStageConfiguration>>, general: SubmissionStagePolicies, groups: ReadonlyArray<{ assigned: boolean; submissionStages?: SubmissionStagePolicies; exceptions?: ReadonlyArray<{ submissionStages?: SubmissionStagePolicies }> }>) {
+  return Object.fromEntries(configuration.stages.map(stage => {
+    const enabled = (policies: SubmissionStagePolicies) => ({ ...defaultSubmissionStagePolicy, ...policies[stage.id] }).enabled !== false;
+    return [stage.id, stage.active && (enabled(general) || groups.some(group => group.assigned && (
+      enabled(mergeSubmissionStagePolicies(general, group.submissionStages)) || group.exceptions?.some(exception => enabled(mergeSubmissionStagePolicies(general, group.submissionStages, exception.submissionStages)))
+    )))];
+  }));
+}
+export async function configuredActivityStageActivations(transaction: { $queryRaw: PluginTeamworkTransaction["query"] }, activityId: string, configuration: Awaited<ReturnType<typeof getActivitySubmissionStageConfiguration>>) {
+  const [activity] = await transaction.$queryRaw<Array<{ metadata: unknown }>>`SELECT metadata FROM "Activity" WHERE id=${activityId}`;
+  const assignments = await transaction.$queryRaw<Array<{ metadata: unknown; exceptions: unknown }>>`SELECT ga.metadata,COALESCE(jsonb_agg(e.settings) FILTER (WHERE e.id IS NOT NULL),'[]'::jsonb) AS exceptions
+    FROM "CourseGroupActivity" ga LEFT JOIN "ActivityAssignmentException" e ON e."groupActivityId"=ga.id WHERE ga."activityId"=${activityId} GROUP BY ga.id`;
+  const general = mergeSubmissionStagePolicies(configuration.defaults, readSubmissionStagePolicies(record(record(activity?.metadata).allGroupsAssignment).submissionStages));
+  return configuredSubmissionStageActivations(configuration, general, assignments.map(assignment => ({ assigned: true,
+    submissionStages: readSubmissionStagePolicies(record(assignment.metadata).submissionStages), exceptions: (Array.isArray(assignment.exceptions) ? assignment.exceptions : []).map(settings => ({ submissionStages: readSubmissionStagePolicies(record(settings).submissionStages) })) })));
+}
+/** Neutral tagged SQL supports both core and plugin-owned transactions. */
+export function submissionStageActivationResolver(transaction: { $queryRaw: PluginTeamworkTransaction["query"] }, activityId: string, configuration: Awaited<ReturnType<typeof getActivitySubmissionStageConfiguration>>) {
+  return async ({ groupId, userId, stageId }: { groupId: string; userId: string; stageId: string }) => {
+    const stage = configuration.stages.find(stage => stage.id === stageId);
+    if (!stage?.active) return false;
+    const [row] = await transaction.$queryRaw<Array<{ activityMetadata: unknown; assignmentMetadata: unknown; assignmentId: string; participantId: string }>>`
+      SELECT a.metadata AS "activityMetadata",ga.metadata AS "assignmentMetadata",ga.id AS "assignmentId",p.id AS "participantId"
+      FROM "Activity" a JOIN "CourseGroupActivity" ga ON ga."activityId"=a.id AND ga."groupId"=${groupId}
+      JOIN "CourseGroup" g ON g.id=ga."groupId" AND g."courseId"=a."courseId"
+      JOIN "CourseGroupParticipant" p ON p."groupId"=ga."groupId" AND p."userId"=${userId} AND p.role='student'
+      JOIN "User" u ON u.id=p."userId" AND u."isActive"=TRUE WHERE a.id=${activityId}`;
+    if (!row) return false;
+    const exceptions = await transaction.$queryRaw<Array<{ settings: unknown }>>`SELECT e.settings FROM "ActivityAssignmentException" e
+      WHERE e."groupActivityId"=${row.assignmentId} AND (e."participantId"=${row.participantId} OR EXISTS(
+        SELECT 1 FROM "StudentTeamMember" m WHERE m."teamId"=e."teamId" AND m."participantId"=${row.participantId}))
+      ORDER BY (e."participantId" IS NOT NULL),e.priority DESC,e.id`;
+    const policies = mergeSubmissionStagePolicies(configuration.defaults, readSubmissionStagePolicies(record(record(row.activityMetadata).allGroupsAssignment).submissionStages),
+      readSubmissionStagePolicies(record(row.assignmentMetadata).submissionStages), ...exceptions.map(exception => readSubmissionStagePolicies(record(exception.settings).submissionStages)));
+    return policies[stageId]?.enabled !== false;
+  };
+}
 export function legacyGeneralStagePolicies(typeKey: string, minutes: unknown): SubmissionStagePolicies {
   const stage = getActivityDefinition(typeKey)?.submissionStages?.find(stage => stage.assessment);
   return stage ? { [stage.id]: { timeLimitMinutes: typeof minutes === "number" && Number.isInteger(minutes) && minutes > 0 && minutes <= 1440 ? minutes : null } } : {};
@@ -46,6 +92,11 @@ export async function resolveActivitySubmissionStage(activity: { id: string; act
   // Existing general time limits remain the legacy default for the answering stage.
   if (stage.assessment && !Object.prototype.hasOwnProperty.call(policies[stageId] ?? {}, "timeLimitMinutes")) policy.timeLimitMinutes = typeof metadata.timeLimitMinutes === "number" ? metadata.timeLimitMinutes : null;
   return { stage, policy, availableUntil: assignment.availableUntil ?? null, window: submissionStageWindow(policy, assignment.availableUntil ?? null) };
+}
+export async function assertActivitySubmissionStageEnabled(activity: { id: string; activityType: { key: string }; metadata?: unknown }, assignment: { metadata: unknown; availableUntil?: Date | string | null }, stageId: string) {
+  const resolved = await resolveActivitySubmissionStage(activity, assignment, stageId);
+  if (!resolved.stage.active || resolved.policy.enabled === false) throw new AppError(409, "SUBMISSION_STAGE_NOT_ACTIVATED", "This stage is awaiting teacher activation.", { stageId });
+  return resolved;
 }
 export async function activityAssessmentStageAssignment<T extends { metadata: unknown; availableUntil?: Date | null }>(activity: { id: string; activityType: { key: string }; metadata?: unknown }, assignment: T): Promise<T> {
   const definition = getActivityDefinition(activity.activityType?.key ?? ""), stage = definition?.submissionStages?.find(stage => stage.assessment);
