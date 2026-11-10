@@ -1,10 +1,10 @@
 # Activity submission stages
 
-Status: implemented and locally validated, November 9, 2026.
+Status: implemented and validated, November 10, 2026.
 
 ## Stage activation follow-up
 
-Implementation is complete; final regression validation is in progress. Core Activity settings owns a separate activation switch for every declared submission stage, with the ordinary General/section/team/student inheritance. A plugin's workflow option (such as Generate challenge questions) determines which stages exist; activation independently controls when students may begin them. Teachers can configure an inactive stage in advance. Student stage actions stay visible but disabled with an Awaiting teacher activation status.
+Implementation and regression validation are complete. Core Activity settings owns a separate activation switch for every declared submission stage, with the ordinary General/section/team/student inheritance. A plugin's workflow option (such as Generate challenge questions) determines which stages apply; activation independently controls when students may begin them. Teachers can configure an inactive stage in advance. Student stage actions stay visible but disabled with an Awaiting teacher activation status.
 
 Draft file preparation remains available before file hand-in activation. File hand-in may be activated while question generation remains closed: files freeze normally and wait without AI calls or answering time. Activating the question stage releases waiting work through the bounded durable queue. Turning it off blocks new generation/answering starts; already-started answering attempts may finish under their existing timing. Activation never extends calendar cutoffs or restarts a stage clock.
 
@@ -13,7 +13,7 @@ New course activities and copies start with explicit inactive stage flags. Histo
 - [x] Shared contract, inheritance, generic hooks and start enforcement.
 - [x] Programming Homework waiting/release workflow, individual/team/cancellation support.
 - [x] Shared teacher controls, student inactive actions and localized statuses.
-- [ ] Unit/API/E2E regressions, docs and incremental commits.
+- [x] Unit/API/E2E regressions, docs and incremental commits.
 
 ## Accepted behavior
 
@@ -33,7 +33,7 @@ Scheduling background explanations use shared help immediately after the relevan
 - Stage schedule overrides are independently merged by stage/field under General → section → prioritized team → student rules.
 - File preparation duration, when configured, starts on the first accepted file upload while the stage is active, or on activation for an existing nonempty draft; no academic attempt is created. Question duration starts at explicit Answer and uses the existing core attempt.
 - Active stage timers retain their start across navigation, refresh and policy edits. Teacher cancellation or deletion of the latest individual hand-in permits a fresh preparation stage; reopening answers preserves the frozen code and original answering start.
-- Stage names and count come from the declared list. Inactive stages retain saved configuration without exposing controls or starting timers.
+- Stage names and count come from the declared list. Workflow-disabled stages retain their saved configuration. Teacher deactivation leaves schedule controls editable for preparation but prevents new student starts.
 
 ## Checkpoints
 
@@ -43,7 +43,7 @@ Scheduling background explanations use shared help immediately after the relevan
 - [x] Shared scheduling UI and course-timezone handling.
 - [x] Local E2E combinations, ordinary-activity regressions, documentation and incremental commits.
 
-All functional tests use local disposable data. No production actions are authorized by this work.
+Functional acceptance uses isolated local data. Production testing remains prohibited under the standing operator rule.
 
 ## Compatibility and persistence
 
@@ -62,3 +62,9 @@ The shared Settings → General panel places availability beside named stage dea
 Validation passed: 2,043 unit tests across 341 files; all workspace typechecks and plugin boundary checks; 27 distinct local API/E2E scenarios. The focused scheduling tests cover every own/global date presence/order combination, equal dates, duration/no-duration, late/no-late/bounded/unbounded behavior, first-stage timers and automatic incomplete recovery for individuals/teams, saved-only answers after stage expiry, disabled-question retention, inheritance/null clearing, malformed/unknown stages, authorization, legacy defaults/new core writes and transactional rollback. Regressions cover ordinary MCQ/programming/Web Design/Parsons routes, compound Test deadlines/closure, duplication, released/read-only access, editor Save/Cancel, late timestamps and the existing homework queue/workflow. Desktop/mobile scheduling screenshots were inspected. Focused lint has no errors and one existing legacy answering-effect warning. Fixture providers validate delivery and policy rather than real AI output quality.
 
 The additive private clock migration was applied locally; no production operations or environment changes were made. Backend slice: `ddb6452`; the following shared UI/acceptance commit completes this delivery. Root/plugin orientation, authoring handbook, assignment/content-access and homework canonical documents were reviewed and updated, with no documentation verification gap.
+
+## Activation acceptance
+
+Shared contract/defaults, inherited section/student activation, manager authorization and transactional rejection are covered. Homework acceptance covers preparation before activation, immutable file hand-in without references while questions wait, later FIFO release, missing-readiness rollback, reopening without regeneration, existing answering continuation, common/separate team questions, late-joining activated members, individual reset and repeated clock backfill. A controlled in-flight provider test closes the stage mid-set, verifies no partial publication or consumed retry, and then resumes successfully. Existing closed/unprepared homework remains editable after upgrade.
+
+The complete regression run and focused optimized-build checks cover all activity types and the exam date/duration matrix, including 180-minute sessions, early/late starts, extended accommodations, section/team/student precedence, exclusions and saved-answer timeout recovery. Private operational evidence stays outside the checkout. Activation adds no new schema migration beyond the previously documented stage-clock migration.
