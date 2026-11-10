@@ -6,6 +6,7 @@ import { homeworkWorkflowCopy } from "./workflow-copy";
 
 import { HomeworkSimulation } from "./homework-simulation";
 import { HomeworkDownloads } from "./homework-downloads";
+import { HomeworkProvidedFiles } from "./homework-provided-files";
 import { HomeworkChallengeQuestion } from "./homework-challenge-question";
 import { HomeworkAnswerConfirmation } from "./homework-answer-confirmation";
 import { createPortal } from "react-dom";
@@ -207,7 +208,6 @@ function LegacyCodingHomeworkActivityView({
   const [assignmentPdf, setAssignmentPdf] = useState<CodingHomeworkAttachmentRecord | null>(null);
   const [requirementDraft, setRequirementDraft] = useState<RequirementDraft>(() => requirementsToDraft(defaultRequirements));
   const [requirementsUpload, setRequirementsUpload] = useState<CodingHomeworkAttachmentRecord | null>(null);
-  const [providedFiles, setProvidedFiles] = useState<CodingHomeworkAttachmentRecord[]>([]);
   const [loading, setLoading] = useState(Boolean(canManage && authoringClient));
   const loadedAuthoringId = useRef<string | null>(null);
   const activityForLoad = useRef(activity); activityForLoad.current = activity;
@@ -218,8 +218,6 @@ function LegacyCodingHomeworkActivityView({
   const [saving, setSaving] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [importingRequirements, setImportingRequirements] = useState(false);
-  const [uploadingProvidedFile, setUploadingProvidedFile] = useState(false);
-  const [deletingProvidedFileId, setDeletingProvidedFileId] = useState<string | null>(null);
   const [studentAssignment, setStudentAssignment] = useState<CodingHomeworkStudentAssignment | null>(null);
   const [latestSubmission, setLatestSubmission] = useState<CodingHomeworkLatestSubmissionResult>(null);
   const [submissionResult, setSubmissionResult] = useState<CodingHomeworkSubmissionResult | null>(null);
@@ -239,7 +237,6 @@ function LegacyCodingHomeworkActivityView({
       setAssignmentPdf(record.assignmentPdf);
       setRequirementDraft(nextRequirementDraft);
       setRequirementsUpload(record.requirementsUpload);
-      setProvidedFiles(record.providedFiles);
       setManagementRevision(value => value + 1);
       savedSnapshotRef.current = serializeSnapshot({
         assignment: record.assignment,
@@ -536,40 +533,6 @@ function LegacyCodingHomeworkActivityView({
     }
   }
 
-  async function uploadProvidedFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file || !authoringClient) {
-      return;
-    }
-    setUploadingProvidedFile(true);
-    try {
-      const record = await authoringClient.uploadProvidedFile(activity.id, await fileToUploadInput(file));
-      setProvidedFiles(record.providedFiles);
-      notifications.success(copy.providedFileUploaded);
-    } catch (error) {
-      notifications.error(error instanceof Error ? error.message : copy.saveError);
-    } finally {
-      setUploadingProvidedFile(false);
-    }
-  }
-
-  async function deleteProvidedFile(attachmentId: string) {
-    if (!authoringClient) {
-      return;
-    }
-    setDeletingProvidedFileId(attachmentId);
-    try {
-      const record = await authoringClient.deleteProvidedFile(activity.id, attachmentId);
-      setProvidedFiles(record.providedFiles);
-      notifications.success(copy.providedFileRemoved);
-    } catch (error) {
-      notifications.error(error instanceof Error ? error.message : copy.saveError);
-    } finally {
-      setDeletingProvidedFileId(null);
-    }
-  }
-
   async function runPreflight(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -763,7 +726,6 @@ function LegacyCodingHomeworkActivityView({
   }
 
   const teacherLongRunningTitle = uploadingPdf ? copy.uploadPdf : importingRequirements ? copy.importRequirements
-    : uploadingProvidedFile ? copy.uploadProvidedFile : deletingProvidedFileId ? copy.removeProvidedFile
     : runningPreflight ? copy.preflight : saving ? copy.save : null;
 
   const teacherProgress = <ProgressDialog
@@ -832,29 +794,7 @@ function LegacyCodingHomeworkActivityView({
               </figure></details>
             ) : null}
           </div>
-          <div className="field">
-            <HelpLabel help={<>{copy.providedFilesHelp}</>}><label>{copy.providedFiles}</label></HelpLabel>
-            <div className="inline-actions">
-              <label className="button secondary">
-                {uploadingProvidedFile ? "..." : copy.uploadProvidedFile}
-                <input hidden type="file" onChange={uploadProvidedFile} />
-              </label>
-
-            </div>
-            {providedFiles.length ? (
-              <div className="stack">
-                {providedFiles.map((file) => (
-                  <div className="inline-actions" key={file.id}>
-                    {activityFileUrl ? <a href={activityFileUrl(file.id)} target="_blank" rel="noreferrer">{file.originalName}</a> : <span>{file.originalName}</span>}
-                    <button className="button secondary" disabled={deletingProvidedFileId === file.id} type="button" onClick={() => void deleteProvidedFile(file.id)}>
-                      <ActionIcon name="remove" />
-                      {deletingProvidedFileId === file.id ? "..." : copy.removeProvidedFile}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : <span className="muted">{copy.noProvidedFiles}</span>}
-          </div>
+          {(solutionRequest ?? workflowRequest) && <HomeworkProvidedFiles key={activity.id} request={(solutionRequest ?? workflowRequest)!} locale={locale} disabled={saving} />}
           </section>
           <section className="stack" hidden={authoringTab !== "solution"}><h2>{editor.solution}</h2>
           {(solutionRequest ?? workflowRequest) && <HomeworkSolutionSelector request={(solutionRequest ?? workflowRequest)!} locale={locale} onSolutionChanged={reconcileSolution} requirements={draftToRequirements(requirementDraft, assignment.languageKey)} onChange={requirements => setRequirementDraft(requirementsToDraft(requirements))} />}

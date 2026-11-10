@@ -22,7 +22,8 @@ test("challenge generation excludes unchanged provided functions and retains mod
     const base = `/api/courses/${data.courseId}/activities/${id}/coding-homework-grader`;
     const authoring = await responseJson<{ assignment: object }>(await teacherApi.get(`${base}/authoring`));
     await responseJson(await teacherApi.put(`${base}/authoring`, { data: { assignment: { ...authoring.assignment, questionCount: count, candidateLimit: 1 }, requirements: {} } }));
-    await responseJson(await teacherApi.post(`${base}/provided-files`, { data: { fileName: "provided.c", base64: Buffer.from(supplied).toString("base64") } }));
+    const provided = await responseJson<{ revision: string }>(await teacherApi.get(`${base}/provided-files-workspace`));
+    await responseJson(await teacherApi.post(`${base}/provided-files-workspace`, { data: { expectedRevision: provided.revision, files: [{ fileName: "provided.c", base64: Buffer.from(supplied).toString("base64") }] } }));
     return { id, base };
   }
   async function openAndSubmit(homework: { id: string; base: string }, code: string) {
