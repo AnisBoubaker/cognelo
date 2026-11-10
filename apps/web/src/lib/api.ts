@@ -1,3 +1,4 @@
+import type { GradebookActionDefinition } from "@cognelo/activity-sdk";
 import type { SubmissionStagePolicies } from "@cognelo/contracts";
 import type { SubmissionStageDefinition } from "@cognelo/activity-sdk";
 import type { TestAiGradingInstructions } from "@cognelo/contracts";
@@ -65,6 +66,8 @@ import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import { ACTIVITY_CONTENT_CLOSED_EVENT } from "@cognelo/activity-ui";
 
 export type { StudentGroupingDto, StudentGroupingStudent, MaterialKind, SubjectKnowledgeGraphDraft, SubjectProgrammingLanguage };
+
+export type GradebookPluginAction = GradebookActionDefinition & { participantIds: string[] };
 
 export type AdminRole = { id: string; key: "admin" | "course_manager" | "teacher" | "student"; name: string; description: string | null };
 export type ActivityContentAccess = {
@@ -1952,6 +1955,22 @@ export const api = {
       params.set("groupId", groupId);
     }
     return request<{ attempts: CourseActivityInProgressAttempt[] }>(`/courses/${courseId}/gradebook?${params.toString()}`);
+  },
+  gradebookPluginActions: (courseId: string, activityId: string, groupId?: string, signal?: AbortSignal) => request<{ actions: GradebookPluginAction[] }>(`/courses/${courseId}/gradebook/activities/${activityId}/plugin-actions${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ""}`, { signal }),
+  downloadGradebookPluginAction: async (courseId: string, activityId: string, input: { actionId: string; groupId?: string; participantId?: string }, signal: AbortSignal) => {
+    const path = `/courses/${courseId}/gradebook/activities/${activityId}/plugin-actions`;
+    assertStudentViewRequestIsSafe(path, { method: "POST" });
+    const response = await fetch(`${API_URL}/api${path}`, { method: "POST", signal, credentials: "include", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+    if (!response.ok) {
+      if (response.status === 401) notifyUnauthorized();
+      const body = await response.json().catch(() => ({}));
+      throw new ApiError(body.error?.message ?? "Download failed.", { ...body.error, status: response.status });
+    }
+    const disposition = response.headers.get("Content-Disposition") ?? "";
+    const encodedName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+    let fileName = /filename="([^"]+)"/i.exec(disposition)?.[1] ?? "download";
+    if (encodedName) { try { fileName = decodeURIComponent(encodedName); } catch { /* Preserve the ordinary filename when an external provider has a malformed filename*. */ } }
+    return { blob: await response.blob(), fileName };
   },
   answerExportStudents: (courseId: string, activityId: string, groupId?: string) => request<{ students: AnswerExportStudent[] }>(`/courses/${courseId}/gradebook/activities/${activityId}/answers-export${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ""}`),
   exportActivityAnswers: async (courseId: string, activityId: string, input: AnswerExportRequest) => {

@@ -371,6 +371,7 @@ export const frMessages = {
       file: "Fichier",
       module: "Module"
     },
+    gradebookActions: { preparing: "Préparation du téléchargement…", failed: "Le téléchargement n’a pas pu être effectué.", loadFailed: "Impossible de charger les actions de téléchargement de l’activité." },
     login: {
       title: "Connexion",
       subtitle: "Utilisez le compte enseignant initial pour créer des cours et des activités.",

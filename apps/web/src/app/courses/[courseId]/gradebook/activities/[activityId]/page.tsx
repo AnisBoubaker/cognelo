@@ -1,6 +1,8 @@
 "use client";
 import { HelpLabel, HelpTooltip } from "@cognelo/activity-ui";
 
+import { useGradebookPluginActions } from "@/lib/use-gradebook-plugin-actions";
+import type { GradebookPluginAction } from "@/lib/api";
 import { useAiGradingRun } from "@/lib/use-ai-grading-run";
 import { AiGradingRunDialog } from "@/components/ai-grading-run-dialog";
 import { DialogHeader } from "@cognelo/activity-ui";
@@ -192,6 +194,7 @@ export default function GradebookActivityResultsPage() {
   const activityTitle = rows[0]?.activityTitle ?? gradebook?.items[0]?.activityTitle ?? reportActivity?.title ?? t("common.loading");
   const activityTypeKey = rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? reportActivity?.activityType.key ?? "";
   const activityActions = getGradebookActivityActions(activityTypeKey);
+  const pluginActions = useGradebookPluginActions(courseId, activityId, activityTypeKey, groupId, gradebook);
   const isSummativeActivity = (rows[0]?.assessmentMode ?? gradebook?.items[0]?.assessmentMode) === "summative";
   const canManageCourse = Boolean(course?.permissions?.canManageCourse);
   const hasMessagingPermission = Boolean(
@@ -862,6 +865,7 @@ export default function GradebookActivityResultsPage() {
               {canExportActivityAnswers(activityTypeKey) ? <button className="button secondary" disabled={!rows.some((row) => row.attempts.some((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded"))} type="button" onClick={() => setAnswerExportTarget({})}>
                 <AppIcon name="download" />{t("answerExport.title")}
               </button> : null}
+              {pluginActions.actions.filter(action => action.scope === "activity").map(action => <button className="button secondary" key={action.id} disabled={pluginActions.busy || !action.participantIds.length} type="button" onClick={() => void pluginActions.download(action)}><AppIcon name="download" />{action.labels[locale] ?? action.labels.en}</button>)}
               <Link className="button secondary activity-report-back" href={backHref}>
                 <AppIcon name="back" />
                 {backLabel}
@@ -991,6 +995,9 @@ export default function GradebookActivityResultsPage() {
                   onReviewAndGrade={openReviewAndGrade}
                   onDeleteSubmission={setSubmissionDeletionRow}
                   onExportAnswers={(row) => setAnswerExportTarget({ participantId: row.participantId })}
+                  pluginActions={pluginActions.actions.filter(action => action.scope === "participant" && action.participantIds.includes(row.participantId))}
+                  pluginActionBusy={pluginActions.busy}
+                  onPluginAction={(action) => void pluginActions.download(action, row.participantId)}
                   onReopenSubmission={reopenSubmission}
                   onRegrade={regradeRow}
                   onGenerateAiFeedback={generateAiFeedbackForRow}
@@ -1131,6 +1138,7 @@ export default function GradebookActivityResultsPage() {
           </div>
         ) : null}
 
+        {pluginActions.progress}
         {answerExportTarget ? <AnswerExportDialog courseId={courseId} activityId={activityId} activityTitle={activityTitle} groupId={groupId} participantId={answerExportTarget.participantId} onClose={() => setAnswerExportTarget(null)} /> : null}
         {submissionDeletionRow ? (
           <DeleteSubmissionDialog
@@ -1312,6 +1320,9 @@ function GradebookStudentRow({
   onReviewAndGrade,
   onDeleteSubmission,
   onExportAnswers,
+  pluginActions,
+  pluginActionBusy,
+  onPluginAction,
   onReopenSubmission,
   onRegrade,
   onGenerateAiFeedback,
@@ -1324,6 +1335,9 @@ function GradebookStudentRow({
   onReviewAndGrade: (row: CourseGradebookRow) => Promise<void>;
   onDeleteSubmission: (row: CourseGradebookRow) => void;
   onExportAnswers: (row: CourseGradebookRow) => void;
+  pluginActions: GradebookPluginAction[];
+  pluginActionBusy: boolean;
+  onPluginAction: (action: GradebookPluginAction) => void;
   onReopenSubmission: (row: CourseGradebookRow) => Promise<void>;
   onRegrade: (row: CourseGradebookRow) => Promise<void>;
   onGenerateAiFeedback: (row: CourseGradebookRow) => Promise<void>;
@@ -1339,7 +1353,7 @@ function GradebookStudentRow({
   const canReopen = row.supportsSubmissionContinuation === true && Boolean(latestReopenableAttempt(row)) && !inProgressAttempt;
   const canDeleteSubmission = deletableSubmissions(row).length > 0;
   const canExport = canExportActivityAnswers(row.activityTypeKey) && row.attempts.some((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
-  const hasActions = canExport || canDeleteSubmission || canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
+  const hasActions = pluginActions.length > 0 || canExport || canDeleteSubmission || canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
 
   function closeActionMenu() {
     setActionMenuAnchor(null);
@@ -1454,6 +1468,7 @@ function GradebookStudentRow({
                   <span>{t(row.assessmentMode === "formative" ? "courseDetail.inspectAttempts" : "courseDetail.reviewAndGrade")}</span>
                 </button>
               ) : null}
+              {pluginActions.map(action => <button className="content-context-menu-item" role="menuitem" type="button" key={action.id} disabled={pluginActionBusy} onClick={() => { closeActionMenu(); onPluginAction(action); }}><AppIcon name="download" /><span>{action.labels[locale] ?? action.labels.en}</span></button>)}
               {canExport ? <button className="content-context-menu-item" role="menuitem" type="button" onClick={() => { closeActionMenu(); onExportAnswers(row); }}><AppIcon name="download" /><span>{t("answerExport.single")}</span></button> : null}
               {canDeleteSubmission ? (
                 <button className="content-context-menu-item is-danger" role="menuitem" type="button"

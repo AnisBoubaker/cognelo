@@ -371,6 +371,7 @@ export const zhMessages = {
       file: "文件",
       module: "模块"
     },
+    gradebookActions: { preparing: "正在准备下载…", failed: "无法完成下载。", loadFailed: "无法加载此活动的下载操作。" },
     login: {
       title: "登录",
       subtitle: "使用预置教师账号来创建课程和活动。",

@@ -371,6 +371,7 @@ export const enMessages = {
       file: "File",
       module: "Module"
     },
+    gradebookActions: { preparing: "Preparing download…", failed: "The download could not be completed.", loadFailed: "The activity’s download actions could not be loaded." },
     login: {
       title: "Sign in",
       subtitle: "Use the seeded teacher account to create courses and activities.",

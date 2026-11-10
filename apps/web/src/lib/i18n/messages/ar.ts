@@ -353,6 +353,7 @@ export const arMessages = {
       paused: "متوقف مؤقتا",
       archived: "مؤرشف"
     },
+    gradebookActions: { preparing: "جارٍ تحضير التنزيل…", failed: "تعذر إكمال التنزيل.", loadFailed: "تعذر تحميل إجراءات تنزيل النشاط." },
     login: {
       title: "تسجيل الدخول",
       subtitle: "استخدم حساب المعلم التجريبي لإنشاء المقررات والأنشطة.",
