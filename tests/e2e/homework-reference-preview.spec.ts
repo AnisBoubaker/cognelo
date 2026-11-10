@@ -64,7 +64,8 @@ test("teachers inspect the exact prepared text with pagination and no model call
     expect(model.requests).toHaveLength(requestsBefore);
     await panel.getByRole("button", { name: "Close", exact: true }).click();
     await openHomeworkEditorSection(page, "Submission");
-    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeDisabled();
+    await expect(page.getByRole("link", { name: "Activity scheduling", exact: true })).toBeVisible();
+    expect((await api.put(`${base}/workflow-settings`, { data: { enabled: true } })).status()).toBe(409);
     expect(await prisma.activityAttempt.count({ where: { activityId: id } })).toBe(0);
   } finally { await page.close(); await student.dispose(); await model.close(); }
 });

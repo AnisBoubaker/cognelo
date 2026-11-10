@@ -55,12 +55,11 @@ test("Programming Homework keeps core top tabs and shared left sections, rich te
   await expect(left.getByRole("tab", { name: "Submission settings", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("Max files", { exact: true })).toHaveValue("100");
   await page.locator(".homework-authoring-panel > form > div > .edit-action-bar").getByRole("button", { name: "Cancel", exact: true }).click(); await expect(page.getByLabel("Max files", { exact: true })).toHaveValue("200");
-  const open = page.getByRole("switch", { name: "Accept final submissions", exact: true }); await expect(open).toBeEnabled(); await open.click(); await expect(open).toBeChecked(); await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
+  // File-only workflows do not lock references: no question stage can use them.
+  await responseJson(await api.put(`${base}/workflow-settings`, { data: { enabled: true } }));
   await top.getByRole("tab", { name: "Reference materials", exact: true }).click();
-  const lockedReferences = page.getByText("Reference materials are locked while final submissions are enabled.", { exact: true });
-  await expect(lockedReferences).toBeVisible();
-  await top.getByRole("tab", { name: "Activity", exact: true }).click(); await open.click(); await expect(open).not.toBeChecked(); await page.getByRole("button", { name: "Save", exact: true }).click(); await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
-  await top.getByRole("tab", { name: "Reference materials", exact: true }).click(); await expect(lockedReferences).toHaveCount(0);
+  await expect(page.getByText("Reference materials are locked while final submissions are enabled.", { exact: true })).toHaveCount(0);
+  await responseJson(await api.put(`${base}/workflow-settings`, { data: { enabled: false } }));
   await top.getByRole("tab", { name: "Activity", exact: true }).click();
   await left.getByRole("tab", { name: "Simulation", exact: true }).click();
   const simulation = page.locator(".homework-simulation");

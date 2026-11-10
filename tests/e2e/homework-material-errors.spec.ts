@@ -35,7 +35,8 @@ test("ZIP reference extraction reports named failures in notification history an
     await expect(toast).toContainText("no readable source/text files");
     await expect(page.getByRole("dialog", { name: "Preparing reference materials…", exact: true })).toBeHidden();
     await openHomeworkEditorSection(page, "Submission");
-    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeDisabled();
+    await expect(page.getByRole("link", { name: "Activity scheduling", exact: true })).toBeVisible();
+    expect((await teacherApi.put(`${base}/workflow-settings`, { data: { enabled: true } })).status()).toBe(409);
     expect(model.embeddingTexts).toHaveLength(2);
     expect(model.embeddingTexts.join("\n")).not.toContain("should not reach embeddings");
     const firstIndex = await prisma.contentMaterialIndex.findFirstOrThrow({ where: { resourceId: starter } });
@@ -53,12 +54,8 @@ test("ZIP reference extraction reports named failures in notification history an
     await page.getByRole("button", { name: "Generate embeddings", exact: true }).click();
     await expect(page.locator(".activity-reference-materials").getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
     await openHomeworkEditorSection(page, "Submission");
-    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeEnabled();
     expect(model.embeddingTexts).toHaveLength(3);
     expect(await prisma.contentMaterialIndex.count({ where: { resourceId: starter } })).toBe(1);
-    await page.getByRole("switch", { name: "Accept final submissions", exact: true }).click();
-    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeChecked();
-    await page.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
+    await responseJson(await teacherApi.put(`${base}/workflow-settings`, { data: { enabled: true } }));
   } finally { await model.close(); }
 });

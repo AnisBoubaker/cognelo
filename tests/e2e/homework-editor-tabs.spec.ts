@@ -28,7 +28,8 @@ test("homework separates references and settings, keeps drafts across tabs, and 
     }
     await openHomeworkEditorSection(page, "Submission");
     await expect(page.getByRole("button", { name: "Generate embeddings", exact: true })).toBeHidden();
-    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeDisabled();
+    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Activity scheduling", exact: true })).toBeVisible();
     await openHomeworkEditorSection(page, "Question Generation");
     await page.getByLabel("Students processed at once (1–4)").fill("3");
     await expect(page.getByRole("dialog", { name: "Save", exact: true })).toBeHidden();
@@ -59,15 +60,13 @@ test("homework separates references and settings, keeps drafts across tabs, and 
     releasePreparation!();
     await expect(progress).toBeHidden();
     await openHomeworkEditorSection(page, "Submission");
-    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeDisabled();
+    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Activity scheduling", exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await page.getByRole("button", { name: "Generate embeddings", exact: true }).click();
     await expect(page.locator(".activity-reference-materials").getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
     await openHomeworkEditorSection(page, "Submission");
-    await page.getByRole("switch", { name: "Accept final submissions", exact: true }).click();
-    await expect(page.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeChecked();
-    await page.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(page.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
+    await responseJson(await teacherApi.put(`/api/courses/${data.courseId}/activities/${activityId}/coding-homework-grader/workflow-settings`, { data: { enabled: true } }));
     await page.reload();
     await page.getByRole("tab", { name: "Reference materials", exact: true }).click();
     await expect(referenceB).not.toBeChecked(); await expect(referenceB).toBeDisabled();

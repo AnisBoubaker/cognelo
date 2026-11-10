@@ -32,10 +32,8 @@ test("teacher selects private solution signatures and student explicitly acknowl
     await teacherPage.getByRole("button", { name: "Generate embeddings", exact: true }).click();
     await expect(teacherPage.locator(".activity-reference-materials").getByText("Reference selection is prepared.", { exact: true })).toBeVisible();
     await openHomeworkEditorSection(teacherPage, "Submission");
-    await teacherPage.getByRole("switch", { name: "Accept final submissions", exact: true }).click();
-    await expect(teacherPage.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeChecked();
-    await teacherPage.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(teacherPage.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
+    await expect(teacherPage.getByRole("link", { name: "Activity scheduling", exact: true })).toBeVisible();
+    await responseJson(await teacherApi.put(`${base}/workflow-settings`, { data: { enabled: true } }));
     const assigned = `/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${id}`;
     await studentPage.goto(assigned);
     await expect(studentPage.locator('input[type="file"][multiple]')).toBeEnabled();

@@ -41,9 +41,11 @@ for (const separate of [false, true]) test(`team homework: ${separate ? "individ
     const { settings } = await responseJson<{ settings: CourseActivityAssignmentSettings }>(await teacherApi.get(settingsPath));
     const assignmentData = { ...settings.general, assessmentMode: "summative", teamworkEnabled: true, groupAssignments: settings.groups.map(group => ({ ...group, teamGroupingId: grouping.id, allowIndividualSubmission: false })) };
     await responseJson(await teacherApi.post(settingsPath, { data: assignmentData }));
-    await responseJson(await teacherApi.put(`${teacherPath}/workflow-settings`, { data: { selected: [] } }));
-    await responseJson(await teacherApi.post(`${teacherPath}/prepare-references`, { data: {} }));
-    await responseJson(await teacherApi.put(`${teacherPath}/workflow-settings`, { data: { enabled: true } }));
+    const activate = async (questions: boolean) => {
+      const current = (await responseJson<{ settings: CourseActivityAssignmentSettings }>(await teacherApi.get(settingsPath))).settings;
+      await responseJson(await teacherApi.post(settingsPath, { data: { ...current.general, submissionStages: { ...current.general.submissionStages, files: { enabled: true }, questions: { enabled: questions } }, groupAssignments: current.groups, confirmActiveStudents: true } }));
+    };
+    await activate(false);
     const assigned = `/api/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}`;
     const endpoint = `${assigned}/coding-homework-grader`;
     const state = async (client = student) => responseJson<Workspace>(await client.get(`${endpoint}/workspace`));
@@ -62,6 +64,16 @@ for (const separate of [false, true]) test(`team homework: ${separate ? "individ
     await expect(page.getByRole("tab", { name: /src\/main.c/ })).toBeVisible();
     await expect(page.getByText("Blue", { exact: false }).first()).toBeVisible();
     await responseJson(await student.post(`${endpoint}/hand-in`, { data: { contextKey: (await state()).teamwork.contextKey, expectedRevision: 2 } }));
+    expect(["uploaded", "processing"]).toContain((await state()).submission?.status);
+    expect(["uploaded", "processing"]).toContain((await state(clients[1])).submission?.status);
+    expect(model.requests).toHaveLength(0);
+    expect(await prisma.activityAttempt.count({ where: { activityId } })).toBe(0);
+    expect(await prisma.backgroundJob.count({ where: { queue: "coding-homework-grader", payload: { path: ["activityId"], equals: activityId } } })).toBe(0);
+    await page.reload(); await expect(page.getByRole("button", { name: "Answer challenge questions", exact: true })).toBeDisabled();
+    // Both common and separate sets can be released after the shared code was frozen.
+    await responseJson(await teacherApi.put(`${teacherPath}/workflow-settings`, { data: { selected: [] } }));
+    await responseJson(await teacherApi.post(`${teacherPath}/prepare-references`, { data: {} }));
+    await activate(true);
     await waitReady(student); await waitReady(clients[1]);
     const first = (await state(student)).submission!, second = (await state(clients[1])).submission!;
     expect(first.id).not.toBe(second.id); expect(model.starts.length).toBe(separate ? 6 : 3);
@@ -98,7 +110,16 @@ for (const separate of [false, true]) test(`team homework: ${separate ? "individ
     expect([403, 409]).toContain((await student.put(`${endpoint}/challenge-answers`, { data: { submissionId: first.id, answers: [] } })).status());
     // Reset only the second member. The third keeps the same questions and the files remain frozen.
     const thirdId = (await state(clients[2])).submission!.id;
+    await activate(false);
+    const callsBeforeReset = model.starts.length;
     await responseJson(await teacherApi.post(`${teacherPath}/manage-submissions`, { data: { action: "reset-challenges", submissionId: second.id, reason: "Reset one student's answers." } }));
+    if (separate) {
+      const held = (await state(clients[1])).submission!;
+      const job = await prisma.backgroundJob.findFirstOrThrow({ where: { queue: "coding-homework-grader", idempotencyKey: `submission:${held.id}` } });
+      expect(job.status).toBe("queued"); expect(job.runAfter.getUTCFullYear()).toBe(9999); expect(job.attempts).toBe(0);
+    }
+    expect(model.starts.length).toBe(callsBeforeReset);
+    await activate(true);
     await waitReady(clients[1]); expect((await state(clients[1])).submission!.id).not.toBe(second.id); expect((await state(clients[2])).submission!.id).toBe(thirdId);
     // Returning starts fresh individual answering, not the original answer/grade.
     await move(participants, []); await waitReady(student);

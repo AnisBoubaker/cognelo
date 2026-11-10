@@ -37,10 +37,8 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
     await prisma.aiAgentConnection.update({ where: { id: connection.id }, data: { model: "new-question-model" } });
     expect(await responseJson(await teacherApi.get(`${authoring}/workflow-settings`))).toMatchObject({ statuses: { [resource.id]: { state: "ready" } } });
     await openHomeworkEditorSection(teacherPage, "Submission");
-    await teacherPage.getByRole("switch", { name: "Accept final submissions", exact: true }).click();
-    await expect(teacherPage.getByRole("switch", { name: "Accept final submissions", exact: true })).toBeChecked();
-    await teacherPage.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(teacherPage.locator(".homework-authoring-panel > form > div > .edit-action-bar")).toContainText("Everything is saved.");
+    await expect(teacherPage.getByRole("link", { name: "Activity scheduling", exact: true })).toBeVisible();
+    await responseJson(await teacherApi.put(`${authoring}/workflow-settings`, { data: { enabled: true } }));
     expect((await teacherApi.put(`${authoring}/workflow-settings`, { data: { selected: [] } })).status()).toBe(409);
     await studentPage.goto(assigned.replace(/^\/api/, ""));
     await expect(studentPage.getByRole("heading", { name: "Prepare your work", exact: true })).toBeVisible();
