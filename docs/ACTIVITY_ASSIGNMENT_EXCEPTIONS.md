@@ -15,7 +15,7 @@ The existing common overrides are:
 | Available from / until | Replace or clear either assignment date. |
 | Time limit | Replace minutes or disable timing. |
 | Visibility | Replace activity visibility; a hidden ancestor folder still hides its descendants. |
-| Safe Exam Browser | Require or waive SEB for summative work. |
+| Safe Exam Browser | Require or waive SEB for ordinary summative work; staged activities override it separately within each stage. |
 | Grade challenges | Permit or prevent new challenges on released summative grades/feedback. |
 | Points possible | Set the normalized grading scale. |
 | Grading | Points or pass/fail, including its threshold and denominator. |

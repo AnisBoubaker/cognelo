@@ -25,8 +25,8 @@ export const homeworkWorkflowRoutes: PluginRouteDefinition[] = [
   } } }),
   route("prepare-references", { methods: { POST: async ({ context }) => finishHomeworkMaterialPreparation(await teacherScope(context)) } }),
   route("workspace", { learnerAccessPhase: "preparation", methods: { GET: ({ context }) => getHomeworkWorkspace(resolveStudentSubmissionScope(context)) } }),
-  route("hand-in", { learnerAccessPhase: "preparation", methods: { POST: async ({ context, readJson }) => handInHomework(resolveStudentSubmissionScope(context), await readJson()) } }),
-  route("answering", { learnerAccessPhase: "assessment_start", methods: {
+  route("hand-in", { learnerAccessPhase: "preparation", submissionStageId: "files", methods: { POST: async ({ context, readJson }) => handInHomework(resolveStudentSubmissionScope(context), await readJson()) } }),
+  route("answering", { learnerAccessPhase: "assessment_start", submissionStageId: "questions", methods: {
     POST: async ({ context, readJson }) => { const data = z.object({ submissionId: z.string().nullable().optional() }).parse(await readJson()); return startHomeworkAnswering(resolveStudentSubmissionScope(context), data.submissionId); },
     GET: ({ context }) => getStartedHomeworkQuestions(resolveStudentSubmissionScope(context))
   } }),

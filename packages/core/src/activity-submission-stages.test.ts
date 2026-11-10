@@ -1,12 +1,69 @@
-import { applyAssignmentExceptions } from "./activity-assignment-exceptions";
+import { applyAssignmentExceptions, resolveAssignmentExceptions } from "./activity-assignment-exceptions";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ definition: vi.fn(), configuration: vi.fn() }));
 vi.mock("@cognelo/activity-sdk", () => ({ getActivityDefinition: mocks.definition }));
 vi.mock("@cognelo/activity-sdk/server", () => ({ getActivitySubmissionStagesHandler: () => ({ configuration: mocks.configuration }) }));
-import { activityAssessmentStageAssignment, getActivitySubmissionStageConfiguration, resolveActivitySubmissionStage, validateSubmissionStagePolicies, initialSubmissionStageMetadata, assertActivitySubmissionStageEnabled, configuredSubmissionStageActivations, submissionStageActivationResolver } from "./activity-submission-stages";
+import { assertActivitySafeExamBrowserSupported, activitySubmissionStageSafeExamBrowser, activityAssessmentStageAssignment, getActivitySubmissionStageConfiguration, resolveActivitySubmissionStage, validateSubmissionStagePolicies, initialSubmissionStageMetadata, assertActivitySubmissionStageEnabled, configuredSubmissionStageActivations, submissionStageActivationResolver } from "./activity-submission-stages";
 const activity = { id: "activity", activityType: { key: "staged" } }, names = { en: "First", fr: "Première", zh: "第一", ar: "الأولى" };
 beforeEach(() => { vi.clearAllMocks(); mocks.definition.mockReturnValue({ submissionStages: [{ id: "files", names, allowsLateSubmissions: true }, { id: "questions", names, assessment: true }] }); mocks.configuration.mockResolvedValue({ defaults: { files: { deadline: "2030-01-01T10:00:00.000Z" } } }); });
 describe("core stage capability resolution", () => {
+  it("lets an activity or one stage disallow SEB and ignores incompatible stored flags", async () => {
+    const declaration = mocks.definition.getMockImplementation()!();
+    mocks.definition.mockReturnValue({ ...declaration, submissionStages: declaration.submissionStages.map((stage: { id: string }) => ({ ...stage, ...(stage.id === "files" ? { supportsSafeExamBrowser: false } : {}) })) });
+    expect(() => validateSubmissionStagePolicies("staged", { files: { requireSafeExamBrowser: true } })).toThrow(expect.objectContaining({ code: "SUBMISSION_STAGE_SEB_UNSUPPORTED" }));
+    expect(() => validateSubmissionStagePolicies("staged", { questions: { requireSafeExamBrowser: true } })).not.toThrow();
+    const assignment = { metadata: { assessmentMode: "summative", submissionStages: { files: { requireSafeExamBrowser: true }, questions: { requireSafeExamBrowser: true } } } };
+    expect((await activitySubmissionStageSafeExamBrowser(activity, assignment))?.requirements).toEqual({ files: false, questions: true });
+    mocks.definition.mockReturnValue({ ...declaration, supportsSafeExamBrowser: false });
+    expect(() => assertActivitySafeExamBrowserSupported("staged", true)).toThrow(expect.objectContaining({ code: "SAFE_EXAM_BROWSER_UNSUPPORTED" }));
+    expect(() => validateSubmissionStagePolicies("staged", { questions: { requireSafeExamBrowser: true } })).toThrow(expect.objectContaining({ code: "SUBMISSION_STAGE_SEB_UNSUPPORTED" }));
+    expect((await activitySubmissionStageSafeExamBrowser(activity, assignment))?.requirements).toEqual({ files: false, questions: false });
+  });
+  for (const files of [false, true]) for (const questions of [false, true]) it(`resolves independent SEB policies: files=${files}, questions=${questions}`, async () => {
+    const assignment = { metadata: { assessmentMode: "summative", submissionStages: { files: { requireSafeExamBrowser: files }, questions: { requireSafeExamBrowser: questions } } } };
+    expect(await activitySubmissionStageSafeExamBrowser(activity, assignment)).toEqual({ requirements: { files, questions }, assessmentRequired: questions });
+  });
+  it("maps old SEB settings to assessment only and honors explicit stage settings and exceptions", async () => {
+    expect(await activitySubmissionStageSafeExamBrowser(activity, { metadata: { assessmentMode: "summative", requireSafeExamBrowser: true } })).toMatchObject({ requirements: { files: false, questions: true } });
+    const configured = { ...activity, metadata: { allGroupsAssignment: { requireSafeExamBrowser: true, submissionStages: { questions: { requireSafeExamBrowser: true } } } } };
+    const assignment = { metadata: { assessmentMode: "summative", requireSafeExamBrowser: true, submissionStageOverrides: {}, overrideFields: [], submissionStages: { questions: { requireSafeExamBrowser: true } } } };
+    const legacyException = applyAssignmentExceptions(assignment, { requireSafeExamBrowser: false });
+    expect((await activitySubmissionStageSafeExamBrowser(configured, legacyException))?.assessmentRequired).toBe(false);
+    const explicit = applyAssignmentExceptions(assignment, { requireSafeExamBrowser: false, submissionStages: { files: { requireSafeExamBrowser: true }, questions: { requireSafeExamBrowser: true } } });
+    expect((await activitySubmissionStageSafeExamBrowser(configured, explicit))?.requirements).toEqual({ files: true, questions: true });
+    expect((await activitySubmissionStageSafeExamBrowser(configured, { metadata: { ...assignment.metadata, submissionStages: { questions: { requireSafeExamBrowser: false } } } }))?.assessmentRequired).toBe(false);
+  });
+  it("preserves team priority and student precedence when old and new SEB exception formats mix", async () => {
+    const legacy = (required: boolean) => ({ overrideFields: ["requireSafeExamBrowser"], requireSafeExamBrowser: required });
+    const canonical = (required: boolean) => ({ submissionStages: { questions: { requireSafeExamBrowser: required } } });
+    const team = (priority: number, settings: unknown) => ({ groupActivityId: "assignment", teamId: `team-${priority}`, participantId: null, priority, settings });
+    const student = (settings: unknown) => ({ groupActivityId: "assignment", teamId: null, participantId: "student", priority: 0, settings });
+    for (const [rows, expected] of [
+      [[team(1, canonical(true)), team(0, legacy(false))], false],
+      [[team(1, legacy(true)), team(0, canonical(false))], false],
+      [[team(0, legacy(false)), student(canonical(true))], true],
+      [[team(0, canonical(true)), student(legacy(false))], false]
+    ] as const) {
+      const overrides = resolveAssignmentExceptions(rows);
+      const assignment = applyAssignmentExceptions({ metadata: { assessmentMode: "summative" } }, overrides);
+      expect((await activitySubmissionStageSafeExamBrowser(activity, assignment))?.assessmentRequired).toBe(expected);
+    }
+  });
+  it("retains older section SEB overrides even after stage timing was configured", async () => {
+    const configured = { ...activity, metadata: { allGroupsAssignment: { requireSafeExamBrowser: false, submissionStages: { questions: { timeLimitMinutes: 10, requireSafeExamBrowser: false } } } } };
+    for (const overrideFields of [undefined, ["requireSafeExamBrowser"]]) {
+      const metadata = { assessmentMode: "summative", requireSafeExamBrowser: true, overrideFields, timeLimitMinutes: 10, submissionStages: { questions: { timeLimitMinutes: 10 } }, submissionStageOverrides: {} };
+      expect((await activitySubmissionStageSafeExamBrowser(configured, { metadata }))?.assessmentRequired).toBe(true);
+    }
+  });
+  it("ignores SEB on disabled workflow stages and formative work", async () => {
+    const assignment = { metadata: { assessmentMode: "summative", submissionStages: { files: { requireSafeExamBrowser: true }, questions: { requireSafeExamBrowser: true } } } };
+    mocks.configuration.mockResolvedValue({ activeStageIds: ["files"] });
+    expect((await activitySubmissionStageSafeExamBrowser(activity, assignment))?.requirements).toEqual({ files: true, questions: false });
+    expect((await activitySubmissionStageSafeExamBrowser(activity, { metadata: { ...assignment.metadata, assessmentMode: "formative" } }))?.requirements).toEqual({ files: false, questions: false });
+    mocks.definition.mockReturnValue({});
+    expect(await activitySubmissionStageSafeExamBrowser(activity, assignment)).toBeNull();
+  });
   it("requires explicit activation for new generic staged activities without changing ordinary metadata", () => {
     expect(initialSubmissionStageMetadata("staged", { custom: "retained" })).toEqual({ custom: "retained", allGroupsAssignment: { submissionStages: { files: { enabled: false }, questions: { enabled: false } } } });
     mocks.definition.mockReturnValue({});

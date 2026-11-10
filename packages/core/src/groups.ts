@@ -1,4 +1,4 @@
-import { configuredActivityStageActivations, configuredSubmissionStageActivations, submissionStageActivationResolver, getActivitySubmissionStageConfiguration, legacyGeneralStagePolicies, legacySectionStageOverrides, readSubmissionStagePolicies, validateSubmissionStagePolicies } from "./activity-submission-stages";
+import { configuredActivityStageActivations, configuredSubmissionStageActivations, submissionStageActivationResolver, getActivitySubmissionStageConfiguration, legacyGeneralStagePolicies, legacyStageSafeExamBrowserPolicies, activitySubmissionStageSafeExamBrowser, compatibleStageSecurityPolicies, assertActivitySafeExamBrowserSupported, legacySectionStageOverrides, readSubmissionStagePolicies, validateSubmissionStagePolicies } from "./activity-submission-stages";
 import { getActivitySubmissionStagesHandler } from "@cognelo/activity-sdk/server";
 import { enqueueBackgroundJob } from "./background-jobs";
 import { teamworkTransaction } from "./activity-teamwork";
@@ -259,7 +259,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
     metadata: rule?.contentPlacement?.metadata ?? asMetadataRecord(coursePlacement?.metadata)
   };
   const stageConfiguration = await getActivitySubmissionStageConfiguration(activity);
-  const generalStages = mergeSubmissionStagePolicies(stageConfiguration.defaults, legacyGeneralStagePolicies(activity.activityType?.key ?? "", rule?.timeLimitMinutes), rule?.submissionStages);
+  const generalStages = compatibleStageSecurityPolicies(activity.activityType?.key ?? "", mergeSubmissionStagePolicies(stageConfiguration.defaults, legacyGeneralStagePolicies(activity.activityType?.key ?? "", rule?.timeLimitMinutes), legacyStageSafeExamBrowserPolicies(activity.activityType?.key ?? "", rule?.requireSafeExamBrowser), rule?.submissionStages));
   const general = {
     ...(stageConfiguration.stages.length ? { submissionStages: generalStages } : {}),
     ...(supportsTeamwork ? { teamworkEnabled: rule?.teamworkEnabled === true, teamworkLocked: lockedTeamGroups.size > 0 } : {}),
@@ -271,7 +271,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
     availableUntil: rule?.availableUntil ?? null,
     timeLimitMinutes: normalizeTimeLimitMinutes(rule?.timeLimitMinutes),
     assessmentMode,
-    requireSafeExamBrowser: assessmentMode === "summative" && rule?.requireSafeExamBrowser === true,
+    requireSafeExamBrowser: getActivityDefinition(activity.activityType?.key ?? "")?.supportsSafeExamBrowser !== false && assessmentMode === "summative" && rule?.requireSafeExamBrowser === true,
     gradeChallengesEnabled: assessmentMode === "summative" && rule?.gradeChallengesEnabled === true,
     gradebookSettings: generalGradebookSettings,
     contentPlacement: generalContentPlacement
@@ -321,11 +321,11 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
         teams: (group.studentGroupings ?? []).flatMap((grouping) => grouping.teams.map((team) => ({ ...team, groupingTitle: grouping.title }))),
         exceptions: (assignment?.assignmentExceptions ?? []).map((exception) => {
           const value = ActivityAssignmentOverrideValuesSchema.parse(exception.settings);
-          const stages = stageConfiguration.stages.length ? mergeSubmissionStagePolicies(value.overrideFields.includes("timeLimit") ? legacyGeneralStagePolicies(activity.activityType?.key ?? "", value.timeLimitMinutes) : {}, value.submissionStages) : undefined;
-          return { ...value, ...(stages ? { submissionStages: stages } : {}), teamId: exception.teamId, participantId: exception.participantId };
+          const stages = stageConfiguration.stages.length ? mergeSubmissionStagePolicies(value.overrideFields.includes("timeLimit") ? legacyGeneralStagePolicies(activity.activityType?.key ?? "", value.timeLimitMinutes) : {}, value.overrideFields.includes("requireSafeExamBrowser") ? legacyStageSafeExamBrowserPolicies(activity.activityType?.key ?? "", value.requireSafeExamBrowser) : {}, value.submissionStages) : undefined;
+          return { ...value, ...(getActivityDefinition(activity.activityType?.key ?? "")?.supportsSafeExamBrowser === false ? { requireSafeExamBrowser: false } : {}), ...(stages ? { submissionStages: compatibleStageSecurityPolicies(activity.activityType?.key ?? "", stages) } : {}), teamId: exception.teamId, participantId: exception.participantId };
         }),
         assignmentId: assignment?.id ?? null,
-        ...(stageConfiguration.stages.length ? { submissionStages: legacySectionStageOverrides(activity.activityType?.key ?? "", assignment?.metadata, overrideFields) } : {}),
+        ...(stageConfiguration.stages.length ? { submissionStages: compatibleStageSecurityPolicies(activity.activityType?.key ?? "", legacySectionStageOverrides(activity.activityType?.key ?? "", assignment?.metadata, overrideFields)) } : {}),
         overrideFields,
         availableFrom: assignment ? assignment.availableFrom?.toISOString() ?? null : general.availableFrom,
         availableUntil: assignment ? assignment.availableUntil?.toISOString() ?? null : general.availableUntil,
@@ -333,7 +333,7 @@ export async function getCourseActivityAssignmentSettings(user: CurrentUser, cou
           ? assignmentTimeLimitMinutes(assignment?.metadata)
           : general.timeLimitMinutes,
         requireSafeExamBrowser:
-          assessmentMode === "summative"
+          getActivityDefinition(activity.activityType?.key ?? "")?.supportsSafeExamBrowser !== false && assessmentMode === "summative"
             ? assignmentRequiresSafeExamBrowser(assignment?.metadata) || (!overrideFields.includes("requireSafeExamBrowser") && general.requireSafeExamBrowser)
             : false,
         gradeChallengesEnabled:
@@ -359,11 +359,12 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
   assertTestAssignmentIsSummative(activity, data.assessmentMode);
   assertActivitySupportsAssessmentMode(activity, data.assessmentMode);
   assertSafeExamBrowserIsSummative(data.assessmentMode, data.requireSafeExamBrowser);
+  assertActivitySafeExamBrowserSupported(activity.activityType?.key ?? "", data.requireSafeExamBrowser);
   assertGradeChallengesAreSummative(data.assessmentMode, data.gradeChallengesEnabled);
   await assertTestReadyForCompositeExecution(courseId, activity);
   const gradebookSettings = normalizeGradebookItemSettings(data.gradebookSettings);
   const stageConfiguration = await getActivitySubmissionStageConfiguration(activity);
-  const stagePolicies = mergeSubmissionStagePolicies(stageConfiguration.defaults, legacyGeneralStagePolicies(activity.activityType?.key ?? "", data.timeLimitMinutes), getCourseWideAssignmentMetadata(activity.metadata)?.submissionStages, data.submissionStages);
+  const stagePolicies = mergeSubmissionStagePolicies(stageConfiguration.defaults, legacyGeneralStagePolicies(activity.activityType?.key ?? "", data.timeLimitMinutes), legacyStageSafeExamBrowserPolicies(activity.activityType?.key ?? "", data.requireSafeExamBrowser), getCourseWideAssignmentMetadata(activity.metadata)?.submissionStages, data.submissionStages);
   validateSubmissionStagePolicies(activity.activityType?.key ?? "", stagePolicies, data.availableFrom, stageConfiguration.stages.filter(stage => stage.active).map(stage => stage.id));
   const stageHandler = getActivitySubmissionStagesHandler(activity.activityType?.key ?? "");
   const activationScope = { user, courseId, activityId, enabled: configuredSubmissionStageActivations(stageConfiguration, stagePolicies, data.groupAssignments ?? []) };
@@ -418,7 +419,11 @@ export async function assignActivityToAllCourseGroups(user: CurrentUser, courseI
     }));
     for (const requested of requestedAssignments) {
       validateSubmissionStagePolicies(activity.activityType?.key ?? "", requested.submissionStages);
-      for (const exception of requested.exceptions ?? []) validateSubmissionStagePolicies(activity.activityType?.key ?? "", exception.submissionStages);
+      assertActivitySafeExamBrowserSupported(activity.activityType?.key ?? "", requested.requireSafeExamBrowser);
+      for (const exception of requested.exceptions ?? []) {
+        validateSubmissionStagePolicies(activity.activityType?.key ?? "", exception.submissionStages);
+        assertActivitySafeExamBrowserSupported(activity.activityType?.key ?? "", exception.requireSafeExamBrowser);
+      }
     }
     const unknownGroup = requestedAssignments.find((assignment) => !groupById.has(assignment.groupId));
     if (unknownGroup) {
@@ -1012,12 +1017,14 @@ export async function getGroupAssignedActivityAccess(
   activityId: string
 ) {
   const activity = await getGroupAssignedActivity(user, courseId, groupId, activityId);
+  const stageSecurity = await activitySubmissionStageSafeExamBrowser(activity, activity.assignment);
   return {
+    ...(stageSecurity ? { stageSafeExamBrowser: stageSecurity.requirements, assessmentRequiresSafeExamBrowser: stageSecurity.assessmentRequired } : {}),
     activityId: activity.id,
     assignmentId: activity.assignment.id,
     title: activity.title,
-    requiresSafeExamBrowser: assignmentRequiresSafeExamBrowser(activity.assignment.metadata),
-    ...(getActivityDefinition(activity.activityType.key)?.assessmentFlow === "deferred" ? { preparationAllowed: true } : {}),
+    requiresSafeExamBrowser: stageSecurity ? Object.values(stageSecurity.requirements).some(Boolean) : getActivityDefinition(activity.activityType?.key ?? "")?.supportsSafeExamBrowser !== false && assignmentRequiresSafeExamBrowser(activity.assignment.metadata),
+    ...(getActivityDefinition(activity.activityType?.key ?? "")?.assessmentFlow === "deferred" ? { preparationAllowed: true } : {}),
     hideAfterAttempts: courseActivityHidesAfterAttempts(activity.metadata),
     canBypass: isAdmin(user) || (await canManageCourse(user, courseId))
   };
@@ -1287,6 +1294,7 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
   assertTestAssignmentIsSummative(activity, data.metadata.assessmentMode);
   assertActivitySupportsAssessmentMode(activity, data.metadata.assessmentMode);
   assertSafeExamBrowserIsSummative(data.metadata.assessmentMode, data.metadata.requireSafeExamBrowser);
+  assertActivitySafeExamBrowserSupported(activity.activityType?.key ?? "", data.metadata.requireSafeExamBrowser);
   assertGradeChallengesAreSummative(data.metadata.assessmentMode, data.metadata.gradeChallengesEnabled);
   await assertTestReadyForCompositeExecution(courseId, activity);
   validateAvailability(data.availableFrom, data.availableUntil);
@@ -1300,6 +1308,20 @@ export async function assignActivityToGroup(user: CurrentUser, courseId: string,
 
   const assignmentMetadata = asMetadataRecord(data.metadata as Prisma.JsonValue);
   const courseAssignmentRule = getCourseWideAssignmentMetadata(activity.metadata);
+  if (getActivityDefinition(activity.activityType?.key ?? "")?.submissionStages?.length) {
+    const raw = input && typeof input === "object" ? (input as { metadata?: Record<string, unknown> }).metadata ?? {} : {};
+    const overrides = mergeSubmissionStagePolicies(
+      Object.prototype.hasOwnProperty.call(raw, "timeLimitMinutes") ? legacyGeneralStagePolicies(activity.activityType.key, assignmentMetadata.timeLimitMinutes) : {},
+      Object.prototype.hasOwnProperty.call(raw, "requireSafeExamBrowser") ? legacyStageSafeExamBrowserPolicies(activity.activityType.key, assignmentMetadata.requireSafeExamBrowser) : {},
+      readSubmissionStagePolicies(assignmentMetadata.submissionStages)
+    );
+    assignmentMetadata.submissionStages = mergeSubmissionStagePolicies(
+      legacyGeneralStagePolicies(activity.activityType.key, courseAssignmentRule?.timeLimitMinutes),
+      legacyStageSafeExamBrowserPolicies(activity.activityType.key, courseAssignmentRule?.requireSafeExamBrowser ?? false),
+      courseAssignmentRule?.submissionStages, overrides
+    ) as Prisma.JsonValue;
+    assignmentMetadata.submissionStageOverrides = overrides as Prisma.JsonValue;
+  }
   if (
     !Object.prototype.hasOwnProperty.call(assignmentMetadata, "timeLimitMinutes") &&
     courseAssignmentRule &&
@@ -1384,6 +1406,7 @@ export async function updateGroupActivityAssignment(
   const effectiveMetadata = data.metadata !== undefined ? data.metadata : asMetadataRecord(assignment.metadata);
   assertActivitySupportsAssessmentMode(assignment.activity, effectiveMetadata.assessmentMode);
   assertSafeExamBrowserIsSummative(effectiveMetadata.assessmentMode, effectiveMetadata.requireSafeExamBrowser);
+  assertActivitySafeExamBrowserSupported(assignment.activity?.activityType?.key ?? "", effectiveMetadata.requireSafeExamBrowser);
   assertGradeChallengesAreSummative(effectiveMetadata.assessmentMode, effectiveMetadata.gradeChallengesEnabled);
   if (isCourseWideGroupAssignment(assignment.metadata) && !isAllowedCourseWideGroupAssignmentUpdate(data, assignment.metadata)) {
     throw new AppError(400, "COURSE_WIDE_GROUP_ACTIVITY_LOCKED", "This activity is assigned to all groups from the course.");
@@ -1986,7 +2009,9 @@ export function assignmentRequiresSafeExamBrowser(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
-  return (value as Record<string, unknown>).requireSafeExamBrowser === true;
+  const metadata = value as Record<string, unknown>;
+  const stages = metadata.submissionStages && typeof metadata.submissionStages === "object" && !Array.isArray(metadata.submissionStages) ? metadata.submissionStages as Record<string, unknown> : {};
+  return metadata.requireSafeExamBrowser === true || metadata.assessmentMode === "summative" && Object.values(stages).some(stage => stage && typeof stage === "object" && (stage as Record<string, unknown>).requireSafeExamBrowser === true);
 }
 
 function isCourseWideGroupAssignment(value: Prisma.JsonValue | undefined) {

@@ -13,7 +13,7 @@ registerActivityPlugin({
     description: "Generic test fixture for assignment capability checks.",
     studentView: { mode: "interactive", execution: "plugin" },
     grading: { supportsCompositeExecution: true, supportsAiFeedback: true }
-  }]
+  }, { key: "no-seb-fixture", name: "No SEB fixture", description: "Activity contract without SEB support", studentView: { mode: "read_only" }, supportsSafeExamBrowser: false }]
 });
 
 const bcryptMocks = vi.hoisted(() => ({ compare: vi.fn(), hash: vi.fn() }));
@@ -840,6 +840,15 @@ describe("group services", () => {
     ).rejects.toMatchObject({ status: 400, code: "SAFE_EXAM_BROWSER_SUMMATIVE_ONLY" });
 
     expect(tx.courseGroupActivity.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects course-wide and section SEB requirements when the activity opts out", async () => {
+    mockPrisma.activity.findFirst.mockResolvedValue({ id: "activity-1", courseId: "course-1", activityType: { key: "no-seb-fixture" } });
+    mockPrisma.courseGroup.findFirst.mockResolvedValue({ id: "group-1", courseId: "course-1" });
+    await expect(assignActivityToAllCourseGroups(teacherUser, "course-1", "activity-1", { assessmentMode: "summative", requireSafeExamBrowser: true })).rejects.toMatchObject({ code: "SAFE_EXAM_BROWSER_UNSUPPORTED" });
+    await expect(assignActivityToGroup(teacherUser, "course-1", "group-1", { activityId: "activity-1", metadata: { assessmentMode: "summative", requireSafeExamBrowser: true } })).rejects.toMatchObject({ code: "SAFE_EXAM_BROWSER_UNSUPPORTED" });
+    expect(tx.courseGroupActivity.upsert).not.toHaveBeenCalled();
+    expect(mockPrisma.courseGroupActivity.create).not.toHaveBeenCalled();
   });
 
   it("rejects enabling grade challenges for a formative course-wide assignment", async () => {

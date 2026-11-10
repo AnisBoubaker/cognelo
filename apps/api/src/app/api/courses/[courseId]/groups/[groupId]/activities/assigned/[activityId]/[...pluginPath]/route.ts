@@ -29,7 +29,8 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
   const deferred = getActivityDefinition(activity.activityType.key)?.assessmentFlow === "deferred";
   const preparation = deferred && route.learnerAccessPhase === "preparation";
   const startingAssessment = deferred && route.learnerAccessPhase === "assessment_start";
-  const access = await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, { receiptOnly: true, preparation });
+  const security = { receiptOnly: true, preparation, ...(route.submissionStageId !== undefined ? { submissionStageId: route.submissionStageId } : {}) };
+  const access = await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, security);
 
   const handler = route.methods[request.method as keyof typeof route.methods];
   if (!handler) {
@@ -86,6 +87,7 @@ async function dispatchPluginRoute(request: NextRequest, params: Awaited<Params[
     request, context,
     readJson: async () => {
       const body = await readBoundedJson(request, MAX_UPLOAD_JSON_BYTES);
+      if (route.submissionStageId !== undefined) await requireSafeExamBrowserAccess(request, user, courseId, groupId, activityId, security);
       // A request can straddle the deadline while uploading. Recheck after the
       // body is read and replace late input, rather than trusting arrival time.
       const timing = preparation || startingAssessment ? undefined : await assertTimedActivityWriteAllowed(user, courseId, groupId, activityId, {

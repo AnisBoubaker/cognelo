@@ -1,4 +1,4 @@
-import { assignmentTimeLimitException } from "./activity-assignment-policy";
+import { assignmentTimeLimitException, assignmentSafeExamBrowserException } from "./activity-assignment-policy";
 import { randomUUID } from "node:crypto";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { getActivitySubmissionStagesHandler, type PluginTeamworkTransaction } from "@cognelo/activity-sdk/server";
@@ -6,6 +6,17 @@ import { SubmissionStagePoliciesSchema, defaultSubmissionStagePolicy, mergeSubmi
 import { AppError } from "./errors";
 const record = (v: unknown): Record<string, unknown> => v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
 export function readSubmissionStagePolicies(value: unknown): SubmissionStagePolicies { return SubmissionStagePoliciesSchema.parse(value ?? {}); }
+export function assertActivitySafeExamBrowserSupported(typeKey: string, required: unknown) {
+  const definition = getActivityDefinition(typeKey);
+  if (required === true && (definition?.supportsSafeExamBrowser === false || definition?.submissionStages?.find(stage => stage.assessment)?.supportsSafeExamBrowser === false)) throw new AppError(400, "SAFE_EXAM_BROWSER_UNSUPPORTED", "This activity does not support requiring Safe Exam Browser.");
+}
+/** Ignore incompatible historic flags when presenting current contract capabilities. */
+export function compatibleStageSecurityPolicies(typeKey: string, policies: SubmissionStagePolicies): SubmissionStagePolicies {
+  const definition = getActivityDefinition(typeKey);
+  return Object.fromEntries(Object.entries(policies).map(([id, policy]) => [id,
+    definition?.supportsSafeExamBrowser === false || definition?.submissionStages?.find(stage => stage.id === id)?.supportsSafeExamBrowser === false ? { ...policy, requireSafeExamBrowser: false } : policy
+  ]));
+}
 /** New placements start closed; older records without these keys retain legacy defaults. */
 export function initialSubmissionStageMetadata(typeKey: string, value: unknown) {
   const metadata = record(value), stages = getActivityDefinition(typeKey)?.submissionStages ?? [];
@@ -56,26 +67,37 @@ export function legacyGeneralStagePolicies(typeKey: string, minutes: unknown): S
   const stage = getActivityDefinition(typeKey)?.submissionStages?.find(stage => stage.assessment);
   return stage ? { [stage.id]: { timeLimitMinutes: typeof minutes === "number" && Number.isInteger(minutes) && minutes > 0 && minutes <= 1440 ? minutes : null } } : {};
 }
+/** The old activity-wide SEB setting protected only the answering phase of deferred work. */
+export function legacyStageSafeExamBrowserPolicies(typeKey: string, required: unknown): SubmissionStagePolicies {
+  const stage = getActivityDefinition(typeKey)?.submissionStages?.find(stage => stage.assessment);
+  return stage && typeof required === "boolean" ? { [stage.id]: { requireSafeExamBrowser: required } } : {};
+}
 export function legacySectionStageOverrides(typeKey: string, value: unknown, fields?: readonly string[]): SubmissionStagePolicies {
   const metadata = record(value);
-  if (Object.prototype.hasOwnProperty.call(metadata, "submissionStageOverrides")) return readSubmissionStagePolicies(metadata.submissionStageOverrides);
   const assessment = getActivityDefinition(typeKey)?.submissionStages?.find(stage => stage.assessment);
-  if (assessment && record(record(metadata.submissionStages)[assessment.id]).timeLimitMinutes === null) return { [assessment.id]: { timeLimitMinutes: null } };
   const overrides = fields ?? (Array.isArray(metadata.overrideFields) ? metadata.overrideFields as string[] : undefined);
-  return (overrides ? overrides.includes("timeLimit") : Object.prototype.hasOwnProperty.call(metadata, "timeLimitMinutes")) ? legacyGeneralStagePolicies(typeKey, metadata.timeLimitMinutes) : {};
+  const canonical = Object.prototype.hasOwnProperty.call(metadata, "submissionStageOverrides");
+  const timing = canonical ? readSubmissionStagePolicies(metadata.submissionStageOverrides)
+    : assessment && record(record(metadata.submissionStages)[assessment.id]).timeLimitMinutes === null ? { [assessment.id]: { timeLimitMinutes: null } }
+    : (overrides ? overrides.includes("timeLimit") : Object.prototype.hasOwnProperty.call(metadata, "timeLimitMinutes")) ? legacyGeneralStagePolicies(typeKey, metadata.timeLimitMinutes) : {};
+  const securityOverrides = Array.isArray(metadata.overrideFields) ? metadata.overrideFields as string[] : fields?.length ? fields : undefined;
+  const hasCanonicalSecurity = assessment && typeof record(record(metadata.submissionStages)[assessment.id]).requireSafeExamBrowser === "boolean";
+  const legacySeb = (securityOverrides ? securityOverrides.includes("requireSafeExamBrowser") : !hasCanonicalSecurity && typeof metadata.requireSafeExamBrowser === "boolean") ? legacyStageSafeExamBrowserPolicies(typeKey, metadata.requireSafeExamBrowser) : {};
+  return mergeSubmissionStagePolicies(legacySeb, timing);
 }
 export async function getActivitySubmissionStageConfiguration(activity: { id: string; activityType: { key: string } }) {
   const declared = getActivityDefinition(activity.activityType?.key ?? "")?.submissionStages ?? [];
   if (!declared.length) return { stages: [], defaults: {} as SubmissionStagePolicies };
   const configuration = await getActivitySubmissionStagesHandler(activity.activityType.key)?.configuration({ activityId: activity.id });
   const active = configuration?.activeStageIds;
-  return { stages: declared.map(stage => ({ ...stage, active: !active || active.includes(stage.id) })), defaults: readSubmissionStagePolicies(configuration?.defaults) };
+  return { stages: declared.map(stage => ({ ...stage, ...(getActivityDefinition(activity.activityType.key)?.supportsSafeExamBrowser === false ? { supportsSafeExamBrowser: false } : {}), active: !active || active.includes(stage.id) })), defaults: readSubmissionStagePolicies(configuration?.defaults) };
 }
 export function validateSubmissionStagePolicies(typeKey: string, policies: SubmissionStagePolicies | undefined, availableFrom?: string | null, activeStageIds?: readonly string[]) {
   const stages = getActivityDefinition(typeKey)?.submissionStages ?? [];
   for (const [id, value] of Object.entries(policies ?? {})) {
     const stage = stages.find(stage => stage.id === id);
     if (!stage) throw new AppError(400, "SUBMISSION_STAGE_UNKNOWN", "Choose a declared submission stage.");
+    if (value.requireSafeExamBrowser === true && (getActivityDefinition(typeKey)?.supportsSafeExamBrowser === false || stage.supportsSafeExamBrowser === false)) throw new AppError(400, "SUBMISSION_STAGE_SEB_UNSUPPORTED", "This stage does not support requiring Safe Exam Browser.");
     if ((value.allowLate === true || value.lateLimitMinutes != null) && !stage.allowsLateSubmissions) throw new AppError(400, "SUBMISSION_STAGE_LATE_UNSUPPORTED", "This stage does not accept late submissions.");
     if ((!activeStageIds || activeStageIds.includes(id)) && availableFrom && value.deadline && Date.parse(value.deadline) < Date.parse(availableFrom)) throw new AppError(400, "SUBMISSION_STAGE_BEFORE_OPENING", "A stage deadline cannot precede the activity opening.");
   }
@@ -87,11 +109,26 @@ export async function resolveActivitySubmissionStage(activity: { id: string; act
   const general = record(record(activity.metadata).allGroupsAssignment);
   const legacyFields = !Array.isArray(metadata.overrideFields) && (metadata.timeLimitMinutes ?? null) === (general.timeLimitMinutes ?? null) ? [] : undefined;
   const legacyException = Object.prototype.hasOwnProperty.call(metadata, assignmentTimeLimitException) ? legacyGeneralStagePolicies(activity.activityType.key, Reflect.get(metadata, assignmentTimeLimitException)) : {};
-  const policies = mergeSubmissionStagePolicies(configuration.defaults, legacyGeneralStagePolicies(activity.activityType.key, general.timeLimitMinutes), readSubmissionStagePolicies(general.submissionStages), readSubmissionStagePolicies(metadata.submissionStages), legacySectionStageOverrides(activity.activityType.key, metadata, legacyFields), legacyException, readSubmissionStagePolicies(metadata.submissionStageExceptionOverrides));
+  const exceptionSecurity = Reflect.get(metadata, assignmentSafeExamBrowserException);
+  const legacySebException = Array.isArray(exceptionSecurity) ? {} : legacyStageSafeExamBrowserPolicies(activity.activityType.key, exceptionSecurity);
+  const orderedSecurity = Array.isArray(exceptionSecurity) ? mergeSubmissionStagePolicies(...exceptionSecurity.map(value => mergeSubmissionStagePolicies(legacyStageSafeExamBrowserPolicies(activity.activityType.key, value.requireSafeExamBrowser), value.submissionStages))) : {};
+  const policies = mergeSubmissionStagePolicies(configuration.defaults, legacyGeneralStagePolicies(activity.activityType.key, general.timeLimitMinutes), legacyStageSafeExamBrowserPolicies(activity.activityType.key, metadata.requireSafeExamBrowser ?? general.requireSafeExamBrowser), readSubmissionStagePolicies(general.submissionStages), readSubmissionStagePolicies(metadata.submissionStages), legacySectionStageOverrides(activity.activityType.key, metadata, legacyFields), legacyException, legacySebException, readSubmissionStagePolicies(metadata.submissionStageExceptionOverrides), orderedSecurity);
   const policy: SubmissionStagePolicy = { ...defaultSubmissionStagePolicy, ...policies[stageId] };
+  if (stage.supportsSafeExamBrowser === false) policy.requireSafeExamBrowser = false;
   // Existing general time limits remain the legacy default for the answering stage.
   if (stage.assessment && !Object.prototype.hasOwnProperty.call(policies[stageId] ?? {}, "timeLimitMinutes")) policy.timeLimitMinutes = typeof metadata.timeLimitMinutes === "number" ? metadata.timeLimitMinutes : null;
   return { stage, policy, availableUntil: assignment.availableUntil ?? null, window: submissionStageWindow(policy, assignment.availableUntil ?? null) };
+}
+export async function activitySubmissionStageSafeExamBrowser(activity: { id: string; activityType: { key: string }; metadata?: unknown }, assignment: { metadata: unknown; availableUntil?: Date | string | null }) {
+  const definition = getActivityDefinition(activity.activityType.key), stages = definition?.submissionStages ?? [];
+  if (!stages.length) return null;
+  const summative = record(assignment.metadata).assessmentMode === "summative";
+  const requirements = Object.fromEntries(await Promise.all(stages.map(async stage => {
+    const resolved = await resolveActivitySubmissionStage(activity, assignment, stage.id);
+    return [stage.id, summative && resolved.stage.active && resolved.policy.requireSafeExamBrowser === true];
+  })));
+  const assessment = stages.find(stage => stage.assessment);
+  return { requirements, assessmentRequired: assessment ? requirements[assessment.id] : Object.values(requirements).some(Boolean) };
 }
 export async function assertActivitySubmissionStageEnabled(activity: { id: string; activityType: { key: string }; metadata?: unknown }, assignment: { metadata: unknown; availableUntil?: Date | string | null }, stageId: string) {
   const resolved = await resolveActivitySubmissionStage(activity, assignment, stageId);

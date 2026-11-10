@@ -116,9 +116,11 @@ export type ActivityProvider =
 
 export type ActivityCreationScope = "bank" | "course";
 
-export type SubmissionStageDefinition = { id: string; names: Record<PluginLocale, string>; assessment?: boolean; allowsLateSubmissions?: boolean };
+export type SubmissionStageDefinition = { id: string; names: Record<PluginLocale, string>; assessment?: boolean; allowsLateSubmissions?: boolean; supportsSafeExamBrowser?: boolean };
 
 export type ActivityDefinition = {
+  /** False prevents SEB requirements for this activity and all of its stages. Defaults to true. */
+  supportsSafeExamBrowser?: boolean;
   /** Extra gradebook actions declared by this activity and implemented by its server service. */
   gradebookActions?: readonly GradebookActionDefinition[];
   /** Ordered stages, including the first; core owns their scheduling. */

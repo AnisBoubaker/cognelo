@@ -413,6 +413,7 @@ export const codingHomeworkChallengeGenerationRoute: PluginRouteDefinition = {
 export const codingHomeworkChallengeAnswersRoute: PluginRouteDefinition = {
   path: "coding-homework-grader/challenge-answers",
   activityTypeKeys: ["coding-homework-grader"],
+  submissionStageId: "questions",
   allowExpiredTimedAttemptMethods: ["POST"],
   expiredAttemptInput: async (context) => {
     const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({ where: {

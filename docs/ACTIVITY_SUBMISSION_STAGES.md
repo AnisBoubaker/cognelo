@@ -2,6 +2,22 @@
 
 Status: implemented and validated, November 10, 2026.
 
+## Safe Exam Browser per stage
+
+Summative staged activities configure **Require Safe Exam Browser** independently inside each stage, with General → section → prioritized team → student inheritance and explicit false overrides. The activity-wide SEB control remains for ordinary activities. Activity and stage definitions may set `supportsSafeExamBrowser: false`; core omits unsupported controls, rejects attempts to enable them at any assignment level and ignores incompatible historic flags at access time. Omission preserves compatibility with existing SEB-capable activities. Disabled workflow stages retain their security settings without imposing access restrictions. Stage activation and SEB are independent: preparation before activation still requires SEB when that preparation stage is protected.
+
+The optional `SubmissionStagePolicy.requireSafeExamBrowser` boolean is stored in the existing stage metadata maps. Older activity/section/team/student SEB settings continue protecting only the assessment stage; homework file preparation remains unrestricted. Reading or saving settings materializes compatible defaults and existing overrides, without rewriting submissions, starting attempts or requiring a database migration. New section assignments inherit General stage security unless explicitly overridden.
+
+Mixed legacy and stage-specific SEB exceptions preserve the full team-priority/student order. Request-local, non-enumerable provenance reconciles those formats; never persist it or expose exception targets to learners. Explicit stage settings on one exception win over that same exception's legacy flag.
+
+Plugins declare `submissionStageId` on routes owned by a stage. Core checks that declared stage's current SEB policy even when the route is marked `learnerAccessPhase: "preparation"`, and repeats the check after reading upload bodies. Unknown stages fail closed. Untagged guarded routes use the assessment stage; deferred resource/receipt routes may retain the explicit preparation exemption. Plugins never inspect SEB tokens, cookies, browser strings or configuration proofs. `SubmissionStageAccessGate` displays a protected-stage state and delegates launch to the host.
+
+Programming Homework tags preparation/read-draft/hand-in as `files` and answering/answer saving as `questions`. Its file stage declares `supportsSafeExamBrowser: false` so students can upload local files in their regular browser. Only Questions answering offers an SEB setting. Assignment documents, provided-file downloads and read-only frozen work/downloads/checks remain accessible outside SEB. File-only homework requires no SEB. Other activities may protect supported stages or disallow SEB entirely. Background question generation and automatic saved-work recovery remain server-owned and start no SEB session or answer clock.
+
+SEB authorization remains scoped to the user/course/section/activity configuration, which supplies the same restrictions for all stages. A verified session therefore satisfies either protected stage without another launch. Requiring SEB in one stage does not gate an unprotected stage. Existing ordinary activity restrictions, content closure, staff bypass and attempt timing remain in force.
+
+Validation includes the generic stage security matrix, activity/stage opt-outs, legacy defaults and inherited exceptions, scoped proof reuse and ordinary guards. Local browser coverage checks homework answering with/without SEB, unsupported file-stage rejection, General/section/student controls, old configurations, file-only individual/team work, the 30-student FIFO queue, ordinary launch behavior, activation and scheduling. This follow-up adds no migration or environment setting.
+
 ## Stage activation follow-up
 
 Implementation and regression validation are complete. Core Activity settings owns a separate activation switch for every declared submission stage, with the ordinary General/section/team/student inheritance. A plugin's workflow option (such as Generate challenge questions) determines which stages apply; activation independently controls when students may begin them. Teachers can configure an inactive stage in advance. Student stage actions stay visible but disabled with an Awaiting teacher activation status.

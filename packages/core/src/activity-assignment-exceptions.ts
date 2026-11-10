@@ -1,4 +1,4 @@
-import { assignmentTimeLimitException } from "./activity-assignment-policy";
+import { assignmentTimeLimitException, assignmentSafeExamBrowserException } from "./activity-assignment-policy";
 import { mergeSubmissionStagePolicies, type SubmissionStagePolicies, ActivityAssignmentOverrideValuesSchema, type ActivityAssignmentExceptionInput, type GradebookItemSettingsInput } from "@cognelo/contracts";
 import { prisma, type Prisma } from "@cognelo/db";
 import { AppError } from "./errors";
@@ -25,11 +25,14 @@ const gradeFields = {
 // Priority zero is highest. Merge lower-priority teams first, then the student's own exception.
 export function resolveAssignmentExceptions(rows: readonly ExceptionRow[]): AssignmentExceptionOverrides {
   const result: AssignmentExceptionOverrides = {};
+  const securityOrder: Array<{ requireSafeExamBrowser?: boolean; submissionStages: SubmissionStagePolicies }> = [];
   const ordered = [...rows].sort((a, b) => Number(Boolean(a.participantId)) - Number(Boolean(b.participantId)) || b.priority - a.priority);
   for (const row of ordered) {
     const parsed = ActivityAssignmentOverrideValuesSchema.safeParse(row.settings);
     if (!parsed.success) throw new AppError(500, "ASSIGNMENT_EXCEPTION_INVALID", "The saved activity exception is invalid.");
     const value = parsed.data;
+    const securityStages = Object.fromEntries(Object.entries(value.submissionStages ?? {}).filter(([, policy]) => policy.requireSafeExamBrowser !== undefined).map(([id, policy]) => [id, { requireSafeExamBrowser: policy.requireSafeExamBrowser }]));
+    if (value.overrideFields.includes("requireSafeExamBrowser") || Object.keys(securityStages).length) securityOrder.push({ ...(value.overrideFields.includes("requireSafeExamBrowser") ? { requireSafeExamBrowser: value.requireSafeExamBrowser === true } : {}), submissionStages: securityStages });
     if (value.submissionStages) result.submissionStages = mergeSubmissionStagePolicies(result.submissionStages, value.submissionStages);
     for (const field of value.overrideFields) {
       if (field === "availableFrom" || field === "availableUntil") result[field] = value[field] ?? null;
@@ -43,6 +46,7 @@ export function resolveAssignmentExceptions(rows: readonly ExceptionRow[]): Assi
       }
     }
   }
+  if (securityOrder.length) Object.defineProperty(result, assignmentSafeExamBrowserException, { value: securityOrder, enumerable: false });
   return result;
 }
 
@@ -87,6 +91,8 @@ export function applyAssignmentExceptions<T extends { metadata: Prisma.JsonValue
     }
   };
   if (overrides.timeLimitMinutes !== undefined) Object.defineProperty(result.metadata, assignmentTimeLimitException, { value: overrides.timeLimitMinutes, enumerable: false });
+  const securityOrder = Reflect.get(overrides, assignmentSafeExamBrowserException);
+  if (metadata.assessmentMode === "summative" && (securityOrder || overrides.requireSafeExamBrowser !== undefined)) Object.defineProperty(result.metadata, assignmentSafeExamBrowserException, { value: securityOrder ?? overrides.requireSafeExamBrowser, enumerable: false });
   return result;
 }
 

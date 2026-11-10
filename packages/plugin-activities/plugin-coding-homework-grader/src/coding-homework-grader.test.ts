@@ -8,6 +8,7 @@ describe("coding homework grader plugin manifest", () => {
     expect(codingHomeworkGraderPlugin.key).toBe("coding-homework-grader");
     expect(codingHomeworkGraderPlugin.activities[0]?.key).toBe("coding-homework-grader");
     expect(codingHomeworkGraderPlugin.activities[0]?.name).toBe("Programming Homework");
+    expect(codingHomeworkGraderPlugin.activities[0]?.submissionStages?.find(stage => stage.id === "files")?.supportsSafeExamBrowser).toBe(false);
     expect(codingHomeworkGraderServerPlugin.routes?.map((route) => route.path)).toEqual([
       "coding-homework-grader/simulation",
       "coding-homework-grader/workflow-settings",

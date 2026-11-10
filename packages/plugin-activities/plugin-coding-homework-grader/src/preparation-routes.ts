@@ -4,7 +4,7 @@ import { getHomeworkTeacherSolution, saveHomeworkTeacherSolution, removeHomework
 import { resolveOwner, resolveStudentSubmissionScope } from "./routes";
 
 export const homeworkPreparationRoute: PluginRouteDefinition = {
-  path: "coding-homework-grader/preparation", activityTypeKeys: ["coding-homework-grader"], learnerAccessPhase: "preparation",
+  path: "coding-homework-grader/preparation", activityTypeKeys: ["coding-homework-grader"], learnerAccessPhase: "preparation", submissionStageId: "files",
   methods: {
     GET: ({ context }) => getHomeworkPreparation(resolveStudentSubmissionScope(context)),
     POST: async ({ context, readJson }) => uploadHomeworkPreparation(resolveStudentSubmissionScope(context), await readJson()),
@@ -12,7 +12,7 @@ export const homeworkPreparationRoute: PluginRouteDefinition = {
   }
 };
 export const homeworkPreparedFileRoute: PluginRouteDefinition = {
-  path: "coding-homework-grader/prepared-file", activityTypeKeys: ["coding-homework-grader"], learnerAccessPhase: "preparation",
+  path: "coding-homework-grader/prepared-file", activityTypeKeys: ["coding-homework-grader"], learnerAccessPhase: "preparation", submissionStageId: "files",
   methods: { GET: ({ context, request }) => getHomeworkPreparedFile(resolveStudentSubmissionScope(context), new URL(request.url).searchParams.get("path") ?? "") }
 };
 export const homeworkTeacherSolutionRoute: PluginRouteDefinition = {

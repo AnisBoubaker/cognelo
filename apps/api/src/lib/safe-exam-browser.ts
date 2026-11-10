@@ -143,7 +143,7 @@ export async function requireSafeExamBrowserAccess(
   courseId: string,
   groupId: string,
   activityId: string,
-  options: { allowFinalization?: boolean; receiptOnly?: boolean; preparation?: boolean } = {}
+  options: { allowFinalization?: boolean; receiptOnly?: boolean; preparation?: boolean; submissionStageId?: string } = {}
 ) {
   void request;
   const access: Awaited<ReturnType<typeof getGroupAssignedActivityAccess>> & { contentClosed?: boolean } = await getGroupAssignedActivityAccess(user, courseId, groupId, activityId);
@@ -151,12 +151,19 @@ export async function requireSafeExamBrowserAccess(
     const content = await assertActivityContentAccess(user, courseId, groupId, activityId, options);
     if (content.locked) access.contentClosed = true;
   }
-  if (!access.requiresSafeExamBrowser || access.canBypass || (options.preparation && access.preparationAllowed)) return access;
+  let required = access.requiresSafeExamBrowser;
+  if (options.submissionStageId !== undefined) {
+    if (!access.stageSafeExamBrowser || !Object.prototype.hasOwnProperty.call(access.stageSafeExamBrowser, options.submissionStageId)) throw new AppError(400, "SUBMISSION_STAGE_UNKNOWN", "The submission stage is unavailable.");
+    required = access.stageSafeExamBrowser[options.submissionStageId];
+  } else if (options.preparation && access.preparationAllowed) required = false;
+  else if (access.assessmentRequiresSafeExamBrowser !== undefined) required = access.assessmentRequiresSafeExamBrowser;
+  if (!required || access.canBypass) return access;
   if (await hasSafeExamBrowserAccess(user, { courseId, groupId, activityId })) return access;
   throw new AppError(
     403,
     "SAFE_EXAM_BROWSER_REQUIRED",
-    "This summative activity must be opened in Safe Exam Browser."
+    access.stageSafeExamBrowser ? "This stage must be opened in Safe Exam Browser." : "This summative activity must be opened in Safe Exam Browser.",
+    options.submissionStageId ? { submissionStageId: options.submissionStageId } : undefined
   );
 }
 

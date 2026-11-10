@@ -53,6 +53,8 @@ export type CoursePluginRouteAuthorization = "manage_course" | "view_gradebook";
 export type PluginRouteDefinition = {
   /** Only honored for definitions opting into deferred assessment. Default routes remain guarded. */
   learnerAccessPhase?: "preparation" | "assessment_start";
+  /** Declared stage owning this route. Its SEB policy applies even to preparation routes. */
+  submissionStageId?: string;
   path: string;
   activityTypeKeys?: readonly string[];
   courseAuthorization?: Partial<Record<PluginRouteMethod, CoursePluginRouteAuthorization>>;
