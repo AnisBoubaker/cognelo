@@ -1,5 +1,7 @@
 import { z } from "zod";
 export * from "./categories";
+export type { GradebookActionDefinition } from "./gradebook-actions";
+import type { GradebookActionDefinition } from "./gradebook-actions";
 import type { ActivityCategoryAssignment } from "./categories";
 
 export type PluginLocale = "en" | "fr" | "zh" | "ar";
@@ -117,6 +119,8 @@ export type ActivityCreationScope = "bank" | "course";
 export type SubmissionStageDefinition = { id: string; names: Record<PluginLocale, string>; assessment?: boolean; allowsLateSubmissions?: boolean };
 
 export type ActivityDefinition = {
+  /** Extra gradebook actions declared by this activity and implemented by its server service. */
+  gradebookActions?: readonly GradebookActionDefinition[];
   /** Ordered stages, including the first; core owns their scheduling. */
   submissionStages?: readonly SubmissionStageDefinition[];
   /** Core owns reference selection, preparation and UI for this activity. */
@@ -236,7 +240,11 @@ const definitions = new Map<string, RegisteredActivityDefinition>();
 for (const definition of coreDefinitions) {
   registerActivityDefinition(definition, { kind: "core", key: definition.key });
 }
-function validateSubmissionStages(definition: ActivityDefinition) {
+function validateActivityCapabilities(definition: ActivityDefinition) {
+  const actions = definition.gradebookActions;
+  if (actions && (actions.length > 20 || new Set(actions.map(action => action.id)).size !== actions.length || actions.some(action =>
+    !/^[a-z][a-z0-9-]{0,63}$/.test(action.id) || action.kind !== "download" || !["participant", "activity"].includes(action.scope)
+    || (["en", "fr", "zh", "ar"] as const).some(locale => !action.labels[locale]?.trim())))) throw new Error(`Invalid gradebook actions: ${definition.key}`);
   const stages = definition.submissionStages;
   if (!stages) return;
   if (!stages.length || stages.length > 20 || new Set(stages.map(stage => stage.id)).size !== stages.length || stages.filter(stage => stage.assessment).length > 1
@@ -245,7 +253,7 @@ function validateSubmissionStages(definition: ActivityDefinition) {
   }
 }
 function registerActivityDefinition(definition: ActivityDefinition, provider: ActivityProvider) {
-  validateSubmissionStages(definition);
+  validateActivityCapabilities(definition);
   if (definitions.has(definition.key)) {
     throw new Error(`Activity type already registered: ${definition.key}`);
   }
@@ -269,7 +277,7 @@ export function registerActivityPlugin(plugin: ActivityPlugin) {
   }
 
   for (const definition of plugin.activities) {
-    validateSubmissionStages(definition);
+    validateActivityCapabilities(definition);
     if (!definition.studentView) {
       throw new Error(`Activity type must declare Student view support: ${definition.key}`);
     }

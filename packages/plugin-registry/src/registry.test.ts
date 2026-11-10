@@ -16,7 +16,8 @@ import {
   resolvePluginGradingHandler,
   resolvePluginHostCapability,
   resolveStudentPreviewExecutionHandler,
-  validateStudentPreviewServerContracts
+  validateStudentPreviewServerContracts,
+  validateGradebookActionServerContracts
 } from "@cognelo/activity-sdk/server";
 import {
   listContentTypeDefinitions,
@@ -66,6 +67,7 @@ describe("installed plugin composition", () => {
       testItemActivityTypeKeys: ["coding-exercise", "mcq", "parsons-problem", "web-design-coding-exercise"]
     })).not.toThrow();
     expect(() => validateStudentPreviewServerContracts(definitions, listServerActivityPlugins())).not.toThrow();
+    expect(() => validateGradebookActionServerContracts(definitions, listServerActivityPlugins())).not.toThrow();
   });
 
   it("exposes plugin capabilities through neutral SDK contracts", () => {

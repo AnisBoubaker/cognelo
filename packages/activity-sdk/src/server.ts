@@ -1,3 +1,5 @@
+import type { GradebookActionService } from "./gradebook-actions";
+export * from "./gradebook-actions";
 import type { SubmissionExportHandler } from "./submission-export";
 export * from "./submission-export";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -407,6 +409,7 @@ export type ServerActivityPlugin = {
     }) => Promise<{ withdrawAttemptIds?: string[] }>;
   };
   /** Read-only projection of a host-authorized submitted attempt. */
+  gradebookActions?: GradebookActionService;
   submissionExport?: { activityTypeKeys: readonly string[]; getContent: SubmissionExportHandler };
   studentSolution?: {
     activityTypeKeys: readonly string[];
@@ -873,4 +876,21 @@ export function resolveActivityTimedFinalization(activityTypeKey: string) {
 
 export function getActivitySubmissionStagesHandler(activityTypeKey: string) {
   return currentServerPlugins().find(plugin => plugin.submissionStages?.activityTypeKeys.includes(activityTypeKey))?.submissionStages ?? null;
+}
+
+export function getGradebookActionService(activityTypeKey: string) {
+  return currentServerPlugins().find(plugin => plugin.gradebookActions?.activityTypeKeys.includes(activityTypeKey))?.gradebookActions ?? null;
+}
+
+/** Complete graph validation; run after composition, not during partial development hot reload. */
+export function validateGradebookActionServerContracts(definitions: readonly Pick<ActivityDefinition, "key" | "gradebookActions">[], plugins: readonly ServerActivityPlugin[]) {
+  for (const definition of definitions) {
+    const services = plugins.flatMap(plugin => plugin.gradebookActions?.activityTypeKeys.includes(definition.key) ? [plugin.gradebookActions] : []);
+    if (definition.gradebookActions?.length && (services.length !== 1 || typeof services[0]?.availability !== "function" || typeof services[0]?.execute !== "function")) throw new Error(`Gradebook actions require one server service: ${definition.key}`);
+    if (!definition.gradebookActions?.length && services.length) throw new Error(`Gradebook action service has no declared actions: ${definition.key}`);
+  }
+  for (const plugin of plugins) if (plugin.gradebookActions) {
+    const keys = plugin.gradebookActions.activityTypeKeys;
+    if (!keys.length || new Set(keys).size !== keys.length || keys.some(key => !definitions.some(definition => definition.key === key))) throw new Error(`Invalid gradebook action activity types: ${plugin.key}`);
+  }
 }

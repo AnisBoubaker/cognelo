@@ -7,6 +7,7 @@ export async function register() {
     if (process.env.NODE_ENV !== "development") {
       const serverActivitySdk = await import("@cognelo/activity-sdk/server");
       const activitySdk = await import("@cognelo/activity-sdk");
+      serverActivitySdk.validateGradebookActionServerContracts(activitySdk.listActivityDefinitions(), serverActivitySdk.listServerActivityPlugins());
       serverActivitySdk.validateStudentPreviewServerContracts(
         activitySdk.listActivityDefinitions(),
         serverActivitySdk.listServerActivityPlugins()

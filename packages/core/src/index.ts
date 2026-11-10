@@ -1,3 +1,4 @@
+export * from "./gradebook-plugin-actions";
 export * from "./material-reference-search";
 export * from "./activity-material-references";
 export * from "./course-material-embedding-settings";
