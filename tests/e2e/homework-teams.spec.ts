@@ -1,3 +1,4 @@
+import { replayHomeworkClockBackfill } from "./fixtures/homework-stage-migration";
 import { access } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@cognelo/db";
@@ -41,11 +42,11 @@ for (const separate of [false, true]) test(`team homework: ${separate ? "individ
     const { settings } = await responseJson<{ settings: CourseActivityAssignmentSettings }>(await teacherApi.get(settingsPath));
     const assignmentData = { ...settings.general, assessmentMode: "summative", teamworkEnabled: true, groupAssignments: settings.groups.map(group => ({ ...group, teamGroupingId: grouping.id, allowIndividualSubmission: false })) };
     await responseJson(await teacherApi.post(settingsPath, { data: assignmentData }));
-    const activate = async (questions: boolean) => {
+    const activate = async (questions: boolean, files = true) => {
       const current = (await responseJson<{ settings: CourseActivityAssignmentSettings }>(await teacherApi.get(settingsPath))).settings;
-      await responseJson(await teacherApi.post(settingsPath, { data: { ...current.general, submissionStages: { ...current.general.submissionStages, files: { enabled: true }, questions: { enabled: questions } }, groupAssignments: current.groups, confirmActiveStudents: true } }));
+      await responseJson(await teacherApi.post(settingsPath, { data: { ...current.general, submissionStages: { ...current.general.submissionStages, files: { enabled: files }, questions: { enabled: questions } }, groupAssignments: current.groups, confirmActiveStudents: true } }));
     };
-    await activate(false);
+    await activate(false, false);
     const assigned = `/api/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}`;
     const endpoint = `${assigned}/coding-homework-grader`;
     const state = async (client = student) => responseJson<Workspace>(await client.get(`${endpoint}/workspace`));
@@ -63,6 +64,9 @@ for (const separate of [false, true]) test(`team homework: ${separate ? "individ
     await page.goto(assigned.replace(/^\/api/, ""));
     await expect(page.getByRole("tab", { name: /src\/main.c/ })).toBeVisible();
     await expect(page.getByText("Blue", { exact: false }).first()).toBeVisible();
+    expect((await replayHomeworkClockBackfill(activityId, true))[0].preparationStartedAt).toBeNull();
+    await activate(false);
+    expect((await replayHomeworkClockBackfill(activityId, true))[0].preparationStartedAt).toBeInstanceOf(Date);
     await responseJson(await student.post(`${endpoint}/hand-in`, { data: { contextKey: (await state()).teamwork.contextKey, expectedRevision: 2 } }));
     expect(["uploaded", "processing"]).toContain((await state()).submission?.status);
     expect(["uploaded", "processing"]).toContain((await state(clients[1])).submission?.status);

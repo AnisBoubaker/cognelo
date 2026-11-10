@@ -1,3 +1,4 @@
+import { replayHomeworkClockBackfill } from "./fixtures/homework-stage-migration";
 import { prisma } from "@cognelo/db";
 import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
 import { test, expect } from "./fixtures/bank-course";
@@ -23,7 +24,7 @@ test("core activates file hand-in independently, releases waiting questions and 
     expect(settings.general.submissionStages).toMatchObject({ files: { enabled: false }, questions: { enabled: false } });
     expect((await student.post(settingsPath, { data: { ...settings.general, submissionStages: { files: { enabled: true } }, groupAssignments: settings.groups } })).status()).toBe(403);
     // The direct section assignment does not choose the course's General assessment mode.
-    await responseJson(await teacherApi.post(settingsPath, { data: { ...settings.general, assessmentMode: "summative", groupAssignments: settings.groups } }));
+    await responseJson(await teacherApi.post(settingsPath, { data: { ...settings.general, assessmentMode: "summative", submissionStages: { ...settings.general.submissionStages, files: { enabled: false, timeLimitMinutes: 10 } }, groupAssignments: settings.groups } }));
     await page.goto(assigned.replace(/^\/api/, ""));
     await expect(page.getByRole("button", { name: "Submit my work", exact: true })).toBeDisabled();
     await expect(page.getByText("Awaiting teacher activation", { exact: true })).toBeVisible();
@@ -31,6 +32,7 @@ test("core activates file hand-in independently, releases waiting questions and 
     await page.getByRole("button", { name: "Check my submission", exact: true }).click();
     await expect(page.getByText("Structure is valid.", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Submit my work", exact: true })).toBeDisabled();
+    expect((await replayHomeworkClockBackfill(id))[0].preparationStartedAt).toBeNull();
     const prepared = await responseJson<{ draft: { revision: number } }>(await student.get(`${assigned}/coding-homework-grader/preparation`));
     expect((await student.post(`${assigned}/coding-homework-grader/hand-in`, { data: { expectedRevision: prepared.draft.revision } })).status()).toBe(409);
 
@@ -44,6 +46,7 @@ test("core activates file hand-in independently, releases waiting questions and 
     await teacher.goto(`/courses/${data.courseId}/gradebook/activities/${id}?settings=1`);
     await fileSwitch.check(); await dialog.getByRole("button", { name: "Save settings", exact: true }).click(); await expect(dialog).toBeHidden();
     await expect(page.getByRole("button", { name: "Submit my work", exact: true })).toBeEnabled({ timeout: 20_000 });
+    expect((await replayHomeworkClockBackfill(id))[0].preparationStartedAt).toBeInstanceOf(Date);
     await page.getByRole("button", { name: "Submit my work", exact: true }).click();
     await page.getByRole("dialog", { name: "Submit my work", exact: true }).getByRole("button", { name: "Submit my work", exact: true }).click();
     await expect(page.getByRole("button", { name: "Answer challenge questions", exact: true })).toBeDisabled();
