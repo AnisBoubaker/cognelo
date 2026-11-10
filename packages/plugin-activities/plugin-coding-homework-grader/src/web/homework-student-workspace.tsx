@@ -6,7 +6,7 @@ import { HomeworkFileViewer } from "./homework-file-viewer";
 import { HomeworkChallengeQuestion } from "./homework-challenge-question";
 import { HomeworkAnswerConfirmation } from "./homework-answer-confirmation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActionIcon, MarkdownRenderer, ProgressDialog, AppDateTime, useServerNow, useDialogs, useNotifications, isActivityContentClosedError } from "@cognelo/activity-ui";
+import { SubmissionStageWaiting, ActionIcon, MarkdownRenderer, ProgressDialog, AppDateTime, useServerNow, useDialogs, useNotifications, isActivityContentClosedError } from "@cognelo/activity-ui";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import type { CodingHomeworkLocale } from "./messages";
 import type { CodingHomeworkStudentAssignment, CodingHomeworkStudentChallengeQuestionRecord } from "./client";
@@ -125,6 +125,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   const policy = workspace?.submissionPolicy ?? defaultHomeworkSubmissionPolicy;
   const ordinaryWindow = homeworkSubmissionWindow(policy, clock);
   const submissionWindow = workspace?.submissionClosesAt !== undefined ? { ...ordinaryWindow, closesAt: workspace.submissionClosesAt, closed: workspace.submissionClosesAt !== null && clock >= Date.parse(workspace.submissionClosesAt) } : ordinaryWindow;
+  const awaitingQuestions = Boolean(active && active.questionGenerationEnabled !== false && !active.started && !completed && workspace?.questionsStageEnabled === false);
   const files = active?.files ?? preparation?.draft.files ?? [];
   const hasCurrentCheck = Boolean(preparation && checkedPreparation && preparation.draft.revision === checkedPreparation.draft.revision &&
     JSON.stringify(preparation.validation.issues) === JSON.stringify(checkedPreparation.validation.issues) &&
@@ -198,19 +199,20 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
         <p>{submissionWindow.closed ? workspace?.automaticSubmissionIssue ? deadlineCopy.autoFailed : deadlineCopy.autoNotice : deadlineCopy.submitReminder.replace("{submit}", copy.handIn)}</p>
       </div>}
       {hasCurrentCheck && preparation.readiness.canSubmit && preparation.readiness.requiresAcknowledgement && <label className="homework-choice"><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /> {copy.incomplete}</label>}
-      {!workspace?.submissionsEnabled && <p role="status">{copy.closed}</p>}
-      {canShowSubmit && <button type="button" disabled={!workspace.submissionsEnabled || submissionWindow.closed || Boolean(busy)} onClick={async () => {
+      {!workspace?.submissionsEnabled && <SubmissionStageWaiting locale={locale} />}
+      {(canShowSubmit || !workspace.submissionsEnabled) && <button type="button" disabled={!canShowSubmit || !workspace.submissionsEnabled || submissionWindow.closed || Boolean(busy)} onClick={async () => {
         if (await dialogs.confirm({ title: copy.handIn, message: workspace?.teamwork?.teamId ? copy.teamHandInDetail : copy.handInDetail, confirmLabel: copy.handIn })) await run(copy.handIn, async signal => { await request("hand-in", body("POST", { ...(workspace?.teamwork ? { contextKey: workspace.teamwork.contextKey } : {}), expectedRevision: preparation.draft.revision, acknowledgeIncomplete: acknowledged }, signal)); });
       }}><ActionIcon name="submit" /> {copy.handIn}</button>}
     </section>}
-    {active && !["challenge_ready", "ready_for_grading", "graded"].includes(active.status) && <div role="status" aria-live="polite" aria-atomic="true" className="preview-panel homework-generation-status">
+    {awaitingQuestions && <div className="preview-panel"><button type="button" disabled><ActionIcon name="open" /> {copy.answer}</button><SubmissionStageWaiting locale={locale} /></div>}
+    {active && !awaitingQuestions && !["challenge_ready", "ready_for_grading", "graded"].includes(active.status) && <div role="status" aria-live="polite" aria-atomic="true" className="preview-panel homework-generation-status">
       {active.processingStatus !== "failed" && <span className="homework-generation-spinner" aria-hidden="true" />}
       <div>
         <strong>{active.generationIssue === "no_eligible_code" ? copy.noEligibleCode : active.processingStatus === "failed" ? copy.generationFailed : active.processingStatus === "queued" ? copy.waitingGeneration : copy.generating}</strong>
         {active.processingStatus === "queued" && active.queuePosition !== null && <p>{copy.queuePosition.replace("{position}", String(active.queuePosition))}</p>}
       </div>
     </div>}
-    {active?.status === "challenge_ready" && !questions.length && <><p>{copy.answerHelp}</p><button type="button" onClick={() => void start()}><ActionIcon name="open" /> {copy.answer}</button></>}
+    {active?.status === "challenge_ready" && !questions.length && !awaitingQuestions && <><p>{copy.answerHelp}</p><button type="button" onClick={() => void start()}><ActionIcon name="open" /> {copy.answer}</button></>}
     {questions.length > 0 && <><h3>{copy.answers}</h3><p className="muted">{copy.autoSave}</p>
       <div className="homework-challenge-list">{questions.map((question, index) => <HomeworkChallengeQuestion key={question.id}
         question={question} number={index + 1} total={questions.length} locale={locale} value={answers[question.id] ?? ""}

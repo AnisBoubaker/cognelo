@@ -43,7 +43,9 @@ export async function handInTeamHomework(scope: HomeworkStudentScope, input: unk
       const [assignment] = await sql.query<Array<{ promptMarkdown: string; candidateLimit: number; questionCount: number; retrievedExampleCount: number; generationInstructions: string; languageKey: string; settings: unknown }>>`SELECT * FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${scope.activityId}`;
       const settings = record(assignment?.settings);
       const questionsEnabled = homeworkQuestionsEnabled(settings);
-      if (!assignment || settings.submissionsEnabled !== true || (questionsEnabled && typeof settings.preparedSnapshotId !== "string")) throw new AppError(409, "HOMEWORK_SUBMISSIONS_CLOSED", "Your teacher has not enabled final submissions yet.");
+      const stageSettings = await homeworkFileStageSettings(scope);
+      const generateNow = questionsEnabled && stageSettings.questionsStageEnabled;
+      if (!assignment || !stageSettings.filesStageEnabled || (generateNow && typeof settings.preparedSnapshotId !== "string")) throw new AppError(409, "HOMEWORK_SUBMISSIONS_CLOSED", "Your teacher has not enabled final submissions yet.");
 
       if (automatic) {
         const [latest] = await sql.query<HomeworkSubmissionRow[]>`SELECT * FROM "PluginCodingHomeworkSubmission" WHERE "workspaceId"=${access.workspace.id} AND kind::text='team_source' ORDER BY "createdAt" DESC LIMIT 1`;
@@ -57,19 +59,19 @@ export async function handInTeamHomework(scope: HomeworkStudentScope, input: unk
       if (readiness.requiresAcknowledgement && !data.acknowledgeIncomplete && !automatic) throw new AppError(409, "HOMEWORK_INCOMPLETE_ACKNOWLEDGEMENT_REQUIRED", "Confirm that you are submitting incomplete work for your team.", { issues: readiness.incomplete });
       await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, entries.reduce((sum, entry) => sum + entry.uncompressedSize, 0));
       const separateTeamQuestions = !access.context.teamId || settings.separateTeamQuestions === true;
-      const generation = questionsEnabled ? { providedCode: await snapshotProvidedCode(scope.activityId), questionLanguage: await getHomeworkQuestionLanguage(scope.courseId), questionGenerationAi: snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings)) } : {};
+      const generation = questionsEnabled ? { providedCode: await snapshotProvidedCode(scope.activityId), questionLanguage: await getHomeworkQuestionLanguage(scope.courseId), ...(generateNow ? { questionGenerationAi: snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings)) } : { awaitingStageActivation: true }) } : {};
       const metadata = { workflowVersion: 2, questionGenerationEnabled: questionsEnabled, workspaceId: access.workspace.id, teamId: access.context.teamId, teamName: access.context.teamTitle, groupingId: access.context.groupingId,
         submittedBy: scope.user.id, handInAt: new Date().toISOString(), draftRevision: access.workspace.revision,
         incompleteAcknowledged: readiness.requiresAcknowledgement, separateTeamQuestions,
         ...generation,
         requirements, folders: access.workspace.folders,
         assignment: { candidateLimit: assignment.candidateLimit, languageKey: assignment.languageKey, promptMarkdown: assignment.promptMarkdown, generationInstructions: assignment.generationInstructions, questionCount: questionsEnabled ? assignment.questionCount : 0, retrievedExampleCount: assignment.retrievedExampleCount } };
-      const stageSettings = await homeworkFileStageSettings(scope, access.workspace.preparationStartedAt);
-      const submissionTiming = automatic ? automaticHomeworkTiming(stageSettings, automatic) : acceptHomeworkSubmissionTiming(stageSettings);
+      const timedStageSettings = await homeworkFileStageSettings(scope, access.workspace.preparationStartedAt);
+      const submissionTiming = automatic ? automaticHomeworkTiming(timedStageSettings, automatic) : acceptHomeworkSubmissionTiming(timedStageSettings);
       Object.assign(metadata, { handInAt: submissionTiming.submittedAt, submissionTiming, ...(automatic ? { automaticHandIn: { cutoff: automatic.cutoff, recoveredAt: new Date().toISOString(), triggeredBy: automatic.triggeredBy, acknowledgementSource: "automatic_deadline" } } : {}) });
       const [owner] = await sql.query<Array<{ createdById: string }>>`SELECT "createdById" FROM "Activity" WHERE id=${scope.activityId}`;
       const [source] = await sql.query<HomeworkSubmissionRow[]>`INSERT INTO "PluginCodingHomeworkSubmission" (id,"activityId","groupId","userId",kind,status,"documentationSnapshotId","structureValidationSummary",metadata,"workspaceId","updatedAt")
-        VALUES (${sourceId},${scope.activityId},${scope.groupId},${owner.createdById},'team_source',${!questionsEnabled ? "ready_for_grading" : separateTeamQuestions ? "structure_valid" : "uploaded"}::"PluginCodingHomeworkSubmissionStatus",${questionsEnabled ? String(settings.preparedSnapshotId) : null},${JSON.stringify(validation)}::jsonb,${JSON.stringify(metadata)}::jsonb,${access.workspace.id},NOW()) RETURNING *`;
+        VALUES (${sourceId},${scope.activityId},${scope.groupId},${owner.createdById},'team_source',${!questionsEnabled ? "ready_for_grading" : separateTeamQuestions ? "structure_valid" : "uploaded"}::"PluginCodingHomeworkSubmissionStatus",${generateNow ? String(settings.preparedSnapshotId) : null},${JSON.stringify(validation)}::jsonb,${JSON.stringify(metadata)}::jsonb,${access.workspace.id},NOW()) RETURNING *`;
       await mkdir(path.join(directory, "files"), { recursive: true, mode: 0o750 });
       for (const entry of entries) {
         if (entry.isDirectory || !entry.content || !validation.validFiles.includes(entry.path)) continue;
@@ -83,7 +85,7 @@ export async function handInTeamHomework(scope: HomeworkStudentScope, input: unk
       const enqueue = async (job: Parameters<typeof enqueueBackgroundJob>[0]) => { await enqueueBackgroundJob(job, tx); };
       const participants = access.context.teamId ? access.context.members : [{ participantId: access.context.participantId, userId: scope.user.id, membershipToken: access.context.membershipToken }];
       for (const participant of participants) await addWorkspaceMember(sql, enqueue, workspace, participant, scope.user);
-      if (questionsEnabled && !separateTeamQuestions) await enqueueTeamQuestions(sql, enqueue, workspace, source);
+      if (generateNow && !separateTeamQuestions) await enqueueTeamQuestions(sql, enqueue, workspace, source);
       await auditHomeworkWorkspace(sql, workspace, scope.user, "submitted", { metadata: { sourceId, revision: workspace.revision, incompleteAcknowledged: readiness.requiresAcknowledgement, memberCount: participants.length, separateTeamQuestions } });
     });
     committed = true;
@@ -97,10 +99,10 @@ export async function getTeamHomeworkWorkspace(scope: HomeworkStudentScope) {
     const [assignment] = await sql.query<Array<{ settings: unknown; questionCount: number }>>`SELECT settings,"questionCount" FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${scope.activityId}`;
     const generationId = submission ? String(record(submission.metadata).generationSourceId ?? submission.id) : null;
     const job = generationId ? await tx.backgroundJob.findUnique({ where: { queue_idempotencyKey: { queue: codingHomeworkProcessingQueue, idempotencyKey: `submission:${generationId}` } } }) : null;
-    const position = job?.status === "queued" ? 1 + await tx.backgroundJob.count({ where: { queue: job.queue, status: "queued", createdAt: { lt: job.createdAt } } }) : null;
+    const position = job?.status === "queued" ? 1 + await tx.backgroundJob.count({ where: { queue: job.queue, status: "queued", runAfter: { lte: new Date() }, createdAt: { lt: job.createdAt } } }) : null;
     const files = submission ? await sql.query<Array<{ path: string; sizeBytes: bigint }>>`SELECT path,"sizeBytes" FROM "PluginCodingHomeworkSubmissionFile" WHERE "submissionId"=${submission.id} ORDER BY path` : [];
     const [cancelled] = await sql.query<Array<{ present: boolean }>>`SELECT EXISTS(SELECT 1 FROM "PluginCodingHomeworkSubmission" WHERE "workspaceMemberId"=${access.member.id} AND status='cancelled') AS present`;
-    return { ...await homeworkFileStageSettings(scope, access.workspace.preparationStartedAt), submissionsEnabled: record(assignment?.settings).submissionsEnabled === true, teamwork: teamWorkspaceProjection(access),
+    return { ...await homeworkFileStageSettings(scope, access.workspace.preparationStartedAt), submissionsEnabled: (await homeworkFileStageSettings(scope)).filesStageEnabled, teamwork: teamWorkspaceProjection(access),
       previousCancelled: !submission && cancelled.present,
       submission: submission ? { questionGenerationEnabled: homeworkQuestionsEnabled(submission.metadata), automaticHandIn: Boolean(record(submission.metadata).automaticHandIn), submissionTiming: readHomeworkSubmissionTiming(submission.metadata), id: submission.id, status: submission.status, createdAt: submission.createdAt.toISOString(), started: Boolean(record(submission.metadata).assessmentStartedAt), coreAttemptId: submission.coreAttemptId,
         processingStatus: job?.status ?? null, generationIssue: record(job?.error).code === "HOMEWORK_NO_ELIGIBLE_CODE" ? "no_eligible_code" : null, queuePosition: position,
@@ -109,7 +111,7 @@ export async function getTeamHomeworkWorkspace(scope: HomeworkStudentScope) {
     if (!(error instanceof AppError) || error.code !== "HOMEWORK_TEAM_REQUIRED") throw error;
     const [assignment] = await coreDb.$queryRaw<Array<{ settings: unknown }>>`SELECT settings FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${scope.activityId}`;
     // Assignment resources remain readable without creating a private draft or member binding.
-    return { submissionPolicy: readHomeworkSubmissionPolicy(assignment?.settings), submissionsEnabled: record(assignment?.settings).submissionsEnabled === true, previousCancelled: false, submission: null,
+    return { ...await homeworkFileStageSettings(scope), submissionPolicy: readHomeworkSubmissionPolicy(assignment?.settings), submissionsEnabled: (await homeworkFileStageSettings(scope)).filesStageEnabled, previousCancelled: false, submission: null,
       teamwork: { contextKey: "team-required", draftRevision: 0, teamId: null, teamName: null, members: [], canSubmit: false } };
   }
 }

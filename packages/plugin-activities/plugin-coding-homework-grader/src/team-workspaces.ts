@@ -1,3 +1,7 @@
+import { getHomeworkQuestionConnection } from "./ai-selection";
+import { snapshotAiModelSelection } from "@cognelo/core";
+import { homeworkStageEnabled } from "./stage-activation-state";
+import { homeworkStageHoldUntil } from "./stage-activation";
 import { completeFileOnlyHomework } from "./file-only-submission";
 import { homeworkQuestionsEnabled } from "./question-policy";
 import { randomUUID } from "node:crypto";
@@ -50,8 +54,23 @@ export async function cancelTeamJobs(sql: TeamSql, submissionIds: string[]) {
 export async function enqueueTeamQuestions(sql: TeamSql, enqueue: Enqueue, workspace: HomeworkWorkspaceRow, submission: HomeworkSubmissionRow) {
   const [row] = await sql.query<Array<{ settings: unknown }>>`SELECT settings FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${workspace.activityId}`;
   const concurrency = Math.max(1, Math.min(4, Number(record(row?.settings).generationConcurrency ?? 2)));
+  let active = submission.kind === "team_source";
+  if (!active) active = await homeworkStageEnabled({ activityId: workspace.activityId, groupId: workspace.groupId, user: { id: submission.userId } }, "questions", sql);
+  if (!submission.documentationSnapshotId) {
+    if (!active) return;
+    const settings = record(row?.settings);
+    const [snapshot] = await sql.query<Array<{ id: string }>>`SELECT id FROM "PluginCodingHomeworkDocumentationSnapshot" WHERE id=${typeof settings.preparedSnapshotId === "string" ? settings.preparedSnapshotId : null} AND "activityId"=${workspace.activityId} AND "courseId"=${workspace.courseId} AND status='ready'`;
+    if (!snapshot) throw new AppError(409, "HOMEWORK_EMBEDDINGS_REQUIRED", "Prepare references before activating challenge questions.");
+    const target = await coreDb.user.findUniqueOrThrow({ where: { id: submission.userId }, select: { id: true, email: true, name: true, firstName: true, lastName: true, roles: { include: { role: true } } } });
+    const user = { ...target, roles: target.roles.map(entry => entry.role.key) as CurrentUser["roles"] };
+    const model = snapshotAiModelSelection(await getHomeworkQuestionConnection({ user, activityId: workspace.activityId, courseId: workspace.courseId }, settings));
+    const generation = JSON.stringify({ questionGenerationAi: model, awaitingStageActivation: false });
+    const sourceId = submission.sharedSourceId ?? submission.id;
+    await sql.execute`UPDATE "PluginCodingHomeworkSubmission" SET "documentationSnapshotId"=${snapshot.id},metadata=metadata || ${generation}::jsonb,"updatedAt"=NOW() WHERE (id=${sourceId} OR "sharedSourceId"=${sourceId}) AND status IN ('uploaded','processing','structure_valid') AND NOT metadata ? 'deletion'`;
+  }
   await enqueue({ queue: codingHomeworkProcessingQueue, handlerKey: codingHomeworkSubmissionProcessingHandlerKey, idempotencyKey: `submission:${submission.id}`, maxAttempts: 3,
-    metadata: { workflowVersion: 2, activityId: workspace.activityId, groupId: workspace.groupId, courseId: workspace.courseId, workspaceId: workspace.id, userId: submission.userId, concurrencyGroup: workspace.activityId, concurrencyLimit: concurrency },
+    runAfter: active ? undefined : homeworkStageHoldUntil,
+    metadata: { ...(active ? {} : { stageActivationHeld: true }), workflowVersion: 2, activityId: workspace.activityId, groupId: workspace.groupId, courseId: workspace.courseId, workspaceId: workspace.id, userId: submission.userId, concurrencyGroup: workspace.activityId, concurrencyLimit: concurrency },
     payload: { workflowVersion: 2, activityId: workspace.activityId, groupId: workspace.groupId, courseId: workspace.courseId, workspaceId: workspace.id, submissionId: submission.id, mode: "student", user: { id: submission.userId } } });
 }
 export async function copySharedQuestions(sql: TeamSql, sourceId: string, childId: string) {

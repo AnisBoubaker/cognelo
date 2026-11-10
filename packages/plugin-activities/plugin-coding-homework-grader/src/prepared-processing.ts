@@ -1,3 +1,4 @@
+import { assertHomeworkGenerationActivated } from "./stage-activation";
 import { generatePreparedHomeworkQuestions } from "./prepared-question-generation";
 import { snapshotProvidedCode, readProvidedCodeBaseline } from "./provided-code";
 import { getHomeworkQuestionLanguage } from "./question-generation-policy";
@@ -26,6 +27,7 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
   if (!current?.isActive) throw new NonRetryableBackgroundJobError("The submitting account is no longer active.");
   scope.user = { id: scope.user.id, email: current.email, name: current.name, firstName: current.firstName, lastName: current.lastName, roles: current.roles.map(entry => entry.role.key) as CurrentUser["roles"] };
   const leaseIsCurrent = async () => {
+    await assertHomeworkGenerationActivated(job, submission, scope.groupId, scope.activityId);
     const row = await coreDb.backgroundJob.findUnique({ where: { id: job.id } });
     if (!row || row.status !== "running" || row.lockedBy !== job.lockedBy) throw new NonRetryableBackgroundJobError("This generation job was cancelled or replaced.", "HOMEWORK_JOB_REPLACED");
   };
@@ -43,8 +45,8 @@ export async function processPreparedHomework(job: BackgroundJobRecord) {
     const questionCount = generated.length;
     // Publish the complete question set atomically, under the same lock used by teacher cancellation.
     await prisma.$transaction(async tx => {
+      await lockActivityTeamwork(tx, scope.activityId);
       if (submission.workspaceId) {
-        await lockActivityTeamwork(tx, scope.activityId);
         const workspace = await tx.pluginCodingHomeworkWorkspace.findUnique({ where: { id: submission.workspaceId } });
         if (!workspace) throw new NonRetryableBackgroundJobError("The shared submission was erased.", "HOMEWORK_JOB_REPLACED");
         await lockStudentGroupingWorkspaces(tx, workspace.groupingId);

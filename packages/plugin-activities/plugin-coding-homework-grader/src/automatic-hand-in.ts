@@ -46,7 +46,7 @@ async function recover(scope: HomeworkTeacherScope, groupId?: string, studentId?
     const user: CurrentUser = { ...stored, roles: stored.roles.map(value => value.role.key) as CurrentUser["roles"] };
     try {
       const stage = await homeworkFileStageSettings({ user, courseId: scope.courseId, activityId: scope.activityId, groupId: candidate.groupId }, candidate.preparationStartedAt);
-      if (!stage.submissionClosesAt || Date.parse(stage.submissionClosesAt) > Date.now()) continue;
+      if (stage.filesStageEnabled === false || !stage.submissionClosesAt || Date.parse(stage.submissionClosesAt) > Date.now()) continue;
       await handInHomework({ user, courseId: scope.courseId, activityId: scope.activityId, groupId: candidate.groupId }, { expectedRevision: candidate.revision, acknowledgeIncomplete: true },
         { cutoff: stage.submissionClosesAt, triggeredBy: scope.user.id, ...(team ? { workspaceId: candidate.id } : {}) });
     } catch (error) {

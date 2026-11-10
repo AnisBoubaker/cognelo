@@ -1,3 +1,4 @@
+import { homeworkFileStageSettings } from "./stage-scheduling";
 import { acceptHomeworkStageTiming } from "./submission-window";
 import { lockHomeworkSettings } from "./workflow-settings";
 import { unlink } from "node:fs/promises";
@@ -50,7 +51,8 @@ export async function uploadTeamHomeworkPreparation(scope: HomeworkStudentScope,
       await lockHomeworkUploadBudget(tx, scope.activityId, scope.user.id, incoming.reduce((sum, entry) => sum + entry.uncompressedSize, 0));
       const update = await applyHomeworkPreparedUpload(access.workspace, data, incoming, requirements, written);
       const preparedAt = (await acceptHomeworkStageTiming(scope, access.workspace.preparationStartedAt)).submittedAt;
-      await tx.$executeRaw`UPDATE "PluginCodingHomeworkWorkspace" SET "preparationStartedAt"=COALESCE("preparationStartedAt",${new Date()}),files=${JSON.stringify(update.files)}::jsonb, folders=${JSON.stringify(update.folders)}::jsonb, revision=revision+1,"updatedAt"=${new Date(preparedAt)} WHERE id=${access.workspace.id}`;
+      const stageClock = (await homeworkFileStageSettings(scope)).filesStageEnabled ? new Date(preparedAt) : null;
+      await tx.$executeRaw`UPDATE "PluginCodingHomeworkWorkspace" SET "preparationStartedAt"=COALESCE("preparationStartedAt",${stageClock}),files=${JSON.stringify(update.files)}::jsonb, folders=${JSON.stringify(update.folders)}::jsonb, revision=revision+1,"updatedAt"=${new Date(preparedAt)} WHERE id=${access.workspace.id}`;
       const sql = teamworkTransaction(tx);
       for (const change of update.changes) await auditHomeworkWorkspace(sql, access.workspace, scope.user, change.operation, { ...change, metadata: { revision: access.workspace.revision + 1 } });
       if (data.kind === "zip" || data.kind === "folder") await auditHomeworkWorkspace(sql, access.workspace, scope.user, data.kind === "zip" ? "zip_replaced" : "folder_added", { path: data.kind === "folder" ? data.path : undefined, metadata: { revision: access.workspace.revision + 1, fileCount: update.files.length } });

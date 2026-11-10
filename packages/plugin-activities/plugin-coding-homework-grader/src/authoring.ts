@@ -1,3 +1,4 @@
+import { updateCourseActivitySubmissionStage } from "@cognelo/core";
 import { homeworkWorkflowDraftSchema } from "./workflow-contract";
 import { homeworkQuestionsEnabled } from "./question-policy";
 import { codingHomeworkAttachmentPath } from "./attachment-storage";
@@ -171,7 +172,11 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
         const { homeworkTeamworkService } = await import("./team-workspaces");
         if (await homeworkTeamworkService.hasActiveSubmissions({ activityId: owner.ownerId, transaction: teamworkTransaction(transaction) })) throw new AppError(409, "HOMEWORK_QUESTION_POLICY_LOCKED", "Cancel active submissions before changing question generation or team question sharing.");
       }
-      if (questionModeChanged || parsed.workflow?.enabled === false) protectedSettings.submissionsEnabled = false;
+      if (questionModeChanged || parsed.workflow?.enabled === false) { protectedSettings.submissionsEnabled = false; protectedSettings.questionsStageEnabled = false; }
+      if (questionModeChanged && scope) {
+        await updateCourseActivitySubmissionStage(scope, "files", { enabled: false }, transaction);
+        await updateCourseActivitySubmissionStage(scope, "questions", { enabled: false }, transaction);
+      }
       for (const key of workflowSettingKeys) { delete assignment.settings[key]; if (protectedSettings[key] !== undefined) assignment.settings[key] = protectedSettings[key]; }
       if (protectedSettings.submissionsEnabled) {
         const currentRequirements = await transaction.pluginCodingHomeworkSubmissionRequirementSet.findUnique({ where: { activityId: owner.ownerId } });
@@ -541,6 +546,7 @@ export async function copyCourseCodingHomeworkAuthoring(params: HomeworkTeacherS
     const settings: Record<string, unknown> = {
       ...sourceSettings,
       submissionsEnabled: false,
+      questionsStageEnabled: false,
       referenceMaterialIds: await getHomeworkReferenceSelection({ ...params, activityId: params.sourceActivityId }, sourceSettings)
     };
     delete settings.submissionPolicy;
@@ -835,6 +841,6 @@ function normalizeObject(value: unknown) {
 }
 
 function copiedBankHomeworkSettings(value: unknown) {
-  const { submissionPolicy: _submissionPolicy, submissionsEnabled: _enabled, preparedSnapshotId: _snapshot, referenceMaterialIds: _materials, embeddingConnectionId: _embeddingConnection, embeddingAi: _embeddingAi, questionGenerationAi: _questionAi, ...settings } = normalizeObject(value);
-  return { ...settings, submissionsEnabled: false };
+  const { submissionPolicy: _submissionPolicy, questionsStageEnabled: _questionsEnabled, submissionsEnabled: _enabled, preparedSnapshotId: _snapshot, referenceMaterialIds: _materials, embeddingConnectionId: _embeddingConnection, embeddingAi: _embeddingAi, questionGenerationAi: _questionAi, ...settings } = normalizeObject(value);
+  return { ...settings, submissionsEnabled: false, questionsStageEnabled: false };
 }

@@ -5,7 +5,8 @@ import type { HomeworkStudentScope } from "./file-preparation";
 export async function homeworkFileStageSettings(scope: HomeworkStudentScope, startedAt?: Date | null) {
   const activity = await getGroupAssignedActivity(scope.user, scope.courseId, scope.groupId, scope.activityId);
   const resolved = await resolveActivitySubmissionStage(activity, activity.assignment, "files"), window = submissionStageWindow(resolved.policy, resolved.availableUntil, startedAt ?? null);
-  return { submissionPolicy: { deadline: window.deadline, allowLate: Boolean(window.deadline) && resolved.policy.allowLate, lateLimitMinutes: window.deadline && resolved.policy.allowLate ? resolved.policy.lateLimitMinutes : null },
+  const questions = await resolveActivitySubmissionStage(activity, activity.assignment, "questions");
+  return { filesStageEnabled: resolved.stage.active && resolved.policy.enabled !== false, questionsStageEnabled: questions.stage.active && questions.policy.enabled !== false, submissionPolicy: { deadline: window.deadline, allowLate: Boolean(window.deadline) && resolved.policy.allowLate, lateLimitMinutes: window.deadline && resolved.policy.allowLate ? resolved.policy.lateLimitMinutes : null },
     submissionClosesAt: window.closesAt, preparationStartedAt: startedAt?.toISOString() ?? null, preparationTimeLimitMinutes: resolved.policy.timeLimitMinutes };
 }
 export async function homeworkAnsweringAssignment(scope: HomeworkStudentScope) {

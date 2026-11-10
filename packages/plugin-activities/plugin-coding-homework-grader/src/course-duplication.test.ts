@@ -35,7 +35,7 @@ describe("same-course homework duplication", () => {
   });
 
   it("retains models and authoring options while independently owning the same prepared index selection", async () => {
-    const settings = { workflowVersion: 2, submissionsEnabled: true, preparedSnapshotId: "source-snapshot", referenceMaterialIds: ["material"],
+    const settings = { workflowVersion: 2, submissionsEnabled: true, questionsStageEnabled: true, preparedSnapshotId: "source-snapshot", referenceMaterialIds: ["material"],
       embeddingConnectionId: "connection", embeddingAi: { connectionId: "connection", model: "vectors" },
       questionGenerationAi: { connectionId: "connection", model: "questions" }, generationConcurrency: 3, customOption: { retained: true } };
     const metadata = { workflowVersion: 2, selected: ["material"], indexIds: ["shared-immutable-index"], preparedAt: "2026-01-01T00:00:00Z" };
@@ -45,7 +45,7 @@ describe("same-course homework duplication", () => {
     expect(mocks.snapshots.findFirst).toHaveBeenCalledWith({ where: { id: "source-snapshot", activityId: "source", courseId: "course", groupId: null } });
     expect(mocks.snapshots.create).toHaveBeenCalledWith({ data: { activityId: "copy", courseId: "course", status: "ready", contentTreeFingerprint: "fingerprint", metadata: { ...metadata, preparedByUserId: scope.user.id } } });
     expect(mocks.assignment.create).toHaveBeenCalledWith({ data: expect.objectContaining({ activityId: "copy", questionCount: 4, generationInstructions: "Ask about boundary values",
-      settings: { ...settings, submissionsEnabled: false, preparedSnapshotId: "copied-snapshot" } }) });
+      settings: { ...settings, submissionsEnabled: false, questionsStageEnabled: false, preparedSnapshotId: "copied-snapshot" } }) });
     expect(settings.preparedSnapshotId).toBe("source-snapshot");
     expect(settings.submissionsEnabled).toBe(true);
   });
@@ -54,7 +54,7 @@ describe("same-course homework duplication", () => {
     mocks.assignment.findUnique.mockResolvedValue(null);
     await copyCourseCodingHomeworkAuthoring(scope);
     expect(mocks.selection).toHaveBeenCalledWith(expect.objectContaining({ activityId: "source", courseId: "course" }), {});
-    expect(mocks.assignment.create).toHaveBeenCalledWith({ data: expect.objectContaining({ settings: { submissionsEnabled: false, referenceMaterialIds: ["material"] } }) });
+    expect(mocks.assignment.create).toHaveBeenCalledWith({ data: expect.objectContaining({ settings: { submissionsEnabled: false, questionsStageEnabled: false, referenceMaterialIds: ["material"] } }) });
     expect(mocks.snapshots.create).not.toHaveBeenCalled();
   });
 

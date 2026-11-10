@@ -902,7 +902,7 @@ function LegacyCodingHomeworkActivityView({
           </div>
           </section>
           <section className="stack" hidden={authoringTab !== "questions"}><HelpLabel help={questionPolicyLocked ? editor.locked : questionsEnabled ? editor.modeChange : editor.disabledHelp}><h2>{editor.questions}</h2></HelpLabel>
-            <ToggleSwitch locale={locale} label={editor.enabled} checked={questionsEnabled} disabled={loading || saving || questionPolicyLocked} onChange={questionGenerationEnabled => { workflow.update({ enabled: false }); setAssignment(current => ({ ...current, settings: { ...current.settings, questionGenerationEnabled } })); }} />
+            <ToggleSwitch locale={locale} label={editor.enabled} checked={questionsEnabled} disabled={loading || saving || questionPolicyLocked} onChange={questionGenerationEnabled => { setAssignment(current => ({ ...current, settings: { ...current.settings, questionGenerationEnabled } })); }} />
 
             <div className="stack" hidden={!questionsEnabled}>
               <div className="settings-grid">

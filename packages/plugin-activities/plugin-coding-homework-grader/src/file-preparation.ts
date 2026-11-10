@@ -1,3 +1,4 @@
+import { homeworkFileStageSettings } from "./stage-scheduling";
 import { acceptHomeworkStageTiming } from "./submission-window";
 import { lockHomeworkSettings } from "./workflow-settings";
 import { createHash, randomUUID } from "node:crypto";
@@ -110,7 +111,7 @@ export async function uploadHomeworkPreparation(scope: HomeworkStudentScope, inp
       if (draft.revision !== data.expectedRevision) throw new AppError(409, "HOMEWORK_DRAFT_CONFLICT", "Your prepared files changed. Reload them before uploading.");
       const next = await applyHomeworkPreparedUpload(draft, data, incoming, requirements, written);
       const preparedAt = (await acceptHomeworkStageTiming(scope, draft.preparationStartedAt)).submittedAt;
-      await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { preparationStartedAt: draft.preparationStartedAt ?? new Date(preparedAt), updatedAt: new Date(preparedAt), files: json(next.files), folders: json(next.folders), revision: { increment: 1 } } });
+      await tx.pluginCodingHomeworkDraft.update({ where: { id: draft.id }, data: { preparationStartedAt: draft.preparationStartedAt ?? ((await homeworkFileStageSettings(scope)).filesStageEnabled ? new Date(preparedAt) : null), updatedAt: new Date(preparedAt), files: json(next.files), folders: json(next.folders), revision: { increment: 1 } } });
       obsolete.push(...next.obsolete);
     }, { timeout: 30_000, maxWait: 30_000 });
     committed = true;

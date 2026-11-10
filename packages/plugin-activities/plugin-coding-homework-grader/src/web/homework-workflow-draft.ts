@@ -10,9 +10,9 @@ import type { HomeworkRequest } from "./workflow-types";
 
 type Settings = { questionGenerationEnabled: boolean; submissionPolicy: HomeworkSubmissionPolicy; questionPolicyLocked: boolean; enabled: boolean; prepared: boolean; concurrency: number;
   ai: { connections: AiModelConnectionOption[]; question: { selection: AiModelSelection | null; resolved: { model: string } | null; error: string | null } } };
-type Draft = { questionAi: AiModelSelection | null; concurrency: string; enabled: boolean };
+type Draft = { questionAi: AiModelSelection | null; concurrency: string };
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-const draftFor = (settings: Settings): Draft => ({ questionAi: settings.ai.question.selection, concurrency: String(settings.concurrency), enabled: settings.enabled });
+const draftFor = (settings: Settings): Draft => ({ questionAi: settings.ai.question.selection, concurrency: String(settings.concurrency) });
 
 /** One draft and saved baseline for all course-only controls in the main editor. */
 export function useHomeworkWorkflowDraft(request: HomeworkRequest | undefined, locale: CodingHomeworkLocale, managementRevision: number) {
@@ -43,7 +43,7 @@ export function useHomeworkWorkflowDraft(request: HomeworkRequest | undefined, l
     const result: HomeworkWorkflowDraftInput = {};
     if (!same(draft.questionAi, saved.questionAi)) result.questionGenerationAi = draft.questionAi;
     if (draft.concurrency !== saved.concurrency) result.concurrency = Number(draft.concurrency);
-    if (modeChanged || draft.enabled !== saved.enabled) result.enabled = draft.enabled;
+    if (modeChanged) result.enabled = false;
     return homeworkWorkflowDraftSchema.parse(result);
   }, [draft, saved, request, copy.loading]);
   const acceptSaved = useCallback(async () => {

@@ -1,3 +1,4 @@
+import { questionStageLocksReferences } from "./stage-activation-state";
 import { randomUUID } from "node:crypto";
 import type { ActivityMaterialReferencesService, PreparedActivityMaterialReferences } from "@cognelo/activity-sdk/server";
 import { AppError, contentIndexRevision } from "@cognelo/core";
@@ -17,12 +18,12 @@ export const homeworkMaterialReferences: ActivityMaterialReferencesService = {
       if (snapshot?.status === "ready") prepared = { id: snapshot.id, selected: strings(data.selected), indexIds: strings(data.indexIds), hiddenReferenceIndexIds: strings(data.hiddenReferenceIndexIds), embeddingAi: data.embeddingAi ? record(data.embeddingAi) : null,
         preparedByUserId: typeof data.preparedByUserId === "string" ? data.preparedByUserId : "", preparedAt: typeof data.preparedAt === "string" ? data.preparedAt : "", selectionFingerprint: String(data.selectionFingerprint ?? "") };
     }
-    return { selected, prepared, locked: settings.submissionsEnabled === true, revision: contentIndexRevision({ selected, preparedId: settings.preparedSnapshotId ?? null, locked: settings.submissionsEnabled === true }) };
+    return { selected, prepared, locked: questionStageLocksReferences(settings), revision: contentIndexRevision({ selected, preparedId: settings.preparedSnapshotId ?? null, locked: questionStageLocksReferences(settings) }) };
   },
   async write({ activityId, courseId, selected, prepared, transaction: sql }) {
     const [assignment] = await sql.query<Array<{ settings: unknown }>>`SELECT settings FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${activityId}`;
     const previous = record(assignment?.settings);
-    if (previous.submissionsEnabled) throw new AppError(409, "HOMEWORK_SELECTION_LOCKED", "Disable submissions before changing references.");
+    if (questionStageLocksReferences(previous)) throw new AppError(409, "HOMEWORK_SELECTION_LOCKED", "Deactivate the question stage before changing references.");
     const next: Record<string, unknown> = { ...previous, workflowVersion: 2, referenceMaterialIds: selected };
     delete next.preparedSnapshotId;
     if (prepared) {
