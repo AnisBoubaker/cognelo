@@ -1,3 +1,4 @@
+import { homeworkGradebookActionService } from "./gradebook-actions";
 import { prepareHomeworkStageActivation, applyHomeworkStageActivation } from "./stage-activation";
 import { homeworkStageConfiguration } from "./stage-activation-state";
 import { homeworkMaterialReferences } from "./material-references";
@@ -56,6 +57,7 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
     activationChanged: applyHomeworkStageActivation
   },
   teamwork: homeworkTeamworkService,
+  gradebookActions: homeworkGradebookActionService,
   materialReferences: homeworkMaterialReferences,
   submissionExport: { activityTypeKeys: ["coding-homework-grader"], getContent: exportHomeworkSubmission },
   key: "coding-homework-grader",

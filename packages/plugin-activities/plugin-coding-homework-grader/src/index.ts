@@ -1,3 +1,4 @@
+import { homeworkGradebookActions } from "./gradebook-action-definitions";
 import { homeworkSubmissionStages } from "./submission-stages";
 import { z } from "zod";
 import type { ActivityPlugin } from "@cognelo/activity-sdk";
@@ -18,6 +19,7 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
     {
       key: "coding-homework-grader",
       assessmentFlow: "deferred",
+      gradebookActions: homeworkGradebookActions,
       submissionStages: homeworkSubmissionStages,
       preparationMediaFields: ["assignmentMarkdown"],
       supportsTeamwork: true,

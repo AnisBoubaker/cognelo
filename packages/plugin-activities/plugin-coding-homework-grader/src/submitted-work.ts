@@ -40,10 +40,12 @@ async function* fileChunks(file: { storedName: string; sizeBytes: bigint; sha256
     if (hash.digest("hex") !== file.sha256) throw new AppError(409, "HOMEWORK_FILE_CHANGED", "The submitted file failed its integrity check.");
   } finally { await handle.close(); }
 }
-async function* submittedZip(work: Awaited<ReturnType<typeof frozenWork>>, signal?: AbortSignal) {
+export type SubmittedZipWork = { files: Array<{ path: string; storedName: string; sizeBytes: bigint; sha256: string }>; folders: string[] };
+export async function* submittedZip(work: SubmittedZipWork, signal?: AbortSignal, validate?: () => Promise<void>) {
   const pending: Uint8Array[] = []; let failure: Error | null = null;
   const zip = new Zip((error, bytes) => { if (error) failure = error; else pending.push(bytes); });
   try {
+    await validate?.();
     for (const folder of work.folders) {
       signal?.throwIfAborted(); const entry = new ZipPassThrough(`${folder}/`); zip.add(entry); entry.push(new Uint8Array(), true);
       if (failure) throw failure; while (pending.length) yield pending.shift()!;
@@ -54,16 +56,21 @@ async function* submittedZip(work: Awaited<ReturnType<typeof frozenWork>>, signa
       for await (const bytes of fileChunks(file, signal)) { entry.push(bytes); if (failure) throw failure; while (pending.length) yield pending.shift()!; }
       entry.push(new Uint8Array(), true); if (failure) throw failure; while (pending.length) yield pending.shift()!;
     }
+    signal?.throwIfAborted(); await validate?.();
     zip.end(); if (failure) throw failure; while (pending.length) yield pending.shift()!;
   } finally { zip.terminate(); }
 }
 export async function downloadSubmittedHomework(scope: HomeworkStudentScope, expectedId?: string | null, signal?: AbortSignal) {
   const work = await frozenWork(scope, expectedId);
   await assertCurrentTeamSubmissionAccess(scope, work.submission);
-  return new Response(Readable.toWeb(Readable.from(submittedZip(work, signal), { objectMode: false })) as ReadableStream, {
-    headers: { "Content-Type": "application/zip", "Content-Disposition": 'attachment; filename="submitted-work.zip"', "Cache-Control": "private, no-store, max-age=0", "X-Content-Type-Options": "nosniff" }
+  return submittedWorkZipResponse(work, "submitted-work.zip", signal);
+}
+export function submittedWorkZipResponse(work: SubmittedZipWork, fileName: string, signal?: AbortSignal, validate?: () => Promise<void>) {
+  return new Response(Readable.toWeb(Readable.from(submittedZip(work, signal, validate), { objectMode: false })) as ReadableStream, {
+    headers: { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="submitted-work.zip"; filename*=UTF-8''${encodeURIComponent(fileName)}`, "Cache-Control": "private, no-store, max-age=0", "X-Content-Type-Options": "nosniff" }
   });
 }
+
 export async function checkSubmittedHomework(scope: HomeworkStudentScope, expectedId?: string | null) {
   const work = await frozenWork(scope, expectedId);
   const requirements = record(work.submission.metadata).requirements ? normalizeCodingHomeworkSubmissionRequirements(record(work.submission.metadata).requirements) : await getHomeworkRequirements(scope.activityId);
