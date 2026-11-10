@@ -86,7 +86,7 @@ export async function saveActivityMaterialReferences(scope: ActivityMaterialRefe
   await prisma.$transaction(async tx => {
     const transaction = sql(tx), state = await handler.read({ ...scope, transaction }); assertVersion(state, data.revision);
     const previous = state.selected ?? tree.defaults;
-    if (state.locked && !sameSelection(previous, data.selected)) throw new AppError(409, "ACTIVITY_REFERENCES_LOCKED", "Disable submissions before changing the reference selection.");
+    if (state.locked && !sameSelection(previous, data.selected)) throw new AppError(409, "ACTIVITY_REFERENCES_LOCKED", "The reference selection is locked by the activity’s workflow settings.");
     if (state.locked || (state.selected !== null && sameSelection(previous, data.selected))) return;
     await handler.write({ ...scope, transaction, selected: [...new Set(data.selected)] });
   }, { timeout: 30_000 });
@@ -95,7 +95,7 @@ export async function saveActivityMaterialReferences(scope: ActivityMaterialRefe
 export async function prepareActivityReferenceMaterial(scope: ActivityMaterialReferenceScope, input: unknown, signal?: AbortSignal) {
   const data = z.object({ resourceId: z.string().min(1), revision: z.string().optional() }).strict().parse(input);
   const state = await getActivityMaterialReferenceState(scope); assertVersion(state, data.revision);
-  if (state.locked) throw new AppError(409, "ACTIVITY_REFERENCES_LOCKED", "Disable submissions before preparing references.");
+  if (state.locked) throw new AppError(409, "ACTIVITY_REFERENCES_LOCKED", "The reference selection is locked by the activity’s workflow settings.");
   const selected = await getActivityMaterialReferenceSelection(scope, state.selected);
   if (!selected.includes(data.resourceId)) throw new AppError(400, "MATERIAL_REFERENCE_INVALID", "This material is not selected.");
   const provider = await createCourseEmbeddingProvider(scope.user, scope.courseId);
@@ -109,7 +109,7 @@ export async function finishActivityMaterialReferencePreparation(scope: Activity
   const handler = await service(scope), tree = await getActivityMaterialReferenceTree(scope);
   await prisma.$transaction(async tx => {
     const transaction = sql(tx), state = await handler.read({ ...scope, transaction }); assertVersion(state, data.revision);
-    if (state.locked) throw new AppError(409, "ACTIVITY_REFERENCES_LOCKED", "Disable submissions before preparing references.");
+    if (state.locked) throw new AppError(409, "ACTIVITY_REFERENCES_LOCKED", "The reference selection is locked by the activity’s workflow settings.");
     const selected = state.selected ?? tree.defaults;
     await lockCourseMaterialEmbeddingSettings(tx, scope.courseId);
     const provider = selected.length ? await createCourseEmbeddingProvider(scope.user, scope.courseId) : null;

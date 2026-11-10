@@ -58,7 +58,7 @@ test("Programming Homework keeps core top tabs and shared left sections, rich te
   // File-only workflows do not lock references: no question stage can use them.
   await responseJson(await api.put(`${base}/workflow-settings`, { data: { enabled: true } }));
   await top.getByRole("tab", { name: "Reference materials", exact: true }).click();
-  await expect(page.getByText("Reference materials are locked while final submissions are enabled.", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Reference selection is locked by this activity’s workflow settings.", { exact: true })).toHaveCount(0);
   await responseJson(await api.put(`${base}/workflow-settings`, { data: { enabled: false } }));
   await top.getByRole("tab", { name: "Activity", exact: true }).click();
   await left.getByRole("tab", { name: "Simulation", exact: true }).click();

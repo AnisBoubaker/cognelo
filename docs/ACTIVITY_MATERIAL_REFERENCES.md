@@ -70,3 +70,5 @@ The November 9 [Programming Homework editor contract](PROGRAMMING_HOMEWORK_EDITO
 - Authorized assumptions: Simulation is course-only, uses a checked ZIP with saved configuration and any required prepared references, and keeps results transient. An absent explicit course model preserves the existing staff default. Already enabled work retains its previous prepared references; disabled work must prepare against the current course model. Material extraction stays plugin-owned and never launches a browser.
 
 The root README/memory/architecture/index, shared material/model contracts, plugin-authoring handbook and homework README/memory/reference/workflow/progress were reviewed and updated. Material plugin extraction contracts remain unchanged and their orientation/reference documents remain accurate. No documentation verification gap remains.
+
+Activities own their operational reference lock through the persistence adapter; the shared panel and errors describe a workflow lock without assuming a final-file-submission switch. Programming Homework locks references when Questions answering is activated, allowing preparation while only File submission is active.
