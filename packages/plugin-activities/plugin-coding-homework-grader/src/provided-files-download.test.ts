@@ -11,7 +11,7 @@ const owner = { ownerKind: "course_activity" as const, ownerId: "activity" };
 function attachment(name: string, content: Buffer, mimeType = "text/plain") {
   return { originalName: name, storedName: name, sizeBytes: BigInt(content.length), sha256: createHash("sha256").update(content).digest("hex"), mimeType };
 }
-function readableFiles(entries: Array<{ originalName: string; storedName: string; sizeBytes: bigint; sha256: string; mimeType: string | null }>, contents: Buffer[]) {
+function readableFiles(entries: Array<{ originalName: string; storedName: string; sizeBytes: bigint; sha256: string; mimeType: string | null; metadata?: unknown }>, contents: Buffer[]) {
   mocks.files.mockResolvedValue(entries);
   mocks.open.mockImplementation(async (filePath: string) => {
     const bytes = contents[entries.findIndex(entry => entry.storedName === path.basename(filePath))];
@@ -51,6 +51,15 @@ describe("provided file downloads", () => {
   });
   it("uses safe unique filenames without dropping duplicate attachments", () => {
     expect(providedArchiveNames(["../main.c", "main.c", "MAIN.c", "..", "C:\\folder\\data.txt", "C:drive.c"].map(originalName => ({ originalName })))).toEqual(["main.c", "main (2).c", "MAIN (3).c", "provided-file", "data.txt", "C_drive.c"]);
+  });
+  it("preserves validated editor paths, empty folders and binary bytes", async () => {
+    const bytes = Buffer.from([0, 5, 22, 7]);
+    readableFiles([{ ...attachment("data.bin", bytes), metadata: { providedPath: "assets/data.bin", providedFolders: ["empty"] } }], [bytes]);
+    const response = await downloadHomeworkProvidedFiles(owner);
+    const members = unzipSync(new Uint8Array(await response.arrayBuffer()));
+    expect(Object.keys(members)).toEqual(["empty/", "assets/data.bin"]);
+    expect(Buffer.from(members["assets/data.bin"])).toEqual(bytes);
+    expect(() => providedArchiveNames([{ originalName: "bad.c", metadata: { providedPath: "../secret.c" } }])).toThrow("invalid stored path");
   });
   it("rejects missing or oversized collections before reading files", async () => {
     mocks.files.mockResolvedValue([]);

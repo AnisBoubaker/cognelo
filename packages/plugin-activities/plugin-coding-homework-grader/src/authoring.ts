@@ -271,6 +271,7 @@ export async function uploadCodingHomeworkProvidedFile(owner: OwnerContext, inpu
   const bytes = decodeUploadBytes(parsed.base64, MAX_PROVIDED_FILE_BYTES);
   await prisma.$transaction(async tx => {
     if (owner.ownerKind === "course_activity") await lockHomeworkSettings(tx, owner.ownerId);
+    else await lockHomeworkTeacherSolution(tx, owner);
     await createAttachment(owner, { bytes, kind: "provided_file", mimeType: parsed.mimeType || "application/octet-stream", originalName: parsed.fileName }, tx);
   });
   return getCodingHomeworkAuthoring(owner);
@@ -279,6 +280,7 @@ export async function uploadCodingHomeworkProvidedFile(owner: OwnerContext, inpu
 export async function deleteCodingHomeworkProvidedFile(owner: OwnerContext, attachmentId: string) {
   await prisma.$transaction(async tx => {
     if (owner.ownerKind === "course_activity") await lockHomeworkSettings(tx, owner.ownerId);
+    else await lockHomeworkTeacherSolution(tx, owner);
     const attachment = await tx.pluginCodingHomeworkAttachment.findFirst({
       where: {
         id: attachmentId,

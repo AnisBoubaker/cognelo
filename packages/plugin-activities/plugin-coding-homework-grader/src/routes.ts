@@ -1,4 +1,5 @@
 import { downloadHomeworkProvidedFiles } from "./provided-files-download";
+import { deleteHomeworkProvidedFiles, getHomeworkProvidedFile, getHomeworkProvidedFiles, uploadHomeworkProvidedFiles } from "./provided-files-workspace";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
@@ -155,6 +156,23 @@ export const codingHomeworkProvidedFilesRoute: PluginRouteDefinition = {
       }
       return deleteCodingHomeworkProvidedFile(await resolveOwner(context), attachmentId);
     }
+  }
+};
+
+export const codingHomeworkProvidedFilesWorkspaceRoute: PluginRouteDefinition = {
+  path: "coding-homework-grader/provided-files-workspace",
+  activityTypeKeys: ["coding-homework-grader"],
+  methods: {
+    GET: async ({ context, request }) => {
+      const owner = await resolveOwner(context);
+      const params = new URL(request.url).searchParams;
+      const filePath = params.get("path");
+      return filePath !== null
+        ? getHomeworkProvidedFile(owner, { path: filePath, revision: params.get("revision") ?? "" }, request.signal)
+        : getHomeworkProvidedFiles(owner, request.signal);
+    },
+    POST: async ({ context, readJson, request }) => uploadHomeworkProvidedFiles(await resolveOwner(context), await readJson(), request.signal),
+    DELETE: async ({ context, readJson, request }) => deleteHomeworkProvidedFiles(await resolveOwner(context), await readJson(), request.signal)
   }
 };
 
