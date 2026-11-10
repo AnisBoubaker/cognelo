@@ -365,6 +365,8 @@ When the private upgrade checklist introduces rich-text media, set `MEDIA_STORAG
 
 ## 5. Run migrations and activate the release
 
+Programming Homework team delivery and stage scheduling require the plugin migrations `202611050010_team_workspaces` and `202611090020_submission_stage_clocks` through the combined migration command. Individual submission remains the default. The clock migration backfills preparation starts for nonempty drafts and shared workspaces; submitted work and grades retain their historical timing. Existing file deadlines, late policy and answering-duration overrides remain readable until canonical stage settings are saved in core. After upgrading, review existing homework scheduling in shared Activity settings beside availability. No environment-variable or runner change is required.
+
 Plugin migration `202611080010_programming_homework_display_name` updates the existing activity-type and plugin catalogue labels to **Programming Homework**. This is an idempotent data-only rename: keys, authored titles, settings and academic records remain unchanged. It uses the combined migration command and needs no schema or environment changes.
 
 The additive `202611060001_course_material_embedding_settings` migration adds the course-wide embedding selection. Apply it with the combined migration command, regenerate Prisma clients and restart the API/web processes. Existing indexes and pinned homework references are preserved; new preparation uses the course setting under **Course settings → AI**, or the existing staff default until configured. No environment variable changes. See [shared activity references](ACTIVITY_MATERIAL_REFERENCES.md).
