@@ -54,8 +54,11 @@ export async function cancelTeamJobs(sql: TeamSql, submissionIds: string[]) {
 export async function enqueueTeamQuestions(sql: TeamSql, enqueue: Enqueue, workspace: HomeworkWorkspaceRow, submission: HomeworkSubmissionRow) {
   const [row] = await sql.query<Array<{ settings: unknown }>>`SELECT settings FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${workspace.activityId}`;
   const concurrency = Math.max(1, Math.min(4, Number(record(row?.settings).generationConcurrency ?? 2)));
-  let active = submission.kind === "team_source";
-  if (!active) active = await homeworkStageEnabled({ activityId: workspace.activityId, groupId: workspace.groupId, user: { id: submission.userId } }, "questions", sql);
+  const eligible = submission.kind === "team_source"
+    ? await sql.query<Array<{ userId: string }>>`SELECT "userId" FROM "PluginCodingHomeworkWorkspaceMember" WHERE "workspaceId"=${workspace.id} AND "currentSubmissionId" IS NOT NULL AND "userId" IS NOT NULL ORDER BY id`
+    : [{ userId: submission.userId }];
+  let active = false;
+  for (const member of eligible) if (await homeworkStageEnabled({ activityId: workspace.activityId, groupId: workspace.groupId, user: { id: member.userId } }, "questions", sql)) { active = true; break; }
   if (!submission.documentationSnapshotId) {
     if (!active) return;
     const settings = record(row?.settings);
@@ -72,6 +75,7 @@ export async function enqueueTeamQuestions(sql: TeamSql, enqueue: Enqueue, works
     runAfter: active ? undefined : homeworkStageHoldUntil,
     metadata: { ...(active ? {} : { stageActivationHeld: true }), workflowVersion: 2, activityId: workspace.activityId, groupId: workspace.groupId, courseId: workspace.courseId, workspaceId: workspace.id, userId: submission.userId, concurrencyGroup: workspace.activityId, concurrencyLimit: concurrency },
     payload: { workflowVersion: 2, activityId: workspace.activityId, groupId: workspace.groupId, courseId: workspace.courseId, workspaceId: workspace.id, submissionId: submission.id, mode: "student", user: { id: submission.userId } } });
+  if (active) await sql.execute`UPDATE "BackgroundJob" SET "runAfter"=NOW(),metadata=metadata-'stageActivationHeld',"updatedAt"=NOW() WHERE queue=${codingHomeworkProcessingQueue} AND "idempotencyKey"=${`submission:${submission.id}`} AND status='queued' AND metadata->>'stageActivationHeld'='true'`;
 }
 export async function copySharedQuestions(sql: TeamSql, sourceId: string, childId: string) {
   await sql.execute`INSERT INTO "PluginCodingHomeworkChallengeQuestion" (id,"submissionId","orderIndex","questionText","generationModel","generationPromptVersion","nearestExamples",metadata,"updatedAt")
@@ -94,6 +98,7 @@ export async function createMemberSubmission(sql: TeamSql, enqueue: Enqueue, wor
   if (!homeworkQuestionsEnabled(source.metadata)) await completeFileOnlyHomework(sql, workspace.courseId, child);
   else if (shared && source.status === "challenge_ready") await copySharedQuestions(sql, source.id, id);
   else if (!shared) await enqueueTeamQuestions(sql, enqueue, workspace, child);
+  else if (["uploaded", "processing", "structure_valid"].includes(source.status)) await enqueueTeamQuestions(sql, enqueue, workspace, source);
   return { ...member, currentSubmissionId: id };
 }
 export async function addWorkspaceMember(sql: TeamSql, enqueue: Enqueue, workspace: HomeworkWorkspaceRow, participant: { participantId: string; userId: string | null; membershipToken: string }, user: CurrentUser) {
