@@ -382,8 +382,8 @@ WHERE (requirements->>'maxArchiveBytes')::bigint > 26214400 OR (requirements->>'
       id: "202611090020_submission_stage_clocks", statements: [
         `ALTER TABLE "PluginCodingHomeworkDraft" ADD COLUMN IF NOT EXISTS "preparationStartedAt" TIMESTAMP(3)`,
         `ALTER TABLE "PluginCodingHomeworkWorkspace" ADD COLUMN IF NOT EXISTS "preparationStartedAt" TIMESTAMP(3)`,
-        `UPDATE "PluginCodingHomeworkDraft" SET "preparationStartedAt"="createdAt" WHERE "preparationStartedAt" IS NULL AND jsonb_array_length(files)>0`,
-        `UPDATE "PluginCodingHomeworkWorkspace" w SET "preparationStartedAt"=COALESCE((SELECT MIN(e."createdAt") FROM "PluginCodingHomeworkWorkspaceEvent" e WHERE e."workspaceId"=w.id AND e.operation IN ('file_added','file_replaced','zip_replaced')),w."updatedAt") WHERE w."preparationStartedAt" IS NULL AND jsonb_array_length(w.files)>0`
+        `UPDATE "PluginCodingHomeworkDraft" d SET "preparationStartedAt"=d."createdAt" FROM "Activity" a WHERE a.id=d."activityId" AND d."preparationStartedAt" IS NULL AND jsonb_array_length(d.files)>0 AND NOT (COALESCE(a.metadata #> '{allGroupsAssignment,submissionStages,files}','{}'::jsonb) ? 'enabled')`,
+        `UPDATE "PluginCodingHomeworkWorkspace" w SET "preparationStartedAt"=COALESCE((SELECT MIN(e."createdAt") FROM "PluginCodingHomeworkWorkspaceEvent" e WHERE e."workspaceId"=w.id AND e.operation IN ('file_added','file_replaced','zip_replaced')),w."updatedAt") FROM "Activity" a WHERE a.id=w."activityId" AND w."preparationStartedAt" IS NULL AND jsonb_array_length(w.files)>0 AND NOT (COALESCE(a.metadata #> '{allGroupsAssignment,submissionStages,files}','{}'::jsonb) ? 'enabled')`
       ]
     }
   ],
