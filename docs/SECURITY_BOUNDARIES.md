@@ -26,6 +26,8 @@ Internal homework analysis is staff-only. Learner responses omit reference-searc
 
 ## Authentication and browser requests
 
+Self-service account name changes check the current administrator-managed [profile policy](USER_PROFILES.md) on the server. Disabling the policy blocks all non-admin name writes, including already-open browser forms. Administrator name edits and independently authenticated password changes remain available.
+
 Session JWTs require the session-specific issuer/audience, HS256, subject, issue/expiry times, and authentication version. SEB launch/access tokens cannot authenticate or renew sessions. Password changes and administrative email changes invalidate older sessions; the password-changing browser receives a fresh cookie. New/reset passwords require at least eight characters and at most 72 UTF-8 bytes to avoid bcrypt truncation.
 
 Unverified session DTOs withhold invitation-derived names and roles until email possession is verified. Failed login responses do not distinguish unknown, inactive, or invited accounts. Existing/unknown activation failures use one public response. Login and activation enforce persistent limits of 10 attempts/account/15 minutes and 200 requests/source/minute. A successful login clears its account bucket. Limits use a database table with expiring, secret-keyed identifiers and work across processes/restarts. 429 responses include Retry-After.

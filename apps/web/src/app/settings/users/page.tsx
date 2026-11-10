@@ -10,6 +10,7 @@ import { AppShell } from "@/components/app-shell";
 import { AppIcon } from "@/components/app-icon";
 import { useAuth } from "@/components/auth-provider";
 import { SettingsNav } from "@/components/settings-nav";
+import { UserProfilePolicySettings } from "@/components/user-profile-policy-settings";
 import { api, type AdminRole, type AdminUser, type AdminUserFilters, type Pagination } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -203,6 +204,7 @@ export default function UserSettingsPage() {
             <div className="section-heading"><div><p className="eyebrow">{t("settings.usersEyebrow")}</p><h1 className="content-title">{t("settings.usersTitle")}</h1></div>{isAdmin ? <button type="button" onClick={openCreate}><AppIcon name="add" /> {t("settings.addUser")}</button> : null}</div>
             {!isAdmin ? <p className="muted">{t("settings.usersAdminOnly")}</p> : (
               <>
+                <UserProfilePolicySettings />
                 <form className="form inline-panel user-filter-form" onSubmit={applyFilters}>
                   <div className="field"><label htmlFor="user-filter-role">{t("settings.filterRole")}</label><select id="user-filter-role" value={filters.role ?? ""} onChange={(event) => setFilters({ ...filters, role: event.target.value || undefined })}><option value="">{t("settings.allRoles")}</option>{roles.map((role) => <option key={role.id} value={role.key}>{t(`roles.${role.key}`)}</option>)}</select></div>
                   <div className="field"><label htmlFor="user-filter-first-name">{t("settings.firstName")}</label><input id="user-filter-first-name" value={filters.firstName ?? ""} onChange={(event) => setFilters({ ...filters, firstName: event.target.value })} /></div>

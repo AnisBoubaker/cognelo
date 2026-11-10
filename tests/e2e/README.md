@@ -1,5 +1,7 @@
 # Browser user flows
 
+`user-name-policy.spec.ts` covers the administrator name-change switch, Save/Cancel/reload, stale profile drafts and unauthorized API writes, admin name edits, password changes and renewed/fresh sessions while names are locked, re-enabling names, and policy-load failure. It restores the original policy and removes its disposable account.
+
 `ai-model-connections.spec.ts` verifies one credential with multiple model names, account/course selectors, token-preserving edits and redaction, Codex/Ollama embedding reuse and invalidation, frozen queued generation choices, and OpenAI/Claude rubric generation. `atomic-ai-grading.spec.ts` also verifies that compound and standalone grading use the course model override. Only local provider boundaries are simulated; API, persistence, queues and browser controls remain real.
 
 `student-course-return.spec.ts` verifies browser-local restoration after activity navigation/reload for both accordion and folder-tab layouts, in learner and teacher Student view. It covers title/Open actions, workspace tabs, nested expansion, scroll position, malformed preferences, and blocked localStorage. The tab-restoration check waits for Grades to become selected before forcing a document navigation, so it does not abort the client-side tab transition it intends to preserve. No runner or model is required.

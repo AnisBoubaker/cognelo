@@ -59,7 +59,8 @@ import type {
   SubjectKnowledgePrerequisiteInput,
   SubjectUpdate,
   UserPasswordChange,
-  UserProfileUpdate
+  UserProfileUpdate,
+  UserProfilePolicy
 } from "@cognelo/contracts";
 import type { ActivityVersionDiff, TestRegradeProgress, TestRegradeItemResult } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
@@ -1633,6 +1634,8 @@ export const api = {
   finalizeClosedActivityContent: (courseId: string, groupId: string, activityId: string) => request<{ access: ActivityContentAccess }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/content-access`, { method: "POST" }),
   applicationTime: () => request<{ timeZone: string; serverNow: string }>("/application-time"),
   applicationTimeSettings: () => request<ApplicationTimeSettingsDto>("/settings/time"),
+  userProfilePolicy: () => request<UserProfilePolicy>("/settings/users"),
+  updateUserProfilePolicy: (input: UserProfilePolicy) => request<UserProfilePolicy>("/settings/users", { method: "PUT", body: JSON.stringify(input) }),
   updateApplicationTimeSettings: (timeZone: string, allowCourseTimeZone?: boolean) => request<ApplicationTimeSettingsDto>("/settings/time", { method: "PUT", body: JSON.stringify({ timeZone, allowCourseTimeZone }) }),
   courseTimeSettings: (courseId: string) => request<CourseTimeSettingsDto>(`/courses/${courseId}/time`),
   updateCourseTimeSettings: (courseId: string, timeZone: string | null) => request<CourseTimeSettingsDto>(`/courses/${courseId}/time`, { method: "PUT", body: JSON.stringify({ timeZone }) }),

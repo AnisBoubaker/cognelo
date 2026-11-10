@@ -1677,12 +1677,13 @@ model GradeChallenge {
 }
 
 model ApplicationSettings {
-  id                  String   @id @default("instance")
-  timeZone            String   @default("UTC")
-  allowCourseTimeZone Boolean  @default(false)
-  updatedAt           DateTime @updatedAt
-  updatedById         String?
-  updatedBy           User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  id                   String   @id @default("instance")
+  timeZone             String   @default("UTC")
+  allowCourseTimeZone   Boolean  @default(false)
+  allowUserNameChanges  Boolean  @default(true)
+  updatedAt            DateTime @updatedAt
+  updatedById          String?
+  updatedBy            User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 }
 
 // Shared, expiring abuse limits; keys are HMACs, never raw account/IP identifiers.

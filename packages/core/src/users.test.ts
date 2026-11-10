@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockPrisma = vi.hoisted(() => ({
   $transaction: vi.fn((operations: unknown[]) => Promise.all(operations)),
   emailVerificationChallenge: { deleteMany: vi.fn() },
+  applicationSettings: { findUnique: vi.fn(), upsert: vi.fn() },
   user: {
     findUnique: vi.fn(),
     findMany: vi.fn(),
@@ -27,13 +28,63 @@ vi.mock("bcryptjs", () => ({
   default: bcryptMocks
 }));
 
-const { changeMyPassword, confirmUserEmail, createUser, listUsers, resetUserPassword, updateMyProfile, updateUser } = await import("./users");
+const { changeMyPassword, confirmUserEmail, createUser, getUserProfilePolicy, listUsers, resetUserPassword, updateMyProfile, updateUser, updateUserProfilePolicy } = await import("./users");
 
 const admin = { id: "admin-1", email: "admin@example.test", name: "Admin", firstName: "Ada", lastName: "Admin", roles: ["admin" as const] };
 
 describe("user services", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.applicationSettings.findUnique.mockResolvedValue({ allowUserNameChanges: true });
+  });
+
+  it("preserves existing self-service behavior when the settings row is absent", async () => {
+    mockPrisma.applicationSettings.findUnique.mockResolvedValue(null);
+    await expect(getUserProfilePolicy()).resolves.toEqual({ allowUserNameChanges: true });
+  });
+
+  it.each(["student", "teacher", "course_manager"] as const)("blocks name changes by %s when disabled", async role => {
+    mockPrisma.applicationSettings.findUnique.mockResolvedValue({ allowUserNameChanges: false });
+    await expect(updateMyProfile({ ...admin, roles: [role] }, { firstName: "Changed", lastName: "Name" }))
+      .rejects.toMatchObject({ status: 403, code: "USER_NAME_CHANGES_DISABLED" });
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    await expect(updateUserProfilePolicy({ ...admin, roles: [role] }, { allowUserNameChanges: true }))
+      .rejects.toMatchObject({ status: 403 });
+    expect(mockPrisma.applicationSettings.upsert).not.toHaveBeenCalled();
+  });
+
+  it("allows administrators to change their own and other users' names while disabled", async () => {
+    mockPrisma.applicationSettings.findUnique.mockResolvedValue({ allowUserNameChanges: false });
+    const account = { ...admin, isActive: true, createdAt: new Date(), updatedAt: new Date(), roles: [{ role: { key: "admin", name: "Admin" } }] };
+    mockPrisma.user.update.mockResolvedValue(account);
+    await updateMyProfile(admin, { firstName: "Updated", lastName: "Admin" });
+    mockPrisma.user.findUnique.mockResolvedValue({ ...account, id: "other-user" });
+    mockPrisma.role.findMany.mockResolvedValue([{ id: "student-role", key: "student", name: "Student" }]);
+    await updateUser(admin, "other-user", { email: admin.email, firstName: "Corrected", lastName: "Student", roles: ["student"] });
+    expect(mockPrisma.user.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: { id: "other-user" }, data: expect.objectContaining({ firstName: "Corrected", lastName: "Student" })
+    }));
+    expect(mockPrisma.applicationSettings.findUnique).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("saves the name policy as %s without changing other application settings", async allowed => {
+    mockPrisma.applicationSettings.upsert.mockResolvedValue({ allowUserNameChanges: allowed });
+    await expect(updateUserProfilePolicy(admin, { allowUserNameChanges: allowed })).resolves.toEqual({ allowUserNameChanges: allowed });
+    expect(mockPrisma.applicationSettings.upsert).toHaveBeenCalledWith({
+      where: { id: "instance" },
+      create: { id: "instance", allowUserNameChanges: allowed, updatedById: admin.id },
+      update: { allowUserNameChanges: allowed, updatedById: admin.id },
+      select: { allowUserNameChanges: true }
+    });
+  });
+
+  it("rejects malformed policies and does not expose unrelated settings", async () => {
+    for (const input of [{}, { allowUserNameChanges: "false" }, { allowUserNameChanges: false, timeZone: "UTC" }]) {
+      await expect(updateUserProfilePolicy(admin, input)).rejects.toThrow();
+    }
+    expect(mockPrisma.applicationSettings.upsert).not.toHaveBeenCalled();
+    mockPrisma.applicationSettings.findUnique.mockResolvedValue({ allowUserNameChanges: false, updatedById: "private" });
+    await expect(getUserProfilePolicy()).resolves.toEqual({ allowUserNameChanges: false });
   });
 
   it("trims names and returns the public current-user shape", async () => {
@@ -84,6 +135,7 @@ describe("user services", () => {
   });
 
   it("changes the password after verifying the current password", async () => {
+    mockPrisma.applicationSettings.findUnique.mockResolvedValue({ allowUserNameChanges: false });
     mockPrisma.user.findUnique.mockResolvedValue({ isActive: true, passwordHash: "old-hash", authVersion: 2 });
     bcryptMocks.compare.mockResolvedValue(true);
     bcryptMocks.hash.mockResolvedValue("new-hash");
@@ -101,6 +153,7 @@ describe("user services", () => {
     ).resolves.toEqual({ ok: true });
 
     expect(bcryptMocks.compare).toHaveBeenCalledWith("OldPassword123!", "old-hash");
+    expect(mockPrisma.applicationSettings.findUnique).not.toHaveBeenCalled();
     expect(bcryptMocks.hash).toHaveBeenCalledWith("NewPassword456!", 12);
     expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
       where: { id: "user-1", isActive: true, passwordHash: "old-hash", authVersion: 2 },

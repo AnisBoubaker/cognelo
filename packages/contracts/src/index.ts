@@ -135,6 +135,11 @@ export const UserProfileUpdateSchema = z.object({
 });
 export type UserProfileUpdate = z.infer<typeof UserProfileUpdateSchema>;
 
+export const UserProfilePolicySchema = z.object({
+  allowUserNameChanges: z.boolean()
+}).strict();
+export type UserProfilePolicy = z.infer<typeof UserProfilePolicySchema>;
+
 export const AdminUserCreateSchema = z.object({
   email: z.string().trim().email().max(320),
   firstName: z.string().trim().min(1).max(120),

@@ -4,6 +4,8 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- [User name changes](USER_PROFILES.md) are controlled by the default-on instance policy in Settings → Users. Enforce it on self-service profile writes; administrators always retain name-edit access. Never use this policy to block password changes.
+
 - Activity assignment section tabs use ascending locale-aware natural title order, consistent with course selectors. Gradebook group choices come from all authorized course sections, independent of result filters; never derive them from filtered gradebook items or rows. Keep empty sections selectable. See [gradebook behavior](GRADEBOOK_IMPLEMENTATION_PLAN.md).
 
 - Activity-bank folders share the course expansion hook: collapsed by default, Expand all / Collapse all, and per-user/bank localStorage with the same sliding four-hour expiry. Keep bank/course keys separate and preserve state through data refreshes; folder display never writes to the database. See [frontend decisions](reference/PLATFORM_DECISIONS.md#frontend-platform-decisions).

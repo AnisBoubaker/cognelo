@@ -6,6 +6,7 @@ import {
   AdminUserUpdateSchema,
   UserPasswordChangeSchema,
   UserProfileUpdateSchema,
+  UserProfilePolicySchema,
   type CurrentUser,
   type RoleKey
 } from "@cognelo/contracts";
@@ -184,8 +185,29 @@ export async function getMe(user: CurrentUser) {
   return user;
 }
 
+export async function getUserProfilePolicy() {
+  const settings = await prisma.applicationSettings.findUnique({
+    where: { id: "instance" }, select: { allowUserNameChanges: true }
+  });
+  return { allowUserNameChanges: settings?.allowUserNameChanges ?? true };
+}
+
+export async function updateUserProfilePolicy(user: CurrentUser, input: unknown) {
+  assertAdmin(user);
+  const data = UserProfilePolicySchema.parse(input);
+  return prisma.applicationSettings.upsert({
+    where: { id: "instance" },
+    create: { id: "instance", ...data, updatedById: user.id },
+    update: { ...data, updatedById: user.id },
+    select: { allowUserNameChanges: true }
+  });
+}
+
 export async function updateMyProfile(user: CurrentUser, input: unknown) {
   const data = UserProfileUpdateSchema.parse(input);
+  if (!isAdmin(user) && !(await getUserProfilePolicy()).allowUserNameChanges) {
+    throw new AppError(403, "USER_NAME_CHANGES_DISABLED", "Only an administrator can change your first and last names.");
+  }
   const firstName = data.firstName.trim();
   const lastName = data.lastName.trim();
   const updatedUser = await prisma.user.update({

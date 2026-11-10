@@ -16,13 +16,24 @@ export default function ProfileSettingsPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [savedSnapshot, setSavedSnapshot] = useState({ firstName: "", lastName: "" });
-  const [error, setError] = useState("");
+  const [allowUserNameChanges, setAllowUserNameChanges] = useState<boolean | null>(null);
+  const isAdmin = user?.roles.includes("admin") ?? false;
+  const canChangeName = isAdmin || allowUserNameChanges === true;
   const [saving, setSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id || isAdmin) return;
+    let active = true;
+    api.userProfilePolicy().then(policy => {
+      if (active) setAllowUserNameChanges(policy.allowUserNameChanges);
+    }).catch(err => { if (active) notifications.error(err instanceof Error ? err.message : t("settings.namePolicyLoadError")); });
+    return () => { active = false; };
+  }, [user?.id, isAdmin, notifications, t]);
 
   useEffect(() => {
     if (!user) {
@@ -40,16 +51,15 @@ export default function ProfileSettingsPage() {
   const roles = useMemo(() => user?.roles.map((role) => t(`roles.${role}`)).join(", ") ?? "", [t, user]);
 
   const currentSnapshot = useMemo(() => ({ firstName, lastName }), [firstName, lastName]);
-  const hasUnsavedChanges = currentSnapshot.firstName !== savedSnapshot.firstName || currentSnapshot.lastName !== savedSnapshot.lastName;
+  const hasUnsavedChanges = canChangeName && (currentSnapshot.firstName !== savedSnapshot.firstName || currentSnapshot.lastName !== savedSnapshot.lastName);
 
   const discardChanges = useCallback(() => {
     setFirstName(savedSnapshot.firstName);
     setLastName(savedSnapshot.lastName);
-    setError("");
   }, [savedSnapshot]);
 
   const saveProfile = useCallback(async () => {
-    setError("");
+    if (!canChangeName) return;
     setSaving(true);
     try {
       await api.updateMyProfile({ firstName, lastName });
@@ -57,14 +67,19 @@ export default function ProfileSettingsPage() {
       setSavedSnapshot({ firstName, lastName });
       notifications.success(t("settings.profileSaved"));
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("settings.profileSaveError");
-      setError(message);
+      const nameLocked = err instanceof ApiError && err.code === "USER_NAME_CHANGES_DISABLED";
+      const message = nameLocked ? t("settings.nameChangesLocked") : err instanceof Error ? err.message : t("settings.profileSaveError");
+      if (nameLocked) {
+        setAllowUserNameChanges(false);
+        setFirstName(savedSnapshot.firstName);
+        setLastName(savedSnapshot.lastName);
+      }
       notifications.error(message);
       throw err;
     } finally {
       setSaving(false);
     }
-  }, [firstName, lastName, notifications, refresh, t]);
+  }, [canChangeName, firstName, lastName, notifications, refresh, savedSnapshot, t]);
 
   useUnsavedChangesGuard(
     useMemo(
@@ -131,7 +146,7 @@ export default function ProfileSettingsPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await saveProfile();
+    try { await saveProfile(); } catch { /* Shared notifications report the error. */ }
   }
 
   async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
@@ -154,28 +169,30 @@ export default function ProfileSettingsPage() {
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">{t("settings.profileEyebrow")}</p>
-                  <h1 className="content-title">{t("settings.profileTitle")}</h1>
+                  <HelpLabel help={!isAdmin && allowUserNameChanges === false ? t("settings.nameChangesLocked") : undefined}><h1 className="content-title">{t("settings.profileTitle")}</h1></HelpLabel>
                 </div>
               </div>
 
               <form className="form" onSubmit={handleSubmit}>
                 <div className="form-grid-two">
-                  <div className="field">
+                  <div className={canChangeName ? "field" : "field field-locked"}>
                     <label htmlFor="firstName">{t("settings.firstName")}</label>
                     <input
                       id="firstName"
                       maxLength={120}
                       required
+                      readOnly={!canChangeName}
                       value={firstName}
                       onChange={(event) => setFirstName(event.target.value)}
                     />
                   </div>
-                  <div className="field">
+                  <div className={canChangeName ? "field" : "field field-locked"}>
                     <label htmlFor="lastName">{t("settings.lastName")}</label>
                     <input
                       id="lastName"
                       maxLength={120}
                       required
+                      readOnly={!canChangeName}
                       value={lastName}
                       onChange={(event) => setLastName(event.target.value)}
                     />
@@ -193,9 +210,7 @@ export default function ProfileSettingsPage() {
                   <input id="roles" readOnly value={roles} />
                 </div>
 
-                {error ? <p className="error">{error}</p> : null}
-
-                <EditActionBar
+                {canChangeName ? <EditActionBar
                   isDirty={hasUnsavedChanges}
                   isSaving={saving}
                   savedLabel={t("common.savedStatus")}
@@ -205,7 +220,7 @@ export default function ProfileSettingsPage() {
                   cancelLabel={t("common.cancel")}
                   onCancel={discardChanges}
                   onSave={saveProfile}
-                />
+                /> : null}
               </form>
             </section>
 
