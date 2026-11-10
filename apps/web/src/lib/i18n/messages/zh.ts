@@ -387,6 +387,7 @@ export const zhMessages = {
       error: "登录失败。",
       rateLimited: "尝试次数过多。请稍候再试。",
       passwordTooLong: "请选择较短的密码。",
+      sessionNotEstablished: "浏览器无法保留登录会话。请确认已允许 Cookie，然后重试。",
       activationError: "无法激活账户。"
     },
     emailVerification: {

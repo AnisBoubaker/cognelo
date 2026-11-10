@@ -369,6 +369,7 @@ export const arMessages = {
       error: "فشل تسجيل الدخول.",
       rateLimited: "محاولات كثيرة جدًا. انتظر قليلًا ثم حاول مرة أخرى.",
       passwordTooLong: "اختر كلمة مرور أقصر.",
+      sessionNotEstablished: "تعذر على متصفحك الاحتفاظ بجلسة تسجيل الدخول. تحقق من السماح بملفات تعريف الارتباط، ثم حاول مجددًا.",
       activationError: "تعذر تفعيل الحساب."
     },
     emailVerification: {

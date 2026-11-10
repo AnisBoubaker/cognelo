@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 import { ApiError } from "./api";
-import { areCurrentUsersEqual, createSessionRefresher } from "./session-refresh";
+import { areCurrentUsersEqual, createSessionRefresher, establishBrowserSession } from "./session-refresh";
 
 describe("session refresher", () => {
   it("recognizes an unchanged authenticated user regardless of role order", () => {
@@ -99,5 +99,28 @@ describe("session refresher", () => {
 
     expect(check).toHaveBeenCalledTimes(2);
     expect(onAuthenticated).toHaveBeenCalledTimes(2);
+  });
+});
+
+
+describe("browser session establishment", () => {
+  const user: CurrentUser = { id: "teacher", email: "teacher@example.test", name: "Teacher", firstName: "Test", lastName: "Teacher", roles: ["teacher"], mustChangePassword: false, emailVerified: true };
+  it("returns the verified session before the authenticated UI can open", async () => {
+    const verified = { user: { ...user, roles: ["admin"] as CurrentUser["roles"] } };
+    await expect(establishBrowserSession(async () => ({ user }), async () => verified)).resolves.toEqual(verified);
+  });
+  it("reports a rejected or missing cookie after otherwise successful credentials", async () => {
+    await expect(establishBrowserSession(async () => ({ user }), async () => { throw new ApiError("Sign in", { status: 401, code: "UNAUTHORIZED" }); })).rejects.toMatchObject({ code: "SESSION_NOT_ESTABLISHED" });
+  });
+  it("rejects an old cookie belonging to a different user", async () => {
+    await expect(establishBrowserSession(async () => ({ user }), async () => ({ user: { ...user, id: "old-account" } }))).rejects.toMatchObject({ code: "SESSION_NOT_ESTABLISHED" });
+  });
+  it("preserves a credential error without checking a browser session", async () => {
+    const check = vi.fn(), failure = new ApiError("Invalid credentials", { status: 401 });
+    await expect(establishBrowserSession(async () => { throw failure; }, check)).rejects.toBe(failure); expect(check).not.toHaveBeenCalled();
+  });
+  it("preserves transport/server failures rather than misdiagnosing cookies", async () => {
+    const failure = new ApiError("Unavailable", { status: 503 });
+    await expect(establishBrowserSession(async () => ({ user }), async () => { throw failure; })).rejects.toBe(failure);
   });
 });

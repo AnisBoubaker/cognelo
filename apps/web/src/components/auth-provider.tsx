@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { CurrentUser } from "@cognelo/contracts";
 import { api, API_UNAUTHORIZED_EVENT } from "@/lib/api";
-import { areCurrentUsersEqual, createSessionRefresher } from "@/lib/session-refresh";
+import { areCurrentUsersEqual, createSessionRefresher, establishBrowserSession } from "@/lib/session-refresh";
 
 type AuthState = {
   user: CurrentUser | null;
@@ -98,13 +98,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionUnavailable,
       refresh,
       login: async (email, password) => {
-        const result = await api.login(email, password);
+        const result = await establishBrowserSession(() => api.login(email, password), api.me);
         setUser(result.user);
         setSessionUnavailable(false);
         return result.user;
       },
       activateAccount: async (input) => {
-        const result = await api.activateAccount(input);
+        const result = await establishBrowserSession(() => api.activateAccount(input), api.me);
         setUser(result.user);
         setSessionUnavailable(false);
         return result.user;

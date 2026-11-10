@@ -387,6 +387,7 @@ export const frMessages = {
       error: "Échec de la connexion.",
       rateLimited: "Trop de tentatives. Patientez avant de réessayer.",
       passwordTooLong: "Choisissez un mot de passe plus court.",
+      sessionNotEstablished: "Votre navigateur n’a pas pu conserver votre session. Vérifiez que les témoins sont autorisés, puis réessayez.",
       activationError: "Impossible d'activer le compte."
     },
     emailVerification: {

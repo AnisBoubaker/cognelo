@@ -2,6 +2,7 @@
 
 import { AppIcon } from "@/components/app-icon";
 
+import { useNotifications } from "@cognelo/activity-ui";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
@@ -19,18 +20,18 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
+  const { error: notifyError } = useNotifications();
+  const showError = (key: Parameters<typeof t>[0]) => notifyError(t(key));
   const [loading, setLoading] = useState(false);
 
   async function handleLogin(event: FormEvent) {
     event.preventDefault();
-    setError("");
     setLoading(true);
     try {
       const user = await login(email, password);
       router.replace(loginReturnPath() ?? getAuthenticatedLandingPath(user));
     } catch (err) {
-      setError(t(err instanceof ApiError && err.code === "RATE_LIMIT_EXCEEDED" ? "login.rateLimited" : "login.error"));
+      showError(err instanceof ApiError && err.code === "SESSION_NOT_ESTABLISHED" ? "login.sessionNotEstablished" : err instanceof ApiError && err.code === "RATE_LIMIT_EXCEEDED" ? "login.rateLimited" : "login.error");
     } finally {
       setLoading(false);
     }
@@ -38,14 +39,13 @@ export default function LoginPage() {
 
   async function handleActivate(event: FormEvent) {
     event.preventDefault();
-    setError("");
     setLoading(true);
     try {
-      if (new TextEncoder().encode(password).byteLength > 72) { setError(t("login.passwordTooLong")); return; }
+      if (new TextEncoder().encode(password).byteLength > 72) { showError("login.passwordTooLong"); return; }
       const user = await activateAccount({ email, password, confirmPassword });
       router.replace(loginReturnPath() ?? getAuthenticatedLandingPath(user));
     } catch (err) {
-      setError(t(err instanceof ApiError && err.code === "RATE_LIMIT_EXCEEDED" ? "login.rateLimited" : "login.activationError"));
+      showError(err instanceof ApiError && err.code === "SESSION_NOT_ESTABLISHED" ? "login.sessionNotEstablished" : err instanceof ApiError && err.code === "RATE_LIMIT_EXCEEDED" ? "login.rateLimited" : "login.activationError");
     } finally {
       setLoading(false);
     }
@@ -69,10 +69,7 @@ export default function LoginPage() {
               aria-selected={mode === "login"}
               className={mode === "login" ? "is-active" : ""}
               type="button"
-              onClick={() => {
-                setMode("login");
-                setError("");
-              }}
+              onClick={() => setMode("login")}
             >
               {t("login.submit")}
             </button>
@@ -80,10 +77,7 @@ export default function LoginPage() {
               aria-selected={mode === "activate"}
               className={mode === "activate" ? "is-active" : ""}
               type="button"
-              onClick={() => {
-                setMode("activate");
-                setError("");
-              }}
+              onClick={() => setMode("activate")}
             >
               {t("login.activateCta")}
             </button>
@@ -117,7 +111,6 @@ export default function LoginPage() {
                 />
               </div>
             ) : null}
-            {error ? <p className="error">{error}</p> : null}
             <button className="login-submit-button" type="submit" disabled={loading}>
               <AppIcon name={mode === "login" ? "login" : "activate"} />
               {loading ? t("login.submitting") : mode === "login" ? t("login.submit") : t("login.activateSubmit")}

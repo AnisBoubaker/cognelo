@@ -387,6 +387,7 @@ export const enMessages = {
       error: "Login failed.",
       rateLimited: "Too many attempts. Please wait and try again.",
       passwordTooLong: "Choose a shorter password.",
+      sessionNotEstablished: "Your browser could not keep your sign-in session. Check that cookies are allowed, then try again.",
       activationError: "Unable to activate the account."
     },
     emailVerification: {

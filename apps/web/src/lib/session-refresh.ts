@@ -56,3 +56,19 @@ export function areCurrentUsersEqual(left: CurrentUser | null, right: CurrentUse
     left.roles.every((role) => right.roles.includes(role))
   );
 }
+
+/** A successful password response is insufficient if the browser rejected its cookie. */
+export async function establishBrowserSession(
+  authenticate: () => Promise<{ user: CurrentUser }>,
+  check: () => Promise<{ user: CurrentUser }>
+) {
+  const result = await authenticate();
+  try {
+    const confirmed = await check();
+    if (confirmed.user.id !== result.user.id) throw new ApiError("The browser did not establish the requested session.", { status: 401, code: "SESSION_NOT_ESTABLISHED" });
+    return confirmed;
+  } catch (error) {
+    if (isUnauthorizedSessionError(error)) throw new ApiError("The browser did not retain the sign-in session.", { status: 401, code: "SESSION_NOT_ESTABLISHED" });
+    throw error;
+  }
+}

@@ -571,3 +571,7 @@ When upgrading to a release containing `202610210001_application_timezone`, the 
 ## Prepared material PDF dependency
 
 Before enabling PDF reference indexing, install `poppler-utils` on the application host (`sudo apt install -y poppler-utils`) and verify `pdftotext -v` under the API service account. The additive core material-index migration and plugin preparation migration are applied by the normal `npm run db:migrate:all` command. No vector database extension or new environment variable is required. See [material services](MATERIAL_EMBEDDING_SERVICES.md).
+
+## Local browser sessions during rehearsal
+
+An HTTP-only loopback rehearsal can differ from HTTPS production: some browser versions reject Secure cookies on localhost, and cookies are shared across ports. Use local TLS or a loopback-only review transport adapter that preserves HttpOnly/SameSite and namespaces the review cookies independently of development. Keep the production cookie policy and candidate source unchanged; record any local adapter in private operator configuration. Verify a browser session survives current-user lookup after login, not just that the password request returned 200. Test the reviewer’s browser engine as well as the default automated browser. Runner remapping must use the runner credential format and pass language discovery plus queued execution in the review instance itself.
