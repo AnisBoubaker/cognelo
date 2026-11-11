@@ -5,6 +5,7 @@ This file is intentionally short. It records only cross-cutting decisions that a
 ## Platform Invariants
 
 - [User name changes](USER_PROFILES.md) are controlled by the default-on instance policy in Settings → Users. Enforce it on self-service profile writes; administrators always retain name-edit access. Never use this policy to block password changes.
+- Gradebook rows and grade exports resolve current linked-account names at read time, falling back to enrollment names for pending/nameless accounts. Never rewrite enrollment or academic snapshots to repair display names. See [participant names](GRADEBOOK_IMPLEMENTATION_PLAN.md#current-participant-names).
 
 - Activity assignment section tabs use ascending locale-aware natural title order, consistent with course selectors. Gradebook group choices come from all authorized course sections, independent of result filters; never derive them from filtered gradebook items or rows. Keep empty sections selectable. See [gradebook behavior](GRADEBOOK_IMPLEMENTATION_PLAN.md).
 

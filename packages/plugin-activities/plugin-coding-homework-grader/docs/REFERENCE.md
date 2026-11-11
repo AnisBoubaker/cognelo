@@ -8,6 +8,8 @@ The activity and plugin are displayed as **Programming Homework**, with localize
 
 ## Current state
 
+Submission management resolves students from their current account identity. Core Student results, review headers and grade exports follow the same current-name policy, with enrollment names as a fallback for pending/nameless accounts. Profile/admin renames, including earlier changes, require no submission rewrite or data backfill. See [gradebook participant names](../../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md#current-participant-names).
+
 Teacher background guidance is attached to its heading or label through shared contextual help. The circled question mark follows the text on the same line; hover/focus reveals the explanation and click/tap pins it. Preserve input/heading accessible names, description associations and draft/save behavior. Errors and warnings continue through existing notifications. See [the shared contract](../../../../docs/CONTEXTUAL_HELP.md).
 
 Teachers author the assignment, private C solution, selected function signatures and required paths. Students upload individual files at the root or a replacement ZIP with its folder structure preserved. The UI offers no destination-folder selector or folder-creation action; the preparation API retains path/folder compatibility. Students manage the persisted revisioned file collection, validate and acknowledge academic gaps, and explicitly hand it in after teacher enablement. No browser code editing, execution tests or automatic correctness grading are introduced.

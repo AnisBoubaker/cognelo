@@ -1,5 +1,7 @@
 # Browser user flows
 
+`gradebook-current-names.spec.ts` submits homework under an imported name, changes the account name through profile and administrator APIs, and checks matching submission-list, Student results, review-header and grade-export names. Pending enrollments retain their entered names; stored enrollments and submitted attempts stay unchanged.
+
 `user-name-policy.spec.ts` covers the administrator name-change switch, Save/Cancel/reload, stale profile drafts and unauthorized API writes, admin name edits, password changes and renewed/fresh sessions while names are locked, re-enabling names, and policy-load failure. It restores the original policy and removes its disposable account.
 
 `ai-model-connections.spec.ts` verifies one credential with multiple model names, account/course selectors, token-preserving edits and redaction, Codex/Ollama embedding reuse and invalidation, frozen queued generation choices, and OpenAI/Claude rubric generation. `atomic-ai-grading.spec.ts` also verifies that compound and standalone grading use the course model override. Only local provider boundaries are simulated; API, persistence, queues and browser controls remain real.

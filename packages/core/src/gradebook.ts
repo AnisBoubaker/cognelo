@@ -1430,7 +1430,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
               where: { role: "student" },
               orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { email: "asc" }],
               include: {
-                user: { select: { id: true, email: true, name: true } }
+                user: { select: { id: true, email: true, name: true, firstName: true, lastName: true } }
               }
             }
           }
@@ -1506,6 +1506,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
     activities.set(baseItem.activity.id, { id: baseItem.activity.id, title: baseItem.activity.title });
 
     return baseItem.group.participants.flatMap((participant) => {
+      const participantNames = gradebookParticipantNames(participant);
       const item = applyGradebookExceptions(baseItem, exceptionsForParticipant(exceptions, baseItem.groupActivity.id, participant.id));
       const grade = item.grades.find((candidate) => candidate.participantId === participant.id) ?? null;
       const attempts = item.attempts.filter((attempt) => attempt.participantId === participant.id);
@@ -1535,10 +1536,10 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         assessmentMode,
         gradesReleased: item.gradesReleased,
         participantId: participant.id,
-        participantName: formatParticipantName(participant),
+        participantName: participantNames.name,
         participantEmail: participant.email,
-        participantFirstName: participant.firstName,
-        participantLastName: participant.lastName,
+        participantFirstName: participantNames.firstName,
+        participantLastName: participantNames.lastName,
         externalId: participant.externalId,
         status,
         score: effectiveGrade?.normalizedScore ?? null,
@@ -2379,9 +2380,28 @@ function deletedSubmissionAuditsForParticipant(
     });
 }
 
-function formatParticipantName(participant: { firstName: string; lastName: string; email: string }) {
-  const name = `${participant.firstName} ${participant.lastName}`.trim();
-  return name || participant.email;
+function gradebookParticipantNames(participant: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  user?: { firstName?: string | null; lastName?: string | null; name?: string | null } | null;
+}) {
+  // Enrollment names remain a fallback for pending accounts. Resolve linked
+  // account names at read time so earlier profile edits are reflected too.
+  let firstName = participant.user?.firstName?.trim() ?? "";
+  let lastName = participant.user?.lastName?.trim() ?? "";
+  if (!firstName && !lastName) {
+    const legacyName = participant.user?.name?.trim();
+    if (legacyName) {
+      const [first, ...rest] = legacyName.split(/\s+/);
+      firstName = first;
+      lastName = rest.join(" ");
+    } else {
+      firstName = participant.firstName;
+      lastName = participant.lastName;
+    }
+  }
+  return { firstName, lastName, name: `${firstName} ${lastName}`.trim() || participant.email };
 }
 
 

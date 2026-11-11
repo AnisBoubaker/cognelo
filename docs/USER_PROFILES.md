@@ -2,7 +2,7 @@
 
 Administrators configure **Allow users to change their first and last names** at **Settings → Users**. The shared On/Off switch uses Save/Cancel and the unsaved-change guard. It is enabled by default, preserving existing behavior for both new installations and upgrades.
 
-When disabled, all non-admin accounts, including teachers and course managers, see read-only first/last name fields in **Settings → Profile**. The profile heading's contextual help explains the restriction, and the name Save/Cancel bar is omitted. Administrators can always change their own names and edit anyone's name through user management. The policy affects account profile names, not retained enrollment or academic snapshots.
+When disabled, all non-admin accounts, including teachers and course managers, see read-only first/last name fields in **Settings → Profile**. The profile heading's contextual help explains the restriction, and the name Save/Cancel bar is omitted. Administrators can always change their own names and edit anyone's name through user management. The policy affects account profile names, not retained enrollment or academic snapshots. The [gradebook](GRADEBOOK_IMPLEMENTATION_PLAN.md#current-participant-names) resolves current linked-account names for Student results, review headers and grade exports, with enrollment names as a fallback for pending accounts.
 
 Password changes remain available independently, including when the name policy cannot be loaded. The existing current-password check, password validation, concurrent-update protection, session invalidation and renewal behavior remain in force. Email changes remain administrator-only.
 

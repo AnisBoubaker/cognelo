@@ -85,6 +85,7 @@ const {
   getActivityAttemptRegradeContexts,
   getActivityAttemptAvailability,
   getCourseGradebook,
+  getCourseGradebookCsv,
   getStudentReleasedGrades,
   getStudentActivitySubmissionAudit,
   listCourseActivityInProgressAttempts,
@@ -981,6 +982,36 @@ describe("gradebook attempt services", () => {
         ]
       }]
     });
+  });
+
+  it.each([
+    { account: { firstName: "Current", lastName: "Learner", name: "Current Learner" }, firstName: "Current", lastName: "Learner" },
+    { account: { firstName: null, lastName: null, name: "Legacy Family Name" }, firstName: "Legacy", lastName: "Family Name" },
+    { account: { firstName: "Onlyname", lastName: null, name: null }, firstName: "Onlyname", lastName: "" },
+    { account: null, firstName: "Imported", lastName: "Placeholder" },
+    { account: { firstName: "", lastName: null, name: "  " }, firstName: "Imported", lastName: "Placeholder" }
+  ])("resolves current gradebook and export names with enrollment fallback: $firstName $lastName", async ({ account, firstName, lastName }) => {
+    const enrollment = { id: "participant-1", firstName: "Imported", lastName: "Placeholder", email: "student@example.test", externalId: "S001", user: account };
+    mockPrisma.gradebookItem.findMany.mockResolvedValue([{
+      id: "gradebook-item-1", activityId: "activity-1", groupId: "group-1", pointsPossible: 100, titleSnapshot: "Homework",
+      group: { id: "group-1", title: "Section A", participants: [enrollment] },
+      activity: { id: "activity-1", title: "Homework", activityType: { key: "coding-homework-grader", name: "Programming Homework" } },
+      groupActivity: { id: "assignment-1", metadata: { assessmentMode: "summative" } }, grades: [], attempts: [], events: []
+    }]);
+    const name = `${firstName} ${lastName}`.trim();
+    await expect(getCourseGradebook(teacherUser, "course-1")).resolves.toMatchObject({ rows: [{
+      participantId: enrollment.id, participantName: name, participantFirstName: firstName, participantLastName: lastName,
+      participantEmail: enrollment.email, externalId: "S001", status: "missing"
+    }] });
+    expect(await getCourseGradebookCsv(teacherUser, "course-1")).toContain(name);
+    // Display changes neither enrollment evidence nor academic state.
+    expect(enrollment).toMatchObject({ firstName: "Imported", lastName: "Placeholder" });
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.gradebookItem.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({ group: { select: expect.objectContaining({ participants: expect.objectContaining({
+        include: { user: { select: { id: true, email: true, name: true, firstName: true, lastName: true } } }
+      }) }) } })
+    }));
   });
 
   it("orders gradebook activities by their depth-first course content placement", async () => {

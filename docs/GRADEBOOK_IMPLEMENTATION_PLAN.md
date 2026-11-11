@@ -21,6 +21,10 @@ It is intentionally a planning artifact. Implementation should proceed iterative
 - Grades attach to a `CourseGroupParticipant`, with optional linked `User` for participants who have activated their account.
 - This matches the current enrollment model where participants can exist before platform users.
 
+### Current participant names
+
+Student results and its review dialogs display the linked account's current first/last name. CSV/XLSX grade exports use the same resolved name fields. Legacy accounts with only a display name remain supported; pending participants and accounts without a usable name fall back to the enrollment names, then email. Resolve names at read time so existing profile/admin renames take effect without a backfill. Keep enrollment identity, external IDs, attempts, grades and historical audit snapshots unchanged. This shared behavior applies to every activity and agrees with Programming Homework's account-based submission list. Regression coverage: `gradebook-current-names.spec.ts` and core gradebook tests.
+
 ### Attempts
 
 - Implemented: [Reopen last submission](SUBMISSION_CONTINUATION.md) restores the same attempt and answers using the original start and current effective settings, including later extensions/student exceptions. Its former grade is withdrawn/recomputed and prior submission evidence is audited.
