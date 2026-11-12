@@ -26,7 +26,10 @@ export async function GET(request: NextRequest, { params }: Params) {
     const filters = {
       groupId: searchParams.get("groupId") || null,
       activityId: searchParams.get("activityId") || null,
-      status: parseStatus(searchParams.get("status"))
+      status: parseStatus(searchParams.get("status")),
+      ...(searchParams.get("view") === "summary" || searchParams.get("assessmentMode") === "summative" ? { assessmentMode: "summative" as const } : {}),
+      ...(searchParams.get("query")?.trim() ? { query: searchParams.get("query")!.trim().slice(0, 200) } : {}),
+      ...(searchParams.get("conceptId") ? { conceptId: searchParams.get("conceptId")!.slice(0, 200) } : {})
     };
 
     if (searchParams.get("view") === "in-progress-attempts") {

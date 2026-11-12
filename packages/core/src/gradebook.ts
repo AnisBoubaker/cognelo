@@ -1241,6 +1241,9 @@ export type CourseGradebookFilters = {
   groupId?: string | null;
   activityId?: string | null;
   status?: CourseGradebookStatusFilter | null;
+  assessmentMode?: "summative" | null;
+  query?: string | null;
+  conceptId?: string | null;
 };
 
 export type CourseActivityInProgressAttempt = {
@@ -1439,6 +1442,8 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
           select: {
             id: true,
             title: true,
+            description: true,
+            knowledgeConcepts: { select: { conceptId: true, concept: { select: { id: true, title: true } } } },
             activityType: { select: { key: true, name: true } }
           }
         },
@@ -1488,8 +1493,9 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
       orderBy: [{ title: "asc" }, { id: "asc" }]
     })
   ]);
-  const activityOrder = buildGradebookActivityOrder(unorderedItems, contentItems);
-  const items = [...unorderedItems].sort((left, right) => {
+  const eligibleItems = unorderedItems.filter((item) => !filters.assessmentMode || assignmentAssessmentMode(item.groupActivity.metadata) === filters.assessmentMode);
+  const activityOrder = buildGradebookActivityOrder(eligibleItems, contentItems);
+  const orderedItems = [...eligibleItems].sort((left, right) => {
     const leftOrder = activityOrder.get(left.activityId) ?? Number.POSITIVE_INFINITY;
     const rightOrder = activityOrder.get(right.activityId) ?? Number.POSITIVE_INFINITY;
     return leftOrder - rightOrder
@@ -1500,10 +1506,18 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
   });
 
   const activities = new Map<string, { id: string; title: string }>();
+  const concepts = new Map<string, { id: string; title: string }>();
+  for (const item of orderedItems) {
+    activities.set(item.activity.id, { id: item.activity.id, title: item.activity.title });
+    for (const link of item.activity.knowledgeConcepts ?? []) concepts.set(link.conceptId, link.concept);
+  }
+  const query = filters.query?.trim().toLocaleLowerCase() ?? "";
+  const items = orderedItems.filter((item) => (
+    !query || `${item.activity.title}\n${item.titleSnapshot ?? ""}\n${item.activity.description ?? ""}`.toLocaleLowerCase().includes(query)
+  ) && (!filters.conceptId || item.activity.knowledgeConcepts?.some((link) => link.conceptId === filters.conceptId)));
 
   const exceptions = await loadAssignmentExceptions(items.map((item) => item.groupActivity.id));
   const rows = items.flatMap((baseItem) => {
-    activities.set(baseItem.activity.id, { id: baseItem.activity.id, title: baseItem.activity.title });
 
     return baseItem.group.participants.flatMap((participant) => {
       const participantNames = gradebookParticipantNames(participant);
@@ -1580,10 +1594,14 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
     filters: {
       groupId: filters.groupId ?? null,
       activityId: filters.activityId ?? null,
-      status: statusFilter
+      status: statusFilter,
+      ...(filters.assessmentMode ? { assessmentMode: filters.assessmentMode } : {}),
+      ...(filters.query ? { query: filters.query } : {}),
+      ...(filters.conceptId ? { conceptId: filters.conceptId } : {})
     },
     groups: availableGroups,
     activities: [...activities.values()],
+    concepts: [...concepts.values()],
     items: items.map((item) => ({
       gradebookItemId: item.id,
       groupId: item.group.id,

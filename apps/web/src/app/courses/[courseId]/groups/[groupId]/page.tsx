@@ -184,7 +184,8 @@ export default function CourseGroupPage() {
       const gradebookResult = await api.courseGradebook(courseId, {
         groupId,
         activityId: gradebookActivityId || undefined,
-        status: gradebookStatus
+        status: gradebookStatus,
+        assessmentMode: "summative"
       });
       setGradebook(gradebookResult.gradebook);
       setStudentGrades(null);
@@ -1608,7 +1609,8 @@ export default function CourseGroupPage() {
                           href={api.courseGradebookCsvUrl(courseId, {
                             groupId,
                             activityId: gradebookActivityId || undefined,
-                            status: gradebookStatus
+                            status: gradebookStatus,
+                            assessmentMode: "summative"
                           })}
                         >
                           <AppIcon name="download" />

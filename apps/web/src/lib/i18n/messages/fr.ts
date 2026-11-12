@@ -1032,6 +1032,10 @@ export const frMessages = {
       loadError: "Impossible de charger le cours."
     },
     courseDetail: {
+    "activitySearch": "Rechercher des activités",
+    "activitySearchPlaceholder": "Titre ou description",
+    "targetedConceptFilter": "Concept ciblé",
+    "allTargetedConcepts": "Tous les concepts",
     teamworkEnabled: "Travail en équipe",
     teamworkHelp: "Une remise commune par équipe. Choisissez le regroupement et la permission de remise individuelle de chaque section dans Affectation.",
     teamworkGrouping: "Regroupement des équipes",

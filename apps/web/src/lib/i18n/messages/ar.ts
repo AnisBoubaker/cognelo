@@ -983,6 +983,10 @@ export const arMessages = {
       pluginsAdminOnly: "إعدادات الإضافات متاحة للمديرين."
     },
     courseDetail: {
+    "activitySearch": "البحث عن الأنشطة",
+    "activitySearchPlaceholder": "العنوان أو الوصف",
+    "targetedConceptFilter": "المفهوم المستهدف",
+    "allTargetedConcepts": "كل المفاهيم",
     teamworkEnabled: "العمل الجماعي",
     teamworkHelp: "تسليم مشترك لكل فريق. اختر التجميع وسياسة التسليم الفردي لكل شعبة في تبويب التكليف.",
     teamworkGrouping: "تجميع الفرق",

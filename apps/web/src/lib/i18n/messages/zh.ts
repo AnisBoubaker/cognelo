@@ -1031,6 +1031,10 @@ export const zhMessages = {
       loadError: "无法加载课程。"
     },
     courseDetail: {
+    "activitySearch": "搜索活动",
+    "activitySearchPlaceholder": "标题或描述",
+    "targetedConceptFilter": "目标概念",
+    "allTargetedConcepts": "所有概念",
     teamworkEnabled: "团队作业",
     teamworkHelp: "每个团队共用一份提交。在分配中为每个班级选择分组和个人提交规则。",
     teamworkGrouping: "团队分组",

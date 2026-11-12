@@ -1196,14 +1196,27 @@ export type WebDesignExerciseSubmission = {
 
 export type GradebookStatus = "all" | "missing" | "late" | "needs_grading" | "graded";
 
+export type GradebookFilters = {
+  groupId?: string;
+  activityId?: string;
+  status?: GradebookStatus;
+  assessmentMode?: "summative";
+  query?: string;
+  conceptId?: string;
+};
+
 export type CourseGradebook = {
   filters: {
     groupId: string | null;
     activityId: string | null;
     status: GradebookStatus;
+    assessmentMode?: "summative";
+    query?: string;
+    conceptId?: string;
   };
   groups: Array<{ id: string; title: string }>;
   activities: Array<{ id: string; title: string }>;
+  concepts?: Array<{ id: string; title: string }>;
   items: CourseGradebookItemSummary[];
   rows: CourseGradebookRow[];
 };
@@ -1212,6 +1225,7 @@ export type CourseGradebookSummary = {
   filters: CourseGradebook["filters"];
   groups: CourseGradebook["groups"];
   activities: CourseGradebook["activities"];
+  concepts?: CourseGradebook["concepts"];
   overview: {
     activityCount: number;
     submissionCount: number;
@@ -1943,8 +1957,11 @@ export const api = {
     }),
   removeCourseMembership: (courseId: string, membershipId: string) =>
     request<{ ok: true }>(`/courses/${courseId}/memberships/${membershipId}`, { method: "DELETE" }),
-  courseGradebook: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
+  courseGradebook: (courseId: string, filters?: GradebookFilters) => {
     const params = new URLSearchParams();
+    if (filters?.assessmentMode) params.set("assessmentMode", filters.assessmentMode);
+    if (filters?.query) params.set("query", filters.query);
+    if (filters?.conceptId) params.set("conceptId", filters.conceptId);
     if (filters?.groupId) {
       params.set("groupId", filters.groupId);
     }
@@ -1957,8 +1974,10 @@ export const api = {
     const query = params.toString();
     return request<{ gradebook: CourseGradebook }>(`/courses/${courseId}/gradebook${query ? `?${query}` : ""}`);
   },
-  courseGradebookSummary: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
+  courseGradebookSummary: (courseId: string, filters?: GradebookFilters) => {
     const params = new URLSearchParams({ view: "summary" });
+    if (filters?.query) params.set("query", filters.query);
+    if (filters?.conceptId) params.set("conceptId", filters.conceptId);
     if (filters?.groupId) {
       params.set("groupId", filters.groupId);
     }
@@ -2035,8 +2054,11 @@ export const api = {
     request<{ readAt: string }>(`/courses/${courseId}/gradebook/activities/${activityId}/messages/conversations/${participantId}`, { method: "PATCH", body: JSON.stringify({ lastMessageId, attemptId }) }),
   sendLearnerActivityMessage: (courseId: string, groupId: string, activityId: string, body: string, testItem?: ActivityMessageTestItemInput) =>
     request<{ sent: boolean }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/messages`, { method: "POST", body: JSON.stringify({ body, testItem }) }),
-  courseGradebookCsvUrl: (courseId: string, filters?: { groupId?: string; activityId?: string; status?: GradebookStatus }) => {
+  courseGradebookCsvUrl: (courseId: string, filters?: GradebookFilters) => {
     const params = new URLSearchParams({ format: "csv" });
+    if (filters?.assessmentMode) params.set("assessmentMode", filters.assessmentMode);
+    if (filters?.query) params.set("query", filters.query);
+    if (filters?.conceptId) params.set("conceptId", filters.conceptId);
     if (filters?.groupId) {
       params.set("groupId", filters.groupId);
     }

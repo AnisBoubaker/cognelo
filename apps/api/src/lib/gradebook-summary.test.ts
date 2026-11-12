@@ -10,6 +10,7 @@ describe("summarizeCourseGradebook", () => {
         { id: "group-a", title: "Section A" }
       ],
       activities: [{ id: "activity-1", title: "Loops" }],
+      concepts: [{ id: "concept-1", title: "Loops" }],
       items: [
         {
           gradebookItemId: "item-b",
@@ -78,6 +79,7 @@ describe("summarizeCourseGradebook", () => {
       meanScore: 14,
       meanMaxScore: 20
     });
+    expect(summary.concepts).toEqual([{ id: "concept-1", title: "Loops" }]);
     expect(summary.activitySummaries).toEqual([
       expect.objectContaining({
         activityId: "activity-1",
@@ -106,6 +108,7 @@ describe("summarizeCourseGradebook", () => {
         { id: "activity-zebra", title: "Zebra first" },
         { id: "activity-alpha", title: "Alpha second" }
       ],
+      concepts: [],
       items: [
         gradebookItem({ activityId: "activity-zebra", activityTitle: "Zebra first", gradebookItemId: "item-zebra" }),
         gradebookItem({ activityId: "activity-alpha", activityTitle: "Alpha second", gradebookItemId: "item-alpha" })

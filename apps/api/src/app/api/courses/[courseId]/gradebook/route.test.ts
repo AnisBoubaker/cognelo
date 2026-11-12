@@ -86,6 +86,17 @@ describe("course gradebook route", () => {
     });
     expect(JSON.stringify(body)).not.toContain("private-participant");
     expect(JSON.stringify(body)).not.toContain("private-attempt");
+    expect(mocks.getCourseGradebook).toHaveBeenCalledWith(expect.anything(), "course-1", expect.objectContaining({ assessmentMode: "summative" }));
+  });
+
+  it("uses the same activity search/concept/summative filters for summary and CSV", async () => {
+    mocks.getCourseGradebookCsv.mockResolvedValue("Group,Activity\n");
+    const query = "query=%20LOOPS%20&conceptId=concept-1&groupId=group-1";
+    await GET(new NextRequest(`http://test.local/api/courses/course-1/gradebook?view=summary&${query}`), params);
+    const filters = expect.objectContaining({ groupId: "group-1", assessmentMode: "summative", query: "LOOPS", conceptId: "concept-1" });
+    expect(mocks.getCourseGradebook).toHaveBeenCalledWith(expect.anything(), "course-1", filters);
+    await GET(new NextRequest(`http://test.local/api/courses/course-1/gradebook?format=csv&assessmentMode=summative&${query}`), params);
+    expect(mocks.getCourseGradebookCsv).toHaveBeenCalledWith(expect.anything(), "course-1", filters);
   });
 
   it("returns a lightweight in-progress attempt feed without loading the full gradebook", async () => {

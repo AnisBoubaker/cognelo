@@ -1211,6 +1211,42 @@ describe("gradebook attempt services", () => {
     });
   });
 
+  it("filters summative assignments by title/description and targeted concept while retaining filter choices", async () => {
+    const item = (id: string, title: string, description: string, assessmentMode: string, conceptId?: string) => ({
+      id: `item-${id}`, activityId: id, groupId: "group-1", titleSnapshot: title, pointsPossible: 100, gradesReleased: false,
+      group: { id: "group-1", title: "Section A", participants: [{ id: "participant-1", firstName: "A", lastName: "Student", email: "student@example.test", user: null }] },
+      activity: { id, title, description, activityType: { key: "mcq", name: "Multiple choice" },
+        knowledgeConcepts: conceptId ? [{ conceptId, concept: { id: conceptId, title: conceptId } }] : [] },
+      groupActivity: { id: `assignment-${id}`, metadata: { assessmentMode }, availableFrom: null, availableUntil: null },
+      grades: [], attempts: [], events: []
+    });
+    mockPrisma.gradebookItem.findMany.mockResolvedValue([
+      item("sum-loops", "Loops quiz", "Count repetitions", "summative", "loops"),
+      item("sum-branches", "Decision quiz", "LOOPS with conditions", "summative", "branches"),
+      item("practice", "Loops practice", "LOOPS", "formative", "practice-only"),
+      item("practice-ai", "Guided loops", "LOOPS", "formative_ai", "practice-only")
+    ]);
+    const filters = { assessmentMode: "summative" as const, query: "  LoOpS  " };
+    const result = await getCourseGradebook(teacherUser, "course-1", filters);
+    expect(result.items.map(item => item.activityId).sort()).toEqual(["sum-branches", "sum-loops"]);
+    expect(result.rows.map(row => row.activityId).sort()).toEqual(["sum-branches", "sum-loops"]);
+    expect(result.activities.map(activity => activity.id).sort()).toEqual(["sum-branches", "sum-loops"]);
+    expect(result.concepts.map(concept => concept.id).sort()).toEqual(["branches", "loops"]);
+    const intersection = await getCourseGradebook(teacherUser, "course-1", { ...filters, conceptId: "branches" });
+    expect(intersection.items.map(item => item.activityId)).toEqual(["sum-branches"]);
+    expect(intersection.concepts).toEqual(result.concepts);
+    const csv = await getCourseGradebookCsv(teacherUser, "course-1", { ...filters, conceptId: "branches" });
+    expect(csv).toContain("Decision quiz");
+    expect(csv).not.toContain("Loops quiz");
+    expect(csv).not.toContain("Loops practice");
+    const empty = await getCourseGradebook(teacherUser, "course-1", { ...filters, conceptId: "foreign-concept" });
+    expect(empty.items).toEqual([]);
+    expect(empty.rows).toEqual([]);
+    expect(empty.concepts).toEqual(result.concepts);
+    // The detailed activity report continues to inspect ordinary formative work.
+    expect((await getCourseGradebook(teacherUser, "course-1")).items).toHaveLength(4);
+  });
+
   it("keeps all authorized section choices when a group/activity/status filter has no results", async () => {
     authMocks.assertCanViewCourseGradebook.mockResolvedValueOnce({ gradingGroupIds: ["group-1", "group-2"] });
     const groups = [{ id: "group-1", title: "Section A" }, { id: "group-2", title: "Section B" }];

@@ -97,6 +97,10 @@ export default function CourseDetailPage() {
   const [gradebookGroupId, setGradebookGroupId] = useState(() => searchParams.get("tab") === "gradebook" ? searchParams.get("groupId") ?? "" : "");
   const [gradebookActivityId, setGradebookActivityId] = useState("");
   const [gradebookStatus, setGradebookStatus] = useState<GradebookStatus>("all");
+  const [gradebookSearch, setGradebookSearch] = useState("");
+  const [gradebookQuery, setGradebookQuery] = useState("");
+  const [gradebookConcept, setGradebookConcept] = useState<{ id: string; title: string } | null>(null);
+  const gradebookConceptId = gradebookConcept?.id ?? "";
   const [savingReleaseItemId, setSavingReleaseItemId] = useState<string | null>(null);
   const [gradeReleaseProgress, setGradeReleaseProgress] = useState<{ completed: number; total: number; released: boolean } | null>(null);
   const [expandedGradebookActivityIds, setExpandedGradebookActivityIds] = useState<Set<string>>(new Set());
@@ -164,6 +168,11 @@ export default function CourseDetailPage() {
     }
   }, [requestedContentGroupId]);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setGradebookQuery(gradebookSearch.trim()), 250);
+    return () => window.clearTimeout(timeout);
+  }, [gradebookSearch]);
+
   const refresh = useCallback(async ({ showContentLoading = false }: { showContentLoading?: boolean } = {}) => {
     const requestId = ++refreshRequestIdRef.current;
     const isCurrentRequest = () => refreshRequestIdRef.current === requestId;
@@ -223,7 +232,9 @@ export default function CourseDetailPage() {
         ? api.courseGradebookSummary(courseId, {
             groupId: gradebookGroupId || undefined,
             activityId: gradebookActivityId || undefined,
-            status: gradebookStatus
+            status: gradebookStatus,
+            query: gradebookQuery || undefined,
+            conceptId: gradebookConceptId || undefined
           }).then((gradebookResult) => {
             if (isCurrentRequest()) setGradebook(gradebookResult.gradebook);
           }).finally(() => {
@@ -255,7 +266,7 @@ export default function CourseDetailPage() {
       setGradebookLoading(false);
       throw err;
     }
-  }, [activeCourseTab, canViewSubjectCatalog, courseId, gradebookActivityId, gradebookGroupId, gradebookStatus, requestedContentGroupId]);
+  }, [activeCourseTab, canViewSubjectCatalog, courseId, gradebookActivityId, gradebookGroupId, gradebookStatus, gradebookQuery, gradebookConceptId, requestedContentGroupId]);
 
   useEffect(() => {
     refresh({ showContentLoading: true }).catch((err) => setError(err instanceof Error ? err.message : t("courseDetail.loadError")));
@@ -361,6 +372,13 @@ export default function CourseDetailPage() {
   );
   const studentRedirectGroupId = course && !canManage ? sortedCourseGroups[0]?.id : null;
   const gradebookActivities = gradebook?.activitySummaries ?? [];
+  const gradebookConcepts = useMemo(
+    () => [
+      ...(gradebook?.concepts ?? []),
+      ...(gradebookConcept && !gradebook?.concepts?.some((concept) => concept.id === gradebookConcept.id) ? [gradebookConcept] : [])
+    ].sort((left, right) => left.title.localeCompare(right.title, locale, { numeric: true, sensitivity: "base" })),
+    [gradebook?.concepts, gradebookConcept, locale]
+  );
   const gradebookOverview = gradebook?.overview ?? {
     activityCount: 0,
     submissionCount: 0,
@@ -1949,6 +1967,18 @@ export default function CourseDetailPage() {
                     <section className="section stack course-gradebook-overview" aria-label={t("courseDetail.gradebookTitle")}>
                       <div className="gradebook-filters">
                         <div className="field">
+                          <label htmlFor="gradebook-search-filter">{t("courseDetail.activitySearch")}</label>
+                          <input id="gradebook-search-filter" type="search" maxLength={200} value={gradebookSearch}
+                            placeholder={t("courseDetail.activitySearchPlaceholder")} onChange={(event) => setGradebookSearch(event.target.value)} />
+                        </div>
+                        <div className="field">
+                          <label htmlFor="gradebook-concept-filter">{t("courseDetail.targetedConceptFilter")}</label>
+                          <select id="gradebook-concept-filter" value={gradebookConceptId} onChange={(event) => setGradebookConcept(gradebookConcepts.find((concept) => concept.id === event.target.value) ?? null)}>
+                            <option value="">{t("courseDetail.allTargetedConcepts")}</option>
+                            {gradebookConcepts.map((concept) => <option key={concept.id} value={concept.id}>{concept.title}</option>)}
+                          </select>
+                        </div>
+                        <div className="field">
                           <label htmlFor="gradebook-group-filter">{t("courseDetail.groupFilter")}</label>
                           <select id="gradebook-group-filter" value={gradebookGroupId} onChange={(event) => setGradebookGroupId(event.target.value)}>
                             <option value="">{t("courseDetail.allGroups")}</option>
@@ -1991,7 +2021,10 @@ export default function CourseDetailPage() {
                         <a className="button secondary gradebook-csv-export" href={api.courseGradebookCsvUrl(courseId, {
                           groupId: gradebookGroupId || undefined,
                           activityId: gradebookActivityId || undefined,
-                          status: gradebookStatus
+                          status: gradebookStatus,
+                          assessmentMode: "summative",
+                          query: gradebookQuery || undefined,
+                          conceptId: gradebookConceptId || undefined
                         })}><AppIcon name="download" />{t("courseDetail.exportCsv")}</a>
                       </div>
 

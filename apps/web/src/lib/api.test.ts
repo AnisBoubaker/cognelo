@@ -273,6 +273,19 @@ describe("web API client", () => {
     expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: API_UNAUTHORIZED_EVENT }));
   });
 
+  it("carries gradebook text/concept filters to the summary and matching summative CSV", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ gradebook: {} }));
+    const filters = { assessmentMode: "summative" as const, query: "Loops & conditions", conceptId: "concept-1", groupId: "group-1" };
+    await api.courseGradebookSummary("course-1", filters);
+    const summaryUrl = new URL(vi.mocked(fetch).mock.calls[0][0] as string);
+    expect(summaryUrl.searchParams.get("query")).toBe(filters.query);
+    expect(summaryUrl.searchParams.get("conceptId")).toBe(filters.conceptId);
+    const csvUrl = new URL(api.courseGradebookCsvUrl("course-1", filters));
+    expect(csvUrl.searchParams.get("query")).toBe(filters.query);
+    expect(csvUrl.searchParams.get("conceptId")).toBe(filters.conceptId);
+    expect(csvUrl.searchParams.get("assessmentMode")).toBe("summative");
+  });
+
   it("returns an empty object for empty successful responses", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }));
 

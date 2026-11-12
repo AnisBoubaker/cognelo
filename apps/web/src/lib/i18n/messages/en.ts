@@ -1026,6 +1026,10 @@ export const enMessages = {
       loadError: "Unable to load course."
     },
     courseDetail: {
+    "activitySearch": "Search activities",
+    "activitySearchPlaceholder": "Title or description",
+    "targetedConceptFilter": "Targeted concept",
+    "allTargetedConcepts": "All concepts",
     teamworkEnabled: "Team work",
     teamworkHelp: "One shared hand-in per team. Choose the grouping and individual-submission policy for each section in Assignment.",
     teamworkGrouping: "Team grouping",

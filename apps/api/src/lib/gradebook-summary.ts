@@ -73,6 +73,7 @@ export function summarizeCourseGradebook(gradebook: ResolvedCourseGradebook) {
     filters: gradebook.filters,
     groups: gradebook.groups,
     activities: gradebook.activities,
+    concepts: gradebook.concepts,
     overview: buildGradebookOverview(activitySummaries),
     activitySummaries
   };

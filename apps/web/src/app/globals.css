@@ -5008,7 +5008,7 @@ button:hover > .disclosure-indicator {
 .course-gradebook-overview .gradebook-filters {
   align-items: end;
   gap: 12px;
-  grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.5fr) minmax(140px, 1fr) auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .course-gradebook-overview .gradebook-filters label {
@@ -5016,12 +5016,14 @@ button:hover > .disclosure-indicator {
   font-size: 0.8rem;
 }
 
-.course-gradebook-overview .gradebook-filters select {
+.course-gradebook-overview .gradebook-filters select,
+.course-gradebook-overview .gradebook-filters input {
   min-height: 38px;
   font-size: 0.875rem;
 }
 
 .gradebook-csv-export {
+  justify-self: end;
   gap: 6px;
   min-height: 38px;
   font-size: 0.85rem;
@@ -5171,6 +5173,12 @@ button:hover > .disclosure-indicator {
 
   .gradebook-metric-label {
     display: inline;
+  }
+}
+
+@media (max-width: 600px) {
+  .course-gradebook-overview .gradebook-filters {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
