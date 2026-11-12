@@ -65,6 +65,8 @@ import type {
 import type { ActivityVersionDiff, TestRegradeProgress, TestRegradeItemResult } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import { ACTIVITY_CONTENT_CLOSED_EVENT } from "@cognelo/activity-ui";
+import { isSystemErrorCode, type SystemErrorCode, type ApiErrorBody } from "@cognelo/contracts";
+import { currentSystemError } from "./system-errors";
 
 export type { StudentGroupingDto, StudentGroupingStudent, MaterialKind, SubjectKnowledgeGraphDraft, SubjectProgrammingLanguage };
 
@@ -1516,16 +1518,30 @@ export function apiAbsoluteUrl(path: string) {
 
 export class ApiError extends Error {
   code?: string;
+  systemCode?: SystemErrorCode;
   details?: unknown;
   status?: number;
 
-  constructor(message: string, options?: { code?: string; details?: unknown; status?: number }) {
+  constructor(message: string, options?: { code?: string; systemCode?: SystemErrorCode; details?: unknown; status?: number }) {
     super(message);
     this.name = "ApiError";
     this.code = options?.code;
+    this.systemCode = options?.systemCode;
     this.details = options?.details;
     this.status = options?.status;
   }
+}
+
+function systemApiError(systemCode: SystemErrorCode, options?: { code?: string; status?: number }) {
+  return new ApiError(currentSystemError(systemCode), { ...options, systemCode });
+}
+
+function responseApiError(error: Partial<ApiErrorBody["error"]> | undefined, status: number) {
+  if (status >= 500 || isSystemErrorCode(error?.systemCode)) {
+    const systemCode = isSystemErrorCode(error?.systemCode) ? error.systemCode : "SYS-001";
+    return systemApiError(systemCode, { code: error?.code, status });
+  }
+  return new ApiError(error?.message ?? "Request failed.", { code: error?.code, details: error?.details, status });
 }
 
 export const API_UNAUTHORIZED_EVENT = "cognelo:api-unauthorized";
@@ -1567,6 +1583,9 @@ async function request<T>(path: string, init?: RequestInit, onProgress?: (progre
       "Content-Type": "application/json",
       ...(init?.headers ?? {})
     }
+  }).catch((error: unknown) => {
+    if (error instanceof Error && error.name === "AbortError") throw error;
+    throw systemApiError("SYS-007");
   });
 
   if (response.ok && response.headers.get("content-type")?.includes("application/x-ndjson")) {
@@ -1588,7 +1607,7 @@ async function request<T>(path: string, init?: RequestInit, onProgress?: (progre
           if (event.type === "result") return event.result as T;
           if (event.type === "error") {
             if (event.status === 401) notifyUnauthorized();
-            throw new ApiError(event.error?.message ?? "Grading failed.", { ...event.error, status: event.status });
+            throw responseApiError(event.error, event.status);
           }
         }
         if (done) throw new ApiError("The grading response was interrupted. Refresh the results before retrying.");
@@ -1596,7 +1615,10 @@ async function request<T>(path: string, init?: RequestInit, onProgress?: (progre
     } finally { reader.releaseLock(); }
   }
 
-  const body = await response.json().catch(() => ({}));
+  const body = await response.json().catch(() => {
+    if (response.ok && response.status !== 204) throw systemApiError("SYS-008", { status: response.status });
+    return {};
+  });
   if (body?.activityContentClosed || body?.error?.code === "ACTIVITY_CONTENT_CLOSED") {
     if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(ACTIVITY_CONTENT_CLOSED_EVENT, { detail: { path } }));
     throw new ApiError("This activity is closed. Its questions and answers are no longer available.", { code: "ACTIVITY_CONTENT_CLOSED", status: 403 });
@@ -1605,11 +1627,7 @@ async function request<T>(path: string, init?: RequestInit, onProgress?: (progre
     if (response.status === 401 || body?.error?.code === "UNAUTHORIZED") {
       notifyUnauthorized();
     }
-    throw new ApiError(body?.error?.message ?? "Request failed.", {
-      code: body?.error?.code,
-      details: body?.error?.details,
-      status: response.status
-    });
+    throw responseApiError(body?.error, response.status);
   }
   return body as T;
 }

@@ -81,6 +81,7 @@ See [Browser user flows](tests/e2e/README.md) for service prerequisites, environ
 
 ## Operations
 
+- [System error code reference](docs/SYSTEM_ERRORS.md)
 - [Install on Ubuntu with Apache](docs/DEPLOYMENT_UBUNTU_APACHE.md)
 - [Upgrade and rollback](docs/DEPLOYMENT_UPGRADE_UBUNTU_APACHE.md)
 - [Security boundaries and upgrades](docs/SECURITY_BOUNDARIES.md)

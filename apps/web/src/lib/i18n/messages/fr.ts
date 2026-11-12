@@ -2,6 +2,17 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const frMessages = {
+  systemErrors: {
+    message: "Erreur système ({code}).",
+    "SYS-001": "Erreur inattendue du serveur. Consultez les journaux de l’API pour retrouver l’exception d’origine.",
+    "SYS-002": "Base de données indisponible. Vérifiez que PostgreSQL est démarré et que DATABASE_URL est accessible. En développement local avec Docker, démarrez Docker puis exécutez docker compose up -d db.",
+    "SYS-003": "Configuration de la base de données refusée. Vérifiez DATABASE_URL, les identifiants, l’existence de la base, les permissions et les paramètres TLS.",
+    "SYS-004": "Le schéma de la base est incompatible avec cette version de l’application. Exécutez npm run db:migrate:all sur la base prévue puis redémarrez les serveurs de développement.",
+    "SYS-005": "La requête à la base a expiré ou le pool de connexions est saturé. Vérifiez l’état, la charge et les limites de connexions de la base avant de réessayer.",
+    "SYS-006": "Une opération ou un service du serveur a échoué. Consultez les journaux de l’API et vérifiez la disponibilité et les identifiants du service configuré.",
+    "SYS-007": "Impossible de joindre l’API. Vérifiez que son serveur est démarré, que NEXT_PUBLIC_API_URL est correcte et que le réseau, CORS et le proxy autorisent la requête.",
+    "SYS-008": "L’API a renvoyé une réponse invalide. Consultez les journaux de l’API et du proxy et vérifiez que les versions web et API correspondent. Le démarrage exige aussi une date serveur et un fuseau IANA valides."
+  },
   testAiInstructions: {
     "action": "Remplacer les consignes de notation IA",
     "label": "Consignes de notation IA",

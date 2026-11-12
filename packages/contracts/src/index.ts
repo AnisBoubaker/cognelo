@@ -1,4 +1,6 @@
 import { SubmissionStagePoliciesSchema } from "./submission-stages";
+import type { SystemErrorCode } from "./system-errors";
+export * from "./system-errors";
 export * from "./submission-stages";
 export * from "./material-references";
 export * from "./ai-grading-runs";
@@ -1060,6 +1062,7 @@ export type ApiErrorBody = {
   error: {
     code: string;
     message: string;
+    systemCode?: SystemErrorCode;
     details?: unknown;
   };
 };

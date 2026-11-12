@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Prisma } from "@cognelo/db";
 import { z } from "zod";
 
 vi.mock("@cognelo/config", () => ({
@@ -16,6 +17,44 @@ const { listContentTypeDefinitions } = await import("@cognelo/content-type-sdk")
 const { listServerContentTypePlugins } = await import("@cognelo/content-type-sdk/server");
 
 describe("API HTTP helpers", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("returns a database support code without private details in production and logs the same code", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const outage = new Prisma.PrismaClientInitializationError("Can't reach database server at private-db.example.test:5432", "5.22.0");
+    const response = await handleRoute(async () => { throw outage; });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: {
+      code: "INTERNAL_ERROR", systemCode: "SYS-002", message: "System error (SYS-002)."
+    } });
+    expect(log).toHaveBeenCalledWith("system_error", { systemCode: "SYS-002", code: "INTERNAL_ERROR" }, outage);
+  });
+
+  it("shows actionable development diagnostics without copying raw exceptions", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await handleRoute(async () => {
+      throw new Prisma.PrismaClientInitializationError("Can't reach database server at private-db.example.test", "5.22.0", "P1001");
+    });
+    const body = await response.json();
+    expect(body.error.message).toContain("Database unavailable");
+    expect(body.error.message).toContain("docker compose up -d db");
+    expect(JSON.stringify(body)).not.toContain("private-db.example.test");
+  });
+
+  it.each(["production", "test"])("keeps unexpected and declared 5xx error details server-side in %s", async (mode) => {
+    vi.stubEnv("NODE_ENV", mode);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const [error, code, systemCode] of [
+      [new Error("secret connection string"), "INTERNAL_ERROR", "SYS-001"],
+      [new AppError(502, "PROVIDER_FAILED", "private provider response", { token: "secret" }), "PROVIDER_FAILED", "SYS-006"]
+    ] as const) {
+      const response = await handleRoute(async () => { throw error; });
+      await expect(response.json()).resolves.toEqual({ error: { code, systemCode, message: `System error (${systemCode}).` } });
+    }
+  });
+
   it("preserves plugin file bytes, content headers and status while applying host response policy", async () => {
     const bytes = new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55, 10, 0, 255]);
     const response = json(new Response(bytes, { status: 206, headers: {

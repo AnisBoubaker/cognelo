@@ -4,6 +4,8 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- [System errors](SYSTEM_ERRORS.md) use stable `SYS-xxx` support categories through shared API/client helpers. Production shows only the localized system-error label and code; development adds fixed diagnoses, never raw exceptions. Keep original machine codes for control flow, log original errors privately, and preserve mounted pages on later clock/session synchronization failures.
+
 - [User name changes](USER_PROFILES.md) are controlled by the default-on instance policy in Settings → Users. Enforce it on self-service profile writes; administrators always retain name-edit access. Never use this policy to block password changes.
 - Gradebook rows and grade exports resolve current linked-account names at read time, falling back to enrollment names for pending/nameless accounts. Never rewrite enrollment or academic snapshots to repair display names. See [participant names](GRADEBOOK_IMPLEMENTATION_PLAN.md#current-participant-names).
 

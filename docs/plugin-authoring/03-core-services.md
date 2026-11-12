@@ -257,6 +257,8 @@ If your plugin adds a route such as:
 
 then the matching browser-side helper should usually be added to `apps/web/src/lib/api.ts`.
 
+These shared helpers carry [system error codes](../SYSTEM_ERRORS.md): unexpected database/server failures and thrown HTTP 5xx `AppError`s receive a stable support category, while existing machine codes stay available for control flow. Preserve `ApiError.message`/`systemCode` in UI notifications rather than replacing infrastructure failures with a validation message. Keep private exception/provider details server-side; custom transports must adopt the same policy explicitly.
+
 ## Activity Renderers
 
 Activity renderers are mapped in:

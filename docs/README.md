@@ -13,6 +13,7 @@ This is the routing page for repository-maintained documentation. Read the small
 - [Platform details](reference/PLATFORM_DETAILS.md): exhaustive current feature, API, data-model, seed, development, deployment-summary, and frontend notes formerly kept in the root README. Search or open the relevant section; do not load it by default.
 - [Detailed platform decisions](reference/PLATFORM_DECISIONS.md): expanded decisions and implementation constraints formerly kept in project memory. Read only relevant sections.
 - [Application timezone and server time](APPLICATION_TIME.md): admin default, optional owner-managed course zones, scheduling conversion, server-clock enforcement, and regression checks.
+- [System error codes](SYSTEM_ERRORS.md): stable support codes, development diagnoses, production wording, private diagnostics and recovery.
 - [User profiles and name changes](USER_PROFILES.md): administrator control of self-service names, profile permissions, independent password changes and migration.
 - [Contextual help](CONTEXTUAL_HELP.md): shared teacher guidance tooltips and quiet date/time presentation.
 - [Action buttons and icons](ACTION_BUTTONS.md): shared appearance, semantic icons, interaction states, and regression coverage.

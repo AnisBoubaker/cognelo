@@ -442,6 +442,12 @@ npm run local:configure
 docker compose up -d db
 ```
 
+Keep Docker Desktop (or the Docker daemon) running while using the local database.
+`npm run dev` starts the web and API apps only; it does not start PostgreSQL.
+If Prisma reports that it cannot reach `127.0.0.1:5432`, start Docker, rerun the
+command above, and check `docker compose ps db` for a healthy database. The running
+apps can reconnect without resetting or reseeding existing data.
+
 If you are developing the coding-exercises plugin, also start Judge0 locally:
 
 ```bash

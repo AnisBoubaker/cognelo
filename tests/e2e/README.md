@@ -1,5 +1,7 @@
 # Browser user flows
 
+`system-errors.spec.ts` intercepts only its own browser requests to verify database/network startup codes, malformed clock responses, Retry recovery, retained forms after later sync failures, and sign-in system-error notifications. It creates no accounts and never stops the shared database/API. `E2E_SYSTEM_ERRORS_PRODUCTION=1` checks code-only wording against an isolated production build.
+
 `gradebook-current-names.spec.ts` submits homework under an imported name, changes the account name through profile and administrator APIs, and checks matching submission-list, Student results, review-header and grade-export names. Pending enrollments retain their entered names; stored enrollments and submitted attempts stay unchanged.
 
 `user-name-policy.spec.ts` covers the administrator name-change switch, Save/Cancel/reload, stale profile drafts and unauthorized API writes, admin name edits, password changes and renewed/fresh sessions while names are locked, re-enabling names, and policy-load failure. It restores the original policy and removes its disposable account.

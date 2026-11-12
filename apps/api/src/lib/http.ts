@@ -2,10 +2,12 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getServerEnv } from "@cognelo/config";
+import { systemErrorMessage } from "@cognelo/contracts";
 import { AppError, readBoundedJson, refreshAuthSession, verifyAuthToken } from "@cognelo/core";
 import "@cognelo/plugin-registry/server";
 export { AUTH_COOKIE, validateCsrfOrigin } from "./csrf";
 import { AUTH_COOKIE } from "./csrf";
+import { classifySystemError } from "./system-errors";
 
 
 export async function requireUser(options: { allowPasswordChangeRequired?: boolean; allowEmailVerificationRequired?: boolean } = {}) {
@@ -117,11 +119,14 @@ export async function handleRoute(handler: () => Promise<Response>) {
         { status: 400 }
       );
     }
-    if (error instanceof AppError) {
+    if (error instanceof AppError && error.status < 500) {
       return json({ error: { code: error.code, message: error.message, details: error.details } }, { status: error.status, ...(error.status === 429 ? { headers: { "Retry-After": String((error.details as { retryAfterSeconds?: number })?.retryAfterSeconds ?? 60) } } : {}) });
     }
-    console.error(error);
-    return json({ error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred." } }, { status: 500 });
+    const systemCode = error instanceof AppError ? "SYS-006" : classifySystemError(error);
+    const code = error instanceof AppError ? error.code : "INTERNAL_ERROR";
+    const status = error instanceof AppError ? error.status : ["SYS-002", "SYS-005"].includes(systemCode) ? 503 : 500;
+    console.error("system_error", { systemCode, code }, error);
+    return json({ error: { code, systemCode, message: systemErrorMessage(systemCode, process.env.NODE_ENV === "development") } }, { status });
   }
 }
 

@@ -31,7 +31,8 @@ export default function LoginPage() {
       const user = await login(email, password);
       router.replace(loginReturnPath() ?? getAuthenticatedLandingPath(user));
     } catch (err) {
-      showError(err instanceof ApiError && err.code === "SESSION_NOT_ESTABLISHED" ? "login.sessionNotEstablished" : err instanceof ApiError && err.code === "RATE_LIMIT_EXCEEDED" ? "login.rateLimited" : "login.error");
+      if (err instanceof ApiError && err.systemCode) notifyError(err.message);
+      else showError(err instanceof ApiError && err.code === "SESSION_NOT_ESTABLISHED" ? "login.sessionNotEstablished" : err instanceof ApiError && err.code === "RATE_LIMIT_EXCEEDED" ? "login.rateLimited" : "login.error");
     } finally {
       setLoading(false);
     }
@@ -45,7 +46,8 @@ export default function LoginPage() {
       const user = await activateAccount({ email, password, confirmPassword });
       router.replace(loginReturnPath() ?? getAuthenticatedLandingPath(user));
     } catch (err) {
-      showError(err instanceof ApiError && err.code === "SESSION_NOT_ESTABLISHED" ? "login.sessionNotEstablished" : err instanceof ApiError && err.code === "RATE_LIMIT_EXCEEDED" ? "login.rateLimited" : "login.activationError");
+      if (err instanceof ApiError && err.systemCode) notifyError(err.message);
+      else showError(err instanceof ApiError && err.code === "SESSION_NOT_ESTABLISHED" ? "login.sessionNotEstablished" : err instanceof ApiError && err.code === "RATE_LIMIT_EXCEEDED" ? "login.rateLimited" : "login.activationError");
     } finally {
       setLoading(false);
     }

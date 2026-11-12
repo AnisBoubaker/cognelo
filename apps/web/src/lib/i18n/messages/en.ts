@@ -1,7 +1,12 @@
 import { parsonsMessages } from "@cognelo/plugin-parsons";
+import { SYSTEM_ERRORS } from "@cognelo/contracts";
 import type { MessageTree } from "../types";
 
 export const enMessages = {
+  systemErrors: {
+    message: "System error ({code}).",
+    ...SYSTEM_ERRORS
+  },
   testAiInstructions: {
     "action": "Replace AI grading instructions",
     "label": "AI grading instructions",

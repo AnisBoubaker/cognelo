@@ -4,11 +4,12 @@ import { AppIcon } from "@/components/app-icon";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApplicationTimeProvider, useApplicationTime } from "@cognelo/activity-ui";
-import type { CourseTimeSettingsDto } from "@cognelo/contracts";
+import { isSystemErrorCode, type CourseTimeSettingsDto } from "@cognelo/contracts";
 import { useAuth } from "@/components/auth-provider";
 import { AppShell } from "@/components/app-shell";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { localizedSystemError } from "@/lib/system-errors";
 
 const CourseTimeContext = createContext<{
   courseId: string;
@@ -35,7 +36,7 @@ export function CourseTimeProvider({ courseId, children }: { courseId: string; c
     api.courseTimeSettings(courseId).then((result) => {
       if (active) { setSettings(result); setLoadedIdentity(identity); setError(null); }
     }).catch((err) => {
-      if (active) setError(err instanceof Error ? err.message : "");
+      if (active) setError(err instanceof ApiError && err.systemCode ? err.systemCode : err instanceof Error ? err.message : "");
     });
     return () => { active = false; };
     // Keep open date forms in their loaded zone. Clock sync stays with AppTimeProvider.
@@ -46,7 +47,7 @@ export function CourseTimeProvider({ courseId, children }: { courseId: string; c
   const courseValue = useMemo(() => settings ? { courseId, settings, setSettings: updateSettings } : null, [courseId, settings, updateSettings]);
   if (!user) return <AppShell>{null}</AppShell>;
   if (!settings || loadedIdentity !== identity) return <AppShell><main className="page stack">
-    <p role={error !== null ? "alert" : undefined}>{error !== null ? error || t("timeSettings.loadError") : t("common.loading")}</p>
+    <p role={error !== null ? "alert" : undefined}>{error !== null ? isSystemErrorCode(error) ? localizedSystemError(error, t) : error || t("timeSettings.loadError") : t("common.loading")}</p>
     {error !== null ? <button onClick={() => { setError(null); setRetry((value) => value + 1); }}><AppIcon name="refresh" /> {t("common.retry")}</button> : null}
   </main></AppShell>;
   return <CourseTimeContext.Provider value={courseValue}><ApplicationTimeProvider value={timeValue}>{children}</ApplicationTimeProvider></CourseTimeContext.Provider>;

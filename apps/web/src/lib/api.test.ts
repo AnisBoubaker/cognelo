@@ -10,6 +10,61 @@ describe("web API client", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("reports unreachable APIs without clearing authentication or exposing transport details", async () => {
+    const dispatchEvent = vi.fn();
+    vi.stubGlobal("window", { dispatchEvent });
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("private transport details"));
+    await expect(api.applicationTime()).rejects.toMatchObject({ systemCode: "SYS-007", message: "System error (SYS-007)." });
+    expect(dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it("preserves cancellation instead of misreporting it as an outage", async () => {
+    const abort = new DOMException("Aborted", "AbortError");
+    vi.mocked(fetch).mockRejectedValueOnce(abort);
+    await expect(api.applicationTime()).rejects.toBe(abort);
+  });
+
+  it("preserves system codes while masking server messages and details in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ error: {
+      code: "INTERNAL_ERROR", systemCode: "SYS-002", message: "private database endpoint", details: { secret: "hidden" }
+    } }), { status: 503 }));
+    const error = await api.applicationTime().catch(error => error);
+    expect(error).toMatchObject({ status: 503, systemCode: "SYS-002", code: "INTERNAL_ERROR", message: "System error (SYS-002)." });
+    expect(error.details).toBeUndefined();
+  });
+
+  it("normalizes proxy failures, unknown codes and invalid successful JSON", async () => {
+    for (const response of [
+      new Response("<html>private proxy diagnostic</html>", { status: 502 }),
+      new Response(JSON.stringify({ error: { systemCode: "SYS-999", message: "private details" } }), { status: 500 })
+    ]) {
+      vi.mocked(fetch).mockResolvedValueOnce(response);
+      await expect(api.applicationTime()).rejects.toMatchObject({ systemCode: "SYS-001", message: "System error (SYS-001)." });
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("not JSON"));
+    await expect(api.applicationTime()).rejects.toMatchObject({ systemCode: "SYS-008" });
+  });
+
+  it("uses the same production policy for streamed failures", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ type: "error", status: 503, error: {
+      code: "INTERNAL_ERROR", systemCode: "SYS-002", message: "private database endpoint"
+    } }) + "\n", { headers: { "content-type": "application/x-ndjson" } }));
+    await expect(api.regradeActivityAttempt("course", "attempt", {}, vi.fn())).rejects.toMatchObject({
+      status: 503, systemCode: "SYS-002", message: "System error (SYS-002)."
+    });
+  });
+
+  it("localizes API system-error messages using the current interface language", async () => {
+    vi.stubGlobal("document", { documentElement: { lang: "fr" } });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ error: {
+      code: "INTERNAL_ERROR", systemCode: "SYS-002", message: "private diagnostic"
+    } }), { status: 503 }));
+    await expect(api.applicationTime()).rejects.toMatchObject({ systemCode: "SYS-002", message: "Erreur système (SYS-002)." });
   });
 
   it("reads Test progress across split UTF-8 chunks and returns the final result", async () => {

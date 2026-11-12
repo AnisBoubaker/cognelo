@@ -78,7 +78,6 @@ function shutdown(exitCode = 0) {
 for (const service of services) {
   const child = spawn(service.command, service.args, {
     stdio: "inherit",
-    shell: true,
     env: process.env
   });
 

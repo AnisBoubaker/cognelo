@@ -2,6 +2,17 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const zhMessages = {
+  systemErrors: {
+    message: "系统错误（{code}）。",
+    "SYS-001": "服务器发生意外错误。请查看 API 日志中的原始异常。",
+    "SYS-002": "数据库不可用。请确认 PostgreSQL 正在运行且 DATABASE_URL 可访问。本地 Docker 开发环境请启动 Docker 并运行 docker compose up -d db。",
+    "SYS-003": "数据库配置被拒绝。请检查 DATABASE_URL、数据库凭据、数据库是否存在、权限和 TLS 设置。",
+    "SYS-004": "数据库结构与此应用版本不兼容。请对目标数据库运行 npm run db:migrate:all，然后重启开发服务器。",
+    "SYS-005": "数据库请求超时或连接池已满。重试前请检查数据库健康状态、负载和连接限制。",
+    "SYS-006": "服务器操作或依赖服务失败。请查看 API 日志，并检查已配置服务的可用性和凭据。",
+    "SYS-007": "无法连接 API。请确认 API 服务器正在运行、NEXT_PUBLIC_API_URL 正确，且网络、CORS 和代理设置允许此请求。",
+    "SYS-008": "API 返回了无效响应。请查看 API 和代理日志，确认网页与 API 版本一致。启动还需要有效的服务器时间和 IANA 时区。"
+  },
   testAiInstructions: {
     "action": "替换 AI 评分说明",
     "label": "AI 评分说明",
