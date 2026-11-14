@@ -1,5 +1,7 @@
 # Programming Exercises Memory
 
+- [Saved-work inspection](../../../docs/WORK_IN_PROGRESS_INSPECTION.md): Inspection reads only the generic saved source; it needs no execution or submitted core attempt. Embedded Tests pass their selected saved state directly. It never runs code or loads grading evidence.
+
 - Learner payloads use the definition’s allowlisted `studentConfig`; keep keys, solutions, private instructions, and authoring metadata server-side. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 

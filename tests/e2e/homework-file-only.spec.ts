@@ -1,6 +1,6 @@
 import { openHomeworkEditorSection } from "./fixtures/homework-editor";
 import { prisma } from "@cognelo/db";
-import type { StudentGroupingDto } from "@cognelo/contracts";
+import type { StudentGroupingDto, WorkInspection } from "@cognelo/contracts";
 import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
 import { test, expect } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
@@ -98,11 +98,17 @@ test("file-only team work immediately completes every member and late joiner wit
     expect((await state(peers[1])).submission?.status).toBe("ready_for_grading");
     expect((await progress()).every(person => person.state === "done")).toBe(true);
     expect(await prisma.activityAttempt.count({ where: { activityId: id, lifecycle: "submitted" } })).toBe(3);
+    const inspection = `${course}/gradebook/activities/${id}/work-in-progress?groupId=${data.groupId}&participantId=${participants[0]}`;
+    const savedWork = await responseJson<WorkInspection>(await api.get(inspection));
+    const previewKey = savedWork.sections.flatMap(section => section.blocks.flatMap(block => block.kind === "file" ? [block.key] : []))[0];
+    expect((await responseJson<{ text: string }>(await api.get(`${inspection}&file=${encodeURIComponent(previewKey)}`))).text).toContain("int main");
     const original = (await state()).submission!;
     const graded = await prisma.activityAttempt.findUniqueOrThrow({ where: { id: original.coreAttemptId } });
     await responseJson(await api.patch(`${course}/gradebook/items/${graded.gradebookItemId}/participants/${graded.participantId}/override`, { data: { score: 75, maxScore: 100, reason: "Reviewed shared code", expectedGradeUpdatedAt: null } }));
     ({ grouping } = await responseJson<{ grouping: StudentGroupingDto }>(await api.patch(`${groupingPath}/${grouping.id}`, { data: { ...grouping, teams: grouping.teams.map(team => ({ ...team, participantIds: participants.slice(1) })) } })));
     expect((await state()).submission).toBeNull();
+    expect((await responseJson<WorkInspection>(await api.get(inspection))).sections).toEqual([]);
+    expect((await api.get(`${inspection}&file=${encodeURIComponent(previewKey)}`)).status()).toBe(409);
     expect(await progress()).toEqual(expect.arrayContaining([expect.objectContaining({ participantId: participants[0], state: "not_started" })]));
     expect(await prisma.grade.count({ where: { gradebookItemId: graded.gradebookItemId, participantId: graded.participantId } })).toBe(0);
     ({ grouping } = await responseJson<{ grouping: StudentGroupingDto }>(await api.patch(`${groupingPath}/${grouping.id}`, { data: { ...grouping, teams: grouping.teams.map(team => ({ ...team, participantIds: participants })) } })));

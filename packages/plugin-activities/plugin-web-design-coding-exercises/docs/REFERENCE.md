@@ -225,3 +225,7 @@ Question review participates in the host’s [single Save all transaction](../..
 ## Released grading details
 
 Released Web Design exercises expose their final grade and available teacher comments. Inside Tests, the shared host gives each exercise its own disclosure; the activity link opens the retained submission workspace. The learner Grades tab lists released activities with expandable details and a link to their submission history. Parent release and content-closure policy govern every Test child. The shared host never exposes private result/configuration/analytics fields. See the [gradebook plan](../../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md).
+
+## Saved-work inspection
+
+Inspection displays the generic saved file bundle as escaped source. Never mount an iframe preview, run JavaScript or call the execution runner. Embedded Tests use their supplied saved file state. See [the shared inspection contract](../../../../docs/WORK_IN_PROGRESS_INSPECTION.md) for permissions, public bounds, snapshot freshness and the host dialog.

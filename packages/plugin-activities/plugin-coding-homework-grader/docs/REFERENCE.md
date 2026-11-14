@@ -381,3 +381,7 @@ Activation is additive JSON policy plus existing queue/clock fields; no addition
 ## Gradebook original-file downloads
 
 The activity declares participant/activity ZIP actions via `gradebookActions`; the server service interprets private hand-in state while core owns roster authorization, section filtering and UI. The generic plugin-actions routes serve the latest current frozen collection per enrollment, even before questions/core attempts, with one numbered section/student directory per batch member. Current team members each receive their own folder; no historical/cancelled/deleted or old membership binding is selected. Stored source bytes/folders are preserved and teacher-only attachments and assessment metadata stay excluded. Existing ZIP streaming verifies file sizes/hashes and bounds per-collection and aggregate resources. No model, execution, automatic recovery, attempt or grade write occurs. See [limits and contract](../../../../docs/GRADEBOOK_PLUGIN_ACTIONS.md).
+
+## Saved-work inspection
+
+Inspection reads existing preparation/current frozen work and saved answers, without ensuring drafts/members, automatic hand-in, generation or answering starts. Lazy file reads verify size/hash and revalidate current assignment/team/source/revision after reading. Reject old file keys after replacement, cancellation or team moves; exclude private teacher files and provider diagnostics. See [the shared inspection contract](../../../../docs/WORK_IN_PROGRESS_INSPECTION.md) for permissions, public bounds, snapshot freshness and the host dialog.

@@ -70,6 +70,7 @@ export const parsonsPlugin: ActivityPlugin = {
     {
       key: "parsons-problem",
       studentResponseState: projectParsonsState,
+      supportsWorkInspection: true,
       studentConfig: projectParsonsConfig,
       reconcileResponseState: reconcileParsonsResponseState,
       name: "Parsons problem",

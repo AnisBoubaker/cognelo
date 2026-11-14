@@ -212,3 +212,7 @@ Question review participates in the host’s [single Save all transaction](../..
 ## Released grading details
 
 Released Parsons exercises expose order/indentation messages and a component breakdown scaled to the exercise points. Inside Tests, the same display includes teacher comments and the exercise grade. The learner Grades tab lists released activities with expandable details and a link to their submission history. Parent release and content-closure policy govern every Test child. The shared host never exposes private result/configuration/analytics fields. See the [gradebook plan](../../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md).
+
+## Saved-work inspection
+
+Standalone inspection reads the latest private in-progress arrangement without calling ensureAttempt or recording events. Embedded Tests use the supplied child state instead. Return saved order/indentation only, with no correctness or reference solution. See [the shared inspection contract](../../../../docs/WORK_IN_PROGRESS_INSPECTION.md) for permissions, public bounds, snapshot freshness and the host dialog.

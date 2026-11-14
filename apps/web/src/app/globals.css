@@ -7075,3 +7075,8 @@ button.help-tooltip-trigger:hover, button.help-tooltip-trigger:focus-visible { c
 .activity-log-entry { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr); gap: 10px 24px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; min-width: 0; overflow-wrap: anywhere; }
 .activity-log-reason { grid-column: 1 / -1; margin: 0; white-space: pre-wrap; }
 @media (max-width: 780px) { .activity-log-entry { grid-template-columns: 1fr; } }
+
+.dialog-panel.work-inspection-dialog { width: min(1400px, calc(100vw - 40px)); max-width: 1400px; }
+.work-inspection-section, .work-inspection-files > section { min-width: 0; overflow-wrap: anywhere; }
+.work-inspection-files .code-renderer { max-width: 100%; }
+.work-inspection-answer { white-space: pre-wrap; }

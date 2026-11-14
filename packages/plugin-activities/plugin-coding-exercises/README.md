@@ -2,6 +2,8 @@
 
 `@cognelo/plugin-coding-exercises` provides the `coding-exercise` activity type. Teachers author prompts, starter/template code, reference solutions, visible and hidden tests, rubrics, and optional automatic feedback. Learners write and run code in Monaco, submit against hidden tests through Judge0, resume drafts, and review prior submissions.
 
+Teachers can [inspect saved work in progress](../../../docs/WORK_IN_PROGRESS_INSPECTION.md) from the Student results menu, independently of submitted-attempt history.
+
 Teacher editing guidance uses shared [contextual help](../../../docs/CONTEXTUAL_HELP.md): a circled question mark after the associated title or label, on the same row, with hover, keyboard and touch access.
 
 Course and section links open the same teacher activity-report workspace. Its **Edit activity** action opens the shared **Activity / Concepts / Grading** authoring tabs; **Settings** opens the same assignment-settings modal as course content. Rubric and test-case controls stay within Grading.

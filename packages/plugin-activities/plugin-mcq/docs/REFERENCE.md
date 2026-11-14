@@ -168,3 +168,7 @@ Released MCQs expose their correct-answer count and available overall/per-questi
 ## Cancellable teacher AI grading
 
 The host's [AI grading run](../../../../docs/AI_GRADING_RUNS.md) evaluates copies sequentially, stages every question of a Test, and publishes only complete results after success or an explicit Keep decision. This plugin honors `deferPublication` with private `staged` artifacts; ordinary completed-only queries cannot use them for student reports, teacher feedback fallback, exports or regrading. `publishEvaluation` validates feedback/activity/attempt identity and promotes the artifact through the host transaction together with academic records. Discard retains private evidence without exposing feedback or changing old grades. Existing formative calls do not defer publication.
+
+## Saved-work inspection
+
+Inspection projects saved selections and authored prompts/choices only. Ignore unknown answer IDs and omit correctness, answer keys, feedback and grading evidence. It performs no answer evaluation or attempt creation. See [the shared inspection contract](../../../../docs/WORK_IN_PROGRESS_INSPECTION.md) for permissions, public bounds, snapshot freshness and the host dialog.

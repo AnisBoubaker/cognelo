@@ -72,3 +72,4 @@ export * from "./activity-submission-stages";
 export * from "./activity-student-progress";
 export * from "./activity-report-actions";
 export * from "./activity-logs";
+export * from "./work-inspection";

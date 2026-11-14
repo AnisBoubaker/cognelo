@@ -15,6 +15,7 @@ export const codingExercisesPlugin: ActivityPlugin = {
       defaultCategoryIds: ["programming"],
       icon: "code",
       supportsSolution: true,
+      supportsWorkInspection: true,
       studentConfig: (config) => codingExerciseConfigSchema.parse(config),
       studentView: { mode: "interactive", execution: "plugin" },
       grading: {

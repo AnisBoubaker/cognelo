@@ -382,6 +382,19 @@ export const zhMessages = {
       file: "文件",
       module: "模块"
     },
+    workInspection: {
+      "title": "查看进行中的作业",
+      "refresh": "刷新",
+      "savedOnly": "只读查看已保存的作业。刷新以查看最近的更改；不会显示尚未保存的编辑。",
+      "savedAt": "上次保存：",
+      "empty": "尚未保存任何作业。",
+      "noAnswer": "尚未保存答案。",
+      "files": "已保存的文件",
+      "question": "题目",
+      "retry": "重试",
+      "truncated": "此预览已截断。",
+      "loadError": "无法加载已保存的作业。"
+    },
     activityLogs: {
       back: "返回日志",
       "title": "日志",
@@ -1061,6 +1074,8 @@ export const zhMessages = {
       loadError: "无法加载课程。"
     },
     courseDetail: {
+    "progressLoadError": "无法加载进度。",
+    "progressUnavailable": "暂不可用",
     "progressHeader": "进度",
     "progressNotStarted": "尚未开始",
     "progressInProgress": "进行中",

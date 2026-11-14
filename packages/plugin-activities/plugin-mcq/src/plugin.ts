@@ -98,6 +98,7 @@ export const mcqPlugin: ActivityPlugin = {
   activities: [
     {
       key: "mcq",
+      supportsWorkInspection: true,
       studentConfig: projectMcqConfig,
       reconcileResponseState: reconcileMcqResponseState,
       name: "Multpiple choice questions",

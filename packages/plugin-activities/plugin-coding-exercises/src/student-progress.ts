@@ -1,13 +1,15 @@
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { prisma } from "@cognelo/db";
-import { assignmentAssessmentMode } from "@cognelo/core";
+import { assignmentAssessmentMode, getCourseActivityProgress } from "@cognelo/core";
 import { getCodingExerciseInitialStudentSource } from "./web/coding-exercise-student-source";
 
 /** Empty/unchanged editor initialization is not evidence of another submission in progress. */
 export const codingExerciseStudentProgress: NonNullable<ServerActivityPlugin["studentProgress"]> = {
   activityTypeKeys: ["coding-exercise"],
   async getProgress(input) {
-    const candidates = input.progress.filter(progress => progress.state === "in_progress" && progress.submittedAt && !progress.attemptNumber);
+    // Older dev route modules may survive hot reload while the plugin registration is refreshed.
+    const progress = input.progress ?? (await getCourseActivityProgress(input.user, input.courseId, input.activityId)).progress;
+    const candidates = progress.filter(progress => progress.state === "in_progress" && progress.submittedAt && !progress.attemptNumber);
     const roster = input.participants.filter(person => candidates.some(progress => progress.participantId === person.participantId && progress.groupId === person.groupId))
       .map(person => ({ ...person, mode: assignmentAssessmentMode(input.assignmentMetadata[person.groupId]) }));
     if (!roster.length) return [];

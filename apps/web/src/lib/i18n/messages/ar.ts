@@ -364,6 +364,19 @@ export const arMessages = {
       paused: "متوقف مؤقتا",
       archived: "مؤرشف"
     },
+    workInspection: {
+      "title": "فحص العمل الجاري",
+      "refresh": "تحديث",
+      "savedOnly": "عرض للقراءة فقط للعمل المحفوظ. حدّث لرؤية التغييرات الأخيرة؛ لا تظهر التعديلات غير المحفوظة.",
+      "savedAt": "آخر حفظ:",
+      "empty": "لم يتم حفظ أي عمل بعد.",
+      "noAnswer": "لم تُحفظ إجابة بعد.",
+      "files": "الملفات المحفوظة",
+      "question": "السؤال",
+      "retry": "إعادة المحاولة",
+      "truncated": "تم اختصار هذه المعاينة.",
+      "loadError": "تعذر تحميل العمل المحفوظ."
+    },
     activityLogs: {
       back: "العودة إلى السجل",
       "title": "السجل",
@@ -1013,6 +1026,8 @@ export const arMessages = {
       pluginsAdminOnly: "إعدادات الإضافات متاحة للمديرين."
     },
     courseDetail: {
+    "progressLoadError": "تعذر تحميل التقدم.",
+    "progressUnavailable": "غير متاح",
     "progressHeader": "التقدم",
     "progressNotStarted": "لم يبدأ",
     "progressInProgress": "قيد العمل",

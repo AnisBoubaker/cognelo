@@ -1,5 +1,7 @@
 # MCQ Memory
 
+- [Saved-work inspection](../../../docs/WORK_IN_PROGRESS_INSPECTION.md): Inspection projects saved selections and authored prompts/choices only. Ignore unknown answer IDs and omit correctness, answer keys, feedback and grading evidence. It performs no answer evaluation or attempt creation.
+
 - Learner payloads use the definition’s allowlisted `studentConfig`; keep keys, solutions, private instructions, and authoring metadata server-side. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 

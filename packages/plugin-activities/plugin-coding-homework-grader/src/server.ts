@@ -1,6 +1,7 @@
 import { homeworkGradebookActionService } from "./gradebook-actions";
 import { homeworkStudentProgressService } from "./student-progress";
 import { homeworkReports } from "./reports";
+import { homeworkWorkInspection } from "./work-inspection";
 import { prepareHomeworkStageActivation, applyHomeworkStageActivation } from "./stage-activation";
 import { homeworkStageConfiguration } from "./stage-activation-state";
 import { homeworkMaterialReferences } from "./material-references";
@@ -51,6 +52,7 @@ registerCodingHomeworkBackgroundJobs();
 export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
   studentProgress: homeworkStudentProgressService,
   reports: homeworkReports,
+  workInspection: homeworkWorkInspection,
   submissionStages: {
     activityTypeKeys: ["coding-homework-grader"],
     async configuration({ activityId }) {

@@ -137,6 +137,7 @@ export type ActivityDefinition = {
   studentConfig?: (config: Record<string, unknown>) => Record<string, unknown>;
   /** Opt-in reference solution, served only through the host's release gate. */
   supportsSolution?: boolean;
+  supportsWorkInspection?: boolean;
   /** Preserve response identity when authored questions change during an attempt. Pure and student-safe. */
   reconcileResponseState?: (previousConfig: unknown, nextConfig: unknown, state: Record<string, unknown>) => Record<string, unknown>;
   /** Strip grading evidence from learner draft/history payloads. Grades use the release-controlled channel. */
@@ -187,6 +188,7 @@ const pluginsByKey = new Map<string, ActivityPlugin>();
 const coreDefinitions: ActivityDefinition[] = [
   {
     key: "test",
+    supportsWorkInspection: true,
     supportsSolution: true,
     name: "Test",
     description: "A summative assessment composed of regular activities.",

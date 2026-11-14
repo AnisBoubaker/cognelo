@@ -4,6 +4,7 @@ export * from "./system-errors";
 export * from "./submission-stages";
 export * from "./activity-progress";
 export * from "./activity-reports";
+export * from "./work-inspection";
 export * from "./material-references";
 export * from "./ai-grading-runs";
 import { z } from "zod";

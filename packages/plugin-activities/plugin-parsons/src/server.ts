@@ -1,5 +1,6 @@
 import { exportParsonsSubmission } from "./submission-export";
 import { parsonsStudentProgress } from "./student-progress";
+import { parsonsWorkInspection } from "./work-inspection";
 export * from "./attempt-types";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { AppError } from "@cognelo/core";
@@ -14,6 +15,7 @@ import { createParsonsBankActivityVariation } from "./variation";
 
 export const parsonsServerPlugin: ServerActivityPlugin = {
   studentProgress: parsonsStudentProgress,
+  workInspection: parsonsWorkInspection,
   submissionExport: { activityTypeKeys: ["parsons-problem"], getContent: exportParsonsSubmission },
   key: "parsons",
   studentSolution: {

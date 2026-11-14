@@ -2,6 +2,8 @@
 import { HelpLabel, HelpTooltip } from "@cognelo/activity-ui";
 
 import { useActivityStudentActions } from "@/lib/use-activity-student-actions";
+import { WorkInspectionDialog } from "@/components/work-inspection-dialog";
+import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { ActivityLogs } from "@/components/activity-logs";
 import type { ActivityStudentAction } from "@cognelo/contracts";
 import { useGradebookPluginActions } from "@/lib/use-gradebook-plugin-actions";
@@ -76,6 +78,8 @@ export default function GradebookActivityResultsPage() {
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [inProgressAttempts, setInProgressAttempts] = useState<CourseActivityInProgressAttempt[]>([]);
   const [studentProgress, setStudentProgress] = useState<ActivityStudentProgress[]>([]);
+  const [studentProgressError, setStudentProgressError] = useState<string | null>(null);
+  const progressErrorRef = useRef<string | null>(null);
   const studentProgressRef = useRef(studentProgress);
   studentProgressRef.current = studentProgress;
   const inProgressAttemptsRef = useRef(inProgressAttempts);
@@ -99,6 +103,7 @@ export default function GradebookActivityResultsPage() {
     error: string;
   } | null>(null);
   const [reviewAndGradeRow, setReviewAndGradeRow] = useState<CourseGradebookRow | null>(null);
+  const [inspectionRow, setInspectionRow] = useState<CourseGradebookRow | null>(null);
   const [submissionDeletionRow, setSubmissionDeletionRow] = useState<CourseGradebookRow | null>(null);
   const [answerExportTarget, setAnswerExportTarget] = useState<{ participantId?: string } | null>(null);
   const [showGradeExport, setShowGradeExport] = useState(false);
@@ -139,17 +144,29 @@ export default function GradebookActivityResultsPage() {
     error: string;
   } | null>(null);
 
+  const requestStudentProgress = useCallback(async () => {
+    try {
+      const result = await api.courseActivityProgress(courseId, activityId, groupId);
+      progressErrorRef.current = null; setStudentProgressError(null);
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("courseDetail.progressLoadError");
+      if (progressErrorRef.current !== message) notifications.error(message);
+      progressErrorRef.current = message; setStudentProgressError(message);
+      return null;
+    }
+  }, [activityId, courseId, groupId, notifications, t]);
+
   const refresh = useCallback(async () => {
     const [courseResult, gradebookResult, inProgressResult] = await Promise.all([
       api.course(courseId),
       api.courseGradebook(courseId, { activityId, groupId }),
-      api.courseActivityProgress(courseId, activityId, groupId).catch(() => ({ attempts: [], progress: [] }))
+      requestStudentProgress()
     ]);
     setCourse(courseResult.course);
     setGradebook(gradebookResult.gradebook);
-    setInProgressAttempts(inProgressResult.attempts);
-    setStudentProgress(inProgressResult.progress ?? []);
-  }, [activityId, courseId, groupId]);
+    if (inProgressResult) { setInProgressAttempts(inProgressResult.attempts); setStudentProgress(inProgressResult.progress ?? []); }
+  }, [activityId, courseId, groupId, requestStudentProgress]);
 
   const aiGrading = useAiGradingRun(courseId, activityId, refresh);
 
@@ -171,8 +188,8 @@ export default function GradebookActivityResultsPage() {
       if (document.visibilityState !== "visible" || refreshing) return;
       refreshing = true;
       try {
-        const result = await api.courseActivityProgress(courseId, activityId, groupId);
-        if (cancelled) return;
+        const result = await requestStudentProgress();
+        if (cancelled || !result) return;
         const completed = inProgressAttemptsRef.current.some((previous) => !result.attempts.some((next) =>
           next.participantId === previous.participantId && next.groupId === previous.groupId && next.attemptNumber === previous.attemptNumber
         ));
@@ -194,7 +211,7 @@ export default function GradebookActivityResultsPage() {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [activityId, courseId, groupId, reportTab]);
+  }, [activityId, courseId, groupId, reportTab, requestStudentProgress]);
 
   const rows = useMemo(() => gradebook?.rows ?? [], [gradebook]);
   const inProgressAttemptByParticipant = useMemo(() => new Map(
@@ -990,6 +1007,7 @@ export default function GradebookActivityResultsPage() {
             </div>
           </div>
 
+          {studentProgressError ? <div className="inline-panel stack" role="alert"><strong>{t("courseDetail.progressLoadError")}</strong><p>{studentProgressError}</p><button className="secondary" type="button" onClick={() => void refresh().catch(error => notifications.error(error instanceof Error ? error.message : t("courseDetail.loadError")))}><AppIcon name="refresh" />{t("workInspection.retry")}</button></div> : null}
           {groupedRows.length ? (
             <div className="table-list table-list-gradebook-detail">
               <div className="table-row table-row-gradebook-detail table-head" aria-hidden="true">
@@ -1006,8 +1024,10 @@ export default function GradebookActivityResultsPage() {
                   row={row}
                   inProgressAttempt={inProgressAttemptByParticipant.get(`${row.groupId}:${row.participantId}`) ?? null}
                   progress={studentProgressByParticipant.get(`${row.groupId}:${row.participantId}`) ?? null}
+                  progressUnavailable={studentProgressError !== null}
                   locale={locale}
                   savingGradeKey={savingGradeKey}
+                  onInspectWork={setInspectionRow}
                   onReviewAndGrade={openReviewAndGrade}
                   onDeleteSubmission={setSubmissionDeletionRow}
                   onExportAnswers={(row) => setAnswerExportTarget({ participantId: row.participantId })}
@@ -1168,6 +1188,7 @@ export default function GradebookActivityResultsPage() {
             onDeleted={refresh}
           />
         ) : null}
+        {inspectionRow ? <WorkInspectionDialog key={`${inspectionRow.activityId}:${inspectionRow.participantId}`} courseId={courseId} row={inspectionRow} onClose={() => setInspectionRow(null)} /> : null}
         {reviewAndGradeRow ? (
           <ReviewAndGradeDialog
             key={`${reviewAndGradeRow.gradebookItemId}:${reviewAndGradeRow.participantId}`}
@@ -1336,8 +1357,10 @@ function GradebookStudentRow({
   row,
   inProgressAttempt,
   progress,
+  progressUnavailable,
   locale,
   savingGradeKey,
+  onInspectWork,
   onReviewAndGrade,
   onDeleteSubmission,
   onExportAnswers,
@@ -1355,8 +1378,10 @@ function GradebookStudentRow({
   row: CourseGradebookRow;
   inProgressAttempt: CourseActivityInProgressAttempt | null;
   progress: ActivityStudentProgress | null;
+  progressUnavailable: boolean;
   locale: Locale;
   savingGradeKey: string | null;
+  onInspectWork: (row: CourseGradebookRow) => void;
   onReviewAndGrade: (row: CourseGradebookRow) => Promise<void>;
   onDeleteSubmission: (row: CourseGradebookRow) => void;
   onExportAnswers: (row: CourseGradebookRow) => void;
@@ -1378,9 +1403,10 @@ function GradebookStudentRow({
   const canAssessWithAi = row.assessmentMode === "summative" && activityActions.canAssessWithAi;
   const canRerunAutomaticGrading = row.assessmentMode === "summative" && activityActions.canRerunAutomaticGrading;
   const canReopen = row.supportsSubmissionContinuation === true && Boolean(latestReopenableAttempt(row)) && !inProgressAttempt && progress?.state !== "in_progress" && progress?.state !== "stage_submitted";
+  const canInspectWork = Boolean(getActivityDefinition(row.activityTypeKey)?.supportsWorkInspection) && (progress?.state === "in_progress" || progress?.state === "stage_submitted");
   const canDeleteSubmission = deletableSubmissions(row).length > 0;
   const canExport = canExportActivityAnswers(row.activityTypeKey) && row.attempts.some((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
-  const hasActions = studentActions.length > 0 || pluginActions.length > 0 || canExport || canDeleteSubmission || canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
+  const hasActions = canInspectWork || studentActions.length > 0 || pluginActions.length > 0 || canExport || canDeleteSubmission || canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
 
   function closeActionMenu() {
     setActionMenuAnchor(null);
@@ -1393,7 +1419,7 @@ function GradebookStudentRow({
         <span className="table-meta-note muted">{row.participantEmail}</span>
       </div>
       <span className="table-meta muted">{row.groupTitle}</span>
-      <div className="gradebook-progress-column" data-label={t("courseDetail.progressHeader")}><ActivityProgressBadge progress={progress} locale={locale} t={t} /></div>
+      <div className="gradebook-progress-column" data-label={t("courseDetail.progressHeader")}>{!progress && progressUnavailable ? <span className="muted">{t("courseDetail.progressUnavailable")}</span> : <ActivityProgressBadge progress={progress} locale={locale} t={t} />}</div>
       <div className="gradebook-grade-cell">
         <strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong>
         {row.gradeCompletion?.status === "partial" ? (
@@ -1468,7 +1494,8 @@ function GradebookStudentRow({
                   <span>{t("courseDetail.regrade")}</span>
                 </button>
               ) : null}
-              {activityActions.canReviewAndGrade ? (
+              {canInspectWork ? <button className="content-context-menu-item" role="menuitem" type="button" onClick={() => { closeActionMenu(); onInspectWork(row); }}><AppIcon name="review" /><span>{t("workInspection.title")}</span></button> : null}
+              {activityActions.canReviewAndGrade && (rowHasSubmittedAttempt || !canInspectWork) ? (
                 <button
                   className="content-context-menu-item"
                   disabled={(row.assessmentMode === "summative" && !rowHasSubmittedAttempt) || savingGradeKey === `${row.gradebookItemId}:${row.participantId}:override`}

@@ -2,6 +2,8 @@
 
 `@cognelo/plugin-coding-homework-grader` provides C homework preparation, immutable hand-in, queued challenge questions, timed/SEB answering and teacher grading, individually or in teams.
 
+Teachers can [inspect saved work in progress](../../../docs/WORK_IN_PROGRESS_INSPECTION.md) from the Student results menu, independently of submitted-attempt history.
+
 Teacher editing guidance uses shared [contextual help](../../../docs/CONTEXTUAL_HELP.md): a circled question mark after the associated title or label, on the same row, with hover, keyboard and touch access.
 
 For team homework, enable **Team work** in core Activity settings and choose a grouping plus the unteamed-student policy for each section under **Group assignment**. All current teammates share preparation and one frozen hand-in. Homework **Question Generation** chooses whether to generate separate question sets; the default is common questions with private individual answers. Timers and grades remain individual. Late joiners receive their own answering participation; moving teams starts fresh and withdraws the previous active grade. Empty-team work is erased. When individual submission is disabled, students without a team see assignment resources and a notice that they must join a team before uploading or submitting; preparation controls are hidden. See [team activity rules](../../../docs/TEAM_ACTIVITY_SUBMISSIONS.md).

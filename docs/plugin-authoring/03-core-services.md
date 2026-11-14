@@ -365,7 +365,7 @@ Declare `ActivityDefinition.gradebookActions` with unique IDs, `kind: "download"
 
 ### Student activity progress
 
-Core supplies **Student results → Progress** from current-mode attempt lifecycle/timing, generic saved drafts and answering presence. Activities with private drafts or pre-attempt stages may register `ServerActivityPlugin.studentProgress` with `activityTypeKeys` and one batch `getProgress` reader. Input contains the grading actor, course/activity IDs, activity metadata, assignment metadata keyed by group ID, the authorized roster of `{participantId, groupId, userId}`, and the core `progress` lifecycle/timing projection. Keep all reads constrained to that roster and the current activity/team bindings.
+Core supplies **Student results → Progress** from current-mode attempt lifecycle/timing, generic saved drafts and answering presence. Activities with private drafts or pre-attempt stages may register `ServerActivityPlugin.studentProgress` with `activityTypeKeys` and one batch `getProgress` reader. Input contains the grading actor, course/activity IDs, activity metadata, assignment metadata keyed by group ID, the authorized roster of `{participantId, groupId, userId}`, and the optional core `progress` lifecycle/timing projection (older callers may omit it). Keep all reads constrained to that roster and the current activity/team bindings.
 
 Return `ActivityStudentProgress[]` with neutral identity and state (`not_started`, `in_progress`, `stage_submitted`, `done`), plus an optional `stageId` from the activity's declared `submissionStages`. The host ignores foreign identities and invalid stages/states, supplies localized stage names from the definition, and preserves only core-owned attempt timing. Do not return responses, raw files, private metadata or grading evidence. Done denotes finished submission, not a completed teacher grade. Omit an enrollment to retain its core projection.
 
@@ -374,3 +374,7 @@ Readers must be read-only, batched and safe to poll every ten seconds. Do not en
 ### Activity logs and student actions
 
 All activity reports receive core lifecycle/grade **Logs**. The optional type-scoped `ServerActivityPlugin.reports` adapter can contribute bounded read-only private lifecycle evidence and student-row mutation actions. The host owns authorization, roster scope, public projection, cursor merging, localized prompts and exact target revalidation. Keep private persistence and execution in the plugin. The old `submissionManagement` renderer hook is removed; use `reports.studentActions` for cancellation/reset and `reports.logs` for history. See [the complete contract](../ACTIVITY_LOGS.md).
+
+### Inspecting saved work in progress
+
+Opt in with `supportsWorkInspection` and register a type-scoped `ServerActivityPlugin.workInspection`. Its read-only `read` projects neutral sections from the authorized draft/private workspace or embedded Test state; optional `readFile` revalidates current file bindings. Never call a learner runtime/ensure path or return grading/private config. The host owns scope, bounded public projection, one-question Test loading and the read-only dialog. See [the inspection contract](../WORK_IN_PROGRESS_INSPECTION.md).

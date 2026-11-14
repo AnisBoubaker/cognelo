@@ -5,6 +5,8 @@ export * from "./submission-export";
 import type { ActivityStudentProgress, CurrentUser } from "@cognelo/contracts";
 import type { ActivityLogCursor, ActivityLogEvidence, ActivityStudentActionList } from "@cognelo/contracts";
 import type { GradebookActionContext } from "./gradebook-actions";
+import type { WorkInspectionFile, WorkInspectionSection } from "@cognelo/contracts";
+import type { GradebookActionParticipant } from "./gradebook-actions";
 import type { ActivityDefinition, ActivitySolutionContent } from "./index";
 
 export type ServerActivityRecord = {
@@ -384,8 +386,19 @@ export type SubmissionStageActivationChange = SubmissionStageActivationScope & {
   enqueue: (job: { queue: string; handlerKey: string; payload: Record<string, unknown>; metadata?: Record<string, unknown>; idempotencyKey?: string; maxAttempts?: number; runAfter?: Date }) => Promise<void>;
 };
 
+export type WorkInspectionContext = {
+  user: CurrentUser; courseId: string; activity: ServerActivityRecord;
+  participant: GradebookActionParticipant; assignmentMetadata: unknown;
+  /** Generic server-saved draft or current Test-item response, never a submission/grading request. */
+  state: Record<string, unknown> | null; embedded: boolean;
+};
 export type ServerActivityPlugin = {
   key: string;
+  workInspection?: {
+    activityTypeKeys: readonly string[];
+    read: (context: WorkInspectionContext) => Promise<{ sections: WorkInspectionSection[]; savedAt?: string | null }>;
+    readFile?: (context: WorkInspectionContext & { key: string }) => Promise<WorkInspectionFile>;
+  };
   reports?: {
     activityTypeKeys: readonly string[];
     /** Read-only, newest-first lifecycle evidence. Never expose raw plugin metadata. */
@@ -406,7 +419,7 @@ export type ServerActivityPlugin = {
       assignmentMetadata: Record<string, unknown>;
       participants: Array<{ participantId: string; groupId: string; userId: string | null }>;
       /** Core lifecycle/timing projection; plugins may refine saved-response evidence. */
-      progress: readonly ActivityStudentProgress[];
+      progress?: readonly ActivityStudentProgress[];
     }) => Promise<ActivityStudentProgress[]>;
   };
   materialReferences?: ActivityMaterialReferencesService;
@@ -618,6 +631,10 @@ export function resolveActivityStudentProgressHandler(activityTypeKey: string) {
 
 export function getActivityReportService(activityTypeKey: string) {
   return currentServerPlugins().find(plugin => plugin.reports?.activityTypeKeys.includes(activityTypeKey))?.reports ?? null;
+}
+
+export function getWorkInspectionService(activityTypeKey: string) {
+  return currentServerPlugins().find(plugin => plugin.workInspection?.activityTypeKeys.includes(activityTypeKey))?.workInspection ?? null;
 }
 
 function normalizePath(path: string | readonly string[]) {

@@ -1,5 +1,7 @@
 # Browser user flows
 
+`work-inspection.spec.ts` checks pre-submission MCQ/code/file work, private Parsons state, active Test question selection, Homework preparation/frozen-file previews and stale keys, read-only behavior, saved-response refresh, keyboard/mobile containment, and explicit progress-load failure/Retry.
+
 `coding-activity-progress.spec.ts` covers graded work with legacy empty/whitespace/starter/unchanged-code drafts, genuine later work and numbered started attempts alongside an earlier grade. It also verifies that initial editor loading creates no draft and real typing saves normally.
 
 `activity-logs.spec.ts` checks shared core and pre-attempt Homework history, tied-timestamp pagination, private-field exclusion, section-staff boundaries, Logs editor return links, desktop/mobile layout, cancellation/reset reason prompts and stale-target rejection. `homework-workflow.spec.ts` cancels completed work from the student row menu.

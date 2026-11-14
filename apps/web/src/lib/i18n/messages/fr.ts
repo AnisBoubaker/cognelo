@@ -382,6 +382,19 @@ export const frMessages = {
       file: "Fichier",
       module: "Module"
     },
+    workInspection: {
+      "title": "Inspecter le travail en cours",
+      "refresh": "Actualiser",
+      "savedOnly": "Vue en lecture seule du travail enregistré. Actualisez pour voir les changements récents; les modifications non enregistrées ne sont pas affichées.",
+      "savedAt": "Dernier enregistrement :",
+      "empty": "Aucun travail enregistré pour le moment.",
+      "noAnswer": "Aucune réponse enregistrée.",
+      "files": "Fichiers enregistrés",
+      "question": "Question",
+      "retry": "Réessayer",
+      "truncated": "Cet aperçu est abrégé.",
+      "loadError": "Impossible de charger le travail enregistré."
+    },
     activityLogs: {
       back: "Retour au journal",
       "title": "Journal",
@@ -1062,6 +1075,8 @@ export const frMessages = {
       loadError: "Impossible de charger le cours."
     },
     courseDetail: {
+    "progressLoadError": "Impossible de charger la progression.",
+    "progressUnavailable": "Indisponible",
     "progressHeader": "Progression",
     "progressNotStarted": "Pas commencé",
     "progressInProgress": "En cours",

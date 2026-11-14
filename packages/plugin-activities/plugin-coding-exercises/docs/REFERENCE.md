@@ -384,3 +384,7 @@ The host's [AI grading run](../../../../docs/AI_GRADING_RUNS.md) evaluates copie
 ## Bulk Test grading instructions
 
 The main course/bank Test editor can replace the AI grading instruction field on all eligible children through the [shared bulk action](../../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#bulk-ai-grading-instructions). Programming Exercises advertise both AI grading capability and an `aiGradingInstructions` authoring handler. The handler reads or initializes the existing private field and merges only `aiFeedback.instructions` through the host transaction; it preserves reference source, tests, validation evidence, rubric-generation guidance, rubric criteria/weights, and AI enablement flags. Course edits record private before/after configuration snapshots beside the core authoring audit. Bank edits remain drafts until publication. The operation never invokes a model or regrades work; later evaluation uses the question's new saved instructions.
+
+## Saved-work inspection
+
+Inspection reads only the generic saved source; it needs no execution or submitted core attempt. Embedded Tests pass their selected saved state directly. It never runs code or loads grading evidence. See [the shared inspection contract](../../../../docs/WORK_IN_PROGRESS_INSPECTION.md) for permissions, public bounds, snapshot freshness and the host dialog.

@@ -376,6 +376,19 @@ export const enMessages = {
       file: "File",
       module: "Module"
     },
+    workInspection: {
+      "title": "Inspect work in progress",
+      "refresh": "Refresh",
+      "savedOnly": "Read-only view of saved work. Refresh to see recent changes; unsaved edits are not shown.",
+      "savedAt": "Last saved:",
+      "empty": "No work has been saved yet.",
+      "noAnswer": "No answer saved yet.",
+      "files": "Saved files",
+      "question": "Question",
+      "retry": "Retry",
+      "truncated": "This preview is shortened.",
+      "loadError": "Unable to load saved work."
+    },
     activityLogs: {
       back: "Back to logs",
       "title": "Logs",
@@ -1056,6 +1069,8 @@ export const enMessages = {
       loadError: "Unable to load course."
     },
     courseDetail: {
+    "progressLoadError": "Progress could not be loaded.",
+    "progressUnavailable": "Unavailable",
     "progressHeader": "Progress",
     "progressNotStarted": "Not started",
     "progressInProgress": "In progress",

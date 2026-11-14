@@ -1,5 +1,7 @@
 # Programming Homework memory
 
+- [Saved-work inspection](../../../docs/WORK_IN_PROGRESS_INSPECTION.md): Inspection reads existing preparation/current frozen work and saved answers, without ensuring drafts/members, automatic hand-in, generation or answering starts. Lazy file reads verify size/hash and revalidate current assignment/team/source/revision after reading. Reject old file keys after replacement, cancellation or team moves; exclude private teacher files and provider diagnostics.
+
 - Use `reports.studentActions` for current frozen-hand-in cancellation/reset and `reports.logs` for retained lifecycle history; the old management renderer is removed. Revalidate opaque submission targets before executing, keep team effects/reasons and existing locks, and preserve section-scoped cutoff recovery during action discovery. Logs remain read-only and never expose raw processing/provider errors. See [the report contract](../../../docs/ACTIVITY_LOGS.md).
 
 - Student results progress uses the optional read-only `studentProgress` adapter, scoped to the host's roster and current workspace/member/source binding. Preparation is in progress; a frozen hand-in is File submission: submitted until answering starts; submitted answers or file-only hand-in are Done before grading. Cancellation/deletion and team moves invalidate the old hand-in. Polling never ensures drafts, recovers submissions or starts generation. See [progress projection](docs/REFERENCE.md#student-results-progress).

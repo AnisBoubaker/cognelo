@@ -1,5 +1,7 @@
 # Web Design Coding Exercises Memory
 
+- [Saved-work inspection](../../../docs/WORK_IN_PROGRESS_INSPECTION.md): Inspection displays the generic saved file bundle as escaped source. Never mount an iframe preview, run JavaScript or call the execution runner. Embedded Tests use their supplied saved file state.
+
 - Learner payloads use the definition’s allowlisted `studentConfig`; keep keys, solutions, private instructions, and authoring metadata server-side. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 

@@ -607,6 +607,8 @@ Until the final item is implemented, imported Test provenance is retained but th
 
 ## Verification Strategy
 
+Active saved responses can be [inspected read-only](WORK_IN_PROGRESS_INSPECTION.md) from Student results before submission. The inspector authorizes the started parent/manifest and loads one selected child through its plugin projection; it never starts/resumes a runtime, recovers expiry, evaluates answers or writes grades. Submitted review retains its existing separate workflow.
+
 The focused [exam-window acceptance matrix](../tests/e2e/test-exam-window.spec.ts) verifies three-hour Tests with buffered opening/closing dates, late starts, 240/270-minute accommodations, individual/team precedence and visibility exclusions. Six-question C scenarios cover SEB authorization, real compilation, saved-answer resume and automatic submission at duration or calendar expiry. The fixture uses generic disposable content; imported course/exam records remain outside the test mutation scope. See [browser test instructions](../tests/e2e/README.md).
 
 Each phase requires:

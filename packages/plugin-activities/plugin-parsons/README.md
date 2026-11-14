@@ -2,6 +2,8 @@
 
 `@cognelo/plugin-parsons` provides the `parsons-problem` activity type. Teachers define a prompt, reference solution, line groups, indentation behavior, and precedence rules. Learners reconstruct the program with keyboard- and pointer-accessible controls.
 
+Teachers can [inspect saved work in progress](../../../docs/WORK_IN_PROGRESS_INSPECTION.md) from the Student results menu, independently of submitted-attempt history.
+
 Teacher editing guidance uses shared [contextual help](../../../docs/CONTEXTUAL_HELP.md): a circled question mark after the associated title or label, on the same row, with hover, keyboard and touch access.
 
 Gradebook attempt review and grading use core grade scope, so explicit course teachers/admins work course-wide while section teachers/TAs are limited to assigned sections; authoring and release remain course-management operations.
