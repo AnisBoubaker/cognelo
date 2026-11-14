@@ -1026,6 +1026,12 @@ export const enMessages = {
       loadError: "Unable to load course."
     },
     courseDetail: {
+    "progressHeader": "Progress",
+    "progressNotStarted": "Not started",
+    "progressInProgress": "In progress",
+    "progressDone": "Done",
+    "progressStageSubmitted": "{stage}: submitted",
+    "progressStageInProgress": "{stage}: in progress",
     "activitySearch": "Search activities",
     "activitySearchPlaceholder": "Title or description",
     "targetedConceptFilter": "Targeted concept",

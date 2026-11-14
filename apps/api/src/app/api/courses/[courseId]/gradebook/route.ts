@@ -9,6 +9,7 @@ import {
 import { handleRoute, json, options, requireUser } from "@/lib/http";
 import { resolveCourseGradebookCompletions } from "@/lib/gradebook-completion";
 import { summarizeCourseGradebook } from "@/lib/gradebook-summary";
+import { courseActivityProgress } from "@/lib/activity-progress";
 
 type Params = { params: Promise<{ courseId: string }> };
 
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       if (!filters.activityId) {
         throw new AppError(400, "ACTIVITY_REQUIRED", "An activity is required to list in-progress attempts.");
       }
+      if (searchParams.get("includeProgress") === "1") return json(await courseActivityProgress(user, courseId, filters.activityId, filters.groupId));
       return json({
         attempts: await listCourseActivityInProgressAttempts(user, courseId, filters.activityId, filters.groupId)
       });

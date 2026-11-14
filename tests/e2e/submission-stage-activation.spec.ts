@@ -81,6 +81,8 @@ test("core activates file hand-in independently, releases waiting questions and 
     await page.getByRole("button", { name: "Answer challenge questions", exact: true }).click();
     const answer = page.locator('textarea[id^="answer-"]').first(); await expect(answer).toBeEditable(); await answer.fill("The function returns the sum of its two parameters."); await answer.blur();
     const attempt = await prisma.activityAttempt.findFirstOrThrow({ where: { activityId: id } });
+    const progressUrl = `/api/courses/${data.courseId}/gradebook?view=in-progress-attempts&includeProgress=1&activityId=${id}`;
+    expect((await responseJson<{ progress: Array<{ state: string; stageId?: string }> }>(await teacherApi.get(progressUrl))).progress).toEqual(expect.arrayContaining([expect.objectContaining({ state: "in_progress", stageId: "questions" })]));
     settings.general.submissionStages.questions.enabled = false; await persist();
     await page.reload(); await expect(answer).toHaveValue("The function returns the sum of its two parameters."); await expect(answer).toBeEditable();
     await expect(page.getByRole("timer")).toBeVisible();
@@ -88,6 +90,7 @@ test("core activates file hand-in independently, releases waiting questions and 
     await page.getByRole("button", { name: "Submit answers", exact: true }).click();
     await page.getByRole("dialog", { name: "Submit answers?", exact: true }).getByRole("button", { name: "Submit answers", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/courses/${data.courseId}/groups/${data.groupId}$`));
+    expect((await responseJson<{ progress: Array<{ state: string }> }>(await teacherApi.get(progressUrl))).progress).toEqual(expect.arrayContaining([expect.objectContaining({ state: "done" })]));
     expect(model.requests).toHaveLength(requests);
   } finally { await student.dispose(); await model?.close(); }
 });

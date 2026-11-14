@@ -87,17 +87,21 @@ test("file-only team work immediately completes every member and late joiner wit
     await responseJson(await api.put(`${base}/workflow-settings`, { data: { enabled: true } }));
     const endpoint = `${course}/groups/${data.groupId}/activities/assigned/${id}/coding-homework-grader`;
     const state = async (client=student) => responseJson<{ teamwork: { contextKey: string }; submission: { id: string; status: string; coreAttemptId: string } | null }>(await client.get(`${endpoint}/workspace`));
+    const progress = async () => (await responseJson<{ progress: Array<{ participantId: string; state: string }> }>(await api.get(`${course}/gradebook?view=in-progress-attempts&includeProgress=1&activityId=${id}`))).progress;
     await responseJson(await student.post(`${endpoint}/preparation`, { data: { kind: "file", path: "main.c", expectedRevision: 0, contextKey: (await state()).teamwork.contextKey, base64: Buffer.from("int main(void) {return 0;}").toString("base64") } }));
     await responseJson(await student.post(`${endpoint}/hand-in`, { data: { expectedRevision: 1, contextKey: (await state()).teamwork.contextKey } }));
     for (const client of [student,peers[0]]) expect((await state(client)).submission?.status).toBe("ready_for_grading");
+    expect(await progress()).toEqual(expect.arrayContaining(participants.slice(0,2).map(participantId => expect.objectContaining({ participantId, state: "done" }))));
     ({ grouping } = await responseJson<{ grouping: StudentGroupingDto }>(await api.patch(`${groupingPath}/${grouping.id}`, { data: { ...grouping, teams: grouping.teams.map(team => ({ ...team, participantIds: participants })) } })));
     expect((await state(peers[1])).submission?.status).toBe("ready_for_grading");
+    expect((await progress()).every(person => person.state === "done")).toBe(true);
     expect(await prisma.activityAttempt.count({ where: { activityId: id, lifecycle: "submitted" } })).toBe(3);
     const original = (await state()).submission!;
     const graded = await prisma.activityAttempt.findUniqueOrThrow({ where: { id: original.coreAttemptId } });
     await responseJson(await api.patch(`${course}/gradebook/items/${graded.gradebookItemId}/participants/${graded.participantId}/override`, { data: { score: 75, maxScore: 100, reason: "Reviewed shared code", expectedGradeUpdatedAt: null } }));
     ({ grouping } = await responseJson<{ grouping: StudentGroupingDto }>(await api.patch(`${groupingPath}/${grouping.id}`, { data: { ...grouping, teams: grouping.teams.map(team => ({ ...team, participantIds: participants.slice(1) })) } })));
     expect((await state()).submission).toBeNull();
+    expect(await progress()).toEqual(expect.arrayContaining([expect.objectContaining({ participantId: participants[0], state: "not_started" })]));
     expect(await prisma.grade.count({ where: { gradebookItemId: graded.gradebookItemId, participantId: graded.participantId } })).toBe(0);
     ({ grouping } = await responseJson<{ grouping: StudentGroupingDto }>(await api.patch(`${groupingPath}/${grouping.id}`, { data: { ...grouping, teams: grouping.teams.map(team => ({ ...team, participantIds: participants })) } })));
     expect((await state()).submission).toMatchObject({ status: "ready_for_grading" });
@@ -106,6 +110,7 @@ test("file-only team work immediately completes every member and late joiner wit
     expect(await prisma.backgroundJob.count({ where: { payload: { path: ["activityId"], equals: id } } })).toBe(0);
     await responseJson(await api.delete(`${base}/manage-submissions`, { data: { submissionId: (await state()).submission!.id, reason: "Reopen shared work" } }));
     for (const client of [student,...peers]) expect((await state(client)).submission).toBeNull();
+    expect((await progress()).every(person => person.state === "in_progress")).toBe(true);
     expect(await prisma.activityAttempt.count({ where: { activityId: id, lifecycle: "deleted" } })).toBe(4);
   } finally { await student.dispose(); for (const peer of peers) await peer.dispose(); await prisma.user.deleteMany({ where: { id: { in: users } } }); }
 });

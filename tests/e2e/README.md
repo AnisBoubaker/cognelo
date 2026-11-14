@@ -1,5 +1,7 @@
 # Browser user flows
 
+`activity-student-progress.spec.ts` covers both Content/Gradebook entry points, a dedicated desktop Progress column, live untimed participation and Done, narrow layouts, Homework preparation/frozen hand-in/cancellation/file-only completion before grading, and private Parsons edits after formative checks. `submission-stage-activation.spec.ts` also checks question-answering and completed progress against real staged homework. Progress reads create no academic attempts.
+
 `gradebook-activity-filters.spec.ts` checks summative-only Gradebook rows/sections, title and description search, targeted concepts, combined and empty filters, matching CSV scope, retained choices, mobile layout, and formative reports still accessible from Content.
 
 `system-errors.spec.ts` intercepts only its own browser requests to verify database/network startup codes, malformed clock responses, Retry recovery, retained forms after later sync failures, and sign-in system-error notifications. It creates no accounts and never stops the shared database/API. `E2E_SYSTEM_ERRORS_PRODUCTION=1` checks code-only wording against an isolated production build.

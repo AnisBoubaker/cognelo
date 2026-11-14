@@ -1798,6 +1798,7 @@ a.card:hover,
   gap: 8px;
 }
 
+
 @media (max-width: 780px) {
   .activity-report-heading .workspace-context {
     flex: 0 1 auto;
@@ -3365,6 +3366,34 @@ button:hover > .disclosure-indicator {
   gap: 3px;
 }
 
+.activity-progress-cell {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.activity-progress-badge {
+  align-items: center;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #475569;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 5px;
+  line-height: 1.3;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 5px 8px;
+}
+
+.activity-progress-done { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.activity-progress-stage_submitted { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.gradebook-progress-column { min-width: 0; }
+
 .gradebook-attempt-in-progress-badge {
   align-items: center;
   background: color-mix(in srgb, var(--brand-teal), white 87%);
@@ -3466,7 +3495,7 @@ button:hover > .disclosure-indicator {
 .table-list-gradebook-detail {
   column-gap: 12px;
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(130px, 0.55fr) minmax(120px, 0.45fr) 110px max-content;
+  grid-template-columns: minmax(180px, 1fr) minmax(90px, 0.5fr) minmax(170px, 0.8fr) minmax(100px, 0.45fr) 90px max-content;
   overflow: hidden;
   row-gap: 0;
 }
@@ -6559,6 +6588,24 @@ button:hover > .disclosure-indicator {
 
 }
 
+@media (max-width: 960px) {
+  .table-list-gradebook-detail { display: block; }
+  .table-list-gradebook-detail .table-row-gradebook-detail {
+    align-items: start;
+    display: grid;
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
+  .table-list-gradebook-detail .table-head { display: none; }
+  .gradebook-progress-column::before {
+    color: var(--muted);
+    content: attr(data-label);
+    display: block;
+    font-size: 12px;
+    margin-bottom: 5px;
+  }
+}
+
 @media (max-width: 780px) {
   .maintenance-metric-grid,
   .maintenance-detail-grid {
@@ -6661,16 +6708,6 @@ button:hover > .disclosure-indicator {
   }
 
   .activity-bank-row-link {
-    grid-template-columns: 1fr;
-  }
-
-  .table-list-gradebook-detail {
-    display: block;
-  }
-
-  .table-list-gradebook-detail .table-row-gradebook-detail {
-    display: grid;
-    grid-column: auto;
     grid-template-columns: 1fr;
   }
 

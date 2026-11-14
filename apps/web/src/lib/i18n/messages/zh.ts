@@ -1031,6 +1031,12 @@ export const zhMessages = {
       loadError: "无法加载课程。"
     },
     courseDetail: {
+    "progressHeader": "进度",
+    "progressNotStarted": "尚未开始",
+    "progressInProgress": "进行中",
+    "progressDone": "已完成",
+    "progressStageSubmitted": "{stage}：已提交",
+    "progressStageInProgress": "{stage}：进行中",
     "activitySearch": "搜索活动",
     "activitySearchPlaceholder": "标题或描述",
     "targetedConceptFilter": "目标概念",

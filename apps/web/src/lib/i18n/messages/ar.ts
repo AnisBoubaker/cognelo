@@ -983,6 +983,12 @@ export const arMessages = {
       pluginsAdminOnly: "إعدادات الإضافات متاحة للمديرين."
     },
     courseDetail: {
+    "progressHeader": "التقدم",
+    "progressNotStarted": "لم يبدأ",
+    "progressInProgress": "قيد العمل",
+    "progressDone": "مكتمل",
+    "progressStageSubmitted": "{stage}: تم التسليم",
+    "progressStageInProgress": "{stage}: قيد العمل",
     "activitySearch": "البحث عن الأنشطة",
     "activitySearchPlaceholder": "العنوان أو الوصف",
     "targetedConceptFilter": "المفهوم المستهدف",

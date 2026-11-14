@@ -2,6 +2,7 @@ import { SubmissionStagePoliciesSchema } from "./submission-stages";
 import type { SystemErrorCode } from "./system-errors";
 export * from "./system-errors";
 export * from "./submission-stages";
+export * from "./activity-progress";
 export * from "./material-references";
 export * from "./ai-grading-runs";
 import { z } from "zod";

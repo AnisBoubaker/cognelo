@@ -172,6 +172,12 @@ Bank-version comparison currently covers generic activity config and metadata on
 
 Draft saves update mutable generic/private bank authoring without creating a version. Changed Published saves create immutable generic snapshots; private authoring remains unversioned.
 
+## Student results progress
+
+`studentProgress` batches only lifecycle/presence flags for the host-authorized roster. Empty preparation is Not started; saved files or a preparation clock are File submission: in progress. A current frozen final hand-in (or the shared team source awaiting a member's participation) is File submission: submitted while questions are waiting, queued, ready or failed. An actual answering start is Questions answering: in progress. Answered/ready-for-grading/graded work is Done, as is file-only hand-in immediately, regardless of teacher grading.
+
+Validate course/activity/group/enrollment ownership, current grouping/team membership, workspace/member/source pointers and associated non-deleted core attempt. Cancelled/deleted hand-ins and stale bindings do not count; retained preparation can become in progress again. The read creates no draft/member/core attempt, performs no cutoff recovery, acquires no workflow lock and schedules no generation. No file text, question, answer or private metadata enters the host response. See [shared progress semantics](../../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md#student-activity-progress).
+
 ## Contributor Workflow
 
 When changing this plugin, update this detailed reference or the phased implementation plan, the package README if its overview or routing changed, and `PROJECT_MEMORY.md` only when a durable invariant changed.

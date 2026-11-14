@@ -4,6 +4,7 @@
 Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
 - Previous-submission inspection loads history without calling `ensureAttempt`; it must not create a live arrangement or start a timed attempt.
+- The read-only `studentProgress` batch reader also never calls `ensureAttempt`. Current-mode core submissions establish Done; newer private arrangement edits or a started current-mode attempt establish In progress. A private completed arrangement alone cannot mark a different assessment mode Done. See [progress projection](docs/REFERENCE.md#student-results-progress).
 - The [student solution contract](../../../docs/ACTIVITY_SOLUTIONS.md) is capability-driven and default-off. Core gates explicit reveals by current assignment access and the summative grade release; the plugin returns only displayable reference content, never grading internals.
 
 - Live corrections preserve the active attempt and arrangement; server evaluation uses the current solution. Never expose embedded summative evaluation before release, including legacy composite state. See [the reference](docs/REFERENCE.md#live-authoring-and-grade-visibility).

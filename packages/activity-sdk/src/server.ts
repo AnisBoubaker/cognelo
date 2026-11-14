@@ -2,7 +2,7 @@ import type { GradebookActionService } from "./gradebook-actions";
 export * from "./gradebook-actions";
 import type { SubmissionExportHandler } from "./submission-export";
 export * from "./submission-export";
-import type { CurrentUser } from "@cognelo/contracts";
+import type { ActivityStudentProgress, CurrentUser } from "@cognelo/contracts";
 import type { ActivityDefinition, ActivitySolutionContent } from "./index";
 
 export type ServerActivityRecord = {
@@ -384,6 +384,18 @@ export type SubmissionStageActivationChange = SubmissionStageActivationScope & {
 
 export type ServerActivityPlugin = {
   key: string;
+  /** Batch, read-only projection. Host supplies only its authorized student roster. */
+  studentProgress?: {
+    activityTypeKeys: readonly string[];
+    getProgress: (input: {
+      user: CurrentUser;
+      courseId: string;
+      activityId: string;
+      activityMetadata: unknown;
+      assignmentMetadata: Record<string, unknown>;
+      participants: Array<{ participantId: string; groupId: string; userId: string | null }>;
+    }) => Promise<ActivityStudentProgress[]>;
+  };
   materialReferences?: ActivityMaterialReferencesService;
   submissionStages?: {
     activityTypeKeys: readonly string[];
@@ -585,6 +597,10 @@ export function validateStudentPreviewServerContracts(
 
 export function listServerActivityPlugins() {
   return [...currentServerPlugins()];
+}
+
+export function resolveActivityStudentProgressHandler(activityTypeKey: string) {
+  return currentServerPlugins().find(plugin => plugin.studentProgress?.activityTypeKeys.includes(activityTypeKey))?.studentProgress?.getProgress ?? null;
 }
 
 function normalizePath(path: string | readonly string[]) {

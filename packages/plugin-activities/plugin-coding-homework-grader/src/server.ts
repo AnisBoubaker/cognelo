@@ -1,4 +1,5 @@
 import { homeworkGradebookActionService } from "./gradebook-actions";
+import { homeworkStudentProgressService } from "./student-progress";
 import { prepareHomeworkStageActivation, applyHomeworkStageActivation } from "./stage-activation";
 import { homeworkStageConfiguration } from "./stage-activation-state";
 import { homeworkMaterialReferences } from "./material-references";
@@ -47,6 +48,7 @@ import { markCodingHomeworkSubmissionDeleted } from "./submission-deletion";
 registerCodingHomeworkBackgroundJobs();
 
 export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
+  studentProgress: homeworkStudentProgressService,
   submissionStages: {
     activityTypeKeys: ["coding-homework-grader"],
     async configuration({ activityId }) {

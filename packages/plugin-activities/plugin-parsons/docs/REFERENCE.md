@@ -58,6 +58,10 @@ The activity config currently includes:
 - `groups`
 - `precedenceRules`
 
+## Student results progress
+
+The optional `studentProgress` reader batches authorized enrollment/account pairs and reads only private arrangement status/last-interaction time plus scoped core lifecycle/submission times. An existing in-progress arrangement is In progress until a current-mode core check/submission establishes Done. Further saved interaction after the latest core submission returns to In progress, even though formative checks retain their private arrangement. A current-mode started core attempt takes precedence. Older-mode submissions never establish Done in the new mode. Inspection creates no arrangements or events and performs no evaluation. See [the shared contract](../../../../docs/plugin-authoring/03-core-services.md#student-activity-progress).
+
 ## Persistence
 
 Core applies [team and student assignment exceptions](../../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md) to access, timing, attempts, grading, and challenge policy. Plugin routes consume the resolved assignment and core grade services; unsubmitted attempt deadlines resolve the latest effective limit from the original start, and the host refreshes policy every 20 seconds. Submitted timing stays fixed.

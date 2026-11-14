@@ -69,3 +69,4 @@ export * from "./public-material-fetch";
 export * from "./pdf-text";
 
 export * from "./activity-submission-stages";
+export * from "./activity-student-progress";

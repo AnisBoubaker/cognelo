@@ -34,6 +34,7 @@ Teacher Test review provides numbered activity navigation, the saved arrangement
 - Authored Parsons data is generic activity config, so core owns bank copying, synchronization, and version comparison.
 - Reusable bank Tests copy Parsons children into Test-owned bank activities and later into independent course children; learner attempt/event rows are never copied.
 - Student state and event history use plugin-owned `PluginParsonsAttempt` and `PluginParsonsAttemptEvent` tables.
+- The shared Student results **Progress** column reads private arrangements without starting an attempt. A completed current-mode check/submission is Done; a subsequent saved edit returns to In progress. See [progress projection](docs/REFERENCE.md#student-results-progress).
 - Teacher/admin previews are ephemeral and must not pollute learner research data.
 - The definition declares interactive, plugin-executed Student view support. Standalone preview state and checks remain browser-scoped; stateless server actions provide the same deterministic, non-persistent evaluation when Parsons is embedded in a preview Test.
 - Formative checks and summative submissions create mode-tagged core attempts linked to the richer plugin attempt. Only summative attempts are graded, suppress correctness until release, and support teacher regrades; formative checks remain read-only teacher evidence.

@@ -5,9 +5,11 @@ const mocks = vi.hoisted(() => ({
   getCourseGradebook: vi.fn(),
   getCourseGradebookCsv: vi.fn(),
   listCourseActivityInProgressAttempts: vi.fn(),
+  courseActivityProgress: vi.fn(),
   requireUser: vi.fn(),
   resolveCompletions: vi.fn()
 }));
+vi.mock("@/lib/activity-progress", () => ({ courseActivityProgress: mocks.courseActivityProgress }));
 
 vi.mock("@cognelo/core", () => ({
   getCourseGradebook: mocks.getCourseGradebook,
@@ -117,5 +119,15 @@ describe("course gradebook route", () => {
     );
     expect(mocks.getCourseGradebook).not.toHaveBeenCalled();
     expect(mocks.resolveCompletions).not.toHaveBeenCalled();
+  });
+
+  it("delegates expanded participation to the scoped progress reader without loading grades", async () => {
+    const progress = { attempts: [], progress: [{ participantId: "student", groupId: "group-1", state: "stage_submitted", stageId: "files" }] };
+    mocks.courseActivityProgress.mockResolvedValue(progress);
+    const response = await GET(new NextRequest("http://test.local/api/courses/course-1/gradebook?view=in-progress-attempts&includeProgress=1&activityId=activity-1&groupId=group-1"), params);
+    expect(await response.json()).toEqual(progress);
+    expect(mocks.courseActivityProgress).toHaveBeenCalledWith({ id: "teacher-1", roles: ["teacher"] }, "course-1", "activity-1", "group-1");
+    expect(mocks.getCourseGradebook).not.toHaveBeenCalled();
+    expect(mocks.listCourseActivityInProgressAttempts).not.toHaveBeenCalled();
   });
 });

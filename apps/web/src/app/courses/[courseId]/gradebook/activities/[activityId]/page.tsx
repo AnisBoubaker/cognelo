@@ -7,8 +7,6 @@ import { useAiGradingRun } from "@/lib/use-ai-grading-run";
 import { AiGradingRunDialog } from "@/components/ai-grading-run-dialog";
 import { DialogHeader } from "@cognelo/activity-ui";
 
-import { useApplicationTime } from "@cognelo/activity-ui";
-
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,6 +16,8 @@ import { createParsonsClient } from "@cognelo/plugin-parsons";
 import { useAuth } from "@/components/auth-provider";
 import { TeacherMessageAlertContext, useTeacherMessageAlerts } from "@/components/teacher-message-alerts";
 import { AppShell } from "@/components/app-shell";
+import { ActivityProgressBadge } from "@/components/activity-progress-badge";
+import type { ActivityStudentProgress } from "@cognelo/contracts";
 import { ActivityChatDialog } from "@/components/activity-chat";
 import { ActivityBroadcastDialog, StaffActivityChat } from "@/components/activity-broadcast-dialog";
 import { activityEditorHref } from "@/lib/activity-editor-navigation";
@@ -73,6 +73,9 @@ export default function GradebookActivityResultsPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [gradebook, setGradebook] = useState<CourseGradebook | null>(null);
   const [inProgressAttempts, setInProgressAttempts] = useState<CourseActivityInProgressAttempt[]>([]);
+  const [studentProgress, setStudentProgress] = useState<ActivityStudentProgress[]>([]);
+  const studentProgressRef = useRef(studentProgress);
+  studentProgressRef.current = studentProgress;
   const inProgressAttemptsRef = useRef(inProgressAttempts);
   inProgressAttemptsRef.current = inProgressAttempts;
   const [savingGradeKey, setSavingGradeKey] = useState<string | null>(null);
@@ -138,17 +141,19 @@ export default function GradebookActivityResultsPage() {
     const [courseResult, gradebookResult, inProgressResult] = await Promise.all([
       api.course(courseId),
       api.courseGradebook(courseId, { activityId, groupId }),
-      api.courseActivityInProgressAttempts(courseId, activityId, groupId).catch(() => ({ attempts: [] }))
+      api.courseActivityProgress(courseId, activityId, groupId).catch(() => ({ attempts: [], progress: [] }))
     ]);
     setCourse(courseResult.course);
     setGradebook(gradebookResult.gradebook);
     setInProgressAttempts(inProgressResult.attempts);
+    setStudentProgress(inProgressResult.progress ?? []);
   }, [activityId, courseId, groupId]);
 
   const aiGrading = useAiGradingRun(courseId, activityId, refresh);
 
   useEffect(() => {
     setInProgressAttempts([]);
+    setStudentProgress([]);
     refresh().catch((err) => notifications.error(err instanceof Error ? err.message : t("courseDetail.loadError")));
   }, [notifications, refresh, t]);
 
@@ -164,13 +169,16 @@ export default function GradebookActivityResultsPage() {
       if (document.visibilityState !== "visible" || refreshing) return;
       refreshing = true;
       try {
-        const result = await api.courseActivityInProgressAttempts(courseId, activityId, groupId);
+        const result = await api.courseActivityProgress(courseId, activityId, groupId);
         if (cancelled) return;
         const completed = inProgressAttemptsRef.current.some((previous) => !result.attempts.some((next) =>
           next.participantId === previous.participantId && next.groupId === previous.groupId && next.attemptNumber === previous.attemptNumber
         ));
+        const finished = (result.progress ?? []).some(next => next.state === "done" && studentProgressRef.current.some(previous =>
+          previous.participantId === next.participantId && previous.groupId === next.groupId && (previous.state !== "done" || previous.submittedAt !== next.submittedAt)));
         setInProgressAttempts(result.attempts);
-        if (completed) {
+        setStudentProgress(result.progress ?? []);
+        if (completed || finished) {
           const updated = await api.courseGradebook(courseId, { activityId, groupId });
           if (!cancelled) setGradebook(updated.gradebook);
         }
@@ -190,6 +198,7 @@ export default function GradebookActivityResultsPage() {
   const inProgressAttemptByParticipant = useMemo(() => new Map(
     inProgressAttempts.map((attempt) => [`${attempt.groupId}:${attempt.participantId}`, attempt])
   ), [inProgressAttempts]);
+  const studentProgressByParticipant = useMemo(() => new Map(studentProgress.map(progress => [`${progress.groupId}:${progress.participantId}`, progress])), [studentProgress]);
   const reportActivity = course?.activities?.find((activity) => activity.id === activityId);
   const activityTitle = rows[0]?.activityTitle ?? gradebook?.items[0]?.activityTitle ?? reportActivity?.title ?? t("common.loading");
   const activityTypeKey = rows[0]?.activityTypeKey ?? gradebook?.items[0]?.activityTypeKey ?? reportActivity?.activityType.key ?? "";
@@ -981,6 +990,7 @@ export default function GradebookActivityResultsPage() {
               <div className="table-row table-row-gradebook-detail table-head" aria-hidden="true">
                 <span>{t("courseDetail.studentHeader")}</span>
                 <span>{t("courseDetail.groupHeader")}</span>
+                <span>{t("courseDetail.progressHeader")}</span>
                 <span>{t("courseDetail.gradeHeader")}</span>
                 <span>{t("courseDetail.submissionsHeader")}</span>
                 <span>{t("courseDetail.actionsHeader")}</span>
@@ -990,6 +1000,7 @@ export default function GradebookActivityResultsPage() {
                   key={`${row.gradebookItemId}-${row.participantId}`}
                   row={row}
                   inProgressAttempt={inProgressAttemptByParticipant.get(`${row.groupId}:${row.participantId}`) ?? null}
+                  progress={studentProgressByParticipant.get(`${row.groupId}:${row.participantId}`) ?? null}
                   locale={locale}
                   savingGradeKey={savingGradeKey}
                   onReviewAndGrade={openReviewAndGrade}
@@ -1315,6 +1326,7 @@ function hasUnsavedFeedbackReview(state: AiFeedbackReviewState) {
 function GradebookStudentRow({
   row,
   inProgressAttempt,
+  progress,
   locale,
   savingGradeKey,
   onReviewAndGrade,
@@ -1330,6 +1342,7 @@ function GradebookStudentRow({
 }: {
   row: CourseGradebookRow;
   inProgressAttempt: CourseActivityInProgressAttempt | null;
+  progress: ActivityStudentProgress | null;
   locale: Locale;
   savingGradeKey: string | null;
   onReviewAndGrade: (row: CourseGradebookRow) => Promise<void>;
@@ -1343,14 +1356,13 @@ function GradebookStudentRow({
   onGenerateAiFeedback: (row: CourseGradebookRow) => Promise<void>;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
-  const { timeZone } = useApplicationTime();
   const rowHasSubmittedAttempt = hasSubmittedAttempt(row);
   const activityActions = getGradebookActivityActions(row.activityTypeKey);
   const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLButtonElement | null>(null);
   const actionMenuOpen = actionMenuAnchor !== null;
   const canAssessWithAi = row.assessmentMode === "summative" && activityActions.canAssessWithAi;
   const canRerunAutomaticGrading = row.assessmentMode === "summative" && activityActions.canRerunAutomaticGrading;
-  const canReopen = row.supportsSubmissionContinuation === true && Boolean(latestReopenableAttempt(row)) && !inProgressAttempt;
+  const canReopen = row.supportsSubmissionContinuation === true && Boolean(latestReopenableAttempt(row)) && !inProgressAttempt && progress?.state !== "in_progress" && progress?.state !== "stage_submitted";
   const canDeleteSubmission = deletableSubmissions(row).length > 0;
   const canExport = canExportActivityAnswers(row.activityTypeKey) && row.attempts.some((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
   const hasActions = pluginActions.length > 0 || canExport || canDeleteSubmission || canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
@@ -1366,6 +1378,7 @@ function GradebookStudentRow({
         <span className="table-meta-note muted">{row.participantEmail}</span>
       </div>
       <span className="table-meta muted">{row.groupTitle}</span>
+      <div className="gradebook-progress-column" data-label={t("courseDetail.progressHeader")}><ActivityProgressBadge progress={progress} locale={locale} t={t} /></div>
       <div className="gradebook-grade-cell">
         <strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong>
         {row.gradeCompletion?.status === "partial" ? (
@@ -1379,19 +1392,6 @@ function GradebookStudentRow({
             <span aria-hidden="true">◐</span>
             {t("courseDetail.partialGrade")}
           </span>
-        ) : null}
-        {inProgressAttempt ? (
-          <div className="gradebook-attempt-in-progress">
-            <span className="gradebook-attempt-in-progress-badge">
-              <span aria-hidden="true">●</span>
-              {t("courseDetail.attemptInProgress", { number: inProgressAttempt.attemptNumber })}
-            </span>
-            <span className="table-meta-note muted">
-              {t("courseDetail.attemptStartedAt", {
-                date: formatAttemptStartedAt(inProgressAttempt.startedAt, locale, timeZone)
-              })}
-            </span>
-          </div>
         ) : null}
       </div>
       <span className="table-meta muted">{row.submittedAttemptCount}</span>
@@ -1484,12 +1484,6 @@ function GradebookStudentRow({
       </div>
     </div>
   );
-}
-
-function formatAttemptStartedAt(value: string, locale: Locale, timeZone: string = "UTC") {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 function normalizeCodingTestResults(value: unknown): Array<{ testId: string; name: string; passed: boolean }> {

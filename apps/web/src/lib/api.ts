@@ -67,6 +67,7 @@ import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
 import { ACTIVITY_CONTENT_CLOSED_EVENT } from "@cognelo/activity-ui";
 import { isSystemErrorCode, type SystemErrorCode, type ApiErrorBody } from "@cognelo/contracts";
 import { currentSystemError } from "./system-errors";
+import type { ActivityStudentProgress } from "@cognelo/contracts";
 
 export type { StudentGroupingDto, StudentGroupingStudent, MaterialKind, SubjectKnowledgeGraphDraft, SubjectProgrammingLanguage };
 
@@ -1995,6 +1996,11 @@ export const api = {
       params.set("groupId", groupId);
     }
     return request<{ attempts: CourseActivityInProgressAttempt[] }>(`/courses/${courseId}/gradebook?${params.toString()}`);
+  },
+  courseActivityProgress: (courseId: string, activityId: string, groupId?: string) => {
+    const params = new URLSearchParams({ view: "in-progress-attempts", activityId, includeProgress: "1" });
+    if (groupId) params.set("groupId", groupId);
+    return request<{ attempts: CourseActivityInProgressAttempt[]; progress: ActivityStudentProgress[] }>(`/courses/${courseId}/gradebook?${params}`);
   },
   gradebookPluginActions: (courseId: string, activityId: string, groupId?: string, signal?: AbortSignal) => request<{ actions: GradebookPluginAction[] }>(`/courses/${courseId}/gradebook/activities/${activityId}/plugin-actions${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ""}`, { signal }),
   downloadGradebookPluginAction: async (courseId: string, activityId: string, input: { actionId: string; groupId?: string; participantId?: string }, signal: AbortSignal) => {

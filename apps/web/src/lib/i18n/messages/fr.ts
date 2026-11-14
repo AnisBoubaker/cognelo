@@ -1032,6 +1032,12 @@ export const frMessages = {
       loadError: "Impossible de charger le cours."
     },
     courseDetail: {
+    "progressHeader": "Progression",
+    "progressNotStarted": "Pas commencé",
+    "progressInProgress": "En cours",
+    "progressDone": "Terminé",
+    "progressStageSubmitted": "{stage} : remis",
+    "progressStageInProgress": "{stage} : en cours",
     "activitySearch": "Rechercher des activités",
     "activitySearchPlaceholder": "Titre ou description",
     "targetedConceptFilter": "Concept ciblé",
