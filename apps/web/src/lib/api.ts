@@ -1,4 +1,5 @@
 import type { GradebookActionDefinition } from "@cognelo/activity-sdk";
+import type { ActivityLogCursor, ActivityLogPage, ActivityStudentActionList } from "@cognelo/contracts";
 import type { SubmissionStagePolicies } from "@cognelo/contracts";
 import type { SubmissionStageDefinition } from "@cognelo/activity-sdk";
 import type { TestAiGradingInstructions } from "@cognelo/contracts";
@@ -2003,6 +2004,14 @@ export const api = {
     return request<{ attempts: CourseActivityInProgressAttempt[]; progress: ActivityStudentProgress[] }>(`/courses/${courseId}/gradebook?${params}`);
   },
   gradebookPluginActions: (courseId: string, activityId: string, groupId?: string, signal?: AbortSignal) => request<{ actions: GradebookPluginAction[] }>(`/courses/${courseId}/gradebook/activities/${activityId}/plugin-actions${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ""}`, { signal }),
+  activityLogs: (courseId: string, activityId: string, groupId?: string, cursor?: ActivityLogCursor, signal?: AbortSignal) => {
+    const params = new URLSearchParams();
+    if (groupId) params.set("groupId", groupId);
+    if (cursor) params.set("cursor", JSON.stringify(cursor));
+    return request<ActivityLogPage>(`/courses/${courseId}/gradebook/activities/${activityId}/logs?${params}`, { signal });
+  },
+  activityStudentActions: (courseId: string, activityId: string, groupId?: string, signal?: AbortSignal) => request<ActivityStudentActionList>(`/courses/${courseId}/gradebook/activities/${activityId}/student-actions${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ""}`, { signal }),
+  executeActivityStudentAction: (courseId: string, activityId: string, input: { actionId: string; targetId: string; participantId: string; groupId: string; reason: string }) => request<{ completed: boolean }>(`/courses/${courseId}/gradebook/activities/${activityId}/student-actions`, { method: "POST", body: JSON.stringify(input) }),
   downloadGradebookPluginAction: async (courseId: string, activityId: string, input: { actionId: string; groupId?: string; participantId?: string }, signal: AbortSignal) => {
     const path = `/courses/${courseId}/gradebook/activities/${activityId}/plugin-actions`;
     assertStudentViewRequestIsSafe(path, { method: "POST" });

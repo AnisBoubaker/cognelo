@@ -5,18 +5,18 @@ import { normalizeHomeworkPath } from "./file-preparation";
 import { homeworkGradebookActions } from "./gradebook-action-definitions";
 import { submittedWorkZipResponse, type SubmittedZipWork } from "./submitted-work";
 
-type Target = { participantId: string; submissionId: string; groupId: string; userId: string };
+type Target = { participantId: string; submissionId: string; groupId: string; userId: string; questionsEnabled: boolean; team: boolean };
 /** Private hand-in state is interpreted here, including hand-ins with no core attempt yet. */
-async function currentTargets(context: GradebookActionContext): Promise<Target[]> {
+export async function currentHomeworkReportTargets(context: GradebookActionContext): Promise<Target[]> {
   const roster = context.participants.filter(person => person.userId);
   if (!roster.length) return [];
   return prisma.$queryRaw<Target[]>`
     WITH authorized AS (SELECT * FROM unnest(${roster.map(p => p.participantId)}::text[],${roster.map(p => p.groupId)}::text[],${roster.map(p => p.userId)}::text[]) AS p("participantId","groupId","userId")),
     latest AS (SELECT DISTINCT ON (p."participantId") p."participantId",s.id AS "submissionId",s."groupId",s."userId",s.status,s."workspaceId",s."workspaceMemberId",s."sharedSourceId",s."coreAttemptId",
-      s.metadata ? 'deletion' AS deleted
+      s.metadata ? 'deletion' AS deleted, s.metadata
       FROM authorized p JOIN "PluginCodingHomeworkSubmission" s ON s."groupId"=p."groupId" AND s."userId"=p."userId" AND s."activityId"=${context.activity.id} AND s.kind='final'
       ORDER BY p."participantId",s."createdAt" DESC,s.id DESC)
-    SELECT l."participantId",l."submissionId",l."groupId",l."userId" FROM latest l
+    SELECT l."participantId",l."submissionId",l."groupId",l."userId",coalesce(l.metadata->>'questionGenerationEnabled','true')<>'false' AS "questionsEnabled",w."teamId" IS NOT NULL AS team FROM latest l
       LEFT JOIN "ActivityAttempt" a ON a.id=l."coreAttemptId"
       LEFT JOIN "PluginCodingHomeworkWorkspace" w ON w.id=l."workspaceId"
       LEFT JOIN "PluginCodingHomeworkWorkspaceMember" m ON m.id=l."workspaceMemberId"
@@ -34,7 +34,7 @@ export function homeworkArchiveSegment(value: string) {
 }
 async function download(context: GradebookActionContext & { actionId: string }) {
   const batch = context.actionId === "download-all-submitted-work";
-  const targets = await currentTargets(context);
+  const targets = await currentHomeworkReportTargets(context);
   if (targets.length !== context.participants.length) throw new AppError(409, "HOMEWORK_DOWNLOAD_CHANGED", "Submitted work changed. Refresh the gradebook and try again.");
   const files = await prisma.pluginCodingHomeworkSubmissionFile.findMany({ where: { submissionId: { in: targets.map(target => target.submissionId) } },
     select: { submissionId: true, path: true, storedName: true, sizeBytes: true, sha256: true }, orderBy: [{ submissionId: "asc" }, { path: "asc" }], take: 20_001 });
@@ -65,7 +65,7 @@ async function download(context: GradebookActionContext & { actionId: string }) 
   if (work.files.length + work.folders.length > 30_000) throw new AppError(413, "HOMEWORK_DOWNLOAD_TOO_LARGE", "The download contains too many paths. Download students individually or filter to a smaller section.");
   const validate = async () => {
     context.signal?.throwIfAborted();
-    const current = await currentTargets(context);
+    const current = await currentHomeworkReportTargets(context);
     if (current.length !== targets.length || targets.some(target => !current.some(row => row.participantId === target.participantId && row.submissionId === target.submissionId))) throw new AppError(409, "HOMEWORK_DOWNLOAD_CHANGED", "Submitted work changed during the download. Try again.");
   };
   await validate();
@@ -75,7 +75,7 @@ async function download(context: GradebookActionContext & { actionId: string }) 
 export const homeworkGradebookActionService: GradebookActionService = {
   activityTypeKeys: ["coding-homework-grader"],
   async availability(context) {
-    const ids = (await currentTargets(context)).map(target => target.participantId);
+    const ids = (await currentHomeworkReportTargets(context)).map(target => target.participantId);
     return Object.fromEntries(homeworkGradebookActions.map(action => [action.id, ids]));
   },
   execute: download

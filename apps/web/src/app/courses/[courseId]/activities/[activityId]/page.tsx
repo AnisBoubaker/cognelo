@@ -80,7 +80,7 @@ export default function ActivityPage() {
     ? activityEditorHref(courseId, testActivityId, returnContext)
     : returnContext ? activityReportHref(courseId, activityId, returnContext) : `/courses/${courseId}`;
   const backLabel = testActivityId ? t("courseDetail.backToTest")
-    : returnContext ? t(returnContext.report === "overview" ? "courseDetail.backToActivityOverview" : "courseDetail.backToStudentResults")
+    : returnContext ? t(returnContext.report === "logs" ? "activityLogs.back" : returnContext.report === "overview" ? "courseDetail.backToActivityOverview" : "courseDetail.backToStudentResults")
       : t("parsons.backToCourse");
 
   const activityContext = (

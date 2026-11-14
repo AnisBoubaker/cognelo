@@ -364,6 +364,36 @@ export const arMessages = {
       paused: "متوقف مؤقتا",
       archived: "مؤرشف"
     },
+    activityLogs: {
+      back: "العودة إلى السجل",
+      "title": "السجل",
+      "refresh": "تحديث",
+      "empty": "لا توجد أحداث مسجلة بعد.",
+      "loadError": "تعذر تحميل سجل النشاط.",
+      "actor": "بواسطة {name}",
+      "attempt": "المحاولة {number}",
+      "more": "تحميل الأحداث السابقة",
+      "events": {
+        questions_ready: "أسئلة التحقق جاهزة",
+        processing_failed: "فشل توليد الأسئلة",
+        "attempt_started": "بدأت المحاولة",
+        "submitted": "اكتمل التسليم",
+        "files_submitted": "تم تسليم الملفات",
+        "automatic_hand_in": "تم تسليم العمل تلقائياً",
+        "submission_cancelled": "تم إلغاء التسليم",
+        "challenges_reset": "أعاد المعلم ضبط الأسئلة",
+        "auto_graded": "تم تسجيل الدرجة التلقائية",
+        "manual_graded": "تم تسجيل درجة المعلم",
+        "overridden": "عدّل المعلم الدرجة",
+        "regraded": "أعيد حساب الدرجة",
+        "released": "تم نشر الدرجة",
+        "hidden": "تم إخفاء الدرجة",
+        "submission_deleted": "تم حذف التسليم",
+        "submission_reopened": "أعاد المعلم فتح التسليم",
+        "ai_feedback_recorded": "تم تسجيل ملاحظات التقييم",
+        "assessment_mode_changed": "تم تغيير نمط التقييم"
+      }
+    },
     gradebookActions: { preparing: "جارٍ تحضير التنزيل…", failed: "تعذر إكمال التنزيل.", loadFailed: "تعذر تحميل إجراءات تنزيل النشاط." },
     login: {
       title: "تسجيل الدخول",

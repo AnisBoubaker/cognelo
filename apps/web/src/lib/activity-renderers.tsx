@@ -13,7 +13,6 @@ import {
 import {
   CodingHomeworkGraderActivityView,
   CodingHomeworkManualGradingPanel,
-  HomeworkSubmissionManagement,
   createCodingHomeworkGraderClient,
   type CodingHomeworkGradebookAttemptRecord
 } from "@cognelo/plugin-coding-homework-grader";
@@ -1490,18 +1489,4 @@ export function getAiFeedbackReviewCalculatedGradePercent(activityTypeKey: strin
   const rendererKey = getActivityDefinition(activityTypeKey)?.aiFeedback?.rendererKey;
   if (rendererKey !== "coding-exercise-ai-feedback-review") return null;
   return getCodingExerciseGradingBreakdown(feedback)?.totalGrade ?? null;
-}
-
-
-type SubmissionManagementProps = { activityTypeKey: string; activityId: string; courseId: string; groupId?: string; locale: Locale; onChanged?: () => void };
-const submissionManagementRenderers: Record<string, ComponentType<SubmissionManagementProps>> = {
-  "coding-homework-submission-management": function HomeworkManagementRenderer({ activityId, courseId, groupId, locale, onChanged }) {
-    const request = useMemo(() => <T,>(route: string, init?: RequestInit) => apiRequest<T>(`/courses/${courseId}/${groupId ? `groups/${groupId}/activities/assigned` : "activities"}/${activityId}/coding-homework-grader/${route}`, init), [activityId, courseId, groupId]);
-    return <HomeworkSubmissionManagement request={request} locale={locale} onChanged={onChanged} recoverAutomatic />;
-  }
-};
-export function ActivitySubmissionManagement(props: SubmissionManagementProps) {
-  const key = getActivityDefinition(props.activityTypeKey)?.submissionManagement?.rendererKey;
-  const Renderer = key ? submissionManagementRenderers[key] : null;
-  return Renderer ? <Renderer {...props} /> : null;
 }

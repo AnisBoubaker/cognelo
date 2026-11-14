@@ -7070,3 +7070,8 @@ button.help-tooltip-trigger:hover, button.help-tooltip-trigger:focus-visible { c
 .toggle-switch > label.toggle-switch-label { margin: 0; cursor: inherit; }
 
 .activity-stage-schedule legend { display: flex; align-items: center; gap: 6px; max-width: 100%; }
+
+.activity-log-list { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; }
+.activity-log-entry { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr); gap: 10px 24px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; min-width: 0; overflow-wrap: anywhere; }
+.activity-log-reason { grid-column: 1 / -1; margin: 0; white-space: pre-wrap; }
+@media (max-width: 780px) { .activity-log-entry { grid-template-columns: 1fr; } }

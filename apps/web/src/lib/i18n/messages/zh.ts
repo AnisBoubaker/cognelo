@@ -382,6 +382,36 @@ export const zhMessages = {
       file: "文件",
       module: "模块"
     },
+    activityLogs: {
+      back: "返回日志",
+      "title": "日志",
+      "refresh": "刷新",
+      "empty": "暂无记录。",
+      "loadError": "无法加载活动日志。",
+      "actor": "操作者：{name}",
+      "attempt": "第 {number} 次尝试",
+      "more": "加载更早的记录",
+      "events": {
+        questions_ready: "挑战问题已就绪",
+        processing_failed: "问题生成失败",
+        "attempt_started": "已开始尝试",
+        "submitted": "已完成提交",
+        "files_submitted": "已提交文件",
+        "automatic_hand_in": "已自动提交作业",
+        "submission_cancelled": "提交已取消",
+        "challenges_reset": "教师已重置挑战问题",
+        "auto_graded": "已记录自动评分",
+        "manual_graded": "已记录教师评分",
+        "overridden": "教师已调整成绩",
+        "regraded": "已重新计算成绩",
+        "released": "已发布成绩",
+        "hidden": "已隐藏成绩",
+        "submission_deleted": "提交已删除",
+        "submission_reopened": "教师已重新开放提交",
+        "ai_feedback_recorded": "已记录评估反馈",
+        "assessment_mode_changed": "已更改评估模式"
+      }
+    },
     gradebookActions: { preparing: "正在准备下载…", failed: "无法完成下载。", loadFailed: "无法加载此活动的下载操作。" },
     login: {
       title: "登录",

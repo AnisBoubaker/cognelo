@@ -1,6 +1,6 @@
 export type ActivityReportReturnContext = {
   origin: "content" | "gradebook";
-  report: "overview" | "students";
+  report: "overview" | "students" | "logs";
   groupId?: string;
 };
 
@@ -8,7 +8,7 @@ export function activityReportReturnContext(search: Pick<URLSearchParams, "get">
   if (search.get("returnTo") !== "report") return undefined;
   return {
     origin: search.get("origin") === "content" ? "content" : "gradebook",
-    report: search.get("report") === "students" ? "students" : "overview",
+    report: search.get("report") === "logs" ? "logs" : search.get("report") === "students" ? "students" : "overview",
     groupId: search.get("groupId") || undefined
   };
 }

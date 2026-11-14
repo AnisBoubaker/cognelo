@@ -6,7 +6,6 @@ import { codingHomeworkGraderDatabaseModule } from "./db";
 export * from "./algorithm";
 export * from "./parsers";
 export * from "./web/client";
-export * from "./web/homework-submission-management";
 export * from "./web/coding-homework-grader-activity-view";
 export * from "./web/coding-homework-manual-grading-panel";
 
@@ -39,7 +38,6 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
         supportsAnalyticsPayloads: true,
         defaultMaxAttempts: 3
       },
-      submissionManagement: { rendererKey: "coding-homework-submission-management" },
       manualGrading: {
         rendererKey: "coding-homework-grader-manual-grading"
       },

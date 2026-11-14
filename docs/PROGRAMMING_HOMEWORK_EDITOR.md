@@ -6,7 +6,7 @@ Status: implemented and locally validated, November 9, 2026.
 
 The core top tabs are Activity, Concepts and Reference materials. Reference materials stays core-owned for embedding/RAG-capable course activities. Activity contains the shared left navigation:
 
-- Activity: title, description, programming language, assignment text in the shared WYSIWYG editor, assignment PDF with a collapsed preview, and provided files. Remove the separate rendered assignment preview and student-submission management from authoring; management remains in Class overview.
+- Activity: title, description, programming language, assignment text in the shared WYSIWYG editor, assignment PDF with a collapsed preview, and provided files. Remove the separate rendered assignment preview and student-submission management from authoring; actions live in Student results row menus and history in the shared Logs tab.
 - Teacher solution: private solution and required filename/function/signature selection. Filenames appear on the left with required checkboxes and delete actions; selecting one shows only its signatures on the right. Select the first file initially and preserve selections across files.
 - Submission requirements: immediately after Teacher solution; manual required files/folders/functions, ignored paths, allowed extensions and requirements import.
 - Question Generation: an On/Off switch, then question count, candidate limit, retrieved examples, generation model, private instructions, team question policy and generation concurrency. Hide or disable dependent controls when off, retaining their saved values.

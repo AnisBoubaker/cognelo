@@ -150,7 +150,6 @@ export type ActivityDefinition = {
   icon?: ActivityIconName;
   grading?: ActivityGradingCapability;
   manualGrading?: ActivityManualGradingContract;
-  submissionManagement?: { rendererKey: string };
   aiFeedback?: ActivityAiFeedbackContract;
   authoring?: ActivityAuthoringContract;
   studentView: ActivityStudentViewContract;

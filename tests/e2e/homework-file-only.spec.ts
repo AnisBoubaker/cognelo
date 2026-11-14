@@ -36,6 +36,8 @@ test("file-only homework completes without AI, embeddings or SEB and keeps incom
     await expect(page.getByRole("button", { name: "Answer challenge questions", exact: true })).toHaveCount(0);
     await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${id}`);
     await teacherPage.getByRole("button", { name: /^Actions for / }).click();
+    await expect(teacherPage.getByRole("menuitem", { name: "Cancel submission", exact: true })).toBeVisible();
+    await expect(teacherPage.getByRole("menuitem", { name: "Reset this student's challenges", exact: true })).toHaveCount(0);
     await teacherPage.getByRole("menuitem", { name: "Review and grade", exact: true }).click();
     const review = teacherPage.getByRole("dialog", { name: "Review and grade", exact: true });
     await expect(review.getByRole("tab", { name: "Submitted files", exact: true })).toHaveAttribute("aria-selected", "true");
@@ -61,7 +63,7 @@ test("file-only homework completes without AI, embeddings or SEB and keeps incom
   } finally { await student.dispose(); }
 });
 
-test("file-only team work immediately completes every member and late joiner with individual grades", async ({ bankCourse: data, teacherApi: api }) => {
+test("file-only team work immediately completes every member and late joiner with individual grades", async ({ bankCourse: data, teacherApi: api, teacherPage }) => {
   const student = await createAuthenticatedApi("student"), users: string[] = [];
   const peers = [];
   try {
@@ -108,7 +110,15 @@ test("file-only team work immediately completes every member and late joiner wit
     expect((await state()).submission!.id).not.toBe(original.id);
     expect(await prisma.activityAttempt.count({ where: { activityId: id, lifecycle: "submitted" } })).toBe(3);
     expect(await prisma.backgroundJob.count({ where: { payload: { path: ["activityId"], equals: id } } })).toBe(0);
-    await responseJson(await api.delete(`${base}/manage-submissions`, { data: { submissionId: (await state()).submission!.id, reason: "Reopen shared work" } }));
+    await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${id}`);
+    await teacherPage.locator(".table-row-gradebook-detail").filter({ hasText: credentialsFor("student").email }).getByRole("button", { name: /^Actions for / }).click();
+    await teacherPage.getByRole("menuitem", { name: "Cancel team submission", exact: true }).click();
+    const cancellation = teacherPage.getByRole("dialog", { name: "Cancel team submission", exact: true });
+    await expect(cancellation).toContainText("Cancel the shared hand-in for all team members");
+    await cancellation.getByRole("textbox").fill("Reopen shared work");
+    await cancellation.getByRole("button", { name: "Cancel team submission", exact: true }).click();
+    await expect(cancellation).toBeHidden();
+    await expect(teacherPage.getByRole("dialog")).toHaveCount(0);
     for (const client of [student,...peers]) expect((await state(client)).submission).toBeNull();
     expect((await progress()).every(person => person.state === "in_progress")).toBe(true);
     expect(await prisma.activityAttempt.count({ where: { activityId: id, lifecycle: "deleted" } })).toBe(4);

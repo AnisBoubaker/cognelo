@@ -382,6 +382,36 @@ export const frMessages = {
       file: "Fichier",
       module: "Module"
     },
+    activityLogs: {
+      back: "Retour au journal",
+      "title": "Journal",
+      "refresh": "Actualiser",
+      "empty": "Aucun événement enregistré.",
+      "loadError": "Impossible de charger le journal de l’activité.",
+      "actor": "Par {name}",
+      "attempt": "Tentative {number}",
+      "more": "Charger les événements précédents",
+      "events": {
+        questions_ready: "Questions de vérification prêtes",
+        processing_failed: "Échec de la génération des questions",
+        "attempt_started": "Tentative commencée",
+        "submitted": "Remise terminée",
+        "files_submitted": "Fichiers remis",
+        "automatic_hand_in": "Travail remis automatiquement",
+        "submission_cancelled": "Remise annulée",
+        "challenges_reset": "Questions réinitialisées par l’enseignant",
+        "auto_graded": "Note automatique enregistrée",
+        "manual_graded": "Note de l’enseignant enregistrée",
+        "overridden": "Note ajustée par l’enseignant",
+        "regraded": "Note recalculée",
+        "released": "Note publiée",
+        "hidden": "Note masquée",
+        "submission_deleted": "Remise supprimée",
+        "submission_reopened": "Remise rouverte par l’enseignant",
+        "ai_feedback_recorded": "Rétroaction enregistrée",
+        "assessment_mode_changed": "Mode d’évaluation modifié"
+      }
+    },
     gradebookActions: { preparing: "Préparation du téléchargement…", failed: "Le téléchargement n’a pas pu être effectué.", loadFailed: "Impossible de charger les actions de téléchargement de l’activité." },
     login: {
       title: "Connexion",

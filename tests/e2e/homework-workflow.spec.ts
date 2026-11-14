@@ -78,6 +78,8 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
     await expect.poll(async () => (await prisma.activityAttempt.findUniqueOrThrow({ where: { id: attempt.id } })).lifecycle, { timeout: 20_000 }).toBe("submitted");
     const [persisted] = await prisma.$queryRaw<Array<{ status: string }>>`SELECT status FROM "PluginCodingHomeworkSubmission" WHERE id=${state.submission.id}`;
     expect(persisted.status).toBe("ready_for_grading");
+    const logs = await responseJson<{ entries: Array<{ type: string }> }>(await teacherApi.get(`/api/courses/${data.courseId}/gradebook/activities/${activityId}/logs`));
+    expect(logs.entries.some(entry => entry.type === "questions_ready")).toBe(true);
     const answers = await prisma.$queryRaw<Array<{ studentAnswer: string; answerSubmittedAt: Date }>>`SELECT "studentAnswer", "answerSubmittedAt" FROM "PluginCodingHomeworkChallengeQuestion" WHERE "submissionId"=${state.submission.id} ORDER BY "orderIndex"`;
     expect(answers.map(answer => answer.studentAnswer)).toEqual(["The function adds the two integers.", "", "", "", ""]);
     expect(answers.every(answer => answer.answerSubmittedAt)).toBe(true);
@@ -85,7 +87,9 @@ test("prepared homework: reusable embeddings, frozen files, explicit answering, 
     await responseJson(await teacherApi.patch(`/api/courses/${data.courseId}/gradebook/items/${attempt.gradebookItemId}/release`, { data: { released: true } }));
     expect(await prisma.grade.count({ where: { gradebookItemId: attempt.gradebookItemId, participantId: attempt.participantId } })).toBe(1);
     await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}?report=overview`);
-    await teacherPage.getByRole("button", { name: "Cancel submission", exact: true }).click();
+    await teacherPage.getByRole("tab", { name: "Student results", exact: true }).click();
+    await teacherPage.getByRole("button", { name: /^Actions for / }).click();
+    await teacherPage.getByRole("menuitem", { name: "Cancel submission", exact: true }).click();
     const cancelDialog = teacherPage.getByRole("dialog", { name: "Cancel submission", exact: true });
     await cancelDialog.getByLabel("Reason for cancellation", { exact: true }).fill("Permit corrected work.");
     await cancelDialog.getByRole("button", { name: "Cancel submission", exact: true }).click();

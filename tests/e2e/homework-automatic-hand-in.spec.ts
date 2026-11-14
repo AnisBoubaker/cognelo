@@ -6,7 +6,7 @@ import { homeworkModelFixture } from "./fixtures/homework-model";
 import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
 
 type State = { teamwork?: { contextKey: string }; automaticSubmissionIssue?: boolean; submission: null | { id: string; status: string; automaticHandIn: boolean; incompleteAcknowledged: boolean; submissionTiming: { deadline: string; submittedAt: string; isLate: boolean; lateByMs: number } } };
-for (const team of [false, true]) test(`saved ${team ? "team" : "individual"} work is recovered at the cutoff through ${team ? "class overview" : "the student page"}`, async ({ bankCourse: data, teacherApi, teacherPage, studentPage }) => {
+for (const team of [false, true]) test(`saved ${team ? "team" : "individual"} work is recovered at the cutoff through ${team ? "report actions" : "the student page"}`, async ({ bankCourse: data, teacherApi, teacherPage, studentPage }) => {
   test.setTimeout(120_000);
   const model = await homeworkModelFixture(data), student = await createAuthenticatedApi("student"); let activityId: string | undefined;
   try {
@@ -40,7 +40,9 @@ for (const team of [false, true]) test(`saved ${team ? "team" : "individual"} wo
     if (team) {
       expect((await student.get(`${endpoint}/workspace`)).status()).toBe(403);
       await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}?report=overview`);
-      await expect(teacherPage.getByText("Saved files were submitted automatically at the cutoff.", { exact: true })).toBeVisible();
+      await expect.poll(async () => Number((await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) FROM "PluginCodingHomeworkSubmission" WHERE "activityId"=${activityId} AND kind='final'`)[0].count)).toBe(1);
+      await teacherPage.getByRole("tab", { name: "Logs", exact: true }).click();
+      await expect(teacherPage.locator(".activity-log-entry").filter({ hasText: "Work submitted automatically" })).toHaveCount(1);
     } else {
       // Reject writes even before any page visit triggers the overdue hand-in.
       expect((await student.post(`${endpoint}/preparation`, { data: { kind: "file", path: "main.c", expectedRevision: 1, replace: true, base64: "aW50IHgoKXt9" } })).status()).toBe(409);
@@ -51,7 +53,7 @@ for (const team of [false, true]) test(`saved ${team ? "team" : "individual"} wo
       await expect(studentPage.getByRole("heading", { name: "Submitted work", exact: true })).toBeVisible();
     }
     // Repeated/concurrent staff reads reuse one immutable hand-in and one queue job.
-    await Promise.all(Array.from({ length: 3 }, () => teacherApi.get(`${authoring}/manage-submissions?recoverAutomatic=1`).then(responseJson)));
+    await Promise.all(Array.from({ length: 3 }, () => teacherApi.get(`/api/courses/${data.courseId}/gradebook/activities/${activityId}/student-actions`).then(responseJson)));
     const rows = await prisma.$queryRaw<Array<{ id: string; metadata: { submissionTiming: { deadline: string; submittedAt: string; isLate: boolean; lateByMs: number }; incompleteAcknowledged: boolean; automaticHandIn: { cutoff: string; recoveredAt: string; acknowledgementSource: string } }; structureValidationSummary: { isValid: boolean }; status: string }>>`SELECT id,metadata,"structureValidationSummary",status FROM "PluginCodingHomeworkSubmission" WHERE "activityId"=${activityId} AND kind='final'`;
     expect(rows).toHaveLength(1);
     expect(rows[0].structureValidationSummary.isValid).toBe(false);

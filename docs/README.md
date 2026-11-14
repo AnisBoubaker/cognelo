@@ -61,6 +61,7 @@ Open these only when changing or reviewing the named area:
 - [Reopening student submissions](SUBMISSION_CONTINUATION.md)
 - [Gradebook](GRADEBOOK_IMPLEMENTATION_PLAN.md)
 - [Activity-contributed gradebook actions](GRADEBOOK_PLUGIN_ACTIONS.md): generic activity-owned download contracts, authorized roster scope and original homework ZIP downloads.
+- [Activity logs and student actions](ACTIVITY_LOGS.md): shared report history, scoped pagination and submission actions in student row menus.
 - [Student answer PDF/ZIP exports](ANSWER_EXPORTS.md)
 - [Role authorization and multi-teacher E2E plan](ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md)
 - [Student groupings and teams](STUDENT_GROUPINGS.md)

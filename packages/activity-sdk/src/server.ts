@@ -3,6 +3,8 @@ export * from "./gradebook-actions";
 import type { SubmissionExportHandler } from "./submission-export";
 export * from "./submission-export";
 import type { ActivityStudentProgress, CurrentUser } from "@cognelo/contracts";
+import type { ActivityLogCursor, ActivityLogEvidence, ActivityStudentActionList } from "@cognelo/contracts";
+import type { GradebookActionContext } from "./gradebook-actions";
 import type { ActivityDefinition, ActivitySolutionContent } from "./index";
 
 export type ServerActivityRecord = {
@@ -384,6 +386,15 @@ export type SubmissionStageActivationChange = SubmissionStageActivationScope & {
 
 export type ServerActivityPlugin = {
   key: string;
+  reports?: {
+    activityTypeKeys: readonly string[];
+    /** Read-only, newest-first lifecycle evidence. Never expose raw plugin metadata. */
+    logs?: (context: GradebookActionContext & { before?: ActivityLogCursor; limit: number }) => Promise<ActivityLogEvidence[]>;
+    studentActions?: {
+      list: (context: GradebookActionContext & { recoverAutomatic: boolean }) => Promise<ActivityStudentActionList>;
+      execute: (context: GradebookActionContext & { actionId: string; targetId: string; reason: string }) => Promise<void>;
+    };
+  };
   /** Batch, read-only projection. Host supplies only its authorized student roster. */
   studentProgress?: {
     activityTypeKeys: readonly string[];
@@ -601,6 +612,10 @@ export function listServerActivityPlugins() {
 
 export function resolveActivityStudentProgressHandler(activityTypeKey: string) {
   return currentServerPlugins().find(plugin => plugin.studentProgress?.activityTypeKeys.includes(activityTypeKey))?.studentProgress?.getProgress ?? null;
+}
+
+export function getActivityReportService(activityTypeKey: string) {
+  return currentServerPlugins().find(plugin => plugin.reports?.activityTypeKeys.includes(activityTypeKey))?.reports ?? null;
 }
 
 function normalizePath(path: string | readonly string[]) {
