@@ -10,7 +10,7 @@ export async function courseActivityProgress(user: CurrentUser, courseId: string
   const stages = getActivityDefinition(snapshot.activityTypeKey)?.submissionStages ?? [];
   if (handler && snapshot.participants.length) {
     const updates = await handler({ user, courseId, activityId, participants: snapshot.participants,
-      activityMetadata: snapshot.activityMetadata, assignmentMetadata: snapshot.assignmentMetadata });
+      activityMetadata: snapshot.activityMetadata, assignmentMetadata: snapshot.assignmentMetadata, progress: snapshot.progress });
     for (const update of updates) {
       const key = `${update.groupId}:${update.participantId}`, previous = statuses.get(key);
       if (!previous || !["not_started", "in_progress", "stage_submitted", "done"].includes(update.state)) continue;

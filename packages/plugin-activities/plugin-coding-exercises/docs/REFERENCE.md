@@ -349,9 +349,13 @@ Submission, review, and other dated UI records use the shared effective course t
 
 The optional [core content-closure policy](../../../../docs/ACTIVITY_CONTENT_ACCESS.md) governs learner retrieval after permitted attempts end, including compound Test children. Shared dispatch denies closed content/history/file reads and returns only a closure signal after the final submission; teacher inspection and stored evidence remain intact. Released grades do not authorize detailed reports or solutions while closed.
 
+## Student results progress
+
+A later draft timestamp alone cannot prove new work: older editor initialization saved empty/starter drafts after completed submissions. The optional `studentProgress` reader receives core progress and checks only ambiguous completed-attempt rows. A batched, authorized server-side comparison excludes empty/whitespace, current starter-equivalent and unchanged submitted code. It returns Done for these rows without deleting or rewriting legacy drafts. New substantive saved responses remain In progress. A current started attempt always remains In progress; a displayed grade may belong to an earlier submission. Core still owns scope, assessment-mode selection, timing and public serialization. No source code enters the progress feed.
+
 ## Editor history and draft restoration
 
-Use the shared [editor undo lifecycle](../../../../docs/EDITOR_UNDO.md). Draft loading gates editing and offers Retry on failure. Restored answers establish a baseline without firing an autosave; real typing, undo, and redo use the existing ordered answer persistence. The Test host retains separate per-question/file models in memory only and disposes them on session/view changes. Reopening or reloading uses the saved answer with empty undo history.
+Use the shared [editor undo lifecycle](../../../../docs/EDITOR_UNDO.md). Draft loading gates editing and offers Retry on failure. Initial empty/starter loading and restored answers establish a baseline without creating or saving a draft; real typing, undo, and redo use the existing ordered answer persistence. The Test host retains separate per-question/file models in memory only and disposes them on session/view changes. Reopening or reloading uses the saved answer with empty undo history.
 
 ## Shared action controls
 

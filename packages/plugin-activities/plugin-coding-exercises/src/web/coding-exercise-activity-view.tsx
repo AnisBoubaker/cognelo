@@ -540,13 +540,10 @@ export function CodingExerciseActivityView({
       JSON.parse(activityConfigKey) as Record<string, unknown>
     );
     executionStateHost.load()
-      .then(async (saved) => {
+      .then((saved) => {
         const sourceCode = typeof saved?.sourceCode === "string" ? saved.sourceCode : initialSourceCode;
         if (cancelled) return;
         setEditorCode(sourceCode);
-        if (typeof saved?.sourceCode !== "string" && !readOnly && studentViewModeRef.current !== "previous") {
-          await executionStateHost.save({ sourceCode });
-        }
         if (!cancelled) setLoadedExecutionKey(executionKey);
       })
       .catch((err) => {

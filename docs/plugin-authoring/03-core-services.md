@@ -365,11 +365,11 @@ Declare `ActivityDefinition.gradebookActions` with unique IDs, `kind: "download"
 
 ### Student activity progress
 
-Core supplies **Student results → Progress** from current-mode attempt lifecycle/timing, generic saved drafts and answering presence. Activities with private drafts or pre-attempt stages may register `ServerActivityPlugin.studentProgress` with `activityTypeKeys` and one batch `getProgress` reader. Input contains the grading actor, course/activity IDs, activity metadata, assignment metadata keyed by group ID, and the authorized roster of `{participantId, groupId, userId}`. Keep all reads constrained to that roster and the current activity/team bindings.
+Core supplies **Student results → Progress** from current-mode attempt lifecycle/timing, generic saved drafts and answering presence. Activities with private drafts or pre-attempt stages may register `ServerActivityPlugin.studentProgress` with `activityTypeKeys` and one batch `getProgress` reader. Input contains the grading actor, course/activity IDs, activity metadata, assignment metadata keyed by group ID, the authorized roster of `{participantId, groupId, userId}`, and the core `progress` lifecycle/timing projection. Keep all reads constrained to that roster and the current activity/team bindings.
 
 Return `ActivityStudentProgress[]` with neutral identity and state (`not_started`, `in_progress`, `stage_submitted`, `done`), plus an optional `stageId` from the activity's declared `submissionStages`. The host ignores foreign identities and invalid stages/states, supplies localized stage names from the definition, and preserves only core-owned attempt timing. Do not return responses, raw files, private metadata or grading evidence. Done denotes finished submission, not a completed teacher grade. Omit an enrollment to retain its core projection.
 
-Readers must be read-only, batched and safe to poll every ten seconds. Do not ensure/create drafts or attempts, recover hand-ins, enqueue jobs, generate questions, acquire workflow locks or evaluate answers. Homework and Parsons provide examples. See [the shared behavior](../GRADEBOOK_IMPLEMENTATION_PLAN.md#student-activity-progress).
+Readers must be read-only, batched and safe to poll every ten seconds. Do not ensure/create drafts or attempts, recover hand-ins, enqueue jobs, generate questions, acquire workflow locks or evaluate answers. Homework, Parsons and Programming Exercises provide examples; the latter refines ambiguous newer drafts without treating editor initialization as another attempt. See [the shared behavior](../GRADEBOOK_IMPLEMENTATION_PLAN.md#student-activity-progress).
 
 ### Activity logs and student actions
 

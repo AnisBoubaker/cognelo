@@ -1,4 +1,5 @@
 import { codingExerciseGradingInstructions } from "./grading-instructions";
+import { codingExerciseStudentProgress } from "./student-progress";
 import { exportCodingSubmission } from "./submission-export";
 import type { PluginAiFeedbackTeacherReviewContext, ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import {
@@ -47,6 +48,7 @@ export { listCodingExerciseProgrammingLanguages } from "./judge0";
 export const codingExercisesServerPlugin: ServerActivityPlugin = {
   submissionExport: { activityTypeKeys: ["coding-exercise"], getContent: exportCodingSubmission },
   key: "coding-exercises",
+  studentProgress: codingExerciseStudentProgress,
   studentSolution: {
     activityTypeKeys: ["coding-exercise"],
     getSolution: async (activity) => {

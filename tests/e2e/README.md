@@ -1,5 +1,7 @@
 # Browser user flows
 
+`coding-activity-progress.spec.ts` covers graded work with legacy empty/whitespace/starter/unchanged-code drafts, genuine later work and numbered started attempts alongside an earlier grade. It also verifies that initial editor loading creates no draft and real typing saves normally.
+
 `activity-logs.spec.ts` checks shared core and pre-attempt Homework history, tied-timestamp pagination, private-field exclusion, section-staff boundaries, Logs editor return links, desktop/mobile layout, cancellation/reset reason prompts and stale-target rejection. `homework-workflow.spec.ts` cancels completed work from the student row menu.
 
 `activity-student-progress.spec.ts` covers both Content/Gradebook entry points, a dedicated desktop Progress column, live untimed participation and Done, narrow layouts, Homework preparation/frozen hand-in/cancellation/file-only completion before grading, and private Parsons edits after formative checks. `submission-stage-activation.spec.ts` also checks question-answering and completed progress against real staged homework. Progress reads create no academic attempts.

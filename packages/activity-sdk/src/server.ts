@@ -405,6 +405,8 @@ export type ServerActivityPlugin = {
       activityMetadata: unknown;
       assignmentMetadata: Record<string, unknown>;
       participants: Array<{ participantId: string; groupId: string; userId: string | null }>;
+      /** Core lifecycle/timing projection; plugins may refine saved-response evidence. */
+      progress: readonly ActivityStudentProgress[];
     }) => Promise<ActivityStudentProgress[]>;
   };
   materialReferences?: ActivityMaterialReferencesService;
