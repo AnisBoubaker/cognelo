@@ -1,12 +1,14 @@
 "use client";
 import { defaultHomeworkSubmissionPolicy, formatHomeworkLateness, homeworkSubmissionWindow } from "../submission-policy";
 import { submissionDeadlineCopy } from "./submission-deadline-copy";
+import { HomeworkSubmissionGuide } from "./homework-submission-guide";
+import { submissionGuideCopy } from "./submission-guide-copy";
 import { HomeworkDownloads } from "./homework-downloads";
 import { HomeworkFileViewer } from "./homework-file-viewer";
 import { HomeworkChallengeQuestion } from "./homework-challenge-question";
 import { HomeworkAnswerConfirmation } from "./homework-answer-confirmation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { SubmissionStageAccessGate, isSubmissionStageAccessError, SubmissionStageWaiting, ActionIcon, MarkdownRenderer, ProgressDialog, AppDateTime, useServerNow, useDialogs, useNotifications, isActivityContentClosedError } from "@cognelo/activity-ui";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { SubmissionStageAccessGate, isSubmissionStageAccessError, ActionIcon, MarkdownRenderer, ProgressDialog, useServerNow, useDialogs, useNotifications, isActivityContentClosedError } from "@cognelo/activity-ui";
 import type { TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import type { CodingHomeworkLocale } from "./messages";
 import type { CodingHomeworkStudentAssignment, CodingHomeworkStudentChallengeQuestionRecord } from "./client";
@@ -17,6 +19,9 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   request: HomeworkRequest; title: string; locale: CodingHomeworkLocale; activityFileUrl?: (id: string) => string; providedFilesUrl?: string; submittedFilesUrl?: string;
   onAssessmentAccessRequested?: () => void; onAssessmentStarted?: () => void; onSubmitted?: () => void; timedAutoSubmit?: TimedActivityAutoSubmit;
 }) {
+  const answersId = useId();
+  const nextStepRef = useRef<HTMLElement | null>(null), revealNextStep = useRef(false), revealAnswers = useRef(false);
+  const guideCopy = submissionGuideCopy(locale);
   const clock = useServerNow(); const deadlineCopy = submissionDeadlineCopy(locale);
   const copy = homeworkWorkflowCopy(locale); const dialogs = useDialogs(); const notifications = useNotifications();
   const [workspace, setWorkspace] = useState<HomeworkWorkspace | null>(null), [preparation, setPreparation] = useState<HomeworkPreparation | null>(null);
@@ -44,6 +49,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
     const participationChanged = activeSubmissionId.current !== (state.submission?.id ?? null);
     contextKey.current = nextKey; activeSubmissionId.current = state.submission?.id ?? null;
     if (changed || participationChanged) {
+      revealAnswers.current = false;
       controller.current?.abort(); setPreparation(null); preparationRef.current = null;
       setQuestions([]); setAnswers({}); setCheckedPreparation(null); setSubmittedCheck(null); setAcknowledged(false); setConfirmingAnswers(false); setSaved(false); dirty.current = false; timeoutHandled.current = null;
       runtimeRefresh.current?.(); // Refresh the host's runtime; a new team has no old answering timer.
@@ -69,6 +75,12 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   }, [workspace?.automaticSubmissionIssue, notifications, deadlineCopy.autoFailed]);
   const active = workspace?.submission;
   const activeId = active?.id;
+  useEffect(() => {
+    if (activeId && revealNextStep.current) { revealNextStep.current = false; nextStepRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }); }
+  }, [activeId]);
+  useEffect(() => {
+    if (questions.length && revealAnswers.current) { revealAnswers.current = false; document.getElementById(answersId)?.scrollIntoView({ block: "start", behavior: "smooth" }); }
+  }, [questions.length, answersId]);
   useEffect(() => { setQuestions([]); setAnswers({}); setCheckedPreparation(null); setSubmittedCheck(null); setAcknowledged(false); setConfirmingAnswers(false); dirty.current = false; }, [active?.id]);
   const completed = active?.status === "ready_for_grading" || active?.status === "graded";
   const loadQuestions = useCallback((result: { questions: CodingHomeworkStudentChallengeQuestionRecord[] }) => { setQuestions(result.questions); setAnswers(Object.fromEntries(result.questions.map(question => [question.id, question.studentAnswer ?? ""]))); dirty.current = false; }, []);
@@ -104,7 +116,7 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   }
   async function start() {
     const startingContext = contextKey.current, startingSubmission = activeSubmissionId.current;
-    try { const result = await request<{ questions: CodingHomeworkStudentChallengeQuestionRecord[] }>("answering", body("POST", { submissionId: activeSubmissionId.current })); if (contextKey.current !== startingContext || activeSubmissionId.current !== startingSubmission) return; loadQuestions(result); onAssessmentStarted?.(); await refresh(); }
+    try { const result = await request<{ questions: CodingHomeworkStudentChallengeQuestionRecord[] }>("answering", body("POST", { submissionId: activeSubmissionId.current })); if (contextKey.current !== startingContext || activeSubmissionId.current !== startingSubmission) return; revealAnswers.current = true; loadQuestions(result); onAssessmentStarted?.(); await refresh(); }
     catch (reason) { if (reason && typeof reason === "object" && "code" in reason && String(reason.code).includes("SAFE_EXAM_BROWSER")) onAssessmentAccessRequested?.(); else showError(reason); }
   }
   const saveAnswers = useCallback(async () => {
@@ -132,7 +144,6 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
   const policy = workspace?.submissionPolicy ?? defaultHomeworkSubmissionPolicy;
   const ordinaryWindow = homeworkSubmissionWindow(policy, clock);
   const submissionWindow = workspace?.submissionClosesAt !== undefined ? { ...ordinaryWindow, closesAt: workspace.submissionClosesAt, closed: workspace.submissionClosesAt !== null && clock >= Date.parse(workspace.submissionClosesAt) } : ordinaryWindow;
-  const awaitingQuestions = Boolean(active && active.questionGenerationEnabled !== false && !active.started && !completed && workspace?.questionsStageEnabled === false);
   const files = active?.files ?? preparation?.draft.files ?? [];
   const hasCurrentCheck = Boolean(preparation && checkedPreparation && preparation.draft.revision === checkedPreparation.draft.revision &&
     JSON.stringify(preparation.validation.issues) === JSON.stringify(checkedPreparation.validation.issues) &&
@@ -142,17 +153,10 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
 
   return <section className="section stack">
     <h2>{title}</h2>
+    {workspace ? <HomeworkSubmissionGuide workspace={workspace} policy={policy} window={submissionWindow} clock={clock} locale={locale} questionsLoaded={questions.length > 0} questionAccessRequired={questionAccessRequired} disabled={Boolean(busy) || Boolean(timedAutoSubmit)} answersId={answersId} nextStepRef={nextStepRef} onStart={() => void start()} onAccess={onAssessmentAccessRequested} /> : null}
     <MarkdownRenderer markdown={assignment?.assignment.promptMarkdown ?? ""} />
     <HomeworkDownloads promptPdfId={assignment?.assignment.promptPdf?.id} hasProvidedFiles={Boolean(assignment?.assignment.providedFiles.length)}
       activityFileUrl={activityFileUrl} providedFilesUrl={providedFilesUrl} locale={locale} />
-    {!active && !policy.deadline && submissionWindow.closesAt && <p role="status"><strong>{deadlineCopy.deadline}: </strong><AppDateTime value={submissionWindow.closesAt} locale={locale} /></p>}
-    {(active?.submissionTiming?.deadline ?? (!active ? policy.deadline : null)) && <div className="stack" role="status">
-      <p><strong>{deadlineCopy.deadline}: </strong><AppDateTime value={(active?.submissionTiming?.deadline ?? policy.deadline)!} locale={locale} /></p>
-      {!active && <p>{policy.allowLate ? submissionWindow.closesAt ? <>{deadlineCopy.closes}: <AppDateTime value={submissionWindow.closesAt} locale={locale} /></> : deadlineCopy.unlimited : deadlineCopy.noLate}</p>}
-      {!active && submissionWindow.closesAt && workspace?.submissionsEnabled && workspace?.teamwork?.canSubmit !== false && <p>{deadlineCopy.autoNotice}</p>}
-      {!active && submissionWindow.closed && <p><strong>{deadlineCopy.closed}</strong></p>}
-      {!active && submissionWindow.isLate && !submissionWindow.closed && <p>{deadlineCopy.lateNow}</p>}
-    </div>}
     {active?.automaticHandIn && <div role="status"><strong>{deadlineCopy.automatic}</strong>{active.incompleteAcknowledged && <p>{deadlineCopy.autoIncomplete}</p>}</div>}
     {active?.submissionTiming?.isLate && <p role="status"><strong>{deadlineCopy.lateBy.replace("{duration}", formatHomeworkLateness(active.submissionTiming.lateByMs, locale))}</strong></p>}
     {!workspace ? <p>{copy.loading}</p> : workspace.teamwork?.canSubmit === false ? <div className="preview-panel" role="status"><strong>{copy.teamRequired}</strong></div> : <>
@@ -207,22 +211,11 @@ export function HomeworkStudentWorkspace({ request, title, locale, activityFileU
         <p>{submissionWindow.closed ? workspace?.automaticSubmissionIssue ? deadlineCopy.autoFailed : deadlineCopy.autoNotice : deadlineCopy.submitReminder.replace("{submit}", copy.handIn)}</p>
       </div>}
       {hasCurrentCheck && preparation.readiness.canSubmit && preparation.readiness.requiresAcknowledgement && <label className="homework-choice"><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /> {copy.incomplete}</label>}
-      {!workspace?.submissionsEnabled && <SubmissionStageWaiting locale={locale} />}
       {(canShowSubmit || !workspace.submissionsEnabled) && <button type="button" disabled={!canShowSubmit || !workspace.submissionsEnabled || submissionWindow.closed || Boolean(busy)} onClick={async () => {
-        if (await dialogs.confirm({ title: copy.handIn, message: workspace?.teamwork?.teamId ? copy.teamHandInDetail : copy.handInDetail, confirmLabel: copy.handIn })) await run(copy.handIn, async signal => { await request("hand-in", body("POST", { ...(workspace?.teamwork ? { contextKey: workspace.teamwork.contextKey } : {}), expectedRevision: preparation.draft.revision, acknowledgeIncomplete: acknowledged }, signal)); });
+        if (await dialogs.confirm({ title: copy.handIn, message: workspace?.teamwork?.teamId ? copy.teamHandInDetail : workspace.questionGenerationEnabled === false ? guideCopy.frozenFilesOnly : guideCopy.frozenTwoStages, confirmLabel: copy.handIn })) await run(copy.handIn, async signal => { await request("hand-in", body("POST", { ...(workspace?.teamwork ? { contextKey: workspace.teamwork.contextKey } : {}), expectedRevision: preparation.draft.revision, acknowledgeIncomplete: acknowledged }, signal)); revealNextStep.current = true; });
       }}><ActionIcon name="submit" /> {copy.handIn}</button>}
     </section>}
-    {awaitingQuestions && <div className="preview-panel"><button type="button" disabled><ActionIcon name="open" /> {copy.answer}</button><SubmissionStageWaiting locale={locale} /></div>}
-    {active && !awaitingQuestions && !["challenge_ready", "ready_for_grading", "graded"].includes(active.status) && <div role="status" aria-live="polite" aria-atomic="true" className="preview-panel homework-generation-status">
-      {active.processingStatus !== "failed" && <span className="homework-generation-spinner" aria-hidden="true" />}
-      <div>
-        <strong>{active.generationIssue === "no_eligible_code" ? copy.noEligibleCode : active.processingStatus === "failed" ? copy.generationFailed : active.processingStatus === "queued" ? copy.waitingGeneration : copy.generating}</strong>
-        {active.processingStatus === "queued" && active.queuePosition !== null && <p>{copy.queuePosition.replace("{position}", String(active.queuePosition))}</p>}
-      </div>
-    </div>}
-    {active?.status === "challenge_ready" && !questions.length && !awaitingQuestions && <><p>{copy.answerHelp}</p><button type="button" onClick={() => void start()}><ActionIcon name="open" /> {copy.answer}</button></>}
-    {questionAccessRequired && !questions.length && <SubmissionStageAccessGate locale={locale} onRequestAccess={onAssessmentAccessRequested} />}
-    {questions.length > 0 && <><h3>{copy.answers}</h3><p className="muted">{copy.autoSave}</p>
+    {questions.length > 0 && <><h3 id={answersId} className="homework-answer-heading">{copy.answers}</h3><p className="muted">{copy.autoSave}</p>
       <div className="homework-challenge-list">{questions.map((question, index) => <HomeworkChallengeQuestion key={question.id}
         question={question} number={index + 1} total={questions.length} locale={locale} value={answers[question.id] ?? ""}
         maxLength={12000} disabled={completed || Boolean(timedAutoSubmit)}

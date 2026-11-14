@@ -1,5 +1,7 @@
 # Programming Homework memory
 
+- The learner submission guide separates workflow mode from activation. Before hand-in use the current question mode; afterwards trust its frozen mode. Show one step for file-only work and two for planned questions even when inactive. Show effective per-stage time/deadline/SEB facts only when applicable; keep already-started answering usable after deactivation. Timing comes from core stage resolution and the original answering start, never a client-side reset. See [student guidance](docs/REFERENCE.md#student-submission-guide).
+
 - [Saved-work inspection](../../../docs/WORK_IN_PROGRESS_INSPECTION.md): Inspection reads existing preparation/current frozen work and saved answers, without ensuring drafts/members, automatic hand-in, generation or answering starts. Lazy file reads verify size/hash and revalidate current assignment/team/source/revision after reading. Reject old file keys after replacement, cancellation or team moves; exclude private teacher files and provider diagnostics.
 
 - Use `reports.studentActions` for current frozen-hand-in cancellation/reset and `reports.logs` for retained lifecycle history; the old management renderer is removed. Revalidate opaque submission targets before executing, keep team effects/reasons and existing locks, and preserve section-scoped cutoff recovery during action discovery. Logs remain read-only and never expose raw processing/provider errors. See [the report contract](../../../docs/ACTIVITY_LOGS.md).

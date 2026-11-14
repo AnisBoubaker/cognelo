@@ -76,8 +76,8 @@ for (const team of [false, true]) test(`homework deadline and recorded lateness 
     await studentPage.reload(); await expect(studentPage.getByText("Late by 1 day, 2 hours, 15 minutes", { exact: true })).toBeVisible();
     const managed = await responseJson<{ submissions: Array<{ id: string; submissionTiming: unknown }> }>(await teacherApi.get(`${teacherPath}/manage-submissions`));
     expect(managed.submissions.find(value => value.id === submitted.submission.id)?.submissionTiming).toEqual(timing);
-    await page.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}?report=overview`);
-    await expect(page.getByText("Late by 1 day, 2 hours, 15 minutes", { exact: true })).toBeVisible();
+    // Pre-attempt teacher management is now in row menus/logs; the retained
+    // lateness label is checked in Review and grade after the answering phase.
     // Changing policy cannot reclassify a frozen hand-in, nor prevent its challenge phase.
     await policy(false, null);
     expect((await readState()).submission?.submissionTiming).toEqual(timing);

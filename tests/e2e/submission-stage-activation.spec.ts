@@ -7,7 +7,7 @@ import { createAuthenticatedApi } from "./fixtures/auth";
 import { homeworkModelFixture } from "./fixtures/homework-model";
 
 const code = "int add(int a, int b) { return a + b; }\n";
-test("core activates file hand-in independently, releases waiting questions and lets started answers finish", async ({ bankCourse: data, teacherApi, teacherPage: teacher, studentPage: page }) => {
+test("core activates file hand-in independently, releases waiting questions and lets started answers finish", async ({ bankCourse: data, teacherApi, teacherPage: teacher, studentPage: page }, info) => {
   test.setTimeout(120_000);
   page.setDefaultTimeout(10_000); teacher.setDefaultTimeout(10_000);
   const student = await createAuthenticatedApi("student");
@@ -27,7 +27,7 @@ test("core activates file hand-in independently, releases waiting questions and 
     await responseJson(await teacherApi.post(settingsPath, { data: { ...settings.general, assessmentMode: "summative", submissionStages: { ...settings.general.submissionStages, files: { enabled: false, timeLimitMinutes: 10 } }, groupAssignments: settings.groups } }));
     await page.goto(assigned.replace(/^\/api/, ""));
     await expect(page.getByRole("button", { name: "Submit my work", exact: true })).toBeDisabled();
-    await expect(page.getByText("Awaiting teacher activation", { exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Submit your work", exact: true }).getByText("Awaiting teacher activation", { exact: true })).toBeVisible();
     await page.locator('input[type="file"][multiple]').setInputFiles({ name: "main.c", mimeType: "text/plain", buffer: Buffer.from(code) });
     await page.getByRole("button", { name: "Check my submission", exact: true }).click();
     await expect(page.getByText("Structure is valid.", { exact: true })).toBeVisible();
@@ -49,6 +49,7 @@ test("core activates file hand-in independently, releases waiting questions and 
     expect((await replayHomeworkClockBackfill(id))[0].preparationStartedAt).toBeInstanceOf(Date);
     await page.getByRole("button", { name: "Submit my work", exact: true }).click();
     await page.getByRole("dialog", { name: "Submit my work", exact: true }).getByRole("button", { name: "Submit my work", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Submit your work", exact: true }).getByText("Submitted", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Answer challenge questions", exact: true })).toBeDisabled();
     await expect(page.getByText("Awaiting teacher activation", { exact: true })).toBeVisible();
     await expect(page.locator(".homework-generation-spinner")).toHaveCount(0);
@@ -78,13 +79,28 @@ test("core activates file hand-in independently, releases waiting questions and 
     expect(await prisma.activityAttempt.count({ where: { activityId: id } })).toBe(0);
     settings.general.submissionStages.questions.enabled = true; await persist();
     await expect(page.getByRole("button", { name: "Answer challenge questions", exact: true })).toBeEnabled({ timeout: 20_000 });
+    await page.screenshot({ path: info.outputPath("answering-guide-ready-desktop.png") });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("region", { name: "Answer challenge questions", exact: true }).scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath("answering-guide-ready-mobile.png") });
+    await page.setViewportSize({ width: 1280, height: 720 });
     await page.getByRole("button", { name: "Answer challenge questions", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Challenge questions", exact: true })).toBeInViewport();
     const answer = page.locator('textarea[id^="answer-"]').first(); await expect(answer).toBeEditable(); await answer.fill("The function returns the sum of its two parameters."); await answer.blur();
     const attempt = await prisma.activityAttempt.findFirstOrThrow({ where: { activityId: id } });
+    const questionGuide = page.getByRole("region", { name: "Answer challenge questions", exact: true });
+    await expect(questionGuide).toContainText("Up to 10 minutes");
+    await expect(questionGuide).toContainText("Your answering timer is already running.");
+    await expect(questionGuide).not.toContainText("Safe Exam Browser");
+    const answeringCutoff = new Date(attempt.startedAt.getTime() + 10 * 60_000).toISOString();
+    await expect(questionGuide.locator(`time[datetime="${answeringCutoff}"]`)).toBeVisible();
     const progressUrl = `/api/courses/${data.courseId}/gradebook?view=in-progress-attempts&includeProgress=1&activityId=${id}`;
     expect((await responseJson<{ progress: Array<{ state: string; stageId?: string }> }>(await teacherApi.get(progressUrl))).progress).toEqual(expect.arrayContaining([expect.objectContaining({ state: "in_progress", stageId: "questions" })]));
     settings.general.submissionStages.questions.enabled = false; await persist();
     await page.reload(); await expect(answer).toHaveValue("The function returns the sum of its two parameters."); await expect(answer).toBeEditable();
+    await expect(questionGuide).toContainText("Answering in progress");
+    await expect(questionGuide.locator(`time[datetime="${answeringCutoff}"]`)).toBeVisible();
     await expect(page.getByRole("timer")).toBeVisible();
     expect((await prisma.activityAttempt.findUniqueOrThrow({ where: { id: attempt.id } })).startedAt).toEqual(attempt.startedAt);
     await page.getByRole("button", { name: "Submit answers", exact: true }).click();

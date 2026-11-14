@@ -18,6 +18,8 @@ At a finite deadline or bounded late cutoff, saved files not yet handed in are s
 
 Question generation is optional, defaulting to enabled for existing homework. File-only hand-ins immediately become submitted, ungraded work for teacher review, including each team member, without AI/embeddings, challenge answering or an answering timer. Existing generation settings are retained. See [editor and optional-question policy](../../../docs/PROGRAMMING_HOMEWORK_EDITOR.md).
 
+Students see a numbered submission guide at the top: **Submit your work**, then **Answer challenge questions** when required. Each stage shows its current status and applicable time allowance/deadline. File-only homework has one step; inactive question stages remain visibly required and waiting. Started answering stays available after deactivation, and SEB guidance appears only when required. See [student submission guidance](docs/REFERENCE.md#student-submission-guide).
+
 The separate Student submissions panel is replaced by row-menu cancellation/reset and shared **Logs**, including pre-attempt file hand-ins, teacher reasons, question readiness and retained processing failures. See [activity logs and actions](../../../docs/ACTIVITY_LOGS.md).
 
 The shared Student results table has a separate **Progress** column: Not started, File submission: in progress/submitted, Questions answering: in progress, then Done. It uses current individual/team work and marks file-only hand-ins Done before grading. See [progress projection](docs/REFERENCE.md#student-results-progress).

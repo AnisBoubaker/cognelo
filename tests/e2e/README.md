@@ -1,5 +1,7 @@
 # Browser user flows
 
+`homework-submission-guide.spec.ts` checks numbered one/two-stage learner guidance, absent/applicable durations and deadlines, original upload clocks, an earlier global cutoff, live question-mode changes, conditional SEB text and desktop/mobile layout. The activation scenario also checks active answering time, continuation after deactivation and navigation to the question form without resetting its original start.
+
 `work-inspection.spec.ts` checks pre-submission MCQ/code/file work, private Parsons state, active Test question selection, Homework preparation/frozen-file previews and stale keys, read-only behavior, saved-response refresh, keyboard/mobile containment, and explicit progress-load failure/Retry.
 
 `coding-activity-progress.spec.ts` covers graded work with legacy empty/whitespace/starter/unchanged-code drafts, genuine later work and numbered started attempts alongside an earlier grade. It also verifies that initial editor loading creates no draft and real typing saves normally.

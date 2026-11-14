@@ -35,6 +35,8 @@ New course activities and copies start with explicit inactive stage flags. Histo
 
 ## Accepted behavior
 
+Programming Homework's learner guide explains the applicable numbered stages and shows each stage's activation/progress state, configured maximum duration and effective deadline only when present. File-only work has one step; planned but inactive questions remain a required second step. Before answering, a prominent notice explains the relative clock start and any earlier deadline, with SEB guidance only when the effective policy requires it. Started answering retains its original clock and stays available after deactivation. See [the owning learner guide](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md#student-submission-guide).
+
 Plugins may declare ordered submission stages, including the first stage, using stable IDs and localized names. Core owns the scheduling UI, deadlines, optional stage time limits, and assignment inheritance. Plugins own evidence, stage transitions and jobs; core never reads plugin tables directly.
 
 Each stage deadline and the overall Available until cutoff are optional. The effective calendar deadline is the earlier configured date, the sole configured date, or absent when both are absent. A stage duration starts with that stage, and further caps its effective end. Available until remains a hard cap across all stages. Waiting for question generation consumes no answering time.

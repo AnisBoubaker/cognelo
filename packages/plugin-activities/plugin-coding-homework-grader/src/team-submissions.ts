@@ -1,6 +1,6 @@
 import { homeworkFileStageSettings } from "./stage-scheduling";
 import { homeworkQuestionsEnabled } from "./question-policy";
-import { readHomeworkSubmissionPolicy, readHomeworkSubmissionTiming } from "./submission-policy";
+import { readHomeworkSubmissionTiming } from "./submission-policy";
 import { acceptHomeworkSubmissionTiming, automaticHomeworkTiming, assertAutomaticHomeworkDraft, type AutomaticHomeworkHandIn } from "./submission-window";
 import { randomUUID, createHash } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
@@ -102,16 +102,17 @@ export async function getTeamHomeworkWorkspace(scope: HomeworkStudentScope) {
     const position = job?.status === "queued" ? 1 + await tx.backgroundJob.count({ where: { queue: job.queue, status: "queued", runAfter: { lte: new Date() }, createdAt: { lt: job.createdAt } } }) : null;
     const files = submission ? await sql.query<Array<{ path: string; sizeBytes: bigint }>>`SELECT path,"sizeBytes" FROM "PluginCodingHomeworkSubmissionFile" WHERE "submissionId"=${submission.id} ORDER BY path` : [];
     const [cancelled] = await sql.query<Array<{ present: boolean }>>`SELECT EXISTS(SELECT 1 FROM "PluginCodingHomeworkSubmission" WHERE "workspaceMemberId"=${access.member.id} AND status='cancelled') AS present`;
-    return { ...await homeworkFileStageSettings(scope, access.workspace.preparationStartedAt), submissionsEnabled: (await homeworkFileStageSettings(scope)).filesStageEnabled, teamwork: teamWorkspaceProjection(access),
+    const stages = await homeworkFileStageSettings(scope, access.workspace.preparationStartedAt, record(submission?.metadata).assessmentStartedAt);
+    return { ...stages, submissionsEnabled: stages.filesStageEnabled, teamwork: teamWorkspaceProjection(access),
       previousCancelled: !submission && cancelled.present,
       submission: submission ? { questionGenerationEnabled: homeworkQuestionsEnabled(submission.metadata), automaticHandIn: Boolean(record(submission.metadata).automaticHandIn), submissionTiming: readHomeworkSubmissionTiming(submission.metadata), id: submission.id, status: submission.status, createdAt: submission.createdAt.toISOString(), started: Boolean(record(submission.metadata).assessmentStartedAt), coreAttemptId: submission.coreAttemptId,
         processingStatus: job?.status ?? null, generationIssue: record(job?.error).code === "HOMEWORK_NO_ELIGIBLE_CODE" ? "no_eligible_code" : null, queuePosition: position,
         questionCount: Number(record(record(submission.metadata).assignment).questionCount ?? assignment?.questionCount ?? 3), files: files.map(file => ({ path: file.path, sizeBytes: Number(file.sizeBytes) })), incompleteAcknowledged: record(submission.metadata).incompleteAcknowledged === true } : null };
   }); } catch (error) {
     if (!(error instanceof AppError) || error.code !== "HOMEWORK_TEAM_REQUIRED") throw error;
-    const [assignment] = await coreDb.$queryRaw<Array<{ settings: unknown }>>`SELECT settings FROM "PluginCodingHomeworkAssignment" WHERE "activityId"=${scope.activityId}`;
     // Assignment resources remain readable without creating a private draft or member binding.
-    return { ...await homeworkFileStageSettings(scope), submissionPolicy: readHomeworkSubmissionPolicy(assignment?.settings), submissionsEnabled: (await homeworkFileStageSettings(scope)).filesStageEnabled, previousCancelled: false, submission: null,
+    const stages = await homeworkFileStageSettings(scope);
+    return { ...stages, submissionsEnabled: stages.filesStageEnabled, previousCancelled: false, submission: null,
       teamwork: { contextKey: "team-required", draftRevision: 0, teamId: null, teamName: null, members: [], canSubmit: false } };
   }
 }
