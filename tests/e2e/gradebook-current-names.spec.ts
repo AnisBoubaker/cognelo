@@ -45,9 +45,8 @@ test("homework submission and gradebook lists follow profile/admin name edits wi
       const name = `${firstName} Learner`;
       await page.goto(`/courses/${data!.courseId}/gradebook/activities/${activityId}`);
       await page.getByRole("tab", { name: "Student results", exact: true }).click();
-      const submission = page.getByRole("listitem").filter({ has: page.getByText(name, { exact: true }) });
-      await expect(submission).toBeVisible();
       const row = page.locator(".table-row-gradebook-detail").filter({ hasText: email });
+      await expect(row).toBeVisible();
       await expect(row).toContainText(name);
       await expect(row).not.toContainText("Imported Placeholder");
       await expect(page.locator(".table-row-gradebook-detail").filter({ hasText: pendingEmail })).toContainText("Pending Learner");

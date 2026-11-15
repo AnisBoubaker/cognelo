@@ -66,14 +66,15 @@ test("homework answer submission confirms blanks, reports errors through notific
       await route.continue();
     });
     await submit(); await dialog.getByRole("button", { name: "Submit answers", exact: true }).click();
-    const toast = page.locator('section[role="alert"]').filter({ hasText: "Temporary answer submission failure." });
+    const toast = page.locator('section[role="alert"]').filter({ hasText: "SYS-001" });
     await expect(toast).toBeVisible();
+    await expect(page.getByText("Temporary answer submission failure.", { exact: true })).toHaveCount(0);
     await expect(page.locator('.section > p.error[role="alert"]')).toHaveCount(0);
     await expect(answers.nth(1)).toHaveValue("The function returns the sum of its arguments.");
     await toast.getByRole("button", { name: "Dismiss notification", exact: true }).click();
     await page.getByRole("button", { name: "Messages", exact: true }).click();
     const history = page.getByRole("region", { name: "Recent messages", exact: true });
-    await expect(history).toContainText("Temporary answer submission failure.");
+    await expect(history).toContainText("SYS-001");
     await history.getByRole("button", { name: "Dismiss notification", exact: true }).click();
 
     await submit();

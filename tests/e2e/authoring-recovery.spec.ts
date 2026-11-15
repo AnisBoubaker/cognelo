@@ -45,7 +45,8 @@ test.describe("authoring draft protection", { tag: "@regression" }, () => {
     await dialog.getByRole("button", { name: "Save and leave" }).click();
     await failedSave;
     await expect(dialog.getByRole("button", { name: "Save and leave" })).toBeEnabled();
-    await expect(page.getByText("E2E temporary save failure.", { exact: true })).toBeVisible();
+    await expect(page.getByText(/SYS-001/)).toBeVisible();
+    await expect(page.getByText("E2E temporary save failure.", { exact: true })).toHaveCount(0);
     await expect(page).toHaveURL(data.editorPath);
     const unchanged = await responseJson<{ activity: { title: string } }>(await teacherApi.get(data.courseActivityPath));
     expect(unchanged.activity.title).toBe(data.title);

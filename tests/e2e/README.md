@@ -2,6 +2,12 @@
 
 `homework-submission-guide.spec.ts` checks numbered one/two-stage learner guidance, absent/applicable durations and deadlines, original upload clocks, an earlier global cutoff, live question-mode changes, conditional SEB text and desktop/mobile layout. The activation scenario also checks active answering time, continuation after deactivation and navigation to the question form without resetting its original start.
 
+The guide keeps the challenge action visible while unavailable. Homework readiness assertions must wait for it to become enabled; unavailable/failed question generation keeps it disabled.
+
+`homework-answer-submission.spec.ts` checks that server failures show the shared support code in notifications and message history while preserving answers and permitting a retry.
+
+Mocked HTTP 5xx recovery checks use `SYS-001` and verify that raw diagnostics stay hidden, including file previews, profile-policy loading and rubric guidance/generation.
+
 `work-inspection.spec.ts` checks pre-submission MCQ/code/file work, private Parsons state, active Test question selection, Homework preparation/frozen-file previews and stale keys, read-only behavior, saved-response refresh, keyboard/mobile containment, and explicit progress-load failure/Retry.
 
 `coding-activity-progress.spec.ts` covers graded work with legacy empty/whitespace/starter/unchanged-code drafts, genuine later work and numbered started attempts alongside an earlier grade. It also verifies that initial editor loading creates no draft and real typing saves normally.
@@ -14,7 +20,9 @@
 
 `system-errors.spec.ts` intercepts only its own browser requests to verify database/network startup codes, malformed clock responses, Retry recovery, retained forms after later sync failures, and sign-in system-error notifications. It creates no accounts and never stops the shared database/API. `E2E_SYSTEM_ERRORS_PRODUCTION=1` checks code-only wording against an isolated production build.
 
-`gradebook-current-names.spec.ts` submits homework under an imported name, changes the account name through profile and administrator APIs, and checks matching submission-list, Student results, review-header and grade-export names. Pending enrollments retain their entered names; stored enrollments and submitted attempts stay unchanged.
+`authoring-recovery.spec.ts` checks the shared system support code for a failed Save and leave, rather than raw server-supplied 5xx text, while retaining draft preservation and successful retry/navigation checks in development and optimized builds.
+
+`gradebook-current-names.spec.ts` submits homework under an imported name, changes the account name through profile and administrator APIs, and checks matching Student results, contextual review, API results and grade-export names. Pending enrollments retain their entered names; stored enrollments and submitted attempts stay unchanged.
 
 `user-name-policy.spec.ts` covers the administrator name-change switch, Save/Cancel/reload, stale profile drafts and unauthorized API writes, admin name edits, password changes and renewed/fresh sessions while names are locked, re-enabling names, and policy-load failure. It restores the original policy and removes its disposable account.
 

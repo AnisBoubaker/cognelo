@@ -106,7 +106,8 @@ test("policy loading failure leaves password editing available and name fields p
     status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "UNAVAILABLE", message: "Policy temporarily unavailable." } })
   }));
   await page.goto("/settings/profile");
-  await expect(page.getByRole("alert").filter({ hasText: "Policy temporarily unavailable." })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "SYS-001" })).toBeVisible();
+  await expect(page.getByText("Policy temporarily unavailable.", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("First name", { exact: true })).not.toBeEditable();
   await expect(page.getByLabel("Current password", { exact: true })).toBeEditable();
   await expect(page.getByLabel("New password", { exact: true })).toBeEditable();

@@ -82,7 +82,7 @@ test("challenge generation excludes unchanged provided functions and retains mod
     expect(job.attempts).toBe(1);
     await page.goto(third.assigned.replace(/^\/api/, ""));
     await expect(page.getByText("No new or modified function could be identified for challenge questions. Contact your teacher to review the submission.", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Answer challenge questions", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Answer challenge questions", exact: true })).toBeDisabled();
 
     rejectAll = true;
     const invalid = await createHomework("Invalid output correction limit");

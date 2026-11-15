@@ -73,16 +73,19 @@ for (const scope of ["course", "bank"] as const) {
         error: { code: "SAVE_UNAVAILABLE", message: "Test guidance save failed." }
       } }));
       await dialog.getByRole("button", { name: initialConfirmLabel, exact: true }).click();
-      await expect(page.getByText("Test guidance save failed.", { exact: true })).toBeVisible();
+      await expect(page.getByText(/SYS-001/)).toBeVisible();
+      await expect(page.getByText("Test guidance save failed.", { exact: true })).toHaveCount(0);
       await expect(guidance).toHaveValue(firstGuidance);
       expect(requests).toHaveLength(0);
       expect((await readReference()).privateConfig.rubricGenerationGuidance).toBeUndefined();
+      await page.getByRole("button", { name: "Dismiss notification", exact: true }).click();
       await page.unroute(`**${guidancePath}`);
     }
     await page.screenshot({ path: testInfo.outputPath("rubric-guidance.png") });
     await dialog.getByRole("button", { name: initialConfirmLabel, exact: true }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByText("Test generation is unavailable.", { exact: true })).toBeVisible();
+    await expect(page.getByText(/SYS-001/)).toBeVisible();
+    await expect(page.getByText("Test generation is unavailable.", { exact: true })).toHaveCount(0);
     expect(requests[0].guidance).toBe(firstGuidance);
     expect(await readReference()).toMatchObject({ sourceCode: referenceSolution, privateConfig: {
       rubricGenerationGuidance: firstGuidance, aiFeedback: { instructions: gradingInstructions, criteria: originalCriteria }

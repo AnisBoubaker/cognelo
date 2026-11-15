@@ -84,7 +84,8 @@ test("submitted files use shared left tabs, open the first file, and isolate loa
       }
       await route.continue();
     });
-    await empty.click(); await expect(panel.getByRole("alert")).toContainText("Temporary file read failure.");
+    await empty.click(); await expect(panel.getByRole("alert")).toContainText("SYS-001");
+    await expect(panel).not.toContainText("Temporary file read failure.");
     await expect(panel).not.toContainText(files[1].text);
     await panel.getByRole("button", { name: "Retry", exact: true }).click();
     await expect(panel).toContainText("This file is empty.");

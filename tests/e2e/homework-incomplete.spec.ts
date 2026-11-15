@@ -48,7 +48,7 @@ test("teacher selects private solution signatures and student explicitly acknowl
     expect((await student.get(`/api${assigned}/coding-homework-grader/teacher-solution`)).status()).toBe(403);
     await acknowledgement.check(); await studentPage.getByRole("button", { name: "Submit my work", exact: true }).click();
     await studentPage.getByRole("dialog", { name: "Submit my work", exact: true }).getByRole("button", { name: "Submit my work", exact: true }).click();
-    await expect(studentPage.getByRole("button", { name: "Answer challenge questions", exact: true })).toBeVisible({ timeout: 45_000 });
+    await expect(studentPage.getByRole("button", { name: "Answer challenge questions", exact: true })).toBeEnabled({ timeout: 45_000 });
     await expect(studentPage.locator("textarea")).toHaveCount(0);
     expect(await responseJson(await student.get(`/api${assigned}/coding-homework-grader/workspace`))).toMatchObject({ submission: { incompleteAcknowledged: true, questionCount: 3 } });
     await studentPage.setViewportSize({ width: 390, height: 844 });
