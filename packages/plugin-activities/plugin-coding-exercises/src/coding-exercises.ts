@@ -27,7 +27,7 @@ export const sampleTestSchema = z.object({
 });
 
 export const codingExerciseConfigSchema = z.object({
-  prompt: z.string().min(10).max(12000),
+  prompt: z.string().min(10).max(12000).or(z.literal("")),
   language: z.string().max(80).default(""),
   executionMode: codingExerciseExecutionModeSchema.default("template"),
   starterCode: z.string().max(40000).default(""),

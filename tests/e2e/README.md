@@ -1,5 +1,7 @@
 # Browser user flows
 
+`activity-creation-defaults.spec.ts` creates fresh bank/course activities and course/bank Test children through the real pickers. It checks empty descriptions, prompts, solutions, starter files and programming sample tests, reload persistence, and the retained MCQ syntax example. It uses disposable course/bank data and requires no AI or execution runner.
+
 `homework-submission-guide.spec.ts` checks numbered one/two-stage learner guidance, absent/applicable durations and deadlines, original upload clocks, an earlier global cutoff, live question-mode changes, conditional SEB text and desktop/mobile layout. The activation scenario also checks active answering time, continuation after deactivation and navigation to the question form without resetting its original start.
 
 The guide keeps the challenge action visible while unavailable. Homework readiness assertions must wait for it to become enabled; unavailable/failed question generation keeps it disabled.

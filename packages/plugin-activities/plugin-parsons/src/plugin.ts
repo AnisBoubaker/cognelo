@@ -1,4 +1,4 @@
-import { projectParsonsConfig } from "./parsons";
+import { defaultParsonsConfig, projectParsonsConfig } from "./parsons";
 import { projectParsonsState } from "./attempt-types";
 import { z } from "zod";
 import type { ActivityPlugin } from "@cognelo/activity-sdk";
@@ -21,8 +21,8 @@ const parsonsPrecedenceRuleSchema = z.object({
 
 const parsonsConfigSchema = z
   .object({
-    prompt: z.string().min(10).max(6000),
-    solution: z.string().min(2).max(20000),
+    prompt: z.string().min(10).max(6000).or(z.literal("")),
+    solution: z.string().min(2).max(20000).or(z.literal("")),
     language: z.string().min(1).max(40).default("python"),
     stripIndentation: z.boolean().default(false),
     groups: z.array(parsonsGroupSchema).default([]),
@@ -117,14 +117,7 @@ export const parsonsPlugin: ActivityPlugin = {
           defaultTitle: "مسألة بارسونز"
         }
       },
-      defaultConfig: {
-        prompt: "Rebuild the program in the correct order.",
-        solution: "print('Hello, Parsons!')",
-        language: "python",
-        stripIndentation: false,
-        groups: [],
-        precedenceRules: []
-      },
+      defaultConfig: { ...defaultParsonsConfig() },
       configSchema: parsonsConfigSchema
     }
   ]

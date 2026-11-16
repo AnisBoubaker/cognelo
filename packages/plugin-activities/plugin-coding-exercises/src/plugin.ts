@@ -64,20 +64,12 @@ export const codingExercisesPlugin: ActivityPlugin = {
         }
       },
       defaultConfig: {
-        prompt: "Write a program that reads a name and prints `Hello, <name>!`.",
+        prompt: "",
         language: "",
         executionMode: "template",
         starterCode: "",
         studentTemplateSource: "{{ STUDENT_CODE }}",
-        sampleTests: [
-          {
-            id: "sample-1",
-            input: "Ada",
-            output: "Hello, Ada!",
-            testCode: "",
-            title: "Greets the provided name"
-          }
-        ],
+        sampleTests: [],
         maxEditorSeconds: 1800
       },
       configSchema: codingExerciseConfigSchema

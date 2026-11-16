@@ -104,6 +104,8 @@ Reusable bank Tests use the same lifecycle at child granularity. Adding a coding
 
 ## Authoring UX
 
+New activities have an empty description, prompt and starter code, with no visible or hidden tests and no private reference solution. The insertion token `{{ STUDENT_CODE }}` remains structural configuration. The config schema accepts an exactly empty prompt for a new draft; a populated prompt retains its 10–12,000 character bounds. Course, bank and Test-child creation share these defaults. Copies retain their authored content; existing activities are not rewritten.
+
 Teacher background guidance is attached to its heading or label through shared contextual help. The circled question mark follows the text on the same line; hover/focus reveals the explanation and click/tap pins it. Preserve input/heading accessible names, description associations and draft/save behavior. Errors and warnings continue through existing notifications. See [the shared contract](../../../../docs/CONTEXTUAL_HELP.md).
 
 The teacher authoring UI is a form surface and must stay registered with the shared `useUnsavedChangesGuard` hook from `@cognelo/activity-ui`. Any future coding-exercise authoring tabs or settings panels should do the same so navigation can offer continue editing, save and leave, or discard and leave.

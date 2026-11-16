@@ -155,6 +155,8 @@ Plugin-specific behavior, persistence, routes, UX decisions, and implementation 
 
 ## Frontend Platform Decisions
 
+- Fresh activity creation in courses, banks and compound Test children leaves the shared description empty rather than copying the type-catalogue explanation. Plugin defaults and parser fallbacks contain no sample prompts, solutions, starter code or tests; MCQ intentionally retains its text-source syntax example. Keep localized default titles, configuration defaults and required empty file/scaffold structure. Draft schemas must accept these empty initial values. Catalogue descriptions still explain picker choices, and copies/imports preserve the source’s authored content.
+
 - Native checkbox/radio controls are excluded from the text-input width, padding and minimum-height recipe. The compact default is 18px, with component-specific choice styles retained; do not fix each new checkbox by relying on a missing wrapper class.
 
 

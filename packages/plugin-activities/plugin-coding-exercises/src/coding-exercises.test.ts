@@ -18,6 +18,11 @@ import {
 } from "./coding-exercises";
 
 describe("coding exercise config and template helpers", () => {
+  it("accepts an empty authoring draft while retaining validation for a populated prompt", () => {
+    expect(parseCodingExerciseConfig({ prompt: "" })).toMatchObject({ prompt: "", starterCode: "", sampleTests: [] });
+    expect(() => parseCodingExerciseConfig({ prompt: "Short" })).toThrow();
+  });
+
   it("normalizes legacy execution modes to template mode", () => {
     expect(
       parseCodingExerciseConfig({

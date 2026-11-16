@@ -16,6 +16,8 @@ Let’s walk through those in order.
 
 ## Step 1: Define The Plugin
 
+Keep `defaultConfig` valid for an empty authoring draft. Supply required structure and settings, while leaving example prompts, solutions, starter code and tests empty. MCQ deliberately retains its source syntax example; see [creation defaults](../reference/PLATFORM_DECISIONS.md#frontend-platform-decisions).
+
 Example:
 
 ```ts

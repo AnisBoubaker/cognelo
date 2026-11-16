@@ -169,7 +169,7 @@ function TestAuthoringView({ activity, activityRouteCourseId, canManage, course,
       source: "local",
       activityTypeKey: activityType.key,
       title: definition?.i18n?.[locale]?.defaultTitle ?? definition?.name ?? activityType.name,
-      description: definition?.i18n?.[locale]?.description ?? definition?.description ?? activityType.description,
+      description: "",
       config: activityCreationConfig(activityType.key, definition, course?.subject?.programmingLanguage),
       position: test.items.length
     });

@@ -4,6 +4,8 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- New activity authoring starts with blank descriptions and no sample prompts, solutions, code or tests; MCQ retains its source syntax example. Keep required file/scaffold structure and valid empty drafts. See [creation defaults](reference/PLATFORM_DECISIONS.md#frontend-platform-decisions).
+
 - [System errors](SYSTEM_ERRORS.md) use stable `SYS-xxx` support categories through shared API/client helpers. Production shows only the localized system-error label and code; development adds fixed diagnoses, never raw exceptions. Keep original machine codes for control flow, log original errors privately, and preserve mounted pages on later clock/session synchronization failures.
 
 - [User name changes](USER_PROFILES.md) are controlled by the default-on instance policy in Settings → Users. Enforce it on self-service profile writes; administrators always retain name-edit access. Never use this policy to block password changes.

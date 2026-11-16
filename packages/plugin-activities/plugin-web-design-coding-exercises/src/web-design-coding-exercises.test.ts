@@ -34,8 +34,11 @@ describe("web design coding exercise helpers", () => {
     expect(normalized.files.map((file) => file.path)).toEqual(["index.html", "script.js"]);
   });
 
-  it("falls back to default config for invalid input", () => {
-    expect(parseWebDesignExerciseConfig({ files: [] }).files.length).toBeGreaterThan(0);
+  it("falls back to empty editor files without restoring sample content", () => {
+    const config = parseWebDesignExerciseConfig({ files: [] });
+    expect(config.prompt).toBe("");
+    expect(config.files.map((file) => file.path)).toEqual(["index.html", "styles.css", "script.js"]);
+    expect(config.files.every((file) => file.starterCode === "")).toBe(true);
   });
 
   it("detects expected-result prompt markers", () => {

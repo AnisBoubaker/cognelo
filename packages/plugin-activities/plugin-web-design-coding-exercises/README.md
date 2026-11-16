@@ -2,6 +2,8 @@
 
 `@cognelo/plugin-web-design-coding-exercises` provides the `web-design-coding-exercise` activity type. Learners edit teacher-defined HTML/CSS/JavaScript starter files, preview them in a sandboxed iframe, and run or submit them against Playwright tests through an external runner.
 
+New activities start with blank instructions and empty `index.html`, `styles.css` and `script.js` files. See [authoring defaults](docs/REFERENCE.md#authoring-ux).
+
 Teachers can [inspect saved work in progress](../../../docs/WORK_IN_PROGRESS_INSPECTION.md) from the Student results menu, independently of submitted-attempt history.
 
 Teacher review routes consume core grade capabilities: explicit course teachers/admins work course-wide, while section teachers/TAs can inspect and grade only assigned sections. Test mutation, authoring, and grade release remain course-management operations.

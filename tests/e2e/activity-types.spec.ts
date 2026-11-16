@@ -400,9 +400,9 @@ test.describe.serial("authoring and completing every activity type", () => {
     await teacherPage.getByRole("tab", { name: "Grading", exact: true }).click();
     await teacherPage.getByRole("tab", { name: "Test cases", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Add sample test" }).click();
-    const sampleTestToggle = teacherPage.getByRole("button", { name: "sample-2" });
+    const sampleTestToggle = teacherPage.getByRole("button", { name: "sample-1" });
     await expect(sampleTestToggle).toBeVisible({ timeout: 10_000 });
-    const sampleTestEditor = teacherPage.locator("#sample-output-match-mode-1").locator("xpath=ancestor::section[1]");
+    const sampleTestEditor = teacherPage.locator("#sample-output-match-mode-0").locator("xpath=ancestor::section[1]");
     await sampleTestEditor.getByRole("textbox").nth(0).fill("Visible greeting", { timeout: 10_000 });
     await sampleTestEditor.getByRole("textbox").nth(1).fill("Ada", { timeout: 10_000 });
     await sampleTestEditor.getByRole("textbox").nth(2).fill("Hello, Ada!", { timeout: 10_000 });
@@ -436,7 +436,7 @@ test.describe.serial("authoring and completing every activity type", () => {
     await teacherPage.getByRole("tab", { name: "Grading", exact: true }).click();
     await teacherPage.getByRole("tab", { name: "Test cases", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Visible greeting" }).click();
-    await expect(teacherPage.locator("#sample-output-match-mode-1")).toHaveValue("contains_lines");
+    await expect(teacherPage.locator("#sample-output-match-mode-0")).toHaveValue("contains_lines");
     await expect(teacherPage.getByLabel("Require lines in this order")).toBeChecked();
     await publishCurrentBankActivity(teacherPage);
 

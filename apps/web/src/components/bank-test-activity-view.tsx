@@ -113,7 +113,7 @@ export function BankTestActivityView({ activity, bank, locale, onActivityUpdated
       source: "local",
       activityTypeKey: activityType.key,
       title: definition?.i18n?.[locale]?.defaultTitle ?? definition?.name ?? activityType.name,
-      description: definition?.i18n?.[locale]?.description ?? definition?.description ?? activityType.description,
+      description: "",
       config: activityCreationConfig(activityType.key, definition, bank.subject?.programmingLanguage),
       position: test.items.length
     });

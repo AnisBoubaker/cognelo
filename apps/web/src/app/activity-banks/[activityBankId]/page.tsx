@@ -215,7 +215,7 @@ export default function ActivityBankDetailPage() {
       const localized = definition?.i18n?.[locale];
       const input = {
         title: localized?.defaultTitle ?? definition?.name ?? activityTypeLabel(selectedActivityTypeKey),
-        description: localized?.description ?? definition?.description ?? "",
+        description: "",
         lifecycle: "draft" as const,
         position: nextBankItemPosition(activityPickerFolderId),
         folderId: activityPickerFolderId

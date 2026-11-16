@@ -19,6 +19,14 @@ import {
 import { buildParsonsGradingResult } from "./grading";
 
 describe("Parsons problem helpers", () => {
+  it("keeps new and cleared drafts empty instead of restoring an example program", () => {
+    for (const value of [undefined, { prompt: "", solution: "" }]) {
+      const config = parseParsonsConfig(value);
+      expect(config).toMatchObject({ prompt: "", solution: "", groups: [], precedenceRules: [] });
+      expect(buildParsonsBlocks("empty-draft", config)).toEqual([]);
+    }
+  });
+
   it("parses defaults and normalizes groups", () => {
     const config = parseParsonsConfig({
       solution: "a = 1\nb = 2\nprint(a + b)",

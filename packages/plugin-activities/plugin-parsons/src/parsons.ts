@@ -49,8 +49,8 @@ type LegacyConfig = {
 
 export function defaultParsonsConfig(): ParsonsConfig {
   return {
-    prompt: "Rebuild the program in the correct order.",
-    solution: "print('Hello, Parsons!')",
+    prompt: "",
+    solution: "",
     language: "python",
     stripIndentation: false,
     groups: [],

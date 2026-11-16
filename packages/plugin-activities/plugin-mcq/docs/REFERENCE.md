@@ -18,6 +18,8 @@ Student prompts may contain long reading passages up to 30,000 characters. The M
 
 ## Authoring Model
 
+New MCQs retain the initial source example so teachers can learn question headings and correct/incorrect choice markers. This is the intentional exception to the platform’s blank new-activity content policy. The separate activity description/student introduction starts empty.
+
 Teacher background guidance is attached to its heading or label through shared contextual help. The circled question mark follows the text on the same line; hover/focus reveals the explanation and click/tap pins it. Preserve input/heading accessible names, description associations and draft/save behavior. Errors and warnings continue through existing notifications. See [the shared contract](../../../../docs/CONTEXTUAL_HELP.md).
 
 The main MCQ source is written as text.

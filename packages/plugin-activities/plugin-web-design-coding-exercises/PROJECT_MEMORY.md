@@ -1,5 +1,7 @@
 # Web Design Coding Exercises Memory
 
+- Default/fallback editor files retain their HTML/CSS/JavaScript paths but contain no example code; the prompt is empty. Never restore the profile-card demonstration on creation or parsing. See [authoring defaults](docs/REFERENCE.md#authoring-ux).
+
 - [Saved-work inspection](../../../docs/WORK_IN_PROGRESS_INSPECTION.md): Inspection displays the generic saved file bundle as escaped source. Never mount an iframe preview, run JavaScript or call the execution runner. Embedded Tests use their supplied saved file state.
 
 - Learner payloads use the definition’s allowlisted `studentConfig`; keep keys, solutions, private instructions, and authoring metadata server-side. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).

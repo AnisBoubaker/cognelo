@@ -122,6 +122,8 @@ Summative submissions do not show correctness feedback during the activity. When
 
 ## UX Notes
 
+Fresh course, bank and Test-child activities start with empty descriptions, prompts and reference solutions, plus empty group/rule lists. `defaultParsonsConfig` is shared by the definition and parser fallback, so missing or cleared authoring fields never restore demonstration code. Exactly empty prompt/solution strings are valid drafts; populated fields retain their existing length bounds. Existing authored activities and copies keep their content.
+
 Teacher background guidance is attached to its heading or label through shared contextual help. The circled question mark follows the text on the same line; hover/focus reveals the explanation and click/tap pins it. Preserve input/heading accessible names, description associations and draft/save behavior. Errors and warnings continue through existing notifications. See [the shared contract](../../../../docs/CONTEXTUAL_HELP.md).
 
 Previous submissions are available before the next timed start. When mounted in history mode, load submitted records without ensuring an answering attempt. Returning to New attempt keeps the explicit start gate.

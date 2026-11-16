@@ -481,7 +481,7 @@ export default function CourseDetailPage() {
         title: selectedActivityCopy.defaultTitle || t("courseDetail.defaultActivityTitle"),
         activityTypeKey: selectedActivityTypeKey,
         lifecycle: "draft",
-        description: selectedActivityCopy.description,
+        description: "",
         config: activityCreationConfig(selectedActivityTypeKey, definition, course?.subject?.programmingLanguage),
         metadata: { researchTags: [] },
         position: course?.activities?.length ?? 0,
@@ -506,7 +506,7 @@ export default function CourseDetailPage() {
       const title = localized?.defaultTitle ?? "New test";
       const result = await api.createTest(courseId, {
         title,
-        description: localized?.description ?? definition?.description ?? "",
+        description: "",
         lifecycle: "draft",
         position: course?.activities?.length ?? 0,
         contentPlacement: buildPickerContentPlacement(title)

@@ -1,5 +1,7 @@
 # Parsons Memory
 
+- Empty new or cleared drafts must stay empty through config parsing; never replace them with a demonstration program. Creation accepts empty prompt/solution strings while retaining populated-field limits. See [authoring defaults](docs/REFERENCE.md#ux-notes).
+
 - [Saved-work inspection](../../../docs/WORK_IN_PROGRESS_INSPECTION.md): Standalone inspection reads the latest private in-progress arrangement without calling ensureAttempt or recording events. Embedded Tests use the supplied child state instead. Return saved order/indentation only, with no correctness or reference solution.
 
 - Learner payloads use the definition’s allowlisted `studentConfig`; keep keys, solutions, private instructions, and authoring metadata server-side. See [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).

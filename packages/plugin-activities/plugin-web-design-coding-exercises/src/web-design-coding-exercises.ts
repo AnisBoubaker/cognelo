@@ -87,8 +87,7 @@ export const defaultWebDesignExerciseFiles: WebDesignExerciseFile[] = [
     id: "index-html",
     path: "index.html",
     language: "html",
-    starterCode:
-      '<main class="page">\n  <h1>Design a profile card</h1>\n  <article class="card">\n    <h2>Ada Lovelace</h2>\n    <p>Build a polished card with layout, color, and interaction.</p>\n    <button>Follow</button>\n  </article>\n</main>',
+    starterCode: "",
     isEditable: true,
     orderIndex: 0
   },
@@ -96,8 +95,7 @@ export const defaultWebDesignExerciseFiles: WebDesignExerciseFile[] = [
     id: "styles-css",
     path: "styles.css",
     language: "css",
-    starterCode:
-      "body {\n  margin: 0;\n  font-family: system-ui, sans-serif;\n  background: #f4f7fb;\n  color: #162033;\n}\n\n.page {\n  min-height: 100vh;\n  display: grid;\n  place-items: center;\n  gap: 1rem;\n}\n\n.card {\n  width: min(320px, 90vw);\n  padding: 1.25rem;\n  border: 1px solid #d7deea;\n  border-radius: 8px;\n  background: white;\n}\n\nbutton {\n  border: 0;\n  border-radius: 6px;\n  padding: 0.65rem 1rem;\n  background: #2454d6;\n  color: white;\n}",
+    starterCode: "",
     isEditable: true,
     orderIndex: 1
   },
@@ -105,15 +103,14 @@ export const defaultWebDesignExerciseFiles: WebDesignExerciseFile[] = [
     id: "script-js",
     path: "script.js",
     language: "javascript",
-    starterCode:
-      'const button = document.querySelector("button");\n\nbutton?.addEventListener("click", () => {\n  button.textContent = button.textContent === "Follow" ? "Following" : "Follow";\n});',
+    starterCode: "",
     isEditable: true,
     orderIndex: 2
   }
 ];
 
 export const defaultWebDesignExerciseConfig: WebDesignExerciseConfig = {
-  prompt: "Create a responsive profile card. Use HTML for structure, CSS for layout and polish, and JavaScript for the button interaction.",
+  prompt: "",
   files: defaultWebDesignExerciseFiles,
   previewEntry: "index.html",
   maxEditorSeconds: 1800

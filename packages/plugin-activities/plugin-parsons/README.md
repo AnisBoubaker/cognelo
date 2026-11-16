@@ -2,6 +2,8 @@
 
 `@cognelo/plugin-parsons` provides the `parsons-problem` activity type. Teachers define a prompt, reference solution, line groups, indentation behavior, and precedence rules. Learners reconstruct the program with keyboard- and pointer-accessible controls.
 
+New activities start with empty instructions and reference code, without an example program. See [authoring defaults](docs/REFERENCE.md#ux-notes).
+
 Teachers can [inspect saved work in progress](../../../docs/WORK_IN_PROGRESS_INSPECTION.md) from the Student results menu, independently of submitted-attempt history.
 
 Teacher editing guidance uses shared [contextual help](../../../docs/CONTEXTUAL_HELP.md): a circled question mark after the associated title or label, on the same row, with hover, keyboard and touch access.
