@@ -3,6 +3,15 @@ import type { editor } from "monaco-editor";
 import { MonacoModelStore } from "./monaco-model-scope";
 
 describe("ephemeral editor model ownership", () => {
+  it("omits empty group segments so language workers can resolve standalone documents", () => {
+    const store = new MonacoModelStore();
+    for (const group of ["", "question-a", "/question-a/file-group"]) {
+      const path = store.path(group, "web-design-solution-script-js");
+      expect(new URL(path).pathname).not.toContain("//");
+      expect(new URL(path).pathname.split("/").at(-1)).toBe("web-design-solution-script-js");
+    }
+  });
+
   it("separates questions, files, and later editing sessions", () => {
     const first = new MonacoModelStore();
     const later = new MonacoModelStore();

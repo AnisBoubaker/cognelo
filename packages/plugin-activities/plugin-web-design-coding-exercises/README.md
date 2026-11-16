@@ -38,7 +38,7 @@ Teacher Test review provides numbered activity navigation, saved files, comments
 - Teacher solution bundles, Playwright tests, screenshots, submissions, and results use plugin-owned persistence.
 - Teacher test removal uses the platform shared confirmation dialog; native modal APIs remain limited to learner-authored code inside the sandboxed preview.
 - Fast preview is client-side and sandboxed; graded execution is server-mediated through the external runner.
-- Editor assets and HTML/CSS/JavaScript workers use the shared first-party [Monaco loader](../../../docs/reference/PLATFORM_DECISIONS.md#frontend-platform-decisions), including when staff inspect expired assignments.
+- Editor assets and HTML/CSS/JavaScript workers use the shared first-party [Monaco loader](../../../docs/reference/PLATFORM_DECISIONS.md#frontend-platform-decisions), including when staff inspect expired assignments. Empty JavaScript solution/starter files remain available to diagnostics across file and authoring-panel switches.
 - The definition declares interactive, plugin-executed Student view support and uses that learner UI plus stateless runner evaluation; it never writes submission, test-result, attempt, grade, or analytics rows.
 - Administrators configure the endpoint under **Settings → Runners**. Core persists the endpoint and required encrypted Bearer token and resolves it through the pool-ready runner selector.
 - Enabled tests must pass against the private reference bundle before they are saved.

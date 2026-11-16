@@ -12,7 +12,10 @@ export class MonacoModelStore {
 
   path(group: string, document: string) {
     // Monaco decodes URI paths once; keep slashes inside identifiers opaque.
-    return `inmemory://cognelo/${this.namespace}/${encodeURIComponent(encodeURIComponent(group))}/${encodeURIComponent(encodeURIComponent(document))}`;
+    // TypeScript normalizes doubled separators before asking the worker host
+    // for a model, so an ungrouped editor must not introduce an empty segment.
+    const groupPath = group ? `${encodeURIComponent(encodeURIComponent(group))}/` : "";
+    return `inmemory://cognelo/${this.namespace}/${groupPath}${encodeURIComponent(encodeURIComponent(document))}`;
   }
   remember(model: editor.ITextModel) { this.models.add(model); }
   saveView(path: string, view: editor.ICodeEditorViewState | null) { if (view) this.views.set(path, view); }

@@ -12,6 +12,8 @@ Saved answers establish the editor's initial state. Loading or restoring an answ
 
 Each owner uses a fresh random URI namespace. Question and document identifiers are encoded without path aliasing. This also prevents Monaco's internal URI-based model recovery from finding a prior session's undo stack. Scope disposal waits until child editors detach and tolerates React Strict Mode's immediate effect reactivation.
 
+Ungrouped editors omit the optional group path segment so their URI path has no doubled separator. TypeScript normalizes repeated separators before requesting a source snapshot, while Monaco looks up the exact model URI. Keeping those identities identical prevents missing-source-file rejections for JavaScript, including empty files.
+
 ## Synchronization and autosave
 
 The shared `MonacoCodeEditor` uses `defaultValue`, not `@monaco-editor/react`'s controlled `value` update path. That wrapper turns later writable-value changes into full-document `executeEdits` operations, which was the source of the whole-answer undo bug.
@@ -26,4 +28,4 @@ Only answer state (`sourceCode` or `files`) crosses the existing persistence bou
 
 `tests/e2e/editor-undo.spec.ts` exercises actual Monaco keyboard undo/redo and persisted answer values: delayed hydration, fresh baseline editing after reload/reopen, question and file separation, duplicate file IDs in different questions, delayed/failed autosaves, failed restoration/retry, prior submissions, later attempts, same-tab account changes, and protected templates. It also checks that writes contain answer state only and that code/history is absent from browser storage.
 
-Unit checks cover model ownership, unique URI namespaces, disposal/Strict Mode reactivation, queued restoration after autosaves, and continuing an active last Test attempt. Existing Monaco-worker, code-template, and submission-history regressions remain applicable.
+Unit checks cover model ownership, canonical paths without empty group segments, unique URI namespaces, disposal/Strict Mode reactivation, queued restoration after autosaves, and continuing an active last Test attempt. The Monaco worker browser regression queries diagnostics for actual empty JavaScript solution/starter models across file and authoring-panel switches, then checks navigation without unhandled errors. Existing Monaco-worker, code-template, and submission-history regressions remain applicable.

@@ -3,6 +3,39 @@ import { expect, test } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
 import { defaultWebDesignExerciseConfig } from "../../packages/plugin-activities/plugin-web-design-coding-exercises/src/web-design-coding-exercises";
 
+test("keeps empty Web Design authoring files available to JavaScript workers across file and panel switches", async ({ teacherPage: page, bankCourse: data }) => {
+  const activityId = await createCourseActivity(data, {
+    activityTypeKey: "web-design-coding-exercise",
+    title: `Empty authoring workers ${data.token}`,
+    config: defaultWebDesignExerciseConfig
+  });
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto(`/courses/${data.courseId}/activities/${activityId}`);
+
+  for (const panel of ["Solution files", "Student starting files", "Solution files"]) {
+    await page.getByRole("tab", { name: panel, exact: true }).click();
+    await page.getByRole("tab", { name: "script.js", exact: true }).click();
+    const id = panel === "Solution files" ? "web-design-solution-script-js" : "web-design-starter-script-js";
+    await expect.poll(() => page.evaluate(id => {
+      const monaco = (window as typeof window & { monaco: typeof import("monaco-editor") }).monaco;
+      return monaco?.editor.getModels().find(model => model.uri.path.endsWith(`/${id}`))?.getLanguageId();
+    }, id)).toBe("javascript");
+    const diagnostics = await page.evaluate(async id => {
+      const monaco = (window as typeof window & { monaco: typeof import("monaco-editor") }).monaco;
+      const model = monaco.editor.getModels().find(model => model.uri.path.endsWith(`/${id}`))!;
+      const getWorker = await monaco.languages.typescript.getJavaScriptWorker();
+      const worker = await getWorker(model.uri);
+      return { text: model.getValue(), diagnostics: await worker.getSyntacticDiagnostics(model.uri.toString()) };
+    }, id);
+    expect(diagnostics).toEqual({ text: "", diagnostics: [] });
+    await page.getByRole("tab", { name: "index.html", exact: true }).click();
+  }
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Subjects", exact: true }).click();
+  await expect(page).toHaveURL(/\/subjects$/);
+  expect(errors).toEqual([]);
+});
+
 for (const expired of [false, true]) {
   test(`loads Web Design language workers for ${expired ? "teacher review of an expired" : "a learner's active"} activity`, async ({ studentPage, teacherPage, teacherApi, bankCourse: data }) => {
     const activityId = await createCourseActivity(data, {
