@@ -598,12 +598,12 @@ function toGradebookSubmissionRecord(
       studentAnswer: question.studentAnswer,
       submissionFunctionId: question.submissionFunctionId
     })),
-    reviews: submission.reviews.map((review) => ({
+    reviews: submission.reviews.filter(review => normalizeObject(review.metadata).status !== "staged").map((review) => ({
       id: review.id,
       createdAt: review.createdAt.toISOString(),
       feedback: review.feedback,
       maxScore: review.maxScore,
-      metadata: normalizeObject(review.metadata),
+      metadata: {},
       reviewerUserId: review.reviewerUserId,
       rubric: normalizeObject(review.rubric),
       score: review.score,

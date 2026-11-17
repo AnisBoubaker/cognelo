@@ -7107,3 +7107,12 @@ button.help-tooltip-trigger:hover, button.help-tooltip-trigger:focus-visible { c
 @media (max-width: 800px) { .homework-stage-list { grid-template-columns: minmax(0, 1fr); } .homework-submission-guide { padding: 12px; } .homework-stage-card { padding: 14px; } }
 
 .homework-answer-heading { scroll-margin-top: 90px; }
+.homework-rubric-review-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+@media (max-width: 900px) {
+  .homework-rubric-review-grid { grid-template-columns: minmax(0, 1fr); }
+}

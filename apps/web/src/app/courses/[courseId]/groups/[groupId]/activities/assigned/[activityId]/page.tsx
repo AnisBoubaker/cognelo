@@ -14,6 +14,7 @@ import { useServerCountdown } from "@/lib/use-server-countdown";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { HomeworkStudentRubricReport } from "@cognelo/plugin-coding-homework-grader";
 import { CodingExerciseStudentGradeReport } from "@cognelo/plugin-coding-exercises";
 import { AppShell } from "@/components/app-shell";
 import { ActivityLiveControlPortal } from "@/components/activity-live-controls";
@@ -490,6 +491,8 @@ function GroupActivityContent() {
                   report={releasedGrade.gradingReport}
                   score={releasedGrade.score}
                 />
+              ) : releasedGrade.activityTypeKey === "coding-homework-grader" && releasedGrade.gradingReport ? (
+                <HomeworkStudentRubricReport feedback={releasedGrade.feedback} report={releasedGrade.gradingReport} locale={locale} maxScore={releasedGrade.maxScore} />
               ) : (
                 <StudentFeedback feedback={releasedGrade.feedback} maxScore={releasedGrade.maxScore} t={t} />
               )}

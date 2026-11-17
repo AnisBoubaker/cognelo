@@ -2,7 +2,7 @@ import { activityAssessmentStageAssignment, assertActivitySubmissionStageEnabled
 import { studentTestFeedback } from "./student-test-feedback";
 import { escapeCsvCell } from "./csv";
 import { getActivityDefinition, getActivityPlugin, getActivityPluginForActivityType } from "@cognelo/activity-sdk";
-import { resolveAttemptContinuationHandler } from "@cognelo/activity-sdk/server";
+import { resolveAttemptContinuationHandler, resolvePluginSharedGrading } from "@cognelo/activity-sdk/server";
 import { Prisma, prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 import {
@@ -20,6 +20,7 @@ import { assignmentAllowsGradeChallenges, assignmentTimeLimitMinutes, courseActi
 import { getActivityContentAccess } from "./activity-content-access";
 import { applyAssignmentExceptions, applyGradebookExceptions, exceptionsForParticipant, loadAssignmentExceptions } from "./activity-assignment-exceptions";
 import { recoverExpiredTestAttempts } from "./test-timeout-recovery";
+import { hashAiFeedbackValue } from "./ai-feedback";
 
 type JsonInput = Prisma.InputJsonValue;
 export type ActivityAttemptAssessmentMode = "formative" | "summative";
@@ -425,7 +426,7 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
   });
 }
 
-export async function recordActivityAttemptGradingResult(user: CurrentUser, input: RecordActivityAttemptGradingResultInput, transaction?: Prisma.TransactionClient) {
+export async function recordActivityAttemptGradingResult(user: CurrentUser, input: RecordActivityAttemptGradingResultInput, transaction?: Prisma.TransactionClient, synchronizeShared = true) {
   const now = input.now ?? new Date();
   const attempt = await (transaction ?? prisma).activityAttempt.findUnique({
     where: { id: input.attemptId },
@@ -571,9 +572,65 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
       }
     });
 
+    if (synchronizeShared && resolvePluginSharedGrading(attempt.pluginKey)) await synchronizeActivitySharedGrading(user, attempt.courseId, attempt.id, tx);
     return { attempt: gradedAttempt, grade };
   };
   return transaction ? record(transaction) : prisma.$transaction(record);
+}
+
+function sharedFeedbackHash(feedback: Record<string, unknown>) {
+  const { feedbackHash: _hash, ...content } = feedback;
+  return hashAiFeedbackValue(content);
+}
+
+/** Related grade updates stay capability-scoped and atomic with their originating grade. */
+export async function synchronizeActivitySharedGrading(user: CurrentUser, courseId: string, attemptId: string, tx: Prisma.TransactionClient) {
+  const attempt = await tx.activityAttempt.findFirst({ where: { id: attemptId, courseId } });
+  if (!attempt?.pluginAttemptRef) return;
+  const service = resolvePluginSharedGrading(attempt.pluginKey);
+  if (!service) return;
+  await assertCanGradeGroup(user, courseId, attempt.groupId);
+  const ownGrade = await tx.grade.findUnique({ where: { gradebookItemId_participantId: { gradebookItemId: attempt.gradebookItemId, participantId: attempt.participantId } } });
+  if (ownGrade?.selectedAttemptId !== attemptId || ["manual", "override"].includes(ownGrade.source)) return;
+  const feedback = asJsonObject(asJsonObject(ownGrade.normalizedResult)?.studentFeedback);
+  if (!feedback) return;
+  const peers = await service.synchronize({ activityId: attempt.activityId, groupId: attempt.groupId, pluginAttemptRef: attempt.pluginAttemptRef, feedback,
+    transaction: { query: (query, ...values) => tx.$queryRaw(query, ...values), execute: (query, ...values) => tx.$executeRaw(query, ...values) } });
+  for (const target of peers) {
+    if (target.attemptId === attemptId) {
+      const own = service.mergeFeedback(feedback, target.component, target.revision, target.policyHash);
+      own.feedback.feedbackHash = sharedFeedbackHash(own.feedback);
+      await tx.grade.update({ where: { id: ownGrade.id }, data: { normalizedResult: { ...asJsonObject(ownGrade.normalizedResult), studentFeedback: own.feedback } as JsonInput } });
+      continue;
+    }
+    const peer = await tx.activityAttempt.findFirst({ where: { id: target.attemptId, courseId, groupId: attempt.groupId, activityId: attempt.activityId,
+      assessmentMode: "summative", lifecycle: { in: ["submitted", "graded"] }, pluginKey: attempt.pluginKey } });
+    if (!peer) continue;
+    const latest = await tx.activityAttempt.findFirst({ where: { groupActivityId: peer.groupActivityId, participantId: peer.participantId, lifecycle: { not: "deleted" } }, orderBy: { attemptNumber: "desc" }, select: { id: true } });
+    if (latest?.id !== peer.id) continue;
+    const grade = await tx.grade.findUnique({ where: { gradebookItemId_participantId: { gradebookItemId: peer.gradebookItemId, participantId: peer.participantId } } });
+    const preserve = grade && ["manual", "override"].includes(grade.source);
+    const previous = grade && (grade.selectedAttemptId === peer.id || preserve && grade.selectedAttemptId === null) ? asJsonObject(asJsonObject(grade.normalizedResult)?.studentFeedback) : null;
+    // Ungraded peers get the shared component when their own review is opened.
+    if (!previous) continue;
+    const merged = service.mergeFeedback(previous, target.component, target.revision, target.policyHash);
+    merged.feedback.feedbackHash = sharedFeedbackHash(merged.feedback);
+    if (!merged.gradingResult) continue;
+    if (preserve) {
+      const nextResult = { ...asJsonObject(grade.normalizedResult), studentFeedback: merged.feedback } as JsonInput;
+      await tx.grade.update({ where: { id: grade.id, updatedAt: grade.updatedAt }, data: { normalizedResult: nextResult } });
+      await tx.gradeEvent.create({ data: { gradeId: grade.id, gradebookItemId: peer.gradebookItemId, participantId: peer.participantId,
+        attemptId: peer.id, actorUserId: user.id, eventType: "ai_feedback_recorded", reason: "Shared submission rubric updated; individual grade retained",
+        previousValue: { normalizedResult: grade.normalizedResult }, nextValue: { normalizedResult: nextResult }, metadata: { sharedGradingOriginAttemptId: attemptId } } });
+      continue;
+    }
+    await recordActivityAttemptGradingResult(user, { attemptId: peer.id,
+      rawScore: merged.gradingResult.rawScore, rawMaxScore: merged.gradingResult.rawMaxScore,
+      source: "regrade", reason: "Shared submission rubric updated",
+      normalizedResult: { ...asJsonObject(grade?.normalizedResult), ...merged.gradingResult.metadata, studentFeedback: merged.feedback } as JsonInput,
+      rawResult: { feedback: merged.feedback } as JsonInput, metadata: { ...asJsonObject(grade?.metadata), sharedGradingOriginAttemptId: attemptId } as JsonInput
+    }, tx, false);
+  }
 }
 
 export async function reopenActivitySubmission(user: CurrentUser, courseId: string, attemptId: string) {
@@ -2297,6 +2354,7 @@ function sanitizePublicJson(value: unknown): unknown {
   if (typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => !key.startsWith("private"))
         .map(([key, item]) => [key, sanitizePublicJson(item)] as const)
         .filter((entry): entry is readonly [string, unknown] => entry[1] !== undefined)
     );

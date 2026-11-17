@@ -298,6 +298,8 @@ export type PluginAiGradingInstructionsHandler = {
 };
 
 export type PluginAiGradingBatchHandler = {
+  /** Optional bounded model evidence, separate from the lazy teacher-review UI projection. */
+  getTemplateSubmission?: (input: PluginAiFeedbackTeacherReviewContext) => Promise<Record<string, unknown>>;
   getInstructions: (
     input: PluginAiFeedbackTeacherReviewContext
   ) => Promise<string> | string;
@@ -487,6 +489,20 @@ export type ServerActivityPlugin = {
   gradeCompletion?: {
     activityTypeKeys: readonly string[];
     getCompletions: PluginGradeCompletionHandler;
+  };
+  /** Publish a shared component and project it onto current related submissions.
+   * Core validates each target and records ordinary audited grades in the same transaction. */
+  sharedGrading?: {
+    synchronize: (input: {
+      activityId: string; groupId: string; pluginAttemptRef: string; feedback: Record<string, unknown>;
+      transaction: {
+        query: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
+        execute: (query: TemplateStringsArray, ...values: unknown[]) => Promise<number>;
+      };
+    }) => Promise<Array<{ attemptId: string; component: Record<string, unknown>; revision: string; policyHash?: string }>>;
+    mergeFeedback: (feedback: Record<string, unknown>, component: Record<string, unknown>, revision: string, policyHash?: string) => {
+      feedback: Record<string, unknown>; gradingResult?: PluginGradingResult;
+    };
   };
   aiGradingInstructions?: PluginAiGradingInstructionsHandler;
   aiFeedback?: {
@@ -710,6 +726,10 @@ export function resolvePluginGradeCompletionHandler(activityTypeKey: string) {
   return currentServerPlugins().find((plugin) =>
     plugin.gradeCompletion?.activityTypeKeys.includes(activityTypeKey)
   )?.gradeCompletion?.getCompletions ?? null;
+}
+
+export function resolvePluginSharedGrading(pluginKey: string) {
+  return currentServerPlugins().find(plugin => plugin.key === pluginKey)?.sharedGrading ?? null;
 }
 
 export function resolvePluginAiFeedbackHandler(activityTypeKey: string) {

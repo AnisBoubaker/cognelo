@@ -24,6 +24,15 @@ export async function homeworkModelFixture(data: Pick<ActivitySuiteData, "course
         response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ output_text: text, content: [{ text }], message: { content: text } })); return;
       }
       const payload = JSON.parse(prompt);
+      if (payload.solution && payload.requirements) {
+        const text = JSON.stringify({ criteria: [{ id: "generated", title: "Reasoning", description: "Credit demonstrated understanding", weightPercent: 100 }] });
+        response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ output_text: text, content: [{ text }], message: { content: text } })); return;
+      }
+      if (Array.isArray(payload.rubric)) {
+        const score = payload.evidence?.answer?.includes("weak") ? 40 : 80;
+        const text = JSON.stringify({ noAnswerProvided: false, summary: "Reviewed submission", criteria: payload.rubric.map((criterion: { id: string }) => ({ criterionId: criterion.id, scorePercent: score, feedback: "Evidence-based criterion feedback" })) });
+        response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ output_text: text, content: [{ text }], message: { content: text } })); return;
+      }
       if (Array.isArray(payload.functions)) { response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ output_text: JSON.stringify({ selectedFunctionKeys: payload.functions.slice(0, 1).map((fn: { key: string }) => fn.key) }) })); return; }
       starts.push(payload.submittedCode ?? ""); sequence++; active++; counted = true; maximum = Math.max(maximum, active); const number = sequence;
       if (hold) await new Promise<void>(resolve => waiting.push(resolve));

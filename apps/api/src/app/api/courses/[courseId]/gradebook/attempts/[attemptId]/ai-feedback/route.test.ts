@@ -28,6 +28,8 @@ vi.mock("@cognelo/core", () => ({
   recalculateTestAttemptGrade: vi.fn(),
   reviseTeacherAttemptAiFeedback: mocks.reviseCoreFeedback
 }));
+const transaction = { grade: { findUnique: vi.fn(async () => ({ id: "grade-1", normalizedScore: 82 })) } };
+vi.mock("@cognelo/db", () => ({ prisma: { $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback(transaction) } }));
 vi.mock("@/lib/http", () => ({
   handleRoute: async (handler: () => Promise<Response>) => handler(),
   json: (data: unknown) => Response.json(data),
@@ -61,7 +63,7 @@ describe("teacher feedback revision route", () => {
         activityType: { key: "coding-exercise", name: "Programming Exercise", description: "" }
       }
     });
-    mocks.getReview.mockResolvedValue({ feedback: { feedbackRef: "evaluation-1", feedbackVersion: 1 } });
+    mocks.getReview.mockResolvedValue({ feedback: { summary: "Reviewed", feedbackRef: "evaluation-1", feedbackVersion: 1 } });
     mocks.resolveTeacherReview.mockReturnValue({
       createFeedbackDraft: vi.fn(),
       getSubmission: vi.fn(),
@@ -100,13 +102,13 @@ describe("teacher feedback revision route", () => {
         rawMaxScore: 100,
         source: "regrade",
         reason: "Teacher rubric review"
-      })
+      }), transaction
     );
     expect(mocks.recordResearch).toHaveBeenCalledWith(expect.objectContaining({
       eventType: "feedback_teacher_grade_adjusted",
       feedbackHash: "revised-hash",
       outcome: "graded"
-    }));
+    }), transaction);
     await expect(response.json()).resolves.toMatchObject({
       feedback: { summary: "Reviewed" },
       grade: { id: "grade-1", normalizedScore: 82 }

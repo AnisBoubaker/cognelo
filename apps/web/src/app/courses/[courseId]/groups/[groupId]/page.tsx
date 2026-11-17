@@ -10,6 +10,7 @@ import "@cognelo/plugin-registry/activity";
 import { MarkdownRenderer, useDialogs } from "@cognelo/activity-ui";
 import type { AssignedActivityAssessmentMode } from "@cognelo/contracts";
 import type { ContentTypeDefinition } from "@cognelo/content-type-sdk";
+import { HomeworkStudentRubricReport } from "@cognelo/plugin-coding-homework-grader";
 import { CodingExerciseStudentGradeReport } from "@cognelo/plugin-coding-exercises";
 import Link from "next/link";
 import { ContentResourceInline, ContentResourceModalTitle } from "@/components/content-resource-display";
@@ -376,6 +377,8 @@ export default function CourseGroupPage() {
                                     {codingExerciseReport && row.score !== null ? (
                                       <CodingExerciseStudentGradeReport feedback={row.feedback} locale={locale}
                                         maxScore={row.maxScore} report={codingExerciseReport} score={row.score} />
+                                    ) : row.activityTypeKey === "coding-homework-grader" && row.gradingReport ? (
+                                      <HomeworkStudentRubricReport feedback={row.feedback} report={row.gradingReport} locale={locale} maxScore={row.maxScore} />
                                     ) : row.feedback ? (
                                       <StudentFeedback feedback={row.feedback} maxScore={row.maxScore} t={t} />
                                     ) : <p className="muted">{t("groupPage.noGradingDetails")}</p>}

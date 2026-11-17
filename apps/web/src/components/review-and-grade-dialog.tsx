@@ -76,8 +76,9 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
   const mcqClient = useMemo(() => createMcqClient(apiRequest), []);
   const parsonsClient = useMemo(() => createParsonsClient(apiRequest), []);
   const feedbackRenderer = getAiFeedbackReviewRenderer(row.activityTypeKey);
+  const [manualFeedbackFallback, setManualFeedbackFallback] = useState(false);
   const manualRenderer = getManualGradingRenderer(row.activityTypeKey);
-  const useFeedbackReview = Boolean(feedbackRenderer && row.assessmentMode !== "formative");
+  const useFeedbackReview = Boolean(feedbackRenderer && row.assessmentMode !== "formative" && !manualFeedbackFallback);
   const [manualReview, setManualReview] = useState<ManualReviewState | null>(null);
   const [feedbackReview, setFeedbackReview] = useState<FeedbackReviewState | null>(null);
   const [savingAction, setSavingAction] = useState<"delete" | "override" | "regrade" | null>(null);
@@ -132,6 +133,12 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
     });
     try {
       const result = await api.activityAttemptAiFeedbackReview(courseId, attempt.coreAttemptId);
+      if (result.review.feedback.reviewEnabled === false) {
+        setManualFeedbackFallback(true);
+        setFeedbackReview(null);
+        await loadManualReview(false);
+        return;
+      }
       const calculatedGrade = gradeFollowsCalculated
         ? calculatedNormalizedGrade(row, result.review.activityTypeKey, result.review.feedback)
         : null;

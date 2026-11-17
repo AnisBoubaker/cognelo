@@ -70,9 +70,10 @@ export function hashAiFeedbackValue(value: unknown) {
   return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
-export async function getTeacherAttemptAiFeedbackReview(user: CurrentUser, courseId: string, attemptId: string) {
+export async function getTeacherAttemptAiFeedbackReview(user: CurrentUser, courseId: string, attemptId: string, transaction?: Prisma.TransactionClient) {
+  const database = transaction ?? prisma;
   await assertCanViewCourseGradebook(user, courseId);
-  const attempt = await prisma.activityAttempt.findFirst({
+  const attempt = await database.activityAttempt.findFirst({
     where: { id: attemptId, courseId },
     include: {
       gradebookItem: { select: { id: true, gradesReleased: true } },
@@ -84,7 +85,7 @@ export async function getTeacherAttemptAiFeedbackReview(user: CurrentUser, cours
   if (attempt.lifecycle !== "submitted" && attempt.lifecycle !== "graded") {
     throw new AppError(409, "FEEDBACK_SUBMISSION_REQUIRED", "Feedback is available only after the learner submits the activity.");
   }
-  const grade = await prisma.grade.findUnique({
+  const grade = await database.grade.findUnique({
     where: {
       gradebookItemId_participantId: {
         gradebookItemId: attempt.gradebookItemId,
@@ -92,7 +93,9 @@ export async function getTeacherAttemptAiFeedbackReview(user: CurrentUser, cours
       }
     }
   });
-  const selectedGrade = grade?.isActive !== false && grade?.selectedAttemptId === attempt.id ? grade : null;
+  const latestForOverride = grade && grade.selectedAttemptId === null && ["manual", "override"].includes(grade.source)
+    ? await database.activityAttempt.findFirst({ where: { groupActivityId: attempt.groupActivityId, participantId: attempt.participantId, lifecycle: { in: ["submitted", "graded"] } }, orderBy: { attemptNumber: "desc" }, select: { id: true } }) : null;
+  const selectedGrade = grade?.isActive !== false && (grade?.selectedAttemptId === attempt.id || latestForOverride?.id === attempt.id) ? grade : null;
   const gradeFeedback = selectedGrade ? readStoredStudentFeedback(selectedGrade.normalizedResult) : {};
   const attemptFeedback = readAttemptTeacherFeedback(attempt.metadata);
   const feedback = isStoredTeacherFeedback(gradeFeedback)
@@ -119,10 +122,12 @@ export async function reviseTeacherAttemptAiFeedback(
   courseId: string,
   attemptId: string,
   revisedFeedback: Record<string, unknown>,
-  expectedFeedbackHash?: string | null
+  expectedFeedbackHash?: string | null,
+  transaction?: Prisma.TransactionClient
 ) {
+  const database = transaction ?? prisma;
   await assertCanViewCourseGradebook(user, courseId);
-  const attempt = await prisma.activityAttempt.findFirst({
+  const attempt = await database.activityAttempt.findFirst({
     where: { id: attemptId, courseId },
     include: { gradebookItem: { select: { id: true, gradesReleased: true } } }
   });
@@ -131,7 +136,7 @@ export async function reviseTeacherAttemptAiFeedback(
   if (attempt.lifecycle !== "submitted" && attempt.lifecycle !== "graded") {
     throw new AppError(409, "FEEDBACK_SUBMISSION_REQUIRED", "Feedback is available only after the learner submits the activity.");
   }
-  const grade = await prisma.grade.findUnique({
+  const grade = await database.grade.findUnique({
     where: {
       gradebookItemId_participantId: {
         gradebookItemId: attempt.gradebookItemId,
@@ -139,7 +144,9 @@ export async function reviseTeacherAttemptAiFeedback(
       }
     }
   });
-  const selectedGrade = grade?.isActive !== false && grade?.selectedAttemptId === attempt.id ? grade : null;
+  const latestForOverride = grade && grade.selectedAttemptId === null && ["manual", "override"].includes(grade.source)
+    ? await database.activityAttempt.findFirst({ where: { groupActivityId: attempt.groupActivityId, participantId: attempt.participantId, lifecycle: { in: ["submitted", "graded"] } }, orderBy: { attemptNumber: "desc" }, select: { id: true } }) : null;
+  const selectedGrade = grade?.isActive !== false && (grade?.selectedAttemptId === attempt.id || latestForOverride?.id === attempt.id) ? grade : null;
   const normalizedResult = asRecord(selectedGrade?.normalizedResult);
   const gradeFeedback = selectedGrade ? readStoredStudentFeedback(selectedGrade.normalizedResult) : {};
   const attemptFeedback = readAttemptTeacherFeedback(attempt.metadata);
@@ -164,7 +171,7 @@ export async function reviseTeacherAttemptAiFeedback(
     ? Number(currentFeedback.feedbackVersion)
     : 1;
   const existingChallenge = hasCurrentFeedback
-    ? await prisma.gradeChallenge.findFirst({
+    ? await database.gradeChallenge.findFirst({
       where: {
         participantId: attempt.participantId,
         attemptId: attempt.id,
@@ -193,7 +200,7 @@ export async function reviseTeacherAttemptAiFeedback(
       }
     : { attemptId: attempt.id, lifecycle: attempt.lifecycle };
 
-  const mutation = await prisma.$transaction(async (tx) => {
+  const save = async (tx: Prisma.TransactionClient) => {
     const attemptUpdate = await tx.activityAttempt.updateMany({
       where: { id: attempt.id, updatedAt: attempt.updatedAt },
       data: {
@@ -282,7 +289,8 @@ export async function reviseTeacherAttemptAiFeedback(
       }
     });
     return { gradeUpdatedAt };
-  });
+  };
+  const mutation = transaction ? await save(transaction) : await prisma.$transaction(save);
 
   return { feedback: nextFeedback, teacherRevision, feedbackHash, gradeUpdatedAt: mutation.gradeUpdatedAt };
 }

@@ -82,63 +82,69 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       currentFeedback,
       feedback: body.feedback
     });
-    const revised = await reviseTeacherAttemptAiFeedback(
-      user,
-      courseId,
-      attemptId,
-      revision.feedback,
-      body.expectedFeedbackHash
-    );
-    const revisedAiWeightPercent = (revised.feedback as Record<string, unknown>).aiWeightPercent;
-    const grading = revision.gradingResult
-      ? await recordActivityAttemptGradingResult(user, {
-          attemptId: context.attemptId,
-          rawScore: revision.gradingResult.rawScore,
-          rawMaxScore: revision.gradingResult.rawMaxScore,
-          source: "regrade",
-          isPass: revision.gradingResult.isPass,
-          rawResult: {
-            feedback: revised.feedback,
-            analyticsPayload: revision.gradingResult.analyticsPayload ?? {}
-          } as Prisma.InputJsonValue,
-          normalizedResult: (revision.gradingResult.metadata ?? {}) as Prisma.InputJsonValue,
-          metadata: {
-            aiFeedbackRef: revised.feedback.feedbackRef,
-            aiFeedbackVersion: revised.feedback.feedbackVersion,
-            feedbackHash: revised.feedbackHash,
-            teacherFeedbackRevision: revised.teacherRevision,
-            teacherRubricAdjusted: true
-          } as Prisma.InputJsonValue,
-          reason: "Teacher rubric review"
-        })
-      : null;
-    if (revision.gradingResult) {
-      await recordAiFeedbackResearchEvent({
-        eventType: "feedback_teacher_grade_adjusted",
+    const saved = await prisma.$transaction(async tx => {
+      const revised = await reviseTeacherAttemptAiFeedback(
+        user,
         courseId,
-        groupId: context.groupId,
-        activityId: context.activityId,
-        groupActivityId: context.activity.assignment?.id ?? null,
-        gradebookItemId: grading?.grade.gradebookItemId ?? null,
-        attemptId: context.attemptId,
-        actorUserId: user.id,
-        pluginKey: context.activityTypeKey,
-        feedbackRef: typeof revised.feedback.feedbackRef === "string" ? revised.feedback.feedbackRef : null,
-        feedbackVersion: typeof revised.feedback.feedbackVersion === "number" ? revised.feedback.feedbackVersion : null,
-        feedbackHash: revised.feedbackHash,
-        aiContribution: typeof revisedAiWeightPercent === "number" ? revisedAiWeightPercent / 100 : null,
-        assessmentMode: "summative",
-        triggerKind: "teacher_feedback_review",
-        outcome: "graded",
-        metadata: {
-          rawScore: revision.gradingResult.rawScore,
-          rawMaxScore: revision.gradingResult.rawMaxScore,
-          normalizedScore: grading?.grade.normalizedScore ?? null,
-          normalizedMaxScore: grading?.grade.normalizedMaxScore ?? null
-        }
-      });
-    }
-    return json({ ...revised, grade: grading?.grade ?? null });
+        attemptId,
+        revision.feedback,
+        body.expectedFeedbackHash,
+        tx
+      );
+      const revisedAiWeightPercent = (revised.feedback as Record<string, unknown>).aiWeightPercent;
+      const grading = revision.gradingResult
+        ? await recordActivityAttemptGradingResult(user, {
+            attemptId: context.attemptId,
+            rawScore: revision.gradingResult.rawScore,
+            rawMaxScore: revision.gradingResult.rawMaxScore,
+            source: "regrade",
+            isPass: revision.gradingResult.isPass,
+            rawResult: {
+              feedback: revised.feedback,
+              analyticsPayload: revision.gradingResult.analyticsPayload ?? {}
+            } as Prisma.InputJsonValue,
+            normalizedResult: { ...(revision.gradingResult.metadata ?? {}), studentFeedback: revised.feedback } as Prisma.InputJsonValue,
+            metadata: {
+              aiFeedbackRef: revised.feedback.feedbackRef,
+              aiFeedbackVersion: revised.feedback.feedbackVersion,
+              feedbackHash: revised.feedbackHash,
+              teacherFeedbackRevision: revised.teacherRevision,
+              teacherRubricAdjusted: true
+            } as Prisma.InputJsonValue,
+            reason: "Teacher rubric review"
+          }, tx)
+        : null;
+      if (revision.gradingResult) {
+        await recordAiFeedbackResearchEvent({
+          eventType: "feedback_teacher_grade_adjusted",
+          courseId,
+          groupId: context.groupId,
+          activityId: context.activityId,
+          groupActivityId: context.activity.assignment?.id ?? null,
+          gradebookItemId: grading?.grade.gradebookItemId ?? null,
+          attemptId: context.attemptId,
+          actorUserId: user.id,
+          pluginKey: context.activityTypeKey,
+          feedbackRef: typeof revised.feedback.feedbackRef === "string" ? revised.feedback.feedbackRef : null,
+          feedbackVersion: typeof revised.feedback.feedbackVersion === "number" ? revised.feedback.feedbackVersion : null,
+          feedbackHash: revised.feedbackHash,
+          aiContribution: typeof revisedAiWeightPercent === "number" ? revisedAiWeightPercent / 100 : null,
+          assessmentMode: "summative",
+          triggerKind: "teacher_feedback_review",
+          outcome: "graded",
+          metadata: {
+            rawScore: revision.gradingResult.rawScore,
+            rawMaxScore: revision.gradingResult.rawMaxScore,
+            normalizedScore: grading?.grade.normalizedScore ?? null,
+            normalizedMaxScore: grading?.grade.normalizedMaxScore ?? null
+          }
+        }, tx);
+      }
+      const finalReview = await getTeacherAttemptAiFeedbackReview(user, courseId, attemptId, tx);
+      const finalGrade = grading ? await tx.grade.findUnique({ where: { id: grading.grade.id } }) : null;
+      return { ...revised, feedback: finalReview.feedback ?? revised.feedback, feedbackHash: finalReview.feedback?.feedbackHash ?? revised.feedbackHash, gradeUpdatedAt: finalReview.gradeUpdatedAt, grade: finalGrade };
+    });
+    return json(saved);
   });
 }
 
@@ -285,7 +291,7 @@ async function resolveBatchGuidance(input: {
     }
     return {
       coreAttemptId: templateAttemptId,
-      submission: await teacherReview.getSubmission(reviewContext),
+      submission: await (batchGrading.getTemplateSubmission ?? teacherReview.getSubmission)(reviewContext),
       feedback: review.feedback
     };
   }));

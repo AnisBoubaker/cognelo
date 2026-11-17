@@ -4,12 +4,15 @@ import path from "node:path";
 import { feedbackExportBlocks, type AnswerExportBlock, type SubmissionExportHandler } from "@cognelo/activity-sdk/server";
 import { AppError } from "@cognelo/core";
 import { prisma } from "./db-client";
+import { isHomeworkFeedback } from "./rubric";
+import { homeworkRubricExportBlocks } from "./rubric-export";
 export const exportHomeworkSubmission: SubmissionExportHandler = async (input) => {
   const submission = input.pluginAttemptRef ? await prisma.pluginCodingHomeworkSubmission.findFirst({ where: {
     id: input.pluginAttemptRef, activityId: input.activity.id, groupId: input.groupId, kind: "final", ...(input.userId ? { userId: input.userId } : {})
-  }, include: { files: { orderBy: { path: "asc" } }, questions: { orderBy: { orderIndex: "asc" } }, reviews: { orderBy: { createdAt: "desc" }, take: 1 } } }) : null;
+  }, include: { files: { orderBy: { path: "asc" } }, questions: { orderBy: { orderIndex: "asc" } }, reviews: { orderBy: { createdAt: "desc" } } } }) : null;
   if (!submission && input.pluginAttemptRef) throw new AppError(409, "ANSWER_EXPORT_SOURCE_MISSING", "The submitted files are unavailable.");
   if (!submission) return { answer: [{ kind: "markdown", text: input.labels.noAnswer }] };
+  submission.reviews = submission.reviews.filter(review => (review.metadata as Record<string, unknown>)?.status !== "staged");
   const answer: AnswerExportBlock[] = [];
   const root = path.resolve(process.cwd(), "../../storage/coding-homework-grader/submissions");
   for (const file of submission.files) {
@@ -34,8 +37,9 @@ export const exportHomeworkSubmission: SubmissionExportHandler = async (input) =
     if (Number(attachment.attachment.sizeBytes) > 30_000_000) throw new AppError(413, "ANSWER_EXPORT_PROMPT_TOO_LARGE", "The assignment PDF is too large to include in this export.");
     promptPdfs.push({ name: attachment.attachment.originalName, bytes: new Uint8Array(await readFile(attachment.filePath)) });
   }
-  const grading = input.includeGrading ? feedbackExportBlocks(input.feedback, input.labels) : [];
-  if (input.includeGrading && submission.reviews[0]) grading.push(...feedbackExportBlocks(submission.reviews[0].rubric, input.labels));
-  if (input.includeGrading && submission.reviews[0]?.feedback) grading.push({ kind: "markdown", title: input.labels.comments, text: submission.reviews[0].feedback });
+  const currentRubric = isHomeworkFeedback(input.feedback) ? input.feedback : submission.reviews.map(review => review.rubric).find(isHomeworkFeedback);
+  const grading = input.includeGrading ? currentRubric ? homeworkRubricExportBlocks(currentRubric, input.labels) : feedbackExportBlocks(input.feedback, input.labels) : [];
+  if (input.includeGrading && !currentRubric && submission.reviews[0]) grading.push(...feedbackExportBlocks(submission.reviews[0].rubric, input.labels));
+  if (input.includeGrading && !currentRubric && submission.reviews[0]?.feedback) grading.push({ kind: "markdown", title: input.labels.comments, text: submission.reviews[0].feedback });
   return { promptPdfs, prompt: assignment?.promptMarkdown ? [{ kind: "markdown", text: assignment.promptMarkdown }] : [], answer, grading };
 };

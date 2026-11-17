@@ -1,4 +1,9 @@
 import { homeworkGradebookActionService } from "./gradebook-actions";
+import { evaluateHomeworkWithAi, createHomeworkFeedbackDraft, getHomeworkTeacherSubmission, reviseHomeworkTeacherFeedback, homeworkGradeCompletions, getHomeworkGradingTemplate } from "./rubric-grading";
+import { homeworkSharedGrading } from "./shared-rubric";
+import { homeworkRubricRoutes } from "./rubric-routes";
+import { getHomeworkStudentGradeReport } from "./rubric-report";
+import { isHomeworkFeedback, objectRecord } from "./rubric";
 import { homeworkStudentProgressService } from "./student-progress";
 import { homeworkReports } from "./reports";
 import { homeworkWorkInspection } from "./work-inspection";
@@ -50,6 +55,31 @@ import { markCodingHomeworkSubmissionDeleted } from "./submission-deletion";
 registerCodingHomeworkBackgroundJobs();
 
 export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
+  sharedGrading: homeworkSharedGrading,
+  gradeCompletion: { activityTypeKeys: ["coding-homework-grader"], getCompletions: homeworkGradeCompletions },
+  studentGradeReport: { activityTypeKeys: ["coding-homework-grader"], getReport: getHomeworkStudentGradeReport },
+  aiFeedback: {
+    evaluateAttempt: evaluateHomeworkWithAi,
+    publishEvaluation: async ({ activityId, coreAttemptId, feedbackRef, transaction }) => {
+      const count = await transaction.execute`UPDATE "PluginCodingHomeworkReview" r SET metadata=jsonb_set(r.metadata,'{status}','"completed"'::jsonb)
+        FROM "PluginCodingHomeworkSubmission" s WHERE r.id=${feedbackRef} AND r."submissionId"=s.id
+          AND s."activityId"=${activityId} AND s."coreAttemptId"=${coreAttemptId} AND r.metadata->>'status'='staged'`;
+      if (count !== 1) throw new AppError(409, "AI_GRADING_CONFLICT", "The prepared homework assessment is no longer available.");
+    },
+    teacherReview: { createFeedbackDraft: createHomeworkFeedbackDraft, getSubmission: getHomeworkTeacherSubmission, reviseFeedback: reviseHomeworkTeacherFeedback },
+    batchGrading: {
+      getTemplateSubmission: getHomeworkGradingTemplate,
+      getInstructions: async ({ activityId }) => {
+        const settings = objectRecord((await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId } }))?.settings);
+        return typeof settings.gradingBatchInstructions === "string" ? settings.gradingBatchInstructions : "Apply the code and question rubrics and their saved grading directions consistently.";
+      },
+      updateInstructions: async ({ activityId, instructions }) => {
+        await prisma.$executeRaw`UPDATE "PluginCodingHomeworkAssignment" SET settings=jsonb_set(settings,'{gradingBatchInstructions}',${JSON.stringify(instructions)}::jsonb), "updatedAt"=NOW() WHERE "activityId"=${activityId}`;
+      },
+      isTemplateComplete: ({ feedback }) => isHomeworkFeedback(feedback) && feedback.combinedScore !== null
+        && [...(feedback.codeWeightPercent > 0 ? [feedback.code] : []), ...(feedback.questionsWeightPercent > 0 ? feedback.questions : [])].every(rubric => rubric.criteria.every(item => item.scorePercent !== null && item.feedback.trim()))
+    }
+  },
   studentProgress: homeworkStudentProgressService,
   reports: homeworkReports,
   workInspection: homeworkWorkInspection,
@@ -87,6 +117,7 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
     }
   },
   routes: [
+    ...homeworkRubricRoutes,
     ...homeworkWorkflowRoutes,
     homeworkPreparationRoute, homeworkPreparedFileRoute, homeworkTeacherSolutionRoute, homeworkSelectFunctionsRoute,
     codingHomeworkAuthoringRoute,
@@ -122,13 +153,13 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
           activityId
         },
         include: {
-          reviews: { orderBy: { createdAt: "desc" }, take: 1 }
+          reviews: { orderBy: { createdAt: "desc" } }
         }
       });
       if (!submission) {
         throw new AppError(404, "CODING_HOMEWORK_SUBMISSION_NOT_FOUND", "The programming homework submission was not found.");
       }
-      const review = submission.reviews[0];
+      const review = submission.reviews.find(review => objectRecord(review.metadata).status !== "staged");
       if (!review || review.score === null || review.maxScore === null) {
         throw new AppError(409, "CODING_HOMEWORK_MANUAL_GRADE_REQUIRED", "This programming homework submission requires manual grading.");
       }

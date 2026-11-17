@@ -42,7 +42,7 @@ Students may submit some or all challenge answers blank. Manual submission first
 
 Teacher gradebook menus offer **Download submitted files (ZIP)** as soon as files are handed in, including while questions are pending. **Download all submitted files (ZIP)** follows the current section filter and includes one numbered student folder per current hand-in; team members each have a folder. Drafts, cancelled/deleted work and former team bindings are excluded. Downloads preserve folders/bytes, include no teacher-only attachments and change no attempts or grades. These actions are provided through the [shared activity contract](../../../docs/GRADEBOOK_PLUGIN_ACTIONS.md), with progress and Cancel.
 
-Teacher **Review and grade** uses the shared wide dialog, with an aligned toolbar and separate Questions and answers / Submitted files tabs. Submitted files use the same read-only left-tab viewer and load on demand for the selected learner/submission. Numbered question cards show the submitted code and answer, including an explicit unanswered state. Grade and feedback stay beside the content on wide screens; historical/formative review remains read-only.
+Teacher **Review and grade** uses the shared wide dialog and aligned toolbar. Without rubric grading it retains Questions and answers / Submitted files tabs; with rubric grading it shows submitted code beside the code rubric and each individual answer beside the generic answer rubric. Submitted files use the same read-only left-tab viewer and load on demand for the selected learner/submission. Numbered question cards show the submitted code and answer, including an explicit unanswered state. Grade and feedback stay beside the content on wide screens; historical/formative review remains read-only.
 
 Student row actions, Logs and core Student results use current account names. Earlier profile/admin name changes appear when refreshed; pending enrollment names remain a core fallback. See [gradebook participant names](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md#current-participant-names).
 
@@ -50,8 +50,11 @@ Student row actions, Logs and core Student results use current account names. Ea
 
 The display name is **Programming Homework** (French: **Devoir de programmation**). The package, plugin/activity keys, API routes and database identifiers retain `coding-homework-grader` for compatibility. Existing teacher-authored activity titles are preserved.
 
+Rubric grading adds a shared **Grading** tab with a whole-project code rubric and one generic rubric applied separately to each challenge answer. Component points total 100; test points remain zero until executable tests are added. Teachers generate rubrics with saved guidance, assess individually/in batches with AI, or edit scores/comments manually. Team code scores are shared; answers and final-grade overrides remain individual. Release blocks incomplete weighted components and student results show the released breakdown. Existing homework stays manual until rubric grading is enabled. See [grading behavior and boundaries](docs/GRADING.md).
+
 ## Read by topic
 
+- [Rubric authoring, AI/manual assessment, team scores and released results](docs/GRADING.md)
 - [Editor sections, optional questions and ZIP simulation](../../../docs/PROGRAMMING_HOMEWORK_EDITOR.md)
 - [Approved choices and delivery scope](../../../docs/CODING_HOMEWORK_SUBMISSION_WORKFLOW.md)
 - [Current routes, persistence and boundaries](docs/REFERENCE.md)

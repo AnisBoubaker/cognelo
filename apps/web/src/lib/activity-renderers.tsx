@@ -13,6 +13,9 @@ import {
 import {
   CodingHomeworkGraderActivityView,
   CodingHomeworkManualGradingPanel,
+  HomeworkRubricReview,
+  isHomeworkFeedback,
+  calculateHomeworkFeedback,
   createCodingHomeworkGraderClient,
   type CodingHomeworkGradebookAttemptRecord
 } from "@cognelo/plugin-coding-homework-grader";
@@ -42,7 +45,7 @@ import { useActivityEditorGradingPortalTarget } from "@/components/activity-edit
 import { createStandaloneActivityDraftHost } from "@/lib/activity-response-draft-host";
 import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
 import { isTestItemAnswered } from "@/lib/test-item-answer-status";
-import type { Locale } from "@/lib/i18n";
+import { useI18n, type Locale } from "@/lib/i18n";
 import {
   itemScorePercentage,
   respondentsForMcqChoice,
@@ -414,6 +417,7 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
 }
 
 function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeof CodingHomeworkGraderActivityView>) {
+  const authoringGradingPortalTarget = useActivityEditorGradingPortalTarget();
   const {
     activityRouteCourseId,
     groupId,
@@ -489,6 +493,7 @@ function CodingHomeworkGraderActivityRenderer(props: ActivityRendererProps<typeo
   return (
     <CodingHomeworkGraderActivityView
       {...activityProps}
+      authoringGradingPortalTarget={authoringGradingPortalTarget}
       activityFileUrl={(attachmentId) =>
         apiAbsoluteUrl(
           groupId
@@ -1300,6 +1305,7 @@ function CodingExerciseBankActivityRenderer(context: BankActivityRendererContext
 }
 
 function CodingHomeworkGraderBankActivityRenderer(context: BankActivityRendererContext) {
+  const authoringGradingPortalTarget = useActivityEditorGradingPortalTarget();
   const codingHomeworkClient = useMemo(() => createCodingHomeworkGraderClient(apiRequest), []);
   const authoringClient = useMemo(
     () => ({
@@ -1320,6 +1326,7 @@ function CodingHomeworkGraderBankActivityRenderer(context: BankActivityRendererC
   const solutionRequest = useMemo(() => <T,>(route: string, init?: RequestInit) => apiRequest<T>(`/activity-banks/${context.activityBankId}/activities/${context.activity.id}/coding-homework-grader/${route}`, init), [context.activityBankId, context.activity.id]);
   return (
     <CodingHomeworkGraderActivityView
+      authoringGradingPortalTarget={authoringGradingPortalTarget}
       providedFilesUrl={apiAbsoluteUrl(`/activity-banks/${context.activityBankId}/activities/${context.activity.id}/coding-homework-grader/provided-files-download`)}
       solutionRequest={solutionRequest}
       activity={context.activity}
@@ -1476,9 +1483,20 @@ export function getManualGradingRenderer(activityTypeKey: string) {
 }
 
 export const aiFeedbackReviewRenderers: Record<string, (context: AiFeedbackReviewRendererContext) => ReactNode> = {
+  "homework-rubric-review": context => <HomeworkRubricReviewRenderer {...context} />,
   "coding-exercise-ai-feedback-review": (context) => <CodingExerciseAiFeedbackReview {...context} />,
   "mcq-ai-feedback-review": (context) => <McqAiFeedbackReview {...context} />
 };
+
+function HomeworkRubricReviewRenderer(context: AiFeedbackReviewRendererContext) {
+  const { locale } = useI18n();
+  const client = useMemo(() => createCodingHomeworkGraderClient(apiRequest), []);
+  const { courseId, groupId, activityId, participantId, submissionId } = context.submission;
+  const readFile = useCallback((path: string, signal: AbortSignal) => client.groupGradebookFile(String(courseId), String(groupId), String(activityId), {
+    participantId: String(participantId), attemptId: String(submissionId), path
+  }, signal), [client, courseId, groupId, activityId, participantId, submissionId]);
+  return <HomeworkRubricReview {...context} locale={locale} readFile={readFile} />;
+}
 
 export function getAiFeedbackReviewRenderer(activityTypeKey: string) {
   const rendererKey = getActivityDefinition(activityTypeKey)?.aiFeedback?.rendererKey;
@@ -1486,6 +1504,7 @@ export function getAiFeedbackReviewRenderer(activityTypeKey: string) {
 }
 
 export function getAiFeedbackReviewCalculatedGradePercent(activityTypeKey: string, feedback: Record<string, unknown>) {
+  if (activityTypeKey === "coding-homework-grader" && isHomeworkFeedback(feedback)) return calculateHomeworkFeedback(feedback).combinedScore;
   const rendererKey = getActivityDefinition(activityTypeKey)?.aiFeedback?.rendererKey;
   if (rendererKey !== "coding-exercise-ai-feedback-review") return null;
   return getCodingExerciseGradingBreakdown(feedback)?.totalGrade ?? null;

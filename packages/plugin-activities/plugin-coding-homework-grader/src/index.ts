@@ -8,6 +8,8 @@ export * from "./parsers";
 export * from "./web/client";
 export * from "./web/coding-homework-grader-activity-view";
 export * from "./web/coding-homework-manual-grading-panel";
+export * from "./web/homework-rubric-review";
+export { isHomeworkFeedback, calculateHomeworkFeedback } from "./rubric";
 
 export const codingHomeworkGraderPlugin: ActivityPlugin = {
   key: "coding-homework-grader",
@@ -23,7 +25,7 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
       preparationMediaFields: ["assignmentMarkdown"],
       supportsTeamwork: true,
       usesMaterialEmbeddings: true,
-      authoring: {},
+      authoring: { gradingTab: true },
       name: "Programming Homework",
       description: "Programming assignment submission and grading workflow.",
       defaultCategoryIds: ["programming"],
@@ -35,6 +37,8 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
         supportsAttempts: true,
         supportsAnswerExport: true,
         supportsManualGrading: true,
+        supportsAiFeedback: true,
+        supportsAiFeedbackGrading: true,
         supportsFeedbackRenderer: true,
         supportsAnalyticsPayloads: true,
         defaultMaxAttempts: 3
@@ -42,6 +46,7 @@ export const codingHomeworkGraderPlugin: ActivityPlugin = {
       manualGrading: {
         rendererKey: "coding-homework-grader-manual-grading"
       },
+      aiFeedback: { rendererKey: "homework-rubric-review" },
       i18n: {
         en: {
           name: "Programming Homework",

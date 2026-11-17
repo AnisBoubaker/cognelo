@@ -4,7 +4,7 @@ Status: implemented and locally validated, November 9, 2026.
 
 ## Approved layout
 
-The core top tabs are Activity, Concepts and Reference materials. Reference materials stays core-owned for embedding/RAG-capable course activities. Activity contains the shared left navigation:
+The core top tabs are Activity, Concepts, Grading and Reference materials. The November 16 [rubric grading delivery](../packages/plugin-activities/plugin-coding-homework-grader/docs/GRADING.md) adds Grading with shared Rubric/Tests left navigation, whole-project and generic answer rubrics, points and directions. Its controls share the ordinary authoring draft and Save/Cancel bar. Reference materials stays core-owned for embedding/RAG-capable course activities. Activity contains the shared left navigation:
 
 - Activity: title, description, programming language, assignment text in the shared WYSIWYG editor, assignment PDF with a collapsed preview, and provided files. Remove the separate rendered assignment preview and student-submission management from authoring; actions live in Student results row menus and history in the shared Logs tab.
 - Teacher solution: private solution and required filename/function/signature selection. Filenames appear on the left with required checkboxes and delete actions; selecting one shows only its signatures on the right. Select the first file initially and preserve selections across files.

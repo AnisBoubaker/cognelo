@@ -23,7 +23,9 @@ The legacy direct Test AI endpoint also stages every child and commits them toge
 
 ## Plugin contract
 
-`aiFeedback.evaluateAttempt` accepts `deferPublication: true`. Supported providers save successful private artifacts with status `staged`, which every ordinary history/report fallback excludes. `aiFeedback.publishEvaluation` validates the exact activity, core attempt and feedback reference and promotes that artifact through the host's neutral transaction executor. Deterministic no-answer feedback may have no artifact. Plugins without this explicit capability cannot enter cancellable grading. Programming Exercises and MCQ implement it; ordinary formative evaluation remains unchanged.
+`aiFeedback.evaluateAttempt` accepts `deferPublication: true`. Supported providers save successful private artifacts with status `staged`, which every ordinary history/report fallback excludes. `aiFeedback.publishEvaluation` validates the exact activity, core attempt and feedback reference and promotes that artifact through the host's neutral transaction executor. Deterministic no-answer feedback may have no artifact. Plugins without this explicit capability cannot enter cancellable grading. Programming Exercises, MCQ and Programming Homework implement it; ordinary formative evaluation remains unchanged.
+
+For activities declaring shared grading components, a kept batch writes all prepared individuals before synchronizing shared scores in the same transaction. Existing individual overrides remain intact.
 
 The host never updates plugin tables directly, deletes immutable model evidence, runs code during publication, or stores private provider credentials in a run. Submitted answers and authored configurations remain untouched.
 

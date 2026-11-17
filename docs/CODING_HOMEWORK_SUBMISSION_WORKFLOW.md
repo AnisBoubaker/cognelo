@@ -29,6 +29,10 @@ The entire reference-material selection/preparation/preview UI belongs to core, 
 
 The November 9 [editor update](PROGRAMMING_HOMEWORK_EDITOR.md) places course-only **Simulation** in Activity’s left navigation and generates from an uploaded preflight ZIP after explicit simulated-hand-in confirmation, including incomplete acknowledgement when needed. It respects saved instructions, the course language and prepared references, excludes unchanged provided code, supports Cancel and creates no student academic records. Results are transient.
 
+## Rubric-grading update — November 16, 2026
+
+The user approved whole-project code-rubric grading and one generic rubric applied independently to each answer, averaged equally. Team code/test scores are shared, question grades individual, with individual teacher final-grade adjustments retained. This delivery implements rubric generation with guidance, teacher-triggered AI/manual assessment, gradebook integration and released student feedback. Executable tests are deferred: the next delivery will target teacher-selected required functions, allow per-function weights and validate generated tests against the solution. See [the canonical grading reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/GRADING.md).
+
 ## Scope
 
 - Support **C** for this delivery, with approximately **30 students submitting at a time**.

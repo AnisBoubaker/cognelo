@@ -7,7 +7,7 @@ describe("gradebook activity actions", () => {
     ["mcq", true, true, true, false],
     ["parsons-problem", true, true, false, false],
     ["web-design-coding-exercise", true, false, false, false],
-    ["coding-homework-grader", true, false, false, false],
+    ["coding-homework-grader", true, false, true, true],
     ["test", true, true, true, true],
     ["placeholder", false, false, false, false],
     ["unknown", false, false, false, false]

@@ -74,7 +74,7 @@ export async function prepareAiGradingAttempt(user: CurrentUser, courseId: strin
   return prepared;
 }
 
-export async function commitPreparedAiGrading(user: CurrentUser, courseId: string, prepared: PreparedAiGrading, tx: Prisma.TransactionClient) {
+export async function commitPreparedAiGrading(user: CurrentUser, courseId: string, prepared: PreparedAiGrading, tx: Prisma.TransactionClient, synchronizeShared = true) {
   const context = await getActivityAttemptRegradeContext(user, courseId, prepared.attemptId);
   await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id = ${prepared.attemptId} FOR UPDATE`;
   const attempt = await tx.activityAttempt.findUniqueOrThrow({ where: { id: prepared.attemptId }, include: { testItemAttempts: true } });
@@ -112,7 +112,7 @@ export async function commitPreparedAiGrading(user: CurrentUser, courseId: strin
         normalizedResult: { ...(grading.metadata ?? {}), studentFeedback: { ...evaluation.feedback,
           feedbackRef: evaluation.feedbackRef, feedbackVersion: evaluation.feedbackVersion, feedbackHash: evaluation.feedbackHash, challengeAllowed: true } } as Prisma.InputJsonValue,
         metadata: { aiFeedbackRef: evaluation.feedbackRef, aiFeedbackVersion: evaluation.feedbackVersion }
-      }, tx);
+      }, tx, synchronizeShared);
     } else result = await recordActivityAttemptAiFeedback(user, courseId, { attemptId: attempt.id, ...evaluation }, tx);
     await recordAiFeedbackResearchEvent({ eventType: "grade_feedback_recorded", courseId, groupId: context.groupId,
       activityId: entry.activityId, attemptId: attempt.id, actorUserId: user.id, pluginKey: entry.activityTypeKey,
@@ -172,7 +172,7 @@ async function resolveBatchGuidance(input: {
     }
     return {
       coreAttemptId: templateAttemptId,
-      submission: await teacherReview.getSubmission(reviewContext),
+      submission: await (batchGrading.getTemplateSubmission ?? teacherReview.getSubmission)(reviewContext),
       feedback: review.feedback
     };
   }));

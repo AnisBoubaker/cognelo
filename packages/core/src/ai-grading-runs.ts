@@ -5,6 +5,8 @@ import { assertCanGradeGroup, assertCanViewCourseGradebook } from "./authorizati
 import { getActivityAttemptRegradeContexts } from "./gradebook";
 import { AppError, notFound } from "./errors";
 import { prepareAiGradingAttempt, commitPreparedAiGrading, type PreparedAiGrading, type AiGradingGuidance } from "./ai-grading-preparation";
+import { resolvePluginSharedGrading } from "@cognelo/activity-sdk/server";
+import { synchronizeActivitySharedGrading } from "./gradebook";
 
 type AiGradingRun = Prisma.AiGradingRunGetPayload<Record<string, never>>;
 const LEASE_MS = 45_000;
@@ -145,7 +147,10 @@ export async function actOnAiGradingRun(user: CurrentUser, courseId: string, id:
       if (action !== "discard") {
         for (const entry of items.filter(item => item.status === "completed").sort((a, b) => a.attemptId.localeCompare(b.attemptId))) {
           if (!entry.prepared) throw stopped();
-          await commitPreparedAiGrading(user, courseId, entry.prepared, tx);
+          await commitPreparedAiGrading(user, courseId, entry.prepared, tx, false);
+        }
+        for (const entry of items.filter(item => item.status === "completed").sort((a, b) => a.attemptId.localeCompare(b.attemptId))) {
+          if (entry.prepared && resolvePluginSharedGrading(entry.prepared.activityTypeKey)) await synchronizeActivitySharedGrading(user, courseId, entry.attemptId, tx);
         }
       }
       await tx.courseAuditEvent.create({ data: { courseId, actorUserId: user.id, eventType: action === "discard" ? "ai_grading_run_discarded" : "ai_grading_run_kept",

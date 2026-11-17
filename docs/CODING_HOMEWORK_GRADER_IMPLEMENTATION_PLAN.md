@@ -5,6 +5,10 @@ This plan describes the phased implementation of the new Coding Homework Grader 
 
 The [approved November 1, 2026 workflow](CODING_HOMEWORK_SUBMISSION_WORKFLOW.md) is implemented for local testing: persistent individual-file/ZIP preparation, private solution-derived static validation, prepared reusable material references, manual submission opening, immutable hand-in, bounded durable generation, explicit SEB/timed answering and teacher cancellation. See the [progress record](CODING_HOMEWORK_IMPLEMENTATION_PROGRESS.md) for exact acceptance runs and remaining final checks. Historical phases below describe the prior pipeline where they conflict with the approved workflow.
 
+## Current grading delivery
+
+The November 16 scope adds optional whole-project code and generic per-answer rubric grading, generated rubrics with separate guidance/directions, teacher-triggered AI/manual review, shared team code grades with individual overrides, completion-aware release and sanitized student reports. Test generation/execution follows later, targeting selected required functions. [Grading](../packages/plugin-activities/plugin-coding-homework-grader/docs/GRADING.md) owns current details; older phase boundaries below remain historical.
+
 ## Source Material
 
 This plan is based on:

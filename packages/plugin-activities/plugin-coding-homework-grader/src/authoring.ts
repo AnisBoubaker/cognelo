@@ -1,3 +1,4 @@
+import { homeworkGradingPolicy } from "./rubric";
 import { updateCourseActivitySubmissionStage } from "@cognelo/core";
 import { homeworkWorkflowDraftSchema } from "./workflow-contract";
 import { homeworkQuestionsEnabled } from "./question-policy";
@@ -166,6 +167,7 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
       await lockHomeworkSettings(transaction, owner.ownerId);
       const current = await transaction.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: owner.ownerId } });
       const protectedSettings = normalizeObject(current?.settings);
+      if (assignment.settings.grading === undefined && protectedSettings.grading !== undefined) assignment.settings.grading = protectedSettings.grading;
       if (assignment.settings.questionGenerationEnabled === undefined && protectedSettings.questionGenerationEnabled !== undefined) assignment.settings.questionGenerationEnabled = protectedSettings.questionGenerationEnabled;
       const questionModeChanged = homeworkQuestionsEnabled(assignment.settings) !== homeworkQuestionsEnabled(protectedSettings);
       if (questionModeChanged || (assignment.settings.separateTeamQuestions === true) !== (protectedSettings.separateTeamQuestions === true)) {
@@ -177,7 +179,8 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
         await updateCourseActivitySubmissionStage(scope, "files", { enabled: false }, transaction);
         await updateCourseActivitySubmissionStage(scope, "questions", { enabled: false }, transaction);
       }
-      for (const key of workflowSettingKeys) { delete assignment.settings[key]; if (protectedSettings[key] !== undefined) assignment.settings[key] = protectedSettings[key]; }
+      for (const key of [...workflowSettingKeys, "gradingRubricGuidance", "gradingBatchInstructions"]) { delete assignment.settings[key]; if (protectedSettings[key] !== undefined) assignment.settings[key] = protectedSettings[key]; }
+      validateHomeworkGradingSettings(assignment.settings);
       if (protectedSettings.submissionsEnabled) {
         const currentRequirements = await transaction.pluginCodingHomeworkSubmissionRequirementSet.findUnique({ where: { activityId: owner.ownerId } });
         if (contentIndexRevision(currentRequirements?.requirements) !== contentIndexRevision(requirements)) throw new AppError(409, "HOMEWORK_REQUIREMENTS_LOCKED", "Disable submissions before changing requirements.");
@@ -217,6 +220,10 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
       const saved = normalizeObject(current?.settings).questionGenerationEnabled;
       if (typeof saved === "boolean") assignment.settings.questionGenerationEnabled = saved;
     }
+    const previousBank = await transaction.pluginBankCodingHomeworkAssignment.findUnique({ where: { bankActivityId: owner.ownerId }, select: { settings: true } });
+    if (assignment.settings.grading === undefined && normalizeObject(previousBank?.settings).grading !== undefined) assignment.settings.grading = normalizeObject(previousBank?.settings).grading;
+    for (const key of ["gradingRubricGuidance", "gradingBatchInstructions"]) if (normalizeObject(previousBank?.settings)[key] !== undefined) assignment.settings[key] = normalizeObject(previousBank?.settings)[key];
+    validateHomeworkGradingSettings(assignment.settings);
     await transaction.pluginBankCodingHomeworkAssignment.upsert({
       where: { bankActivityId: owner.ownerId },
       create: {
@@ -246,6 +253,11 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
   }, { timeout: 30_000 });
 
   return getCodingHomeworkAuthoring(owner);
+}
+
+function validateHomeworkGradingSettings(settings: Record<string, unknown>) {
+  const grading = homeworkGradingPolicy(settings);
+  if (grading.enabled && settings.questionGenerationEnabled === false && grading.questionsWeightPercent !== 0) throw new AppError(400, "HOMEWORK_GRADING_WEIGHTS_INVALID", "Question-answer points must be zero when questions are disabled.");
 }
 
 export async function uploadCodingHomeworkAssignmentPdf(owner: OwnerContext, input: unknown) {

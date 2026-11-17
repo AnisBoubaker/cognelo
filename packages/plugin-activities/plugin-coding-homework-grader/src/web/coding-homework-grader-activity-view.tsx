@@ -1,5 +1,8 @@
 "use client";
 import { HelpLabel } from "@cognelo/activity-ui";
+import { HomeworkRubricEditor } from "./homework-rubric-editor";
+import { defaultHomeworkGrading, homeworkGradingSchema, objectRecord, type HomeworkGradingPolicy } from "../rubric";
+import { homeworkRubricCopy } from "./rubric-copy";
 
 import { useHomeworkWorkflowDraft } from "./homework-workflow-draft";
 import { homeworkWorkflowCopy } from "./workflow-copy";
@@ -95,6 +98,7 @@ type SubmissionClient = {
 };
 
 type CodingHomeworkGraderActivityViewProps = {
+  authoringGradingPortalTarget?: HTMLElement | null;
   activity: RenderableActivity;
   activityFileUrl?: (attachmentId: string) => string;
   providedFilesUrl?: string;
@@ -173,6 +177,7 @@ export function CodingHomeworkGraderActivityView(props: CodingHomeworkGraderActi
   return <LegacyCodingHomeworkActivityView {...props} />;
 }
 function LegacyCodingHomeworkActivityView({
+  authoringGradingPortalTarget,
   activity,
   activityFileUrl,
   providedFilesUrl,
@@ -205,6 +210,8 @@ function LegacyCodingHomeworkActivityView({
   const [description, setDescription] = useState(activity.description);
   const [assignment, setAssignment] = useState<CodingHomeworkAssignmentRecord>(() => defaultAuthoring(activity).assignment);
   const questionsEnabled = homeworkQuestionsEnabled(assignment.settings);
+  const gradingPolicy = (assignment.settings.grading ?? defaultHomeworkGrading(questionsEnabled)) as HomeworkGradingPolicy;
+  const gradingValid = homeworkGradingSchema.safeParse(gradingPolicy).success && (!gradingPolicy.enabled || questionsEnabled || gradingPolicy.questionsWeightPercent === 0);
   const [assignmentPdf, setAssignmentPdf] = useState<CodingHomeworkAttachmentRecord | null>(null);
   const [requirementDraft, setRequirementDraft] = useState<RequirementDraft>(() => requirementsToDraft(defaultRequirements));
   const [requirementsUpload, setRequirementsUpload] = useState<CodingHomeworkAttachmentRecord | null>(null);
@@ -412,6 +419,7 @@ function LegacyCodingHomeworkActivityView({
 
       setSaving(true);
       try {
+        if (!gradingValid) throw new Error(homeworkRubricCopy(locale).invalid);
         const requirements = draftToRequirements(requirementDraft, assignment.languageKey);
         const saved = savedSnapshotRef.current ? JSON.parse(savedSnapshotRef.current) as { assignment: CodingHomeworkAssignmentRecord } : null;
         const workflowInput = workflowChanges(saved ? homeworkQuestionsEnabled(saved.assignment.settings) !== questionsEnabled : false);
@@ -451,7 +459,7 @@ function LegacyCodingHomeworkActivityView({
         setSaving(false);
       }
     },
-    [activity.config, activity.id, applyAuthoring, assignment, authoringClient, copy.saveError, copy.saved, description, notifications, onSave, requirementDraft, title, questionsEnabled, workflowChanges, acceptWorkflowSaved]
+    [activity.config, activity.id, applyAuthoring, assignment, authoringClient, copy.saveError, copy.saved, description, notifications, onSave, requirementDraft, title, questionsEnabled, workflowChanges, acceptWorkflowSaved, gradingValid, locale]
   );
 
   useUnsavedChangesGuard(
@@ -737,7 +745,32 @@ function LegacyCodingHomeworkActivityView({
 
       />;
 
+  const editActions = <EditActionBar
+        isDirty={hasUnsavedChanges}
+        isSaving={saving}
+        savedLabel={actionCopy.saved}
+        unsavedLabel={actionCopy.unsaved}
+        saveLabel={copy.save}
+        savingLabel={actionCopy.saving}
+        cancelLabel={actionCopy.cancel}
+        onCancel={discardChanges}
+        onSave={() => saveHomework()}
+        saveDisabled={!gradingValid || !authoringClient || !onSave || Boolean(workflowRequest && !workflow.draft)}
+      />;
+  const gradingEditor = !loading && <div className="stack"><HomeworkRubricEditor key={activity.id} policy={gradingPolicy} locale={locale} questionsEnabled={questionsEnabled}
+    disabled={saving} title={title} prompt={assignment.promptMarkdown} request={solutionRequest ?? workflowRequest}
+    guidance={objectRecord(assignment.settings.gradingRubricGuidance)}
+    onChange={grading => setAssignment(current => ({ ...current, settings: { ...current.settings, grading } }))}
+    onGuidanceSaved={(kind, guidance) => {
+      setAssignment(current => ({ ...current, settings: { ...current.settings, gradingRubricGuidance: { ...objectRecord(current.settings.gradingRubricGuidance), [kind]: guidance } } }));
+      if (savedSnapshotRef.current) {
+        const saved = JSON.parse(savedSnapshotRef.current);
+        saved.assignment.settings.gradingRubricGuidance = { ...objectRecord(saved.assignment.settings.gradingRubricGuidance), [kind]: guidance };
+        savedSnapshotRef.current = serializeSnapshot(saved);
+      }
+    }} />{editActions}</div>;
   return <>
+    {authoringGradingPortalTarget ? createPortal(gradingEditor, authoringGradingPortalTarget) : authoringGradingPortalTarget === undefined ? gradingEditor : null}
     <div className="settings-layout homework-authoring-layout">
       <SideNavigation ariaLabel={editor.navigation} items={authoringTabs.map(id => ({ id, label: editor[id], isActive: authoringTab === id }))}
         tabs={{ idPrefix: "homework-editor", panelId: "homework-authoring-panel", onSelect: id => setAuthoringTab(id as typeof authoringTab) }} />
@@ -842,7 +875,8 @@ function LegacyCodingHomeworkActivityView({
           </div>
           </section>
           <section className="stack" hidden={authoringTab !== "questions"}><HelpLabel help={questionPolicyLocked ? editor.locked : questionsEnabled ? editor.modeChange : editor.disabledHelp}><h2>{editor.questions}</h2></HelpLabel>
-            <ToggleSwitch locale={locale} label={editor.enabled} checked={questionsEnabled} disabled={loading || saving || questionPolicyLocked} onChange={questionGenerationEnabled => { setAssignment(current => ({ ...current, settings: { ...current.settings, questionGenerationEnabled } })); }} />
+            <ToggleSwitch locale={locale} label={editor.enabled} checked={questionsEnabled} disabled={loading || saving || questionPolicyLocked} onChange={questionGenerationEnabled => { setAssignment(current => ({ ...current, settings: { ...current.settings, questionGenerationEnabled,
+              ...(!questionGenerationEnabled && current.settings.grading ? { grading: { ...objectRecord(current.settings.grading), codeWeightPercent: 100, questionsWeightPercent: 0 } } : {}) } })); }} />
 
             <div className="stack" hidden={!questionsEnabled}>
               <div className="settings-grid">
@@ -907,18 +941,7 @@ function LegacyCodingHomeworkActivityView({
               preflight={<PreflightPanel copy={copy} disabled={hasUnsavedChanges} preflightResult={preflightResult} runningPreflight={runningPreflight} onUpload={runPreflight} />} />
           </section>}
           <div hidden={authoringTab === "simulation"}>
-      <EditActionBar
-        isDirty={hasUnsavedChanges}
-        isSaving={saving}
-        savedLabel={actionCopy.saved}
-        unsavedLabel={actionCopy.unsaved}
-        saveLabel={copy.save}
-        savingLabel={actionCopy.saving}
-        cancelLabel={actionCopy.cancel}
-        onCancel={discardChanges}
-        onSave={() => saveHomework()}
-        saveDisabled={!authoringClient || !onSave || Boolean(workflowRequest && !workflow.draft)}
-      />
+      {editActions}
           </div>
         </form>
       </div>
