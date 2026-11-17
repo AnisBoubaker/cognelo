@@ -2,6 +2,7 @@
 import { HelpLabel, HelpTooltip } from "@cognelo/activity-ui";
 
 import { useActivityStudentActions } from "@/lib/use-activity-student-actions";
+import { useActivityBatchActions } from "@/lib/use-activity-batch-actions";
 import { WorkInspectionDialog } from "@/components/work-inspection-dialog";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { ActivityLogs } from "@/components/activity-logs";
@@ -224,6 +225,7 @@ export default function GradebookActivityResultsPage() {
   const activityActions = getGradebookActivityActions(activityTypeKey);
   const pluginActions = useGradebookPluginActions(courseId, activityId, activityTypeKey, groupId, gradebook);
   const studentActions = useActivityStudentActions(courseId, activityId, groupId, refresh);
+  const batchActions = useActivityBatchActions(courseId, activityId, groupId, refresh);
   const isSummativeActivity = (rows[0]?.assessmentMode ?? gradebook?.items[0]?.assessmentMode) === "summative";
   const canManageCourse = Boolean(course?.permissions?.canManageCourse);
   const hasMessagingPermission = Boolean(
@@ -895,6 +897,7 @@ export default function GradebookActivityResultsPage() {
                 <AppIcon name="download" />{t("answerExport.title")}
               </button> : null}
               {pluginActions.actions.filter(action => action.scope === "activity").map(action => <button className="button secondary" key={action.id} disabled={pluginActions.busy || !action.participantIds.length} type="button" onClick={() => void pluginActions.download(action)}><AppIcon name="download" />{action.labels[locale] ?? action.labels.en}</button>)}
+              {batchActions.actions.map(action => <button className="button danger" key={action.id} disabled={batchActions.busy || !action.participantIds.length} type="button" onClick={() => void batchActions.execute(action)}><AppIcon name={action.icon === "cancel" ? "close" : "refresh"} />{action.labels[locale] ?? action.labels.en}</button>)}
               <Link className="button secondary activity-report-back" href={backHref}>
                 <AppIcon name="back" />
                 {backLabel}
@@ -1179,6 +1182,7 @@ export default function GradebookActivityResultsPage() {
 
         {pluginActions.progress}
         {studentActions.progress}
+        {batchActions.progress}
         {answerExportTarget ? <AnswerExportDialog courseId={courseId} activityId={activityId} activityTitle={activityTitle} groupId={groupId} participantId={answerExportTarget.participantId} onClose={() => setAnswerExportTarget(null)} /> : null}
         {submissionDeletionRow ? (
           <DeleteSubmissionDialog

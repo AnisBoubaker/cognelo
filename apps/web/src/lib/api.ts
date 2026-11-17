@@ -1,5 +1,5 @@
 import type { GradebookActionDefinition } from "@cognelo/activity-sdk";
-import type { ActivityLogCursor, ActivityLogPage, ActivityStudentActionList } from "@cognelo/contracts";
+import type { ActivityLogCursor, ActivityLogPage, ActivityStudentActionList, ActivityBatchActionList } from "@cognelo/contracts";
 import type { WorkInspection, WorkInspectionFile } from "@cognelo/contracts";
 import type { SubmissionStagePolicies } from "@cognelo/contracts";
 import type { SubmissionStageDefinition } from "@cognelo/activity-sdk";
@@ -2018,6 +2018,8 @@ export const api = {
   inspectActivityWorkFile: (courseId: string, activityId: string, groupId: string, participantId: string, file: string, signal?: AbortSignal) =>
     request<WorkInspectionFile>(`/courses/${courseId}/gradebook/activities/${activityId}/work-in-progress?${new URLSearchParams({ groupId, participantId, file })}`, { signal }),
   activityStudentActions: (courseId: string, activityId: string, groupId?: string, signal?: AbortSignal) => request<ActivityStudentActionList>(`/courses/${courseId}/gradebook/activities/${activityId}/student-actions${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ""}`, { signal }),
+  activityBatchActions: (courseId: string, activityId: string, groupId?: string, signal?: AbortSignal) => request<ActivityBatchActionList>(`/courses/${courseId}/gradebook/activities/${activityId}/activity-actions${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ""}`, { signal }),
+  executeActivityBatchAction: (courseId: string, activityId: string, input: { actionId: string; reason: string; revision: string; operationId: string; groupId?: string }) => request<{ completed: boolean; affectedCount: number }>(`/courses/${courseId}/gradebook/activities/${activityId}/activity-actions`, { method: "POST", body: JSON.stringify(input) }),
   executeActivityStudentAction: (courseId: string, activityId: string, input: { actionId: string; targetId: string; participantId: string; groupId: string; reason: string }) => request<{ completed: boolean }>(`/courses/${courseId}/gradebook/activities/${activityId}/student-actions`, { method: "POST", body: JSON.stringify(input) }),
   downloadGradebookPluginAction: async (courseId: string, activityId: string, input: { actionId: string; groupId?: string; participantId?: string }, signal: AbortSignal) => {
     const path = `/courses/${courseId}/gradebook/activities/${activityId}/plugin-actions`;

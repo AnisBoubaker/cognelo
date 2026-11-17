@@ -14,11 +14,11 @@ async function withdraw(tx: Prisma.TransactionClient, scope: HomeworkTeacherScop
     if (attempt) await deleteActivitySubmission(scope.user, scope.courseId, { attemptId, reason }, { allowStartedReplacement: true, transaction: tx });
   }
 }
-export async function cancelTeamHomeworkSubmission(scope: HomeworkTeacherScope, workspaceId: string, reason: string, expectedSourceId: string) {
+export async function cancelTeamHomeworkSubmission(scope: HomeworkTeacherScope, workspaceId: string, reason: string, expectedSourceId: string, transaction?: Prisma.TransactionClient) {
   const initial = await prisma.pluginCodingHomeworkWorkspace.findFirst({ where: { id: workspaceId, activityId: scope.activityId, courseId: scope.courseId } });
   if (!initial) throw new AppError(404, "HOMEWORK_SUBMISSION_NOT_FOUND", "The shared submission was not found.");
   await assertCanGradeGroup(scope.user, scope.courseId, initial.groupId);
-  await coreDb.$transaction(async tx => {
+  const cancel = async (tx: Prisma.TransactionClient) => {
     await lockActivityTeamwork(tx, scope.activityId); await lockStudentGroupingWorkspaces(tx, initial.groupingId);
     const sql = teamworkTransaction(tx);
     const [workspace] = await sql.query<HomeworkWorkspaceRow[]>`SELECT * FROM "PluginCodingHomeworkWorkspace" WHERE id=${workspaceId} FOR UPDATE`;
@@ -31,7 +31,8 @@ export async function cancelTeamHomeworkSubmission(scope: HomeworkTeacherScope, 
     await sql.execute`UPDATE "PluginCodingHomeworkSubmission" SET status='cancelled', metadata=metadata || ${JSON.stringify({ cancellation: { cancelledAt: new Date().toISOString(), cancelledBy: scope.user.id, reason } })}::jsonb,"updatedAt"=NOW() WHERE id=${workspace.currentSubmissionId}`;
     await sql.execute`UPDATE "PluginCodingHomeworkWorkspace" SET "currentSubmissionId"=NULL,"preparationStartedAt"=NULL,revision=revision+1,"updatedAt"=NOW() WHERE id=${workspace.id}`;
     await auditHomeworkWorkspace(sql, workspace, scope.user, "submission_cancelled", { metadata: { reason, submissionId: workspace.currentSubmissionId, affectedMembers: members.length } });
-  }, { timeout: 30_000 });
+  };
+  if (transaction) await cancel(transaction); else await coreDb.$transaction(cancel, { timeout: 30_000 });
   return { cancelled: true, team: Boolean(initial.teamId) };
 }
 export async function resetHomeworkStudentChallenges(scope: HomeworkTeacherScope, submissionId: string, reason: string) {

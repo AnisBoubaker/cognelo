@@ -3,7 +3,7 @@ export * from "./gradebook-actions";
 import type { SubmissionExportHandler } from "./submission-export";
 export * from "./submission-export";
 import type { ActivityStudentProgress, CurrentUser } from "@cognelo/contracts";
-import type { ActivityLogCursor, ActivityLogEvidence, ActivityStudentActionList } from "@cognelo/contracts";
+import type { ActivityLogCursor, ActivityLogEvidence, ActivityStudentActionList, ActivityBatchAction } from "@cognelo/contracts";
 import type { GradebookActionContext } from "./gradebook-actions";
 import type { WorkInspectionFile, WorkInspectionSection } from "@cognelo/contracts";
 import type { GradebookActionParticipant } from "./gradebook-actions";
@@ -408,6 +408,11 @@ export type ServerActivityPlugin = {
     studentActions?: {
       list: (context: GradebookActionContext & { recoverAutomatic: boolean }) => Promise<ActivityStudentActionList>;
       execute: (context: GradebookActionContext & { actionId: string; targetId: string; reason: string }) => Promise<void>;
+    };
+    activityActions?: {
+      list: (context: GradebookActionContext) => Promise<ActivityBatchAction[]>;
+      /** Must revalidate the revision and publish the operation receipt atomically with its changes. */
+      execute: (context: GradebookActionContext & { actionId: string; reason: string; revision: string; operationId: string; requestHash: string }) => Promise<{ affectedCount: number }>;
     };
   };
   /** Batch, read-only projection. Host supplies only its authorized student roster. */

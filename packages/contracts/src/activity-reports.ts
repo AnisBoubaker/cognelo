@@ -13,3 +13,8 @@ export type ActivityStudentAction = {
   icon: "cancel" | "reset";
 };
 export type ActivityStudentActionList = { actions: ActivityStudentAction[]; issues: string[] };
+export type ActivityBatchAction = {
+  id: string; icon: "cancel" | "reset"; revision: string; participantIds: string[];
+  labels: Record<string, string>; messages: Record<string, string>; reasonLabels: Record<string, string>;
+};
+export type ActivityBatchActionList = { actions: ActivityBatchAction[] };

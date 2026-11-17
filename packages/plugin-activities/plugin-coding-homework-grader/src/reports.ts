@@ -1,3 +1,4 @@
+import { homeworkBatchActions } from "./batch-actions";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import type { ActivityLogEvidence, ActivityStudentAction } from "@cognelo/contracts";
 import { prisma } from "./db-client";
@@ -10,6 +11,7 @@ import { homeworkWorkflowCopy } from "./web/workflow-copy";
 const localized = (field: keyof ReturnType<typeof homeworkWorkflowCopy>) => Object.fromEntries((["en", "fr", "zh", "ar"] as const).map(locale => [locale, homeworkWorkflowCopy(locale)[field]]));
 export const homeworkReports: NonNullable<ServerActivityPlugin["reports"]> = {
   activityTypeKeys: ["coding-homework-grader"],
+  activityActions: homeworkBatchActions,
   studentActions: {
     async list(context) {
       const scope = { user: context.user, courseId: context.courseId, activityId: context.activity.id };

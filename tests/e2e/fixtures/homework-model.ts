@@ -47,7 +47,7 @@ export async function homeworkModelFixture(data: Pick<ActivitySuiteData, "course
     const connection = await prisma.aiAgentConnection.create({ data: { displayName: `Homework fixture ${data.token}`, provider: options.provider ?? "openai", model: "synthetic-model", ownerId: owner.user.id, baseUrl: `http://127.0.0.1:${(server.address() as { port: number }).port}/v1`, apiKey: encryptCredential("synthetic-test-key") } });
     await prisma.user.update({ where: { id: owner.user.id }, data: { metadata: { e2e: true, aiPreferences: { questionAuthoringAiAgentConnectionId: connection.id } } } });
     const release = () => { hold = false; waiting.splice(0).forEach(resolve => resolve()); };
-    return { connection, api: owner.api, page: owner.page, requests, starts, embeddingTexts, get active() { return active; }, get maximum() { return maximum; }, release,
+    return { connection, api: owner.api, page: owner.page, requests, starts, embeddingTexts, get active() { return active; }, get maximum() { return maximum; }, release, failNext(count: number) { failures = count; },
       async close() { release(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await owner.close(); }
     };
   } catch (error) { server.closeAllConnections(); server.close(); await owner.close(); throw error; }

@@ -5,18 +5,18 @@ import { normalizeHomeworkPath } from "./file-preparation";
 import { homeworkGradebookActions } from "./gradebook-action-definitions";
 import { submittedWorkZipResponse, type SubmittedZipWork } from "./submitted-work";
 
-type Target = { participantId: string; submissionId: string; groupId: string; userId: string; questionsEnabled: boolean; team: boolean };
+export type HomeworkReportTarget = { workspaceId?: string | null; sharedSourceId?: string | null; workspaceMemberId?: string | null; coreAttemptId?: string | null; participantId: string; submissionId: string; groupId: string; userId: string; questionsEnabled: boolean; team: boolean };
 /** Private hand-in state is interpreted here, including hand-ins with no core attempt yet. */
-export async function currentHomeworkReportTargets(context: GradebookActionContext): Promise<Target[]> {
+export async function currentHomeworkReportTargets(context: GradebookActionContext, database: Pick<typeof prisma, "$queryRaw"> = prisma): Promise<HomeworkReportTarget[]> {
   const roster = context.participants.filter(person => person.userId);
   if (!roster.length) return [];
-  return prisma.$queryRaw<Target[]>`
+  return database.$queryRaw<HomeworkReportTarget[]>`
     WITH authorized AS (SELECT * FROM unnest(${roster.map(p => p.participantId)}::text[],${roster.map(p => p.groupId)}::text[],${roster.map(p => p.userId)}::text[]) AS p("participantId","groupId","userId")),
     latest AS (SELECT DISTINCT ON (p."participantId") p."participantId",s.id AS "submissionId",s."groupId",s."userId",s.status,s."workspaceId",s."workspaceMemberId",s."sharedSourceId",s."coreAttemptId",
       s.metadata ? 'deletion' AS deleted, s.metadata
       FROM authorized p JOIN "PluginCodingHomeworkSubmission" s ON s."groupId"=p."groupId" AND s."userId"=p."userId" AND s."activityId"=${context.activity.id} AND s.kind='final'
       ORDER BY p."participantId",s."createdAt" DESC,s.id DESC)
-    SELECT l."participantId",l."submissionId",l."groupId",l."userId",coalesce(l.metadata->>'questionGenerationEnabled','true')<>'false' AS "questionsEnabled",w."teamId" IS NOT NULL AS team FROM latest l
+    SELECT l."participantId",l."submissionId",l."groupId",l."userId",l."workspaceId",l."sharedSourceId",l."workspaceMemberId",l."coreAttemptId",coalesce(l.metadata->>'questionGenerationEnabled','true')<>'false' AS "questionsEnabled",w."teamId" IS NOT NULL AS team FROM latest l
       LEFT JOIN "ActivityAttempt" a ON a.id=l."coreAttemptId"
       LEFT JOIN "PluginCodingHomeworkWorkspace" w ON w.id=l."workspaceId"
       LEFT JOIN "PluginCodingHomeworkWorkspaceMember" m ON m.id=l."workspaceMemberId"

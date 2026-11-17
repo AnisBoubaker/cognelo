@@ -1,7 +1,7 @@
 import { homeworkQuestionsEnabled } from "./question-policy";
 import { readHomeworkSubmissionTiming } from "./submission-policy";
 import { z } from "zod";
-import { prisma as coreDb } from "@cognelo/db";
+import { prisma as coreDb, type Prisma as CorePrisma } from "@cognelo/db";
 import { AppError, assertCanManageCourse, assertCanGradeGroup, deleteActivitySubmission } from "@cognelo/core";
 import { prisma } from "./db-client";
 import { record, lockHomeworkWorkflow } from "./file-preparation";
@@ -19,13 +19,13 @@ export async function listHomeworkSubmissions(scope: HomeworkTeacherScope, group
     status: job?.status === "failed" && submission.status !== "cancelled" ? "failed" : submission.status, createdAt: submission.createdAt.toISOString(), started: Boolean(record(submission.metadata).assessmentStartedAt),
     processingError: submission.processingError ?? (job?.status === "failed" && typeof record(job.error).message === "string" ? record(job.error).message as string : null), cancelled: submission.status === "cancelled" || Boolean(record(submission.metadata).deletion) }; }) };
 }
-export async function cancelHomeworkSubmission(scope: HomeworkTeacherScope, input: unknown) {
+export async function cancelHomeworkSubmission(scope: HomeworkTeacherScope, input: unknown, transaction?: CorePrisma.TransactionClient) {
   const data = z.object({ submissionId: z.string().min(1), reason: z.string().trim().min(1).max(2000) }).strict().parse(input);
   const submission = await prisma.pluginCodingHomeworkSubmission.findFirst({ where: { id: data.submissionId, activityId: scope.activityId, kind: { in: ["final", "team_source"] } } });
   if (!submission) throw new AppError(404, "HOMEWORK_SUBMISSION_NOT_FOUND", "The submission was not found.");
   await assertCanGradeGroup(scope.user, scope.courseId, submission.groupId);
-  if (submission.workspaceId) return (await import("./team-management")).cancelTeamHomeworkSubmission(scope, submission.workspaceId, data.reason, submission.kind === "team_source" ? submission.id : submission.sharedSourceId!);
-  await coreDb.$transaction(async tx => {
+  if (submission.workspaceId) return (await import("./team-management")).cancelTeamHomeworkSubmission(scope, submission.workspaceId, data.reason, submission.kind === "team_source" ? submission.id : submission.sharedSourceId!, transaction);
+  const cancel = async (tx: CorePrisma.TransactionClient) => {
     await lockHomeworkWorkflow(tx, { activityId: scope.activityId, groupId: submission.groupId, user: { id: submission.userId } as typeof scope.user });
     const [current] = await tx.$queryRaw<Array<{ metadata: unknown; status: string; coreAttemptId: string | null }>>`SELECT metadata, status, "coreAttemptId" FROM "PluginCodingHomeworkSubmission" WHERE id=${submission.id} FOR UPDATE`;
     if (current.status === "cancelled" || record(current.metadata).deletion) return;
@@ -36,6 +36,7 @@ export async function cancelHomeworkSubmission(scope: HomeworkTeacherScope, inpu
     await tx.backgroundJob.updateMany({ where: { queue: codingHomeworkProcessingQueue, idempotencyKey: `submission:${submission.id}`, status: { in: ["queued", "failed"] } }, data: { status: "cancelled", lockedAt: null, lockedBy: null, completedAt: new Date() } });
     // An in-flight provider request retains its concurrency slot until its worker unwinds.
     await tx.backgroundJob.updateMany({ where: { queue: codingHomeworkProcessingQueue, idempotencyKey: `submission:${submission.id}`, status: "running" }, data: { status: "cancelled", completedAt: new Date() } });
-  }, { timeout: 30_000 });
+  };
+  if (transaction) await cancel(transaction); else await coreDb.$transaction(cancel, { timeout: 30_000 });
   return { cancelled: true };
 }
