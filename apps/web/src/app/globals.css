@@ -4218,6 +4218,7 @@ button:hover > .disclosure-indicator {
 
 .activity-settings-error {
   margin-top: 18px;
+  scroll-margin-block: 16px;
 }
 
 .activity-summative-settings {

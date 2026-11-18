@@ -4,6 +4,8 @@ Dismissible dialogs use the shared `DialogHeader` and `DialogCloseButton` from `
 
 The header stays at the top of the dialog's scroll area. Ordinary dialogs use a sticky heading; settings and chat keep their heading outside an independently scrolling body. Dialog padding is described by `--dialog-padding` so the sticky surface remains flush with the panel on desktop and mobile. Keep long messages, forms, and results in the scrolling content, rather than in the sticky heading.
 
+Activity settings keeps load/save failures at the end of its scrolling content. After failure, scroll the alert into view and focus it so a visible Save action cannot appear to have done nothing. Repeat this for identical retry errors while retaining the active tab and unsaved draft; the shared dialog behavior covers every activity type. See [settings errors](ACTIVITY_ASSIGNMENT_EXCEPTIONS.md).
+
 ## Review and grade
 
 The review workspace has one accessible dialog containing both its action bar and scrolling panel. Previous student, student position, Next student, Activity messages, and the close cross share one compact row above the content. The bar can use the available width instead of stacking Activity messages below navigation. At narrow widths, the action labels yield to icons; localized accessible names and tooltips remain.

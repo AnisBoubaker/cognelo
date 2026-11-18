@@ -12,7 +12,7 @@ import { getActivityDefinition } from "@cognelo/activity-sdk";
 import "@cognelo/plugin-registry/activity";
 import type { ActivityAssignmentOverrideField, AssignedActivityAssessmentMode } from "@cognelo/contracts";
 import { useBodyScrollLock, useDialogs } from "@cognelo/activity-ui";
-import { FormEvent, useEffect, useId, useMemo, useState } from "react";
+import { FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { AppIcon } from "@/components/app-icon";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import {
@@ -117,7 +117,8 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
   const [draft, setDraft] = useState<ActivitySettingsDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ message: string } | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const [savedAssessmentMode, setSavedAssessmentMode] = useState<AssignedActivityAssessmentMode | null>(null);
   const isTest = activity.activityType.key === "test";
   const supportsTeamwork = getActivityDefinition(activity.activityType.key)?.supportsTeamwork === true;
@@ -127,7 +128,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setError("");
+    setError(null);
     api.courseActivityAssignmentSettings(courseId, activity.id)
       .then(({ settings }) => {
         if (cancelled) return;
@@ -140,7 +141,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
       })
       .catch((loadError) => {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : t("courseDetail.activitySettingsLoadError"));
+          setError({ message: loadError instanceof Error ? loadError.message : t("courseDetail.activitySettingsLoadError") });
         }
       })
       .finally(() => {
@@ -150,6 +151,12 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
       cancelled = true;
     };
   }, [activity.id, courseId, isTest, t, timeZone, locale]);
+
+  useEffect(() => {
+    if (!error || loading || saving) return;
+    errorRef.current?.focus({ preventScroll: true });
+    errorRef.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
+  }, [error, loading, saving]);
 
   const selectedGroup = useMemo(
     () => draft?.groups.find((group) => group.groupId === selectedGroupId) ?? draft?.groups[0] ?? null,
@@ -220,7 +227,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
       confirmVariant: "danger"
     })) return;
     setSaving(true);
-    setError("");
+    setError(null);
     try {
       const allowedGroupFields = draft.assessmentMode === "summative"
         ? undefined
@@ -299,7 +306,8 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
       await onSaved();
       onClose();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : t("courseDetail.activitySettingsSaveError"));
+      // A new failure object also reveals repeated errors from synchronous validation.
+      setError({ message: saveError instanceof Error ? saveError.message : t("courseDetail.activitySettingsSaveError") });
     } finally {
       setSaving(false);
     }
@@ -540,7 +548,7 @@ export function ActivitySettingsDialog({ activity, courseId, onClose, onSaved }:
                   <p className="muted">{t("courseDetail.activitySettingsComingLater")}</p>
                 </section>
               ) : null}
-              {error ? <p className="error activity-settings-error">{error}</p> : null}
+              {error ? <p className="error activity-settings-error" ref={errorRef} role="alert" tabIndex={-1}>{error.message}</p> : null}
             </div>
           </div>
 

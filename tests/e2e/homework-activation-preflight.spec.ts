@@ -6,7 +6,7 @@ import { createAuthenticatedApi } from "./fixtures/auth";
 import { ensureContentTypePluginEnabled } from "./fixtures/content-plugins";
 import { homeworkModelFixture } from "./fixtures/homework-model";
 
-test("question activation rejects section-hidden references in UI, section assignments and exceptions before releasing files", async ({ bankCourse: data, browser, teacherApi }) => {
+test("question activation rejects section-hidden references in UI, section assignments and exceptions before releasing files", async ({ bankCourse: data, browser, teacherApi }, testInfo) => {
   test.setTimeout(150_000);
   await ensureContentTypePluginEnabled("text-content");
   const model = await homeworkModelFixture(data), api = model.api, page = await model.page(browser), student = await createAuthenticatedApi("student");
@@ -42,9 +42,24 @@ test("question activation rejects section-hidden references in UI, section assig
     await dialog.getByRole("button", { name: "Save settings", exact: true }).click();
     expect((await rejected).status()).toBe(409);
     await expect(dialog).toBeVisible();
-    await expect(page.getByText(/Cannot activate challenge questions: references are hidden/).first()).toContainText(materialTitle);
-    await expect(page.getByText(/Cannot activate challenge questions: references are hidden/).first()).toContainText(data.groupTitle);
+    const error = dialog.getByRole("alert");
+    await expect(error).toContainText(materialTitle);
+    await expect(error).toContainText(data.groupTitle);
+    await expect(error).toBeFocused();
+    await expect(error).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: testInfo.outputPath("activation-error-desktop.png") });
+    // A retry from the top must reveal the same error again on a narrow screen.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await dialog.locator(".activity-settings-content").evaluate(element => { element.scrollTop = 0; });
+    await expect(error).not.toBeInViewport();
+    const repeated = page.waitForResponse(response => response.url().endsWith(settingsPath) && response.request().method() === "POST");
+    await dialog.getByRole("button", { name: "Save settings", exact: true }).click();
+    expect((await repeated).status()).toBe(409);
+    await expect(error).toBeFocused();
+    await expect(error).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: testInfo.outputPath("activation-error-mobile.png") });
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.setViewportSize({ width: 1280, height: 720 });
     expect((await read()).general.submissionStages?.questions.enabled).toBe(false);
     expect((await read()).groups.find(group => group.groupId === data.groupId)?.submissionStages?.questions?.enabled ?? false).toBe(false);
     expect(model.requests).toHaveLength(requests);

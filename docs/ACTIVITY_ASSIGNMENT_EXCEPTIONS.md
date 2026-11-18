@@ -2,6 +2,8 @@
 
 Implemented in the activity settings dialog's **Exceptions** tab. Course managers open the same modal from course content or the **Settings** action on the activity-report page (Class overview or Student results). Saving from a report keeps the selected tab and section context; cancellation discards the draft. Course managers select a section, add teams or individual student enrollments, and check only the settings to replace. Changes, removals, and priority moves share the dialog's ordinary Save/Cancel boundary. The section must be assigned the activity first. Hidden groupings remain eligible exception targets.
 
+Load/save failures appear in a focusable alert after the current settings panel. Once the request finishes, the dialog scrolls that error into view and focuses it, including repeated failures with the same message. The selected tab, unsaved settings and existing close/cancel behavior are retained. This applies to activation rejection and other settings errors across activity types and entry points.
+
 ## Precedence and fields
 
 Resolve each setting independently: **General → section override → matching team exceptions → student exception**. Teachers order team exceptions with the highest priority first. When several matching teams replace the same setting, the first wins; unchecked settings continue inheriting from lower-priority rules. An individual's selected setting always wins over teams, regardless of list position. Explicit null dates/time limits and false switches are replacements, not inheritance.
