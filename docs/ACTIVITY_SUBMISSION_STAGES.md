@@ -33,6 +33,14 @@ New course activities and copies start with explicit inactive stage flags. Histo
 - [x] Shared teacher controls, student inactive actions and localized statuses.
 - [x] Unit/API/E2E regressions, docs and incremental commits.
 
+## Activation readiness
+
+Programming Homework rejects a settings save that would open Questions answering with unprepared references, an invalid generation-model configuration, missing/incompatible stored vectors, revoked private-reference authority, or public references unavailable to learners in an enabled section. The error names materials needing preparation or the material/section visibility conflicts. An attempted activation remains unapplied when the transaction fails; submitted files, timers, answers, grades and jobs retain their previous state.
+
+Core resolves the prospective assigned sections from saved General/section/exception policy inside the settings transaction, including empty sections and configured team/student activation exceptions. Explicitly closed sections are excluded. A new section assignment rechecks readiness even when questions are already active elsewhere. Existing waiting hand-ins with older pinned reference snapshots are checked before their jobs are released. Explicitly prepared private references retain their separate authorization; readiness never makes a hidden material public or silently treats a public reference as private.
+
+The preflight reads stored indexes/vectors and connection configuration without requesting embeddings or generating sample questions. Missing extraction/index preparation therefore blocks opening, including unsupported catalog-only links. It cannot predict later provider outages, credential expiry, visibility changes or model-output failures. Teachers may use Simulation for a real generation rehearsal. Closing stages and the documented closed/unprepared legacy compatibility remain available. See [reference service validation](MATERIAL_EMBEDDING_SERVICES.md#activation-preflight).
+
 ## Accepted behavior
 
 Programming Homework's learner guide explains the applicable numbered stages and shows each stage's activation/progress state, configured maximum duration and effective deadline only when present. File-only work has one step; planned but inactive questions remain a required second step. Before answering, a prominent notice explains the relative clock start and any earlier deadline, with SEB guidance only when the effective policy requires it. Started answering retains its original clock and stays available after deactivation. See [the owning learner guide](../packages/plugin-activities/plugin-coding-homework-grader/docs/REFERENCE.md#student-submission-guide).

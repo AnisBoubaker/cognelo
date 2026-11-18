@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { SubmissionStageActivationChange, SubmissionStageActivationScope, PluginTeamworkTransaction } from "@cognelo/activity-sdk/server";
-import { configuredActivityStageActivations, AppError, NonRetryableBackgroundJobError, lockActivityTeamwork, teamworkTransaction, contentIndexRevision, createCourseEmbeddingProvider, getActivityMaterialReferences, lockCourseMaterialEmbeddingSettings, materialEmbeddingSelectionIdentity, snapshotAiModelSelection, type BackgroundJobRecord } from "@cognelo/core";
+import { assertPreparedActivityReferencesReady, configuredActivityStageActivationGroups, configuredActivityStageActivations, AppError, NonRetryableBackgroundJobError, lockActivityTeamwork, teamworkTransaction, contentIndexRevision, createCourseEmbeddingProvider, getActivityMaterialReferences, lockCourseMaterialEmbeddingSettings, materialEmbeddingSelectionIdentity, snapshotAiModelSelection, type BackgroundJobRecord } from "@cognelo/core";
 import { prisma as coreDb } from "@cognelo/db";
 import { prisma } from "./db-client";
 import { getHomeworkQuestionConnection } from "./ai-selection";
@@ -22,10 +22,21 @@ export async function prepareHomeworkStageActivation(scope: Scope): Promise<Prep
 }
 export async function validateHomeworkQuestionActivation(scope: Scope, settings: Record<string, unknown>, references: Prepared["references"], sql: PluginTeamworkTransaction) {
   const revision = contentIndexRevision({ selected: Array.isArray(settings.referenceMaterialIds) ? settings.referenceMaterialIds : null, preparedId: settings.preparedSnapshotId ?? null, locked: questionStageLocksReferences(settings) });
-  if (!references?.prepared || revision !== references.revision || typeof settings.preparedSnapshotId !== "string") throw new AppError(409, "HOMEWORK_EMBEDDINGS_REQUIRED", "Prepare the saved reference selection before activating challenge questions.");
+  if (!references?.prepared || revision !== references.revision || typeof settings.preparedSnapshotId !== "string") {
+    const missing = references?.selected.filter(id => references.statuses[id]?.state !== "ready").map(id => references.rows.find(row => row.resourceId === id)?.title ?? "Reference material") ?? [];
+    throw new AppError(409, "HOMEWORK_EMBEDDINGS_REQUIRED", `Prepare the saved reference selection before activating challenge questions.${missing.length ? ` Materials needing preparation: ${missing.slice(0, 5).map(title => `“${title}”`).join(", ")}${missing.length > 5 ? `, and ${missing.length - 5} more` : ""}.` : ""}`);
+  }
   await lockCourseMaterialEmbeddingSettings({ $queryRaw: sql.query }, scope.courseId);
   if (!references.locked && references.selected.length && materialEmbeddingSelectionIdentity((await createCourseEmbeddingProvider(scope.user, scope.courseId)).selection) !== references.embedding.identity) throw new AppError(409, "COURSE_EMBEDDING_MODEL_CHANGED", "The course embedding model changed. Prepare the reference selection again.");
+  const groups = await configuredActivityStageActivationGroups({ $queryRaw: sql.query }, scope.activityId, homeworkStageConfiguration(settings), "questions");
+  await assertHomeworkReferenceSnapshotReady(scope, settings.preparedSnapshotId, groups, sql);
   return snapshotAiModelSelection(await getHomeworkQuestionConnection(scope, settings));
+}
+
+async function assertHomeworkReferenceSnapshotReady(scope: Scope, snapshotId: string, groups: ReadonlyArray<{ id: string; title: string }>, sql: PluginTeamworkTransaction) {
+  const [snapshot] = await sql.query<Array<{ metadata: unknown }>>`SELECT metadata FROM "PluginCodingHomeworkDocumentationSnapshot" WHERE id=${snapshotId} AND "activityId"=${scope.activityId} AND "courseId"=${scope.courseId} AND status='ready'`;
+  if (!snapshot) throw new AppError(409, "HOMEWORK_EMBEDDINGS_REQUIRED", "Prepare references before activating challenge questions.");
+  await assertPreparedActivityReferencesReady(scope, record(snapshot.metadata), groups);
 }
 
 /** Called with the activity/settings transaction: no provider call is made here. */
@@ -39,7 +50,7 @@ export async function applyHomeworkStageActivation(input: SubmissionStageActivat
   // An unprepared legacy homework with its old file gate closed must remain editable.
   const preserveClosedLegacy = settings.questionsStageEnabled === undefined && (input.prepared as Prepared | undefined)?.previousQuestionsEnabled === true && !input.enabled.files && typeof settings.preparedSnapshotId !== "string";
   let model: Awaited<ReturnType<typeof validateHomeworkQuestionActivation>> | null = null;
-  if (questionsEnabled && !questionStageLocksReferences(settings) && !preserveClosedLegacy) model = await validateHomeworkQuestionActivation(input, settings, references, sql);
+  if (questionsEnabled && !preserveClosedLegacy) model = await validateHomeworkQuestionActivation(input, settings, references, sql);
   const next = { ...settings, submissionsEnabled: Boolean(input.enabled.files), ...(!preserveClosedLegacy || !questionsEnabled ? { questionsStageEnabled: questionsEnabled } : {}), workflowVersion: 2 };
   await sql.execute`UPDATE "PluginCodingHomeworkAssignment" SET settings=${JSON.stringify(next)}::jsonb,"updatedAt"=NOW() WHERE "activityId"=${input.activityId}`;
 
@@ -62,10 +73,24 @@ export async function applyHomeworkStageActivation(input: SubmissionStageActivat
     for (const member of members) if (await input.isEnabled({ groupId: submission.groupId, userId: member.userId, stageId: "questions" })) return true;
     return false;
   };
+  const checkedSnapshots = new Set<string>();
   for (const submission of submissions) {
     const metadata = record(submission.metadata), sharedChild = submission.kind === "final" && submission.workspaceId && metadata.separateTeamQuestions !== true;
     if (sharedChild) continue;
     const enabled = await current(submission);
+    if (enabled && submission.documentationSnapshotId && submission.documentationSnapshotId !== settings.preparedSnapshotId) {
+      const key = `${submission.documentationSnapshotId}:${submission.groupId}`;
+      if (!checkedSnapshots.has(key)) {
+        const [group] = await sql.query<Array<{ id: string; title: string }>>`SELECT id,title FROM "CourseGroup" WHERE id=${submission.groupId} AND "courseId"=${input.courseId}`;
+        if (!group) throw new AppError(409, "HOMEWORK_SUBMISSION_SCOPE_CHANGED", "The submission section changed. Reload activity settings.");
+        try { await assertHomeworkReferenceSnapshotReady(input, submission.documentationSnapshotId, [group], sql); }
+        catch (error) {
+          if (error instanceof AppError && error.status < 500) throw new AppError(error.status, error.code, `${error.message} A waiting submission retains an earlier reference snapshot. Use “Reset question generation for all students” to apply the current prepared references while keeping submitted files.`, error.details);
+          throw error;
+        }
+        checkedSnapshots.add(key);
+      }
+    }
     if (enabled && (!submission.documentationSnapshotId || !record(metadata.questionGenerationAi).connectionId)) {
       model ??= await validateHomeworkQuestionActivation(input, settings, references, sql);
       const pinned = { ...metadata, questionGenerationAi: model, awaitingStageActivation: false };

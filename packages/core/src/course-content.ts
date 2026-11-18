@@ -96,6 +96,8 @@ type UpdateContentItemInput = {
 type ListContentOptions = ContentScope & {
   visibleOnly?: boolean;
   includeGroupItems?: boolean;
+  /** Teacher preflight using the same material visibility rules as a learner. */
+  learnerVisibility?: boolean;
 };
 
 type CourseContentDb = Pick<
@@ -626,7 +628,7 @@ export async function getContentResourceForPluginRoute(
 
   const mustEnforceVisibility = options.enforceVisibility === true || !(await canManageCourse(user, courseId));
   if (mustEnforceVisibility) {
-    const visible = await listContentItems(user, courseId, { groupId: scope.groupId, visibleOnly: true });
+    const visible = await listContentItems(user, courseId, { groupId: scope.groupId, visibleOnly: true, learnerVisibility: options.enforceVisibility });
     if (!visible.some((item) => item.contentResourceId === contentResourceId)) throw new AppError(404, "CONTENT_RESOURCE_NOT_AVAILABLE", "This content resource is not available.");
   }
 
@@ -780,7 +782,7 @@ async function listScopedContentItems(user: CurrentUser, courseId: string, optio
     ? await prisma.courseGroupContentVisibilityOverride.findMany({ where: { groupId: scope.groupId } })
     : [];
   let effectiveItems = applyGroupVisibilityOverrides(items, overrides);
-  if (!manager && scope.groupId) {
+  if ((!manager || options.learnerVisibility) && scope.groupId) {
     const hidden = await prisma.courseGroupHiddenCourseMaterial.findMany({ where: { groupId: scope.groupId }, select: { courseMaterialId: true } });
     if (hidden.length) {
       const hiddenIds = new Set(hidden.map((entry) => entry.courseMaterialId));

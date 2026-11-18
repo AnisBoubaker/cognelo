@@ -41,7 +41,8 @@ const mockPrisma = vi.hoisted(() => ({
     upsert: vi.fn()
   },
   courseMaterial: {
-    findFirst: vi.fn()
+    findFirst: vi.fn(),
+    findMany: vi.fn()
   }
 }));
 
@@ -124,6 +125,7 @@ describe("course content services", () => {
     mockPrisma.courseContentItem.count.mockResolvedValue(0);
     mockPrisma.courseContentItem.findMany.mockResolvedValue([]);
     mockPrisma.courseGroupContentVisibilityOverride.findMany.mockResolvedValue([]);
+    mockPrisma.courseGroupHiddenCourseMaterial.findMany.mockResolvedValue([]);
     authMocks.canManageCourse.mockResolvedValue(true);
     pluginMocks.assertContentResourcePluginActive.mockResolvedValue(undefined);
     pluginMocks.assertContentTypePluginEnabled.mockResolvedValue(undefined);
@@ -640,6 +642,17 @@ describe("course content services", () => {
     await expect(listContentItems(teacherUser, "course-1", { visibleOnly: true })).resolves.toMatchObject([
       { id: "week-2", effectiveVisibility: "visible" }
     ]);
+  });
+  it("applies legacy hidden-material ancestors when a manager preflights learner visibility", async () => {
+    mockPrisma.courseContentItem.findMany.mockResolvedValue([
+      { id: "lesson", materialId: "child", contentResourceId: "resource", parentId: null, isVisible: true, groupId: null, kind: "material" }
+    ]);
+    mockPrisma.courseGroupHiddenCourseMaterial.findMany.mockResolvedValue([{ courseMaterialId: "parent" }]);
+    mockPrisma.courseMaterial.findMany.mockResolvedValue([{ id: "parent", parentId: null }, { id: "child", parentId: "parent" }]);
+    expect(await listContentItems(teacherUser, "course-1", { groupId: "group-1", visibleOnly: true })).toHaveLength(1);
+    expect(await listContentItems(teacherUser, "course-1", { groupId: "group-1", visibleOnly: true, learnerVisibility: true })).toEqual([]);
+    mockPrisma.courseContentResource.findFirst.mockResolvedValue({ id: "resource", pluginKey: "github-repo-content" });
+    await expect(getContentResourceForPluginRoute(teacherUser, "course-1", "resource", { groupId: "group-1", enforceVisibility: true })).rejects.toMatchObject({ code: "CONTENT_RESOURCE_NOT_AVAILABLE" });
   });
 
   it("lists group content with shared course folders and group-specific items", async () => {

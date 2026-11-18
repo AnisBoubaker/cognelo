@@ -42,6 +42,20 @@ export async function configuredActivityStageActivations(transaction: { $queryRa
   return configuredSubmissionStageActivations(configuration, general, assignments.map(assignment => ({ assigned: true,
     submissionStages: readSubmissionStagePolicies(record(assignment.metadata).submissionStages), exceptions: (Array.isArray(assignment.exceptions) ? assignment.exceptions : []).map(settings => ({ submissionStages: readSubmissionStagePolicies(record(settings).submissionStages) })) })));
 }
+/** Include empty sections and configured exceptions so readiness also covers future participants. */
+export async function configuredActivityStageActivationGroups(transaction: { $queryRaw: PluginTeamworkTransaction["query"] }, activityId: string, configuration: Awaited<ReturnType<typeof getActivitySubmissionStageConfiguration>>, stageId: string) {
+  if (!configuration.stages.some(stage => stage.id === stageId && stage.active)) return [];
+  const [activity] = await transaction.$queryRaw<Array<{ metadata: unknown }>>`SELECT metadata FROM "Activity" WHERE id=${activityId}`;
+  const assignments = await transaction.$queryRaw<Array<{ id: string; title: string; metadata: unknown; exceptions: unknown }>>`SELECT g.id,g.title,ga.metadata,COALESCE(jsonb_agg(e.settings) FILTER (WHERE e.id IS NOT NULL),'[]'::jsonb) AS exceptions
+    FROM "CourseGroupActivity" ga JOIN "CourseGroup" g ON g.id=ga."groupId" JOIN "Activity" a ON a.id=ga."activityId" AND a."courseId"=g."courseId"
+    LEFT JOIN "ActivityAssignmentException" e ON e."groupActivityId"=ga.id WHERE ga."activityId"=${activityId} GROUP BY ga.id,g.id ORDER BY g.id`;
+  const general = mergeSubmissionStagePolicies(configuration.defaults, readSubmissionStagePolicies(record(record(activity?.metadata).allGroupsAssignment).submissionStages));
+  return assignments.filter(assignment => {
+    const section = mergeSubmissionStagePolicies(general, readSubmissionStagePolicies(record(assignment.metadata).submissionStages));
+    return section[stageId]?.enabled !== false || (Array.isArray(assignment.exceptions) ? assignment.exceptions : []).some(settings =>
+      mergeSubmissionStagePolicies(section, readSubmissionStagePolicies(record(settings).submissionStages))[stageId]?.enabled !== false);
+  }).map(({ id, title }) => ({ id, title }));
+}
 /** Neutral tagged SQL supports both core and plugin-owned transactions. */
 export function submissionStageActivationResolver(transaction: { $queryRaw: PluginTeamworkTransaction["query"] }, activityId: string, configuration: Awaited<ReturnType<typeof getActivitySubmissionStageConfiguration>>) {
   return async ({ groupId, userId, stageId }: { groupId: string; userId: string; stageId: string }) => {
