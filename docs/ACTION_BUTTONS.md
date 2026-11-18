@@ -8,6 +8,12 @@ Tabs, sidebar navigation, accordion rows, menu items, editor keys, and floating 
 
 Teacher contextual-help triggers use the compact shared circled-question-mark control after the associated text on the same row. This is an icon-only disclosure, separate from ordinary action buttons. See [contextual help](CONTEXTUAL_HELP.md).
 
+## Activity report actions
+
+Every teacher activity report uses one three-dot **Activity actions** menu for editing, settings, messaging, exports/downloads, class-wide grading and activity-contributed batch operations. The context-sensitive Back link stays visible beside the menu. Class overview, Student results and Logs share the same menu; capability, assessment-mode, role, section, busy and disabled guards stay with the existing handlers. Unsupported operations are omitted.
+
+The host menu uses the shared portaled ContextMenu, with viewport bounds, scrollable overflow and wrapping labels on narrow screens. Arrow keys, Home/End and Tab navigate enabled items, Escape restores trigger focus, and selecting an entry closes the menu before opening its dialog or navigating. Internal menu scrolling must not dismiss it. Destructive entries retain red styling and their existing confirmation/reason flow. Unread message counts remain visible on the trigger and in the existing alert banner.
+
 ## Shared edit bars
 
 `EditActionBar` sizes to its status and controls instead of spanning the whole form. It stays at the physical left side to leave space for the fixed bottom-right Messages launcher, including in right-to-left layouts. Controls wrap within narrow containers; on narrow screens the sticky bar sits above the launcher and respects safe-area insets. Keep the notification location unchanged. Save/discard state, labels, keyboard focus and navigation guards retain their existing behavior.

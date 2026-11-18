@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import { test, expect } from "./fixtures/bank-course";
 import { assignCourseTest, responseJson } from "./fixtures/activity-suite";
@@ -68,7 +69,8 @@ test("Test review saves all drafts, recalculates totals, and warns before leavin
     const stale = (await responseJson<{ review: TestItemTeacherReview }>(await teacherApi.get(reviewPath(children[0].id)))).review;
 
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${created.activity.id}`);
-    await page.getByRole("button", { name: "Review and grade all", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Review and grade all", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Review and grade", exact: true });
     const selectProgram = (number: number) => dialog.getByRole("button", { name: `Activity ${number}: Program ${number}`, exact: true }).click();
     await dialog.getByRole("textbox", { name: "Summary", exact: true }).fill("First reviewed answer.");
@@ -114,7 +116,8 @@ test("Test review saves all drafts, recalculates totals, and warns before leavin
     await expect(dialog.getByRole("textbox", { name: "Summary", exact: true })).toHaveValue("Unsaved closing draft.");
     await dialog.getByRole("textbox", { name: "Summary", exact: true }).fill("Recovered answer reviewed.");
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
-    await page.getByRole("button", { name: "Review and grade all", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Review and grade all", exact: true }).click();
     await expect(dialog.getByRole("textbox", { name: "Summary", exact: true })).toHaveValue("First reviewed answer.");
     await expect(dialog.getByRole("textbox", { name: "Strengths", exact: true })).toHaveValue("Clear expression.");
     await expect(dialog.getByRole("textbox", { name: "Criterion feedback", exact: true })).toHaveValue("Partial rubric credit.");
@@ -138,7 +141,8 @@ test("Test review saves all drafts, recalculates totals, and warns before leavin
     expect(await prisma.courseAuditEvent.count({ where: { courseId: data.courseId, eventType: "test_item_reviewed", targetId: { in: [first.id, recovered.id] } } })).toBe(4);
     const modelEvaluations = await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) FROM "PluginCodingExerciseAiEvaluation" WHERE "coreAttemptId"=${parentId}`;
     expect(Number(modelEvaluations[0].count)).toBe(0);
-    await page.getByRole("button", { name: "Review and grade all", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Review and grade all", exact: true }).click();
     await dialog.getByRole("checkbox", { name: "Override the calculated Test total", exact: true }).check();
     await dialog.getByLabel("Test total", { exact: true }).fill("19");
     await dialog.getByRole("textbox", { name: "Feedback", exact: true }).fill("Overall teacher judgment.");
@@ -217,7 +221,8 @@ test("Test review saves all drafts, recalculates totals, and warns before leavin
     expect(historical.readOnly).toBe(true);
     expect((await teacherApi.patch(reviewPath(children[0].id), { data: { expectedUpdatedAt: historical.updatedAt, expectedFeedbackHash: historical.feedbackHash, score: 0 } })).status()).toBe(409);
     await page.reload();
-    await page.getByRole("button", { name: "Review and grade all", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Review and grade all", exact: true }).click();
     await dialog.getByRole("textbox", { name: "Summary", exact: true }).fill("Unsaved latest submission.");
     await dialog.getByRole("button", { name: "Next", exact: true }).click();
     await confirmation.getByRole("button", { name: "Cancel", exact: true }).click();

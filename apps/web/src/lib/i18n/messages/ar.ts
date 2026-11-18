@@ -1436,6 +1436,7 @@ export const arMessages = {
       renameFolder: "إعادة تسمية {title}",
       renameFolderAction: "إعادة تسمية المجلد",
       contentActions: "إجراءات {title}",
+      activityReportActions: "إجراءات النشاط",
       contentActionsTitle: "إجراءات إضافية",
       contentSettingsAction: "الإعدادات",
       removeContentItem: "حذف {title}",

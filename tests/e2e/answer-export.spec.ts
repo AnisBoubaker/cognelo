@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { unzipSync } from "fflate";
 import { prisma } from "@cognelo/db";
 import { test, expect, ORIGINAL_SOURCE } from "./fixtures/bank-course";
@@ -31,7 +32,8 @@ import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/ap
     expect((await teacherApi.post(endpoint, { data: { ...request, attemptId: "another-students-attempt" } })).status()).toBe(400);
     const before = await prisma.activityAttempt.findMany({ where: { activityId: data.activityId }, orderBy: { id: "asc" } });
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${data.activityId}?report=overview`);
-    await page.getByRole("button", { name: "Export student answers", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Export student answers", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Export student answers", exact: true });
     await expect(dialog.getByLabel("Attempts to include")).toHaveValue("latest");
     await expect(dialog.getByRole("checkbox", { name: "Include the prompt with each answer", exact: true })).toBeChecked();
@@ -47,7 +49,8 @@ import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/ap
     await download.saveAs(testInfo.outputPath("all-attempts.pdf"));
     expect(download.suggestedFilename()).toMatch(/\.pdf$/);
     await expect(dialog).toBeHidden();
-    await page.getByRole("button", { name: "Export student answers", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Export student answers", exact: true }).click();
     await dialog.getByLabel("Download format").selectOption("zip");
     await dialog.getByRole("checkbox", { name: "Include grades, rubric scores, comments and test results", exact: true }).check();
     const zipDownloadPromise = page.waitForEvent("download", { timeout: 45_000 });
@@ -71,7 +74,8 @@ import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/ap
     expect((await responseJson<{ students: AnswerExportStudent[] }>(await teacherApi.get(endpoint))).students).toEqual([]);
     expect((await teacherApi.post(endpoint, { data: request })).status()).toBe(400);
     await page.reload();
-    await expect(page.getByRole("button", { name: "Export student answers", exact: true })).toBeDisabled();
+    await openActivityReportActions(page);
+    await expect(page.getByRole("menuitem", { name: "Export student answers", exact: true })).toBeDisabled();
     await page.getByRole("tab", { name: "Student results", exact: true }).click();
     await page.getByRole("button", { name: /^Actions for / }).click();
     await expect(page.getByRole("menuitem", { name: "Export answer as PDF", exact: true })).toHaveCount(0);
@@ -115,7 +119,8 @@ test("exports a compound Test with saved code, question prompts and only selecte
     const { students } = await responseJson<{ students: AnswerExportStudent[] }>(await teacherApi.get(endpoint));
     expect(students).toHaveLength(2);
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${testId}?report=overview`);
-    await page.getByRole("button", { name: "Export student answers", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Export student answers", exact: true }).click();
     const selection = page.getByRole("dialog", { name: "Export student answers", exact: true });
     await expect(selection.getByRole("checkbox")).toHaveCount(4);
     await selection.getByRole("checkbox", { name: /Export Peer/ }).uncheck();

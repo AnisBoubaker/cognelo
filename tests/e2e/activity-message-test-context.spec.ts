@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import { test, expect, ORIGINAL_SOURCE } from "./fixtures/bank-course";
 import { assignCourseTest, responseJson } from "./fixtures/activity-suite";
@@ -51,7 +52,8 @@ test("Test messages capture the selected exercise and retain it after navigation
     await envelope.click();
     expect((await send("I need help here.")).testItem).toEqual({ parentAttemptId: attempt.id, testItemId: second.id });
     await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}`);
-    await teacherPage.getByRole("button", { name: "Message students", exact: true }).click();
+    await openActivityReportActions(teacherPage);
+    await teacherPage.getByRole("menuitem", { name: "Message students", exact: true }).click();
     await teacherDialog.getByRole("tab").filter({ hasText: studentName }).click();
     await expect(teacherDialog.getByRole("article").filter({ hasText: "I need help here." }).getByText(`Exercise 2: ${second.activity.title}`, { exact: true })).toBeVisible();
 
@@ -83,7 +85,8 @@ test("Test messages capture the selected exercise and retain it after navigation
     const { conversation } = await responseJson<{ conversation: StaffActivityConversation }>(await teacherApi.get(`${staffMessages}/conversations/${attempt.participantId}?attemptId=${attempt.id}`));
     expect(conversation.messages.find((message) => message.body === "I need help here.")?.testItemContext).toEqual({ testItemId: second.id, activityId: second.activity.id, title: second.activity.title, exerciseNumber: 2 });
     await teacherPage.reload();
-    await teacherPage.getByRole("button", { name: "Message students", exact: true }).click();
+    await openActivityReportActions(teacherPage);
+    await teacherPage.getByRole("menuitem", { name: "Message students", exact: true }).click();
     await teacherDialog.getByRole("tab").filter({ hasText: studentName }).click();
     await expect(teacherDialog.getByText(`Exercise 2: ${second.activity.title}`, { exact: true })).toBeVisible();
     await teacherPage.screenshot({ path: testInfo.outputPath("message-exercise-context.png") });

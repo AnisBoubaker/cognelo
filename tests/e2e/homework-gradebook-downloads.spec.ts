@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { readFile } from "node:fs/promises";
 import { unzipSync, zipSync, strToU8 } from "fflate";
 import { prisma } from "@cognelo/db";
@@ -58,7 +59,8 @@ test("activity-contributed gradebook downloads work before challenges, preserve 
     expect((await api.post(actions, { data: { actionId: singleAction, participantId: p1.id, path: "private-solution.c" } })).status()).toBe(400);
 
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${id}`);
-    await expect(page.getByRole("button", { name: "Download all submitted files (ZIP)", exact: true })).toBeEnabled();
+    await openActivityReportActions(page);
+    await expect(page.getByRole("menuitem", { name: "Download all submitted files (ZIP)", exact: true })).toBeEnabled();
     const row = page.locator(".table-row-gradebook-detail").filter({ hasText: data.groupTitle }).filter({ has: page.getByRole("button", { name: /^Actions for / }) });
     await row.getByRole("button", { name: /^Actions for / }).click();
     const saving = page.waitForEvent("download");
@@ -66,7 +68,8 @@ test("activity-contributed gradebook downloads work before challenges, preserve 
     const single = unzipSync(await readFile((await (await saving).path())!));
     expect(Buffer.from(single["src/main.c"]).toString()).toBe(code); expect(Buffer.from(single["notes/données.txt"]).toString()).toBe(note); expect(single["empty/"]).toBeDefined();
     expect(Object.keys(single).some(path => /private-solution|provided-only/.test(path))).toBe(false);
-    const batchDownload = page.waitForEvent("download"); await page.getByRole("button", { name: "Download all submitted files (ZIP)", exact: true }).click();
+    await openActivityReportActions(page);
+    const batchDownload = page.waitForEvent("download"); await page.getByRole("menuitem", { name: "Download all submitted files (ZIP)", exact: true }).click();
     const batch = unzipSync(await readFile((await (await batchDownload).path())!));
     expect(Object.keys(batch).filter(path => path.endsWith("src/main.c"))).toHaveLength(2);
     expect(Object.keys(batch).filter(path => path.endsWith("empty/"))).toHaveLength(2);
@@ -90,7 +93,8 @@ test("activity-contributed gradebook downloads work before challenges, preserve 
       await gate; await route.fulfill({ status: 200, contentType: "application/zip", body: Buffer.from(zipSync({ "late.txt": strToU8("late response") })) }).catch(() => {}); finished();
     });
     const downloads: string[] = []; page.on("download", file => downloads.push(file.suggestedFilename()));
-    await page.getByRole("button", { name: "Download all submitted files (ZIP)", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Download all submitted files (ZIP)", exact: true }).click();
     const progress = page.getByRole("dialog", { name: "Preparing download…", exact: true }); await expect(progress).toBeVisible(); await progress.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(progress).toBeHidden(); release(); await handled; expect(downloads).toEqual([]); await page.unroute("**/plugin-actions");
     expect(await prisma.activityAttempt.count({ where: { activityId: id } })).toBe(0);

@@ -29,6 +29,7 @@ export function calculateContextMenuPosition(input: {
 
 export function ContextMenu({
   anchor,
+  ariaLabel,
   children,
   className,
   onClose,
@@ -36,6 +37,7 @@ export function ContextMenu({
   point
 }: {
   anchor?: HTMLElement | null;
+  ariaLabel?: string;
   children: ReactNode;
   className?: string;
   onClose: () => void;
@@ -59,7 +61,7 @@ export function ContextMenu({
       viewportWidth: window.innerWidth
     });
     setStyle({ left, top, visibility: "visible" });
-  }, [anchor, open, point]);
+  }, [anchor, children, open, point]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -69,21 +71,25 @@ export function ContextMenu({
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
     }
+    function handleScroll(event: Event) {
+      if (event.target instanceof Node && menuRef.current?.contains(event.target)) return;
+      onClose();
+    }
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
     window.addEventListener("resize", onClose);
-    window.addEventListener("scroll", onClose, true);
+    window.addEventListener("scroll", handleScroll, true);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("resize", onClose);
-      window.removeEventListener("scroll", onClose, true);
+      window.removeEventListener("scroll", handleScroll, true);
     };
   }, [anchor, onClose, open]);
 
   if (!open || typeof document === "undefined" || (!anchor && !point)) return null;
   return createPortal(
-    <div className={className} ref={menuRef} role="menu" style={{ ...style, bottom: "auto", position: "fixed", right: "auto", zIndex: 1000 }}>
+    <div aria-label={ariaLabel} className={className} ref={menuRef} role="menu" style={{ ...style, bottom: "auto", position: "fixed", right: "auto", zIndex: 1000 }}>
       {children}
     </div>,
     document.body

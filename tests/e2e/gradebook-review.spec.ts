@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import { expect, test } from "./fixtures/auth";
 import { provisionLearningFlow, removeLearningFlow } from "./fixtures/learning-flow";
@@ -5,7 +6,8 @@ import { provisionLearningFlow, removeLearningFlow } from "./fixtures/learning-f
 test.describe("consistent gradebook review actions", () => {
   test("batch grading exposes the selected student's retained discussion", async ({ teacherPage: page }) => {
     await page.goto("/courses/seed-course-programming-101/gradebook/activities/seed-activity-c-median-feedback");
-    await page.getByRole("button", { name: "Review and grade all", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Review and grade all", exact: true }).click();
     await expect(page.getByRole("dialog").getByRole("heading", { name: "Review and grade", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Activity messages", exact: true }).click();
     const discussion = page.getByRole("dialog", { name: "Activity messages", exact: true });
@@ -19,12 +21,16 @@ test.describe("consistent gradebook review actions", () => {
     await page.goto("/courses/seed-course-programming-101/gradebook/activities/seed-activity-c-median-feedback");
 
     await expect(page.getByRole("heading", { name: "C exercise: Median of three integers" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Edit activity" })).toBeVisible();
+    await openActivityReportActions(page);
+    await expect(page.getByRole("menuitem", { name: "Edit activity" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Class overview" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Student results" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByRole("button", { name: "Rerun automatic grading for all" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "AI-assess all submissions" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Review and grade all" })).toBeVisible();
+    await openActivityReportActions(page);
+    await expect(page.getByRole("menuitem", { name: "Rerun automatic grading for all" })).toBeVisible();
+    await openActivityReportActions(page);
+    await expect(page.getByRole("menuitem", { name: "AI-assess all submissions" })).toBeVisible();
+    await openActivityReportActions(page);
+    await expect(page.getByRole("menuitem", { name: "Review and grade all" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Generate AI feedback for all" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Review feedback for all" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Grade All Manually" })).toHaveCount(0);
@@ -103,7 +109,8 @@ test.describe("consistent gradebook review actions", () => {
     await expect(page).toHaveURL(/\/gradebook\/activities\/seed-activity-c-median-feedback\?origin=content&report=overview$/);
     await expect(page.getByRole("tab", { name: "Class overview" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tab", { name: "Student results" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Edit activity" })).toHaveAttribute(
+    await openActivityReportActions(page);
+    await expect(page.getByRole("menuitem", { name: "Edit activity" })).toHaveAttribute(
       "href",
       "/courses/seed-course-programming-101/activities/seed-activity-c-median-feedback?returnTo=report&origin=content&report=overview"
     );

@@ -1,5 +1,7 @@
 # Browser user flows
 
+`activity-report-menu.spec.ts` checks the shared three-dot menu across all available activity types, visible contextual Back navigation, settings opening, disabled actions, section-staff permissions, keyboard focus/navigation/dismissal, mobile containment and internal menu scrolling. Existing activity tests open the report menu through `openActivityReportActions` before selecting class-wide actions.
+
 `homework-batch-actions.spec.ts` checks confirmed/reasoned class-wide generation recovery and cancellation, current-reference adoption, frozen file/timestamp retention, no new file hand-in or answering attempt, section/staff/student boundaries, stale previews and idempotent receipts, common/separate team generation, retained answer history and grade withdrawal, mobile confirmation and cancelled-dialog safety. Its AI provider and course are isolated local fixtures.
 
 `homework-rubric-grading.spec.ts` verifies Grading-tab draft/guidance independence, manual rubric save and released learner details, mobile containment, deterministic release blocking for partial components, real rubric generation and authorization, cancellation/late-response isolation, team code propagation with individual answers/overrides, and staged batch discard/atomic publication. It uses isolated local AI connections and creates no production data.

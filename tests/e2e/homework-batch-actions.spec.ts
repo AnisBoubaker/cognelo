@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import type { APIRequestContext } from "@playwright/test";
 import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
@@ -68,7 +69,8 @@ test("class reset recovers failed generation with current references without ano
     const page = await model.page(browser);
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${id}?groupId=${data.groupId}`);
     const label = "Reset question generation for all students";
-    await page.getByRole("button", { name: label, exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: label, exact: true }).click();
     const confirmation = page.getByRole("dialog", { name: label, exact: true });
     await expect(confirmation).toContainText("2 students");
     await page.setViewportSize({ width: 390, height: 844 });
@@ -76,7 +78,8 @@ test("class reset recovers failed generation with current references without ano
     await expect(confirmation.getByRole("button", { name: label, exact: true })).toBeDisabled();
     await confirmation.getByRole("button", { name: "Cancel", exact: true }).click();
     expect((await state()).submission?.id).toBe(before[0].id);
-    await page.getByRole("button", { name: label, exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: label, exact: true }).click();
     await confirmation.getByLabel("Reason", { exact: true }).fill("Recover with corrected references");
     const response = page.waitForResponse(response => response.url().endsWith("/activity-actions") && response.request().method() === "POST");
     await confirmation.getByRole("button", { name: label, exact: true }).click();
@@ -97,7 +100,8 @@ test("class reset recovers failed generation with current references without ano
     await studentPage.goto(endpoint().replace(/^\/api/, "").replace(/\/coding-homework-grader$/, ""));
     await expect(studentPage.getByRole("button", { name: "Submit my work", exact: true })).toHaveCount(0);
     await expect(studentPage.getByRole("button", { name: "Answer challenge questions", exact: true })).toBeEnabled();
-    await page.getByRole("button", { name: "Cancel all submissions", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Cancel all submissions", exact: true }).click();
     const cancel = page.getByRole("dialog", { name: "Cancel all submissions", exact: true });
     await cancel.getByLabel("Reason", { exact: true }).fill("Reopen this section's files");
     await cancel.getByRole("button", { name: "Cancel all submissions", exact: true }).click();

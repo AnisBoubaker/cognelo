@@ -1,6 +1,7 @@
 "use client";
 import { HelpLabel, HelpTooltip } from "@cognelo/activity-ui";
 
+import { ActivityReportActionsMenu, type ActivityReportMenuAction } from "@/components/activity-report-actions-menu";
 import { useActivityStudentActions } from "@/lib/use-activity-student-actions";
 import { useActivityBatchActions } from "@/lib/use-activity-batch-actions";
 import { WorkInspectionDialog } from "@/components/work-inspection-dialog";
@@ -854,6 +855,26 @@ export default function GradebookActivityResultsPage() {
     });
   }
 
+  const reportMenuActions: ActivityReportMenuAction[] = [];
+  if (canMessageStudents) reportMenuActions.push({ id: "messages", icon: "messages", label: t("activityMessenger.messageStudents"), badge: unreadMessageCount, onSelect: openActivityMessenger });
+  if (canManageCourse) reportMenuActions.push(
+    { id: "edit", icon: "edit", label: t("courseDetail.editActivityTitle"), href: activityEditorHref(courseId, activityId, { origin, report: reportTab, groupId }) },
+    { id: "settings", icon: "settings", label: t("courseDetail.contentSettingsAction"), disabled: !reportActivity, onSelect: () => setShowActivitySettings(true) }
+  );
+  reportMenuActions.push({ id: "export-grades", icon: "download", label: t("courseDetail.exportGrades"), disabled: !course || !gradebook, onSelect: () => setShowGradeExport(true) });
+  if (canExportActivityAnswers(activityTypeKey)) reportMenuActions.push({ id: "export-answers", icon: "download", label: t("answerExport.title"), disabled: !rows.some(row => row.attempts.some(attempt => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded")), onSelect: () => setAnswerExportTarget({}) });
+  for (const action of pluginActions.actions.filter(action => action.scope === "activity")) reportMenuActions.push({ id: `download:${action.id}`, icon: "download", label: action.labels[locale] ?? action.labels.en, disabled: pluginActions.busy || !action.participantIds.length, onSelect: () => { void pluginActions.download(action); } });
+  if (isSummativeActivity && activityActions.canRerunAutomaticGrading) reportMenuActions.push({ id: "regrade", icon: "refresh", label: savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll"), disabled: !hasRowsWithSubmittedAttempts || savingGradeKey === "__all:regrade", onSelect: () => { void regradeAllRows(); } });
+  if (isSummativeActivity && activityActions.canAssessWithAi) reportMenuActions.push({ id: "assess-ai", icon: "generate", label: savingGradeKey === "__all:ai-feedback" ? t("common.saving") : t("courseDetail.generateAiFeedbackAll"), disabled: savingGradeKey === "__all:ai-feedback", onSelect: () => { void (activityActions.aiAssessmentChangesGrade ? openAiGradingBatchDialog() : generateAiFeedbackForAllRows()); } });
+  if (activityActions.canReviewAndGrade) {
+    if (isSummativeActivity && (supportsAiFeedbackReview(activityTypeKey) || activityTypeKey === "test")) reportMenuActions.push({ id: "review", icon: "review", label: t("courseDetail.gradeAllManually"), disabled: !hasRowsWithSubmittedAttempts, onSelect: () => {
+      if (activityTypeKey === "test") setReviewAndGradeRow(groupedRows.find(row => selectedSubmittedAttempt(row)) ?? null);
+      else void openFeedbackReview(groupedRows);
+    } });
+    else reportMenuActions.push({ id: "review", icon: "review", label: t("courseDetail.gradeAllManually"), disabled: !hasRowsWithSubmittedAttempts, href: manualGradingHref(courseId, activityId, groupId) });
+  }
+  for (const action of batchActions.actions) reportMenuActions.push({ id: `batch:${action.id}`, icon: action.icon === "cancel" ? "close" : "refresh", label: action.labels[locale] ?? action.labels.en, danger: true, disabled: batchActions.busy || !action.participantIds.length, onSelect: () => { void batchActions.execute(action); } });
+
   return (
     <TeacherMessageAlertContext.Provider value={hasMessagingPermission ? { ...alerts.sound, unreadCount: unreadMessageCount } : null}>
     <AppShell>
@@ -868,36 +889,8 @@ export default function GradebookActivityResultsPage() {
               </p>
             </div>
             <div className="section-actions activity-report-actions">
-              {canMessageStudents ? (
-                <button className={`button secondary activity-report-message-trigger${unreadMessageCount ? " has-unread" : ""}`} type="button"
-                  aria-label={t("activityMessenger.messageStudents")} aria-describedby={unreadMessageCount ? "activity-message-alert-summary" : undefined}
-                  onClick={openActivityMessenger}>
-                  <AppIcon name="messages" />
-                  {t("activityMessenger.messageStudents")}
-                  {unreadMessageCount ? <span className="activity-message-count" aria-hidden="true">{unreadMessageCount > 99 ? "99+" : unreadMessageCount}</span> : null}
-                </button>
-              ) : null}
-              {canManageCourse ? (
-                <>
-                  <Link className="button secondary" href={activityEditorHref(courseId, activityId, { origin, report: reportTab, groupId })}>
-                    <AppIcon name="edit" />
-                    {t("courseDetail.editActivityTitle")}
-                  </Link>
-                  <button className="button secondary" disabled={!reportActivity} type="button" onClick={() => setShowActivitySettings(true)}>
-                    <AppIcon name="settings" />
-                    {t("courseDetail.contentSettingsAction")}
-                  </button>
-                </>
-              ) : null}
-              <button className="button secondary" disabled={!course || !gradebook} type="button" onClick={() => setShowGradeExport(true)}>
-                <AppIcon name="download" />
-                {t("courseDetail.exportGrades")}
-              </button>
-              {canExportActivityAnswers(activityTypeKey) ? <button className="button secondary" disabled={!rows.some((row) => row.attempts.some((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded"))} type="button" onClick={() => setAnswerExportTarget({})}>
-                <AppIcon name="download" />{t("answerExport.title")}
-              </button> : null}
-              {pluginActions.actions.filter(action => action.scope === "activity").map(action => <button className="button secondary" key={action.id} disabled={pluginActions.busy || !action.participantIds.length} type="button" onClick={() => void pluginActions.download(action)}><AppIcon name="download" />{action.labels[locale] ?? action.labels.en}</button>)}
-              {batchActions.actions.map(action => <button className="button danger" key={action.id} disabled={batchActions.busy || !action.participantIds.length} type="button" onClick={() => void batchActions.execute(action)}><AppIcon name={action.icon === "cancel" ? "close" : "refresh"} />{action.labels[locale] ?? action.labels.en}</button>)}
+              <ActivityReportActionsMenu label={t("courseDetail.activityReportActions")} actions={reportMenuActions}
+                unreadCount={unreadMessageCount} describedBy={unreadMessageCount ? "activity-message-alert-summary" : undefined} />
               <Link className="button secondary activity-report-back" href={backHref}>
                 <AppIcon name="back" />
                 {backLabel}
@@ -971,42 +964,6 @@ export default function GradebookActivityResultsPage() {
             <div>
               <p className="eyebrow">{t("courseDetail.detailedResults")}</p>
               <h2>{t("courseDetail.studentResultsTitle")}</h2>
-            </div>
-            <div className="row wrap">
-              {isSummativeActivity && activityActions.canRerunAutomaticGrading ? (
-                <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts || savingGradeKey === "__all:regrade"} type="button" onClick={() => void regradeAllRows()}>
-                  <AppIcon name="refresh" />
-                  {savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll")}
-                </button>
-              ) : null}
-              {isSummativeActivity && activityActions.canAssessWithAi ? (
-                <button className="button secondary" disabled={savingGradeKey === "__all:ai-feedback"} type="button" onClick={() => void (activityActions.aiAssessmentChangesGrade ? openAiGradingBatchDialog() : generateAiFeedbackForAllRows())}>
-                  <AppIcon name="generate" />
-                  {savingGradeKey === "__all:ai-feedback" ? t("common.saving") : t("courseDetail.generateAiFeedbackAll")}
-                </button>
-              ) : null}
-              {isSummativeActivity && activityActions.canReviewAndGrade && (supportsAiFeedbackReview(activityTypeKey) || activityTypeKey === "test") ? (
-                <button className="button secondary" disabled={!hasRowsWithSubmittedAttempts} type="button" onClick={() => {
-                  if (activityTypeKey === "test") setReviewAndGradeRow(groupedRows.find(row => selectedSubmittedAttempt(row)) ?? null);
-                  else void openFeedbackReview(groupedRows);
-                }}>
-                  <AppIcon name="review" />
-                  {t("courseDetail.gradeAllManually")}
-                </button>
-              ) : activityActions.canReviewAndGrade && hasRowsWithSubmittedAttempts ? (
-                <Link
-                  className="button secondary"
-                  href={manualGradingHref(courseId, activityId, groupId)}
-                >
-                  <AppIcon name="review" />
-                  {t("courseDetail.gradeAllManually")}
-                </Link>
-              ) : activityActions.canReviewAndGrade ? (
-                <button className="button secondary" disabled type="button">
-                  <AppIcon name="review" />
-                  {t("courseDetail.gradeAllManually")}
-                </button>
-              ) : null}
             </div>
           </div>
 

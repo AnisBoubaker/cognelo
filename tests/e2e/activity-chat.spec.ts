@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import type { APIRequestContext } from "@playwright/test";
 import { test, expect } from "./fixtures/bank-course";
@@ -54,7 +55,8 @@ test("student-initiated private chat, offline broadcasts, live permission and re
     await studentDialog.getByRole("button", { name: "Send message", exact: true }).click();
     await expect(studentDialog.getByText("My private question about the prompt.")).toBeVisible();
     await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${data.activityId}`);
-    await teacherPage.getByRole("button", { name: "Message students", exact: true }).click();
+    await openActivityReportActions(teacherPage);
+    await teacherPage.getByRole("menuitem", { name: "Message students", exact: true }).click();
     const teacherDialog = teacherPage.getByRole("dialog", { name: "Activity messages", exact: true });
     await expect(teacherDialog.getByRole("tab", { name: /Chat Peer/ })).toHaveCount(0);
     await teacherDialog.getByRole("tab", { name: new RegExp(participant.firstName) }).click();
@@ -184,7 +186,8 @@ test("messaging uses the existing activity heartbeat and fetches history only on
   await expect(studentPage.getByRole("dialog", { name: "Activity messages" }).getByText("Only fetch this when the revision changes.")).toBeVisible({ timeout: 30_000 });
   expect(learnerHistoryRequests).toBe(2);
   await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${data.activityId}`);
-  await teacherPage.getByRole("button", { name: "Message students", exact: true }).click();
+  await openActivityReportActions(teacherPage);
+  await teacherPage.getByRole("menuitem", { name: "Message students", exact: true }).click();
   await expect(teacherPage.getByRole("dialog", { name: "Activity messages" }).getByText("Only fetch this when the revision changes.")).toBeVisible();
   const status = await teacherPage.waitForResponse((response) => new URL(response.url()).pathname === staffMessages && new URL(response.url()).searchParams.get("summary") === "1", { timeout: 15_000 });
   expect((await status.json()).messaging).not.toHaveProperty("broadcasts");

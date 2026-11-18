@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { expect, test } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
 
@@ -29,16 +30,20 @@ for (const expired of [false, true]) {
     await expect(page).toHaveURL(reportPath);
     await expect(page.getByRole("tab", { name: "Class overview", exact: true })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tab", { name: "Student results", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Edit activity", exact: true })).toHaveClass(/secondary/);
-    await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
-    await page.getByRole("link", { name: "Edit activity", exact: true }).click();
+    await openActivityReportActions(page);
+    await expect(page.getByRole("menuitem", { name: "Edit activity", exact: true })).toHaveClass(/content-context-menu-item/);
+    await openActivityReportActions(page);
+    await expect(page.getByRole("menuitem", { name: "Settings", exact: true })).toBeVisible();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Edit activity", exact: true }).click();
     await expect(page).toHaveURL(editorPath);
     await page.reload();
     await expect(page.getByRole("link", { name: "Back to activity overview", exact: true })).toHaveAttribute("href", reportPath);
     await page.getByRole("link", { name: "Back to activity overview", exact: true }).click();
     await expect(page).toHaveURL(reportPath);
     await expect(page.getByRole("tab", { name: "Class overview", exact: true })).toHaveAttribute("aria-selected", "true");
-    await page.getByRole("link", { name: "Edit activity", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Edit activity", exact: true }).click();
     await expect(page).toHaveURL(editorPath);
     await expect(page.getByRole("tab", { name: "Activity", exact: true })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tab", { name: "Concepts", exact: true })).toBeVisible();
@@ -52,7 +57,8 @@ for (const expired of [false, true]) {
     await expect(page.getByText("Knowledge concept links saved.", { exact: true })).toBeVisible();
     await page.goto(assignedPath);
     await expect(page).toHaveURL(reportPath);
-    await page.getByRole("link", { name: "Edit activity", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Edit activity", exact: true }).click();
     await expect(page).toHaveURL(editorPath);
     await page.getByRole("tab", { name: "Concepts (1)", exact: true }).click();
     await expect(page.getByRole("checkbox", { name: `Select all learning targets for ${conceptTitle}`, exact: true })).toBeChecked();

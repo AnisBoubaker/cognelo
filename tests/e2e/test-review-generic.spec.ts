@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import { expect, test, ORIGINAL_SOURCE } from "./fixtures/bank-course";
 import { assignCourseTest, responseJson } from "./fixtures/activity-suite";
@@ -31,7 +32,8 @@ test("one Save all persists MCQ feedback and generic question grades together", 
     await responseJson(await student.post(`${assigned}/test/submit`, { data: { parentAttemptId: id, sessionId: "mixed-review" } }));
     const initial = await prisma.grade.findFirstOrThrow({ where: { selectedAttemptId: id } });
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${created.activity.id}`);
-    await page.getByRole("button", { name: "Review and grade all", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Review and grade all", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Review and grade", exact: true });
     const select = (number: number, title: string) => dialog.getByRole("button", { name: `Activity ${number}: ${title}`, exact: true }).click();
     const save = dialog.getByRole("button", { name: "Save all", exact: true });
@@ -51,7 +53,8 @@ test("one Save all persists MCQ feedback and generic question grades together", 
     expect(saves).toBe(1);
     await expect.poll(async () => (await prisma.grade.findUniqueOrThrow({ where: { id: initial.id } })).normalizedScore).toBe(10.5);
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
-    await page.getByRole("button", { name: "Review and grade all", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Review and grade all", exact: true }).click();
     await expect(dialog.getByRole("textbox", { name: "Summary", exact: true })).toHaveValue("Reviewed choices.");
     await select(2, "Arrangement");
     await expect(dialog.getByRole("textbox", { name: "Comments", exact: true })).toHaveValue("Reviewed arrangement.");

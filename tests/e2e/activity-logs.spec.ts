@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import { test, expect, ORIGINAL_SOURCE } from "./fixtures/bank-course";
 import { createAuthenticatedApi, createAuthenticatedApiWithCredentials, credentialsFor } from "./fixtures/auth";
@@ -32,7 +33,8 @@ test("shared logs show lifecycle and grading events, page tied timestamps, and p
     await expect(teacher.locator(".activity-log-entry")).toHaveCount(50);
     await teacher.getByRole("button", { name: "Load older events", exact: true }).click();
     await expect(teacher.locator(".activity-log-entry").filter({ hasText: "Submission completed" })).toHaveCount(1);
-    await teacher.getByRole("link", { name: "Edit activity", exact: true }).click();
+    await openActivityReportActions(teacher);
+    await teacher.getByRole("menuitem", { name: "Edit activity", exact: true }).click();
     await expect(teacher).toHaveURL(/report=logs/);
     await teacher.getByRole("link", { name: "Back to logs", exact: true }).click();
     await expect(teacher.getByRole("tab", { name: "Logs", exact: true })).toHaveAttribute("aria-selected", "true");

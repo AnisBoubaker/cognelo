@@ -1798,6 +1798,38 @@ a.card:hover,
   gap: 8px;
 }
 
+.activity-report-menu-trigger {
+  position: relative;
+}
+
+.activity-report-menu-trigger .activity-message-count {
+  margin: 0;
+  position: absolute;
+  right: -6px;
+  top: -6px;
+}
+
+.activity-report-context-menu {
+  max-height: calc(100dvh - 16px);
+  max-width: min(420px, calc(100vw - 16px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  width: max-content;
+}
+
+.activity-report-context-menu .content-context-menu-item {
+  min-height: 38px;
+  white-space: normal;
+}
+
+.activity-report-context-menu .content-context-menu-item > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (pointer: coarse) {
+  .activity-report-context-menu .content-context-menu-item { min-height: 44px; }
+}
 
 @media (max-width: 780px) {
   .activity-report-heading .workspace-context {
@@ -1807,11 +1839,11 @@ a.card:hover,
 
   .activity-report-actions {
     width: 100%;
-    justify-content: flex-start;
+    justify-content: space-between;
   }
 
   .activity-report-actions .activity-report-back {
-    flex-basis: 100%;
+    max-width: calc(100% - 52px);
     justify-content: center;
   }
 }
@@ -6986,7 +7018,7 @@ button:hover > .disclosure-indicator {
 .activity-chat-bubble .activity-chat-exercise { color: var(--muted); font-size: .8rem; font-weight: 600; margin: 6px 0; }
 
 .activity-message-count { align-items: center; background: var(--danger); border-radius: 999px; color: white; display: inline-flex; flex: 0 0 auto; font-size: .75rem; font-weight: 800; justify-content: center; line-height: 1.4; min-width: 24px; padding: 3px 7px; }
-.activity-report-message-trigger.has-unread { background: #e4f1ff; border-color: var(--brand-blue); color: var(--brand-ink); animation: activity-message-attention 2.4s ease-in-out infinite; }
+.activity-report-message-trigger.has-unread, .activity-report-menu-trigger.has-unread { background: #e4f1ff; border-color: var(--brand-blue); color: var(--brand-ink); animation: activity-message-attention 2.4s ease-in-out infinite; }
 .activity-message-alert { align-items: center; background: #e4f1ff; border: 1px solid var(--brand-blue); border-inline-start-width: 5px; border-radius: 10px; box-shadow: 0 4px 20px rgba(46, 131, 216, .12); color: var(--brand-ink); display: flex; flex-wrap: wrap; gap: 12px; padding: 12px 16px; position: sticky; top: 12px; z-index: 25; }
 .activity-message-alert > div { display: grid; flex: 1; gap: 3px; min-width: 150px; }
 .activity-message-alert small { color: var(--muted); }
@@ -6996,7 +7028,7 @@ button:hover > .disclosure-indicator {
 .activity-chat-tabs[role="tablist"] > button[role="tab"][data-unread="true"] { background: #e4f1ff; border-color: color-mix(in srgb, var(--brand-blue), white 45%); color: var(--brand-ink); }
 .activity-chat-unread-badge { background: var(--brand-ink); border-radius: 6px; color: white; font-size: .65rem; font-weight: 800; margin-inline-start: auto; padding: 2px 5px; }
 @keyframes activity-message-attention { 0%, 100% { box-shadow: 0 0 0 0 rgba(46, 131, 216, .1); } 50% { box-shadow: 0 0 0 5px rgba(46, 131, 216, .22); } }
-@media (prefers-reduced-motion: reduce) { .activity-report-message-trigger.has-unread { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .activity-report-message-trigger.has-unread, .activity-report-menu-trigger.has-unread { animation: none; } }
 @media (max-width: 480px) { .activity-chat-heading { gap: 8px; padding: 10px 12px; } .activity-chat-heading .dialog-header-actions { margin-inline-start: auto; } }
 
 .answer-export-options { color: var(--ink); }

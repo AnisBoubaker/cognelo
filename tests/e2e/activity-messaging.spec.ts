@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { createAuthenticatedApi, expect, test } from "./fixtures/auth";
 import { responseJson } from "./fixtures/activity-suite";
 import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
@@ -69,7 +70,8 @@ test.describe("attempt-scoped activity messaging", () => {
     await teacherPage.goto(
       `/courses/${data.courseId}/gradebook/activities/${data.activityId}?groupId=${data.groupId}`
     );
-    await teacherPage.getByRole("button", { name: "Message students" }).click();
+    await openActivityReportActions(teacherPage);
+    await teacherPage.getByRole("menuitem", { name: "Message students" }).click();
     const teacherDialog = teacherPage.getByRole("dialog", { name: "Activity messages" });
     await expect(teacherDialog.getByText(/1 active learner attempt\(s\)/)).toBeVisible();
     await teacherDialog.getByLabel("Message", { exact: true }).fill("Please reread question 2 before submitting.");

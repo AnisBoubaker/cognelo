@@ -16,3 +16,5 @@ This file is for placeholder-plugin memory only.
 - Its bank drafts follow core publication versioning: only a changed Published save creates an immutable version.
 
 - Honor the host [activity content closure policy](../../../docs/ACTIVITY_CONTENT_ACCESS.md) for prompts, histories, solutions, and files. Final submission may return a host-handled closure signal instead of a review payload; preserve records and finalization cleanup.
+
+- Teacher report actions stay in the host-owned Activity actions menu across activity types; the context-sensitive Back link stays visible. Keep plugin permissions, eligibility, handlers and confirmation/reason flows unchanged. See [shared report actions](../../../docs/ACTION_BUTTONS.md#activity-report-actions).

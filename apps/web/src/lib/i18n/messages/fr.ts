@@ -1484,6 +1484,7 @@ export const frMessages = {
       renameFolder: "Renommer {title}",
       renameFolderAction: "Renommer le dossier",
       contentActions: "Actions pour {title}",
+      activityReportActions: "Actions de l’activité",
       contentActionsTitle: "Plus d'actions",
       contentSettingsAction: "Paramètres",
       removeContentItem: "Supprimer {title}",

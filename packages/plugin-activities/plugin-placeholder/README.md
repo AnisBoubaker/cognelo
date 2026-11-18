@@ -32,6 +32,8 @@ It also declares two dummy plugin-owned tables, `PluginPlaceholderDummyRecord` a
 
 If this placeholder ever grows custom authoring or settings UI, that form should register with `useUnsavedChangesGuard` from `@cognelo/activity-ui`.
 
+Teacher activity reports use the shared three-dot **Activity actions** menu for activity-wide operations. The context-sensitive Back link stays visible outside it; student-specific actions remain in row menus. See [report actions](../../../docs/ACTION_BUTTONS.md#activity-report-actions).
+
 ## Contributor Workflow
 
 When changing this plugin, update:

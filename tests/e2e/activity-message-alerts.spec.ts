@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { test, expect } from "./fixtures/bank-course";
 import { createAuthenticatedApi } from "./fixtures/auth";
 import { responseJson } from "./fixtures/activity-suite";
@@ -43,7 +44,7 @@ test("teachers receive visible and audible message alerts, can mute, and stop po
     await responseJson(await teacherApi.post(settingsPath, { data: { ...settings.general, assessmentMode: "summative", messagingEnabled: true, twoWayMessagingEnabled: true, groupAssignments: settings.groups } }));
     await responseJson(await student.post(`${assigned}/messages`, { data: { body: "An existing unread question." } }));
     await page.goto(reportPath);
-    const trigger = page.getByRole("button", { name: "Message students", exact: true });
+    const trigger = page.getByRole("button", { name: "Activity actions", exact: true });
     const banner = page.locator(".activity-message-alert");
     await expect(trigger).toBeVisible();
     await expect(banner).toContainText("Unread student messages: 1");
@@ -94,7 +95,8 @@ test("teachers receive visible and audible message alerts, can mute, and stop po
     await page.screenshot({ path: testInfo.outputPath("teacher-muted-messenger.png") });
 
     await page.reload();
-    await trigger.click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Message students", exact: true }).click();
     await expect(composer).toBeFocused();
     await page.keyboard.press("Space");
     await expect(composer).toHaveValue(" ");

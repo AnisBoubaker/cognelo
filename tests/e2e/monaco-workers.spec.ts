@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import DOMPurify from "dompurify";
 import { expect, test } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson } from "./fixtures/activity-suite";
@@ -56,7 +57,8 @@ for (const expired of [false, true]) {
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(`/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${activityId}`);
     if (expired) {
-      await page.getByRole("link", { name: "Edit activity", exact: true }).click();
+      await openActivityReportActions(page);
+      await page.getByRole("menuitem", { name: "Edit activity", exact: true }).click();
       await page.getByRole("tab", { name: "Student starting files", exact: true }).click();
     }
     await expect(page.locator(".monaco-editor").first()).toBeVisible();

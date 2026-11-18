@@ -1,4 +1,4 @@
-import { openGradebookActions } from "./fixtures/gradebook-ui";
+import { openGradebookActions, openActivityReportActions } from "./fixtures/gradebook-ui";
 import { readFile } from "node:fs/promises";
 import { prisma } from "@cognelo/db";
 import { confirmSharedDialog, expect, test } from "./fixtures/auth";
@@ -103,7 +103,8 @@ test.describe("partial grade safeguards", () => {
     await expect(partial).toHaveText(/Partial/);
     await expect(partial).toHaveAttribute("title", "Partial grade: 1 of 2 grading components complete.");
 
-    await page.getByRole("button", { name: "Export grades", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Export grades", exact: true }).click();
     const exportDialog = page.getByRole("dialog", { name: "Export activity grades" });
     await exportDialog.getByLabel("File name", { exact: true }).fill("partial-grade-exclusion");
     const downloadPromise = page.waitForEvent("download");

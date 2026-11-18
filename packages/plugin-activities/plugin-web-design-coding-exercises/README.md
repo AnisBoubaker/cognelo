@@ -22,6 +22,8 @@ Learner responses use an explicit public projection; see [learner data boundarie
 
 Teacher Test review provides numbered activity navigation, saved files, comments, and an item-grade override through the [shared review workflow](../../../docs/TEST_COMPOUND_ACTIVITY_IMPLEMENTATION_PLAN.md#teacher-review-and-grading).
 
+Teacher activity reports use the shared three-dot **Activity actions** menu for activity-wide operations. The context-sensitive Back link stays visible outside it; student-specific actions remain in row menus. See [report actions](../../../docs/ACTION_BUTTONS.md#activity-report-actions).
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)

@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import { expect, test } from "./fixtures/auth";
 
@@ -76,7 +77,8 @@ test.describe("guided batch AI grading", () => {
     });
 
     await page.goto(`/courses/${courseId}/gradebook/activities/${activityId}`);
-    await page.getByRole("button", { name: "AI-assess all submissions", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "AI-assess all submissions", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Prepare batch AI grading" });
     const instructions = dialog.getByRole("textbox", { name: "AI instructions", exact: true });
     await expect(instructions).toHaveValue("Apply the reviewed examples consistently.");

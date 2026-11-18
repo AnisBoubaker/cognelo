@@ -80,6 +80,8 @@ Live course-question edits preserve active responses and use the shared warning/
 
 Learner responses use an explicit public projection; see [learner data boundaries](docs/REFERENCE.md#learner-data-boundaries).
 
+Teacher activity reports use the shared three-dot **Activity actions** menu for activity-wide operations. The context-sensitive Back link stays visible outside it; student-specific actions remain in row menus. See [report actions](../../../docs/ACTION_BUTTONS.md#activity-report-actions).
+
 ## Read By Topic
 
 - [Shared submission deletion and retained student history](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md#submission-deletion)

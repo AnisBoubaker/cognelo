@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { API_BASE_URL, createAuthenticatedApi } from "./fixtures/auth";
 import { expect, test } from "./fixtures/bank-course";
 import { assignCourseTest, createCourseActivity, responseJson } from "./fixtures/activity-suite";
@@ -44,7 +45,8 @@ test.describe("installed plugin composition", () => {
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${codingId}`
     );
     await expect(page.getByRole("tab", { name: "Class overview", exact: true })).toBeVisible();
-    await page.getByRole("link", { name: "Edit activity", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Edit activity", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Coding exercise authoring" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Activity view unavailable" })).toHaveCount(0);
 

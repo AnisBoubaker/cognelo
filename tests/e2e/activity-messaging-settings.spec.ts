@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
 import { test, expect } from "./fixtures/bank-course";
 import { createAuthenticatedApi } from "./fixtures/auth";
@@ -51,7 +52,8 @@ for (const timed of [false, true]) {
       await responseJson(await teacherApi.post(settingsPath, { data: { ...legacyGeneral, groupAssignments: enabled.groups, confirmActiveStudents: true } }));
       expect((await readSettings()).general.messagingEnabled).toBe(true);
       await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${data.activityId}?groupId=${data.groupId}`);
-      const broadcastButton = teacherPage.getByRole("button", { name: "Message students", exact: true });
+      const broadcastButton = teacherPage.getByRole("menuitem", { name: "Message students", exact: true });
+      await openActivityReportActions(teacherPage);
       await expect(broadcastButton).toBeVisible();
       await broadcastButton.click();
 

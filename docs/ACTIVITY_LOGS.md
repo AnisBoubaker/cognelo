@@ -1,6 +1,6 @@
 # Activity logs and student actions
 
-Every teacher activity report has **Class overview**, **Student results**, and **Logs** tabs, whether entered from Content or Gradebook. Content still opens Class overview by default. Logs and editor return links preserve the activity, origin and optional section. The separate Programming Homework Student submissions panel is removed. Individual cancellation and challenge reset live in each student’s shared three-dot menu, alongside grading, reopening, deletion and downloads. Activity-wide submission operations appear in the report toolbar and follow its section filter.
+Every teacher activity report has **Class overview**, **Student results**, and **Logs** tabs, whether entered from Content or Gradebook. Content still opens Class overview by default. Logs and editor return links preserve the activity, origin and optional section. The separate Programming Homework Student submissions panel is removed. Individual cancellation and challenge reset live in each student’s shared three-dot menu, alongside grading, reopening, deletion and downloads. Activity-wide submission operations appear in the report’s Activity actions menu and follow its section filter.
 
 ## Recorded history
 
@@ -20,7 +20,7 @@ Core requires gradebook capability, derives the authorized current student roste
 
 `ServerActivityPlugin.reports` declares `activityTypeKeys` and optional `logs` and `studentActions` handlers. The host supplies a `GradebookActionContext`: authorized actor, course/activity and roster. A read-only `logs` handler receives `before` and `limit`, returns neutral `ActivityLogEvidence`, and must constrain every query to the supplied roster/activity. Return stable namespaced IDs, UTC timestamps, shared event types, optional attempt number, actor ID and teacher reason. Never return private plugin payloads. Activities without an adapter still receive core logs.
 
-Student actions are separate from read-only gradebook downloads. `studentActions.list` returns localized labels/confirmation/reason prompts and eligible `{id,participantId,groupId,targetId}` actions. The target is an opaque, specific submission identity. The host refuses out-of-roster actions and renders them only in the relevant student's menu.
+Student actions are separate from read-only gradebook downloads. `studentActions.list` returns localized labels/confirmation/reason prompts and eligible `{id,participantId,groupId,targetId}` actions. The target is an opaque, specific submission identity. The host refuses out-of-roster actions and renders them only in the relevant student’s menu.
 
 `GET …/student-actions` discovers current actions. Its `recoverAutomatic` adapter flag preserves Homework's existing authorized teacher-read cutoff recovery, now without a visible management panel. Recovery stays scoped to the authorized sections; issues use notifications. Logs never run this recovery. Compatibility `manage-submissions` APIs remain available.
 

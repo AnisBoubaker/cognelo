@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import { test, expect, ORIGINAL_SOURCE } from "./fixtures/bank-course";
 import { assignCourseTest, responseJson } from "./fixtures/activity-suite";
@@ -139,7 +140,8 @@ test("teacher Student view reviews and restores temporary answers without creati
   await assignCourseTest(data, activityId, title);
   const overviewPath = `/courses/${data.courseId}/gradebook/activities/${activityId}?origin=content&report=overview&groupId=${data.groupId}`;
   await teacherPage.goto(overviewPath);
-  await teacherPage.getByRole("link", { name: "Edit activity", exact: true }).click();
+  await openActivityReportActions(teacherPage);
+  await teacherPage.getByRole("menuitem", { name: "Edit activity", exact: true }).click();
   await teacherPage.getByRole("article").filter({ hasText: "Preview addition" }).getByRole("link", { name: "Edit", exact: true }).click();
   await expect(teacherPage.getByRole("link", { name: "Back to Test", exact: true })).toBeVisible();
   await teacherPage.reload();

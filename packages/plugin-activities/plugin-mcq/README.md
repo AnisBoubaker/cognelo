@@ -24,6 +24,8 @@ Learner responses use an explicit public projection; see [learner data boundarie
 
 Teacher review inside Tests uses the same submitted-choice and feedback form as a standalone MCQ, with a separate explicit item-grade override. See [assessment feedback](docs/REFERENCE.md#ai-assessment-feedback).
 
+Teacher activity reports use the shared three-dot **Activity actions** menu for activity-wide operations. The context-sensitive Back link stays visible outside it; student-specific actions remain in row menus. See [report actions](../../../docs/ACTION_BUTTONS.md#activity-report-actions).
+
 ## Read By Topic
 
 - [Shared team and student assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md)

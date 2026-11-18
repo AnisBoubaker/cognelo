@@ -1483,6 +1483,7 @@ export const zhMessages = {
       renameFolder: "重命名 {title}",
       renameFolderAction: "重命名文件夹",
       contentActions: "{title} 的操作",
+      activityReportActions: "活动操作",
       contentActionsTitle: "更多操作",
       contentSettingsAction: "设置",
       removeContentItem: "删除 {title}",

@@ -16,7 +16,7 @@ This is the routing page for repository-maintained documentation. Read the small
 - [System error codes](SYSTEM_ERRORS.md): stable support codes, development diagnoses, production wording, private diagnostics and recovery.
 - [User profiles and name changes](USER_PROFILES.md): administrator control of self-service names, profile permissions, independent password changes and migration.
 - [Contextual help](CONTEXTUAL_HELP.md): shared teacher guidance tooltips and quiet date/time presentation.
-- [Action buttons and icons](ACTION_BUTTONS.md): shared appearance, semantic icons, interaction states, and regression coverage.
+- [Action buttons and icons](ACTION_BUTTONS.md): shared appearance, semantic icons, activity-report menus, interaction states, and regression coverage.
 - [Dialog headers and dismissal](DIALOGS.md): persistent close controls, compact review actions, app-wide coverage, and dismissal semantics.
 - [Code editor undo and saved answers](EDITOR_UNDO.md): in-memory history isolation, saved-answer baselines, model disposal, and autosave regression checks.
 - [Email delivery and test recipients](EMAIL_DELIVERY.md): outbound mail boundary and private local capture for synthetic recipients.

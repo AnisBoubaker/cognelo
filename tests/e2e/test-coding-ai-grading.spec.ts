@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { createServer } from "node:http";
 import { prisma } from "@cognelo/db";
 import { encryptCredential } from "@cognelo/core";
@@ -96,7 +97,8 @@ test("Test AI grading uses matching question templates and authoritative questio
     } }));
     expect((await student.post(`/api/courses/${data.courseId}/gradebook/attempts/${ids[0]}/ai-feedback`, { data: {} })).status()).toBe(403);
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}`);
-    await page.getByRole("button", { name: "AI-assess all submissions", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "AI-assess all submissions", exact: true }).click();
     const emptySetup = page.getByRole("dialog", { name: "Prepare batch AI grading", exact: true });
     await expect(emptySetup.getByRole("textbox")).toHaveCount(0);
     await expect(emptySetup.getByRole("checkbox")).toHaveCount(0);
@@ -124,7 +126,8 @@ test("Test AI grading uses matching question templates and authoritative questio
       if (request.method() === "PATCH" && request.url().endsWith("/ai-grading-batch")) instructionWrites.push(request.url());
     });
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}`);
-    await page.getByRole("button", { name: "AI-assess all submissions", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "AI-assess all submissions", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Prepare batch AI grading", exact: true });
     await expect(dialog.getByRole("textbox", { name: "AI instructions", exact: true })).toHaveCount(0);
     await expect(dialog.getByRole("checkbox", { name: "Update AI instructions in the activity settings", exact: true })).toHaveCount(0);

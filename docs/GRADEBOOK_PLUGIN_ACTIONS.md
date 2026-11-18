@@ -1,6 +1,6 @@
 # Activity-contributed gradebook actions
 
-An activity can offer extra read-only downloads through `ActivityDefinition.gradebookActions`. Each declaration has a stable unique `id`, `kind: "download"`, a `participant` or `activity` scope, and English/French/Chinese/Arabic labels. The gradebook renders supported activity actions in its report header and eligible participant actions in the student's row menu. Other activity types do not inherit these actions. A deactivated provider is blocked before private data is read; disabling creation of new activities does not prevent downloads of existing work.
+An activity can offer extra read-only downloads through `ActivityDefinition.gradebookActions`. Each declaration has a stable unique `id`, `kind: "download"`, a `participant` or `activity` scope, and English/French/Chinese/Arabic labels. The gradebook renders supported activity actions in its report header’s three-dot Activity actions menu and eligible participant actions in the student's row menu. Other activity types do not inherit these actions. A deactivated provider is blocked before private data is read; disabling creation of new activities does not prevent downloads of existing work.
 
 The owning server plugin registers `gradebookActions` with matching `activityTypeKeys` and two methods:
 
@@ -11,7 +11,7 @@ Core authorizes course/section grading scope and derives the current enrolled st
 
 `GET /api/courses/:courseId/gradebook/activities/:activityId/plugin-actions?groupId=...` returns declared metadata with eligible enrollment IDs. `POST` accepts `actionId`, optional `groupId`, and the required `participantId` for participant actions; activity actions take no participant ID. Both endpoints require gradebook permission. Downloads are private/no-store and expose Content-Disposition to the authorized web client.
 
-The shared UI applies the current section filter to batch scope, independent of pagination. A supported action without eligible hand-ins is disabled in the header; participant menu actions appear only for eligible rows. Metadata refresh is lightweight and reads no file bytes. Download preparation uses the shared blocking progress dialog with Cancel; aborts and late results cannot trigger a download. Errors enter shared notifications/history.
+The shared UI applies the current section filter to batch scope, independent of pagination. A supported action without eligible hand-ins is disabled in the header’s Activity actions menu; participant menu actions appear only for eligible rows. Metadata refresh is lightweight and reads no file bytes. Download preparation uses the shared blocking progress dialog with Cancel; aborts and late results cannot trigger a download. Errors enter shared notifications/history.
 
 ## Programming Homework offering
 

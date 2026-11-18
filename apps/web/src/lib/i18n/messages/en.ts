@@ -1517,6 +1517,7 @@ export const enMessages = {
       renameFolder: "Rename {title}",
       renameFolderAction: "Rename folder",
       contentActions: "Actions for {title}",
+      activityReportActions: "Activity actions",
       contentActionsTitle: "More actions",
       contentSettingsAction: "Settings",
       newActivityInFolder: "New activity",

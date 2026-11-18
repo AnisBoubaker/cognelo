@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import { parseMcqSource } from "@cognelo/plugin-mcq";
 import type { APIRequestContext, Page } from "@playwright/test";
@@ -104,7 +105,8 @@ test("individual and whole-class Test regrading rerun every child and display me
     expect(firstGrades.map(g => g.normalizedScore).sort((a, b) => a - b)).toEqual([0, 20]);
     // Rerun all includes the already-regraded Test as well as the other student's Test.
     for (const child of children) await responseJson(await teacherApi.patch(`/api/courses/${data.courseId}/activities/${child.activityId}`, { data: { config: { source: ORIGINAL_SOURCE.replace("- [x] Four\n- [ ] Five", "- [ ] Five\n- [x] Four") } } }));
-    await page.getByRole("button", { name: "Rerun automatic grading for all", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "Rerun automatic grading for all", exact: true }).click();
     await confirmSharedDialog(page);
     for (const pause of [2, 3]) {
       await expect.poll(() => page.evaluate(() => (window as unknown as { regradePauses: number }).regradePauses)).toBe(pause);

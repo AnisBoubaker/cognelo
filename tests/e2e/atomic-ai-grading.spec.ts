@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { createServer } from "node:http";
 import { prisma } from "@cognelo/db";
 import { encryptCredential } from "@cognelo/core";
@@ -94,7 +95,8 @@ test("atomic Test AI grading supports cancel, keep, discard, failed requests and
     // Browser cancellation during the second student's first question.
     reset("gate-third");
     await page.goto(`/courses/${data.courseId}/gradebook/activities/${activityId}`);
-    await page.getByRole("button", { name: "AI-assess all submissions", exact: true }).click();
+    await openActivityReportActions(page);
+    await page.getByRole("menuitem", { name: "AI-assess all submissions", exact: true }).click();
     await page.getByRole("dialog", { name: "Prepare batch AI grading" }).getByRole("button", { name: "Start AI grading", exact: true }).click();
     await expect.poll(() => calls, { timeout: 30_000 }).toBe(3);
     expect(await evidence()).toEqual(before);

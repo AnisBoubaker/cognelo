@@ -1,3 +1,4 @@
+import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { prisma } from "@cognelo/db";
 import { test, expect } from "./fixtures/bank-course";
 import { createAuthenticatedApi } from "./fixtures/auth";
@@ -22,7 +23,8 @@ test("teachers strike their own broadcasts and private replies while preserving 
     await expect(learnerDialog.getByText("Earlier broadcast to withdraw.", { exact: true })).toBeVisible();
     expect(await learnerDialog.getByRole("button", { name: /^Delete/ }).count()).toBe(0);
     await teacherPage.goto(`/courses/${data.courseId}/gradebook/activities/${data.activityId}`);
-    await teacherPage.getByRole("button", { name: "Message students", exact: true }).click();
+    await openActivityReportActions(teacherPage);
+    await teacherPage.getByRole("menuitem", { name: "Message students", exact: true }).click();
     const teacherDialog = teacherPage.getByRole("dialog", { name: "Activity messages", exact: true });
     const broadcastBubble = teacherDialog.getByRole("article").filter({ hasText: "Earlier broadcast to withdraw." });
     await broadcastBubble.getByRole("button", { name: "Delete broadcast for all recipients", exact: true }).click();
