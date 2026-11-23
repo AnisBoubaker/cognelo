@@ -1,3 +1,4 @@
+import { readCodingSourceFiles } from "./coding-files";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { prisma as corePrisma, type Prisma as CorePrisma } from "@cognelo/db";
@@ -134,6 +135,7 @@ export async function getCodingExerciseAiFeedbackTeacherSubmission(input: {
   return {
     kind: "coding-exercise",
     sourceCode: execution.sourceCode,
+    ...(readCodingSourceFiles(execution.sourceFiles) ? { files: readCodingSourceFiles(execution.sourceFiles) } : {}),
     language: parseCodingExerciseConfig(input.activity.config).language,
     resultSummary: toRecord(latestTests.resultSummary),
     submittedAt: execution.updatedAt.toISOString()
@@ -340,6 +342,7 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
       prompt: config.prompt,
       language: config.language,
       starterCode: config.starterCode,
+      ...(config.files ? { providedFiles: config.files } : {}),
       studentTemplateSource: config.studentTemplateSource,
       teachingLanguage,
       referenceSolution: reference?.sourceCode ?? ""

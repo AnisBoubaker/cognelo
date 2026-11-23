@@ -19,6 +19,7 @@ type SolutionResult = Exclude<Awaited<ReturnType<typeof generateCodingExerciseSo
 
 export const createCodingExerciseBankActivityVariation: BankActivityVariationHandler = async (input) => {
   const sourceConfig = parseCodingExerciseConfig(input.sourceActivity.config);
+  if (sourceConfig.files) throw new AppError(409, "CODING_EXERCISE_PROJECT_VARIATION_UNSUPPORTED", "Duplicate this exercise and edit its individual files. Automatic project variations are not available.");
   if (sourceConfig.responseMode === "blanks") {
     throw new AppError(409, "CODING_EXERCISE_BLANK_VARIATION_UNSUPPORTED", "Duplicate this exercise and edit its blanks manually. Automatic blank variations are not available.");
   }

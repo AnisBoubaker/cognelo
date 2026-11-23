@@ -11,6 +11,7 @@ type CodingExerciseReviewAttempt = {
   createdAt: string;
   languageKey: string;
   sourceCode: string;
+  files?: unknown;
   resultSummary: Record<string, unknown>;
   aiFeedback?: { feedback?: Record<string, unknown> } | null;
 };
@@ -91,6 +92,7 @@ export function CodingExerciseManualGradingPanel({
             readOnly
             submission={{
               sourceCode: selectedAttempt.sourceCode,
+              files: selectedAttempt.files,
               language: selectedAttempt.languageKey,
               resultSummary: selectedAttempt.resultSummary
             }}

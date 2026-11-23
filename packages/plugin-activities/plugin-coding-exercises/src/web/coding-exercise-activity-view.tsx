@@ -1,8 +1,13 @@
 "use client";
+import { defaultCodingFileName, codingFiles, codingFilePrivate, codingFileNameSchema, codingFileBlankTemplate, referenceCodingFiles, formatCodingSourceFiles, type CodingFile, type CodingSourceFile, type CodingFilePrivate } from "../coding-files";
+import { CodingFileTabs } from "./coding-file-tabs";
+import { CodingFilesView } from "./coding-files-view";
+import { CodingProjectEditor } from "./coding-project-editor";
+import type { AuthoringBlankRange } from "./code-blanks-authoring-model";
 import { assembleCodingBlankSource, codingBlankAnswer, codingBlankIds, codingBlankResponseState, readCodingBlankResponse, type CodingBlankAnswers } from "../code-blanks";
 import { CodeBlanksAuthoring } from "./code-blanks-authoring";
 import { CodeBlanksEditor } from "./code-blanks-editor";
-import { HelpLabel, SideNavigation, useDialogs } from "@cognelo/activity-ui";
+import { HelpLabel, SideNavigation, MonacoModelGroup, MonacoModelScope, useDialogs } from "@cognelo/activity-ui";
 import { CodingExerciseGradingGeneral } from "./coding-exercise-grading-general";
 
 import { DialogCloseButton, DialogHeader, getDialogCloseLabel } from "@cognelo/activity-ui";
@@ -12,7 +17,7 @@ import { ActionIcon, ConfirmationDialog, useBodyScrollLock, useApplicationTime, 
 import { type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ActivityExecutionStateHost, TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
-import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, ProgressDialog, RichTextEditor, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
+import { CodeEditor, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, ProgressDialog, RichTextEditor, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
   balanceCodingExerciseAiRubricCriterionWeights,
   buildCodingExerciseStudentTemplateProjectionFromSource,
@@ -38,7 +43,7 @@ import {
 } from "../coding-exercises";
 import {
   getCodingExerciseActivityConfig,
-  getCodingExerciseInitialStudentSource
+  getCodingExerciseInitialStudentSource, getCodingExerciseStudentFiles
 } from "./coding-exercise-student-source";
 import { formatCodingExercisesMessage, normalizeCodingExercisesLocale, type CodingExercisesLocale } from "./messages";
 import { applyGeneratedCodingExerciseTests, type TestGenerationMode } from "./coding-exercise-generated-tests";
@@ -84,6 +89,7 @@ type CodingExecution = {
   kind: "run" | "submit";
   status: "pending" | "completed" | "failed";
   sourceCode: string;
+  files?: CodingSourceFile[];
   stdin: string;
   stdout?: string | null;
   stderr?: string | null;
@@ -183,6 +189,7 @@ type CodingExerciseClient = {
     activityId: string,
     input: {
       sourceCode: string;
+      files?: CodingSourceFile[];
       blankAnswers?: CodingBlankAnswers;
       blankTemplate?: string;
       stdin?: string;
@@ -197,7 +204,7 @@ type CodingExerciseClient = {
   submitCode: (
     courseId: string,
     activityId: string,
-    input: { sourceCode: string; blankAnswers?: CodingBlankAnswers; blankTemplate?: string }
+    input: { sourceCode: string; files?: CodingSourceFile[]; blankAnswers?: CodingBlankAnswers; blankTemplate?: string }
   ) => Promise<{
     execution: CodingExecution;
     availability: CodingAttemptAvailability;
@@ -250,6 +257,8 @@ type CodingExerciseAiGenerationClient = {
     templateVisibleLineNumbers: number[];
     visibleTestCount: number;
     hiddenTestCount: number;
+    projectFiles?: CodingExerciseConfig["files"];
+    projectReferences?: CodingExercisePrivateConfig["fileSources"];
     existingTests?: { sampleTests: SampleTest[]; hiddenTests: HiddenTest[] };
     knowledge: ActivityKnowledgeGenerationRequest;
   }) => Promise<
@@ -325,8 +334,8 @@ export function CodingExerciseActivityView({
 }: CodingExerciseActivityViewProps) {
   const pluginLocale = normalizeCodingExercisesLocale(locale);
   const actionCopy = getEditActionBarCopy(pluginLocale);
-  const t = (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) =>
-    formatCodingExercisesMessage(pluginLocale, key, values);
+  const t = useCallback((key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) =>
+    formatCodingExercisesMessage(pluginLocale, key, values), [pluginLocale]);
   const notifications = useNotifications();
   const dialogs = useDialogs();
   const knowledgeGeneration = useActivityKnowledgeGeneration();
@@ -336,6 +345,8 @@ export function CodingExerciseActivityView({
     privateConfig: CodingExercisePrivateConfig;
     language: string;
   } | null>(null);
+  const authoringFileHistories = useRef(new Map<string, Map<number, AuthoringBlankRange[]>>());
+  useEffect(() => () => { authoringFileHistories.current.clear(); }, [activity.id]);
   const previousActivityIdRef = useRef(activity.id);
   const studentViewModeRef = useRef(studentViewMode);
   studentViewModeRef.current = studentViewMode;
@@ -357,6 +368,9 @@ export function CodingExerciseActivityView({
       privateConfig: parseCodingExercisePrivateConfig({})
     })
   );
+  const [authoringLoaded, setAuthoringLoaded] = useState(!canManage);
+  const [authoringReload, setAuthoringReload] = useState(0);
+  const [authoringLoadFailed, setAuthoringLoadFailed] = useState(false);
   const [referenceValidationSummary, setReferenceValidationSummary] = useState<Record<string, unknown> | null>(null);
   const [expandedSampleTestIds, setExpandedSampleTestIds] = useState<string[]>([]);
   const [expandedHiddenTestIds, setExpandedHiddenTestIds] = useState<string[]>([]);
@@ -387,7 +401,15 @@ export function CodingExerciseActivityView({
   const [editorCode, setEditorCode] = useState(() => getCodingExerciseInitialStudentSource(activity.config));
   const [restoredBlankTemplate, setRestoredBlankTemplate] = useState<string | null>(null);
   const [blankAnswers, setBlankAnswers] = useState<CodingBlankAnswers>({});
+  const [sourceFiles, setSourceFiles] = useState<CodingSourceFile[]>(() => getCodingExerciseStudentFiles(getCodingExerciseActivityConfig(activity.config)));
+  const [selectedFileId, setSelectedFileId] = useState("main");
   const isBlanks = config.responseMode === "blanks";
+  const fileDefinitions = readOnly && sourceFiles.length ? sourceFiles.map(file => ({ ...file, starterCode: "", studentTemplateSource: file.studentTemplateSource ?? "{{ STUDENT_CODE }}" })) : codingFiles(config);
+  const activeFile = fileDefinitions.find(file => file.id === selectedFileId) ?? fileDefinitions[0];
+  const activeSourceFile = sourceFiles.find(file => file.id === activeFile.id);
+  const activeFilePrivate = codingFilePrivate(privateConfig, activeFile.id, config.files ? "" : referenceSolution);
+  const blankNumberOffset = fileDefinitions.slice(0, fileDefinitions.indexOf(activeFile)).reduce((count, file) => count + codingBlankIds(file.blankTemplate ?? "").length, 0);
+  const projectReferenceSource = config.files ? formatCodingSourceFiles(referenceCodingFiles(config, privateConfig, referenceSolution)) : referenceSolution;
   const maxPracticeRuns = getCodingExerciseMaxTestRuns(config);
   const practiceRunLoadError = t("loadPracticeRunsError");
   const showPracticeRuns = maxPracticeRuns !== 0;
@@ -438,7 +460,7 @@ export function CodingExerciseActivityView({
   const sampleValidationTests = getReferenceValidationTests(referenceValidationSummary, "sampleTests");
   const hiddenValidationTests = getReferenceValidationTests(referenceValidationSummary, "hiddenTests");
   const templateProjection = buildCodingExerciseStudentTemplateProjectionFromSource(
-    config.studentTemplateSource || buildCodingExerciseTemplateSource("", "")
+    activeSourceFile?.studentTemplateSource ?? activeFile.studentTemplateSource ?? buildCodingExerciseTemplateSource("", "")
   );
   const visibleSampleTests = normalizeCodingExerciseSampleTests(config.sampleTests);
   const isPersonalizedTest = selectedSampleTestId === personalizedTestId;
@@ -484,6 +506,8 @@ export function CodingExerciseActivityView({
     }
     if (isNewActivity || canManage) {
       setEditorCode(getCodingExerciseInitialStudentSource(nextConfig));
+      setSourceFiles(getCodingExerciseStudentFiles(nextConfig));
+      setSelectedFileId("main");
       setBlankAnswers({});
     }
     setSelectedSampleTestId(sampleTests[0]?.id ?? personalizedTestId);
@@ -570,11 +594,14 @@ export function CodingExerciseActivityView({
         const nextConfig = getCodingExerciseActivityConfig(JSON.parse(activityConfigKey));
         const restored = readCodingBlankResponse(saved);
         const displayTemplate = readOnly && restored ? restored.blankTemplate : nextConfig.blankTemplate ?? "";
-        const answers = nextConfig.responseMode === "blanks" ? Object.fromEntries(codingBlankIds(displayTemplate).map(id => [id, codingBlankAnswer(restored?.blankAnswers ?? {}, id)])) : {};
+        const files = getCodingExerciseStudentFiles(nextConfig, saved, readOnly);
+        const allTemplates = nextConfig.files ? files.map(file => file.blankTemplate ?? "").join("\n") : displayTemplate;
+        const answers = nextConfig.responseMode === "blanks" ? Object.fromEntries(codingBlankIds(allTemplates).map(id => [id, codingBlankAnswer(restored?.blankAnswers ?? {}, id)])) : {};
         const sourceCode = nextConfig.responseMode === "blanks"
-          ? codingBlankResponseState(displayTemplate, answers).sourceCode
-          : typeof saved?.sourceCode === "string" ? saved.sourceCode : initialSourceCode;
+          ? Object.values(answers).some(value => value.trim()) ? nextConfig.files ? formatCodingSourceFiles(files) : codingBlankResponseState(displayTemplate, answers).sourceCode : ""
+          : nextConfig.files || files.length ? formatCodingSourceFiles(files) : typeof saved?.sourceCode === "string" ? saved.sourceCode : initialSourceCode;
         if (cancelled) return;
+        setSourceFiles(files);
         setRestoredBlankTemplate(displayTemplate);
         setBlankAnswers(answers);
         setEditorCode(sourceCode);
@@ -606,12 +633,16 @@ export function CodingExerciseActivityView({
 
   useEffect(() => {
     if (!canManage || !course?.id || !codingClient) {
+      setAuthoringLoaded(true);
       return;
     }
-
+    let cancelled = false;
+    setAuthoringLoaded(false);
+    setAuthoringLoadFailed(false);
     codingClient
       .listHiddenTests(course.id, activity.id)
       .then((result) => {
+        if (cancelled) return;
         setHiddenTests(result.tests);
         setReferenceSolution(result.referenceSolution?.sourceCode ?? "");
         setPrivateConfig(parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {}));
@@ -628,9 +659,11 @@ export function CodingExerciseActivityView({
         );
         setReferenceValidationSummary(result.referenceSolution?.validationSummary ?? null);
         setError("");
+        setAuthoringLoaded(true);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : t("loadHiddenTestsError")));
-  }, [activity.id, canManage, course?.id]);
+      .catch((err) => { if (!cancelled) { setAuthoringLoadFailed(true); setError(err instanceof Error ? err.message : t("loadHiddenTestsError")); } });
+    return () => { cancelled = true; };
+  }, [activity.id, canManage, course?.id, authoringReload]);
 
   useEffect(() => {
     if (canManage || deferSubmission || !course?.id || !codingClient?.listHistory) {
@@ -792,16 +825,71 @@ export function CodingExerciseActivityView({
 
   function toggleTemplateVisibleLine(lineIndex: number) {
     aiGenerationDraftRef.current = null;
-    setPrivateConfig((current) => {
-      const visibleLineNumbers = current.templateVisibleLineNumbers.includes(lineIndex)
-        ? current.templateVisibleLineNumbers.filter((value) => value !== lineIndex)
-        : [...current.templateVisibleLineNumbers, lineIndex].sort((left, right) => left - right);
+    const visible = activeFilePrivate.templateVisibleLineNumbers;
+    updateAuthorFilePrivate({ templateVisibleLineNumbers: visible.includes(lineIndex)
+      ? visible.filter(value => value !== lineIndex) : [...visible, lineIndex].sort((left, right) => left - right) });
+  }
 
-      return {
-        ...current,
-        templateVisibleLineNumbers: visibleLineNumbers
-      };
+  function blankAuthoringHistory(id: string) {
+    const key = `${activity.id}:${id}`;
+    let history = authoringFileHistories.current.get(key);
+    if (!history) { history = new Map(); authoringFileHistories.current.set(key, history); }
+    return history;
+  }
+  function updateAuthorFile(id: string, patch: Partial<CodingFile>) {
+    setConfig(current => {
+      if (!current.files) return { ...current, ...patch };
+      const files = current.files.map(file => file.id === id ? { ...file, ...patch } : file);
+      return { ...current, files, starterCode: files[0].starterCode, blankTemplate: files[0].blankTemplate, studentTemplateSource: files[0].studentTemplateSource };
     });
+  }
+  function updateAuthorFilePrivate(patch: Partial<CodingFilePrivate>) {
+    aiGenerationDraftRef.current = null;
+    const { referenceSolution: nextReference, ...templatePatch } = patch;
+    if (!config.files) {
+      if (nextReference !== undefined) setReferenceSolution(nextReference);
+      setPrivateConfig(current => ({ ...current, ...templatePatch }));
+      return;
+    }
+    setPrivateConfig(current => ({ ...current,
+      fileSources: { ...current.fileSources, [activeFile.id]: { ...codingFilePrivate(current, activeFile.id), ...patch } },
+      ...(activeFile.id === config.files![0].id ? templatePatch : {}) }));
+  }
+  function initializePrivateFiles() {
+    if (config.files) return;
+    const first = codingFiles(config)[0];
+    setPrivateConfig(current => ({ ...current, fileSources: { ...current.fileSources,
+      [first.id]: codingFilePrivate(current, first.id, referenceSolution) } }));
+  }
+  function validFileName(name: string, excluding?: string) {
+    if (!codingFileNameSchema.safeParse(name).success || codingFiles(config).some(file => file.id !== excluding && file.name.toLowerCase() === name.toLowerCase())) {
+      notifications.error(t("invalidFileName")); return false;
+    }
+    return true;
+  }
+  function addFile(name: string) {
+    if (!validFileName(name) || codingFiles(config).length >= 20) return false;
+    initializePrivateFiles();
+    const id = `file-${crypto.randomUUID()}`;
+    const file: CodingFile = { id, name, starterCode: "", ...(isBlanks ? { blankTemplate: "" } : {}), studentTemplateSource: "{{ STUDENT_CODE }}" };
+    setConfig(current => ({ ...current, files: [...codingFiles(current), file] }));
+    setPrivateConfig(current => ({ ...current, fileSources: { ...current.fileSources,
+      [id]: { referenceSolution: "", templateSource: "{{ STUDENT_CODE }}", templateVisibleLineNumbers: [] } } }));
+    setSelectedFileId(id); return true;
+  }
+  function renameFile(id: string, name: string) {
+    if (!validFileName(name, id)) return false;
+    initializePrivateFiles();
+    setConfig(current => ({ ...current, files: codingFiles(current).map(file => file.id === id ? { ...file, name } : file) }));
+    return true;
+  }
+  async function removeFile(id: string) {
+    const file = codingFiles(config).find(file => file.id === id);
+    if (!file || !await dialogs.confirm({ message: t("removeFileConfirm", { name: file.name }), confirmVariant: "danger" })) return;
+    setConfig(current => ({ ...current, files: current.files?.filter(file => file.id !== id) }));
+    setPrivateConfig(current => ({ ...current, fileSources: Object.fromEntries(Object.entries(current.fileSources ?? {}).filter(([key]) => key !== id)),
+      blankReferenceAnswers: Object.fromEntries(Object.entries(current.blankReferenceAnswers ?? {}).filter(([key]) => !codingBlankIds(file.blankTemplate ?? "").includes(key))) }));
+    setSelectedFileId(codingFiles(config)[0].id);
   }
 
   function toggleSampleTest(testId: string) {
@@ -853,7 +941,11 @@ export function CodingExerciseActivityView({
       if (aiFeedbackValidationMessage) {
         throw new Error(aiFeedbackValidationMessage);
       }
-      const normalizedPrivateConfig = parseCodingExercisePrivateConfig(getPersistedPrivateConfig(privateConfig));
+      const normalizedPrivateConfig = parseCodingExercisePrivateConfig({ ...getPersistedPrivateConfig(privateConfig),
+        ...(config.files ? { fileSources: Object.fromEntries(config.files.map((file, index) => [file.id,
+          privateConfig.fileSources?.[file.id] ?? { referenceSolution: isBlanks ? assembleCodingBlankSource(file.blankTemplate ?? "", privateConfig.blankReferenceAnswers ?? {}) : index === 0 ? referenceSolution : "",
+            templateSource: index === 0 ? privateConfig.templateSource || "{{ STUDENT_CODE }}" : "{{ STUDENT_CODE }}",
+            templateVisibleLineNumbers: index === 0 ? privateConfig.templateVisibleLineNumbers : [] }])) } : {}) });
 
       if (!normalizedPrivateConfig.templateSource.includes(codingExerciseTemplateInsertionToken)) {
         throw new Error(t("templateSourceMissingMarker"));
@@ -876,6 +968,9 @@ export function CodingExerciseActivityView({
         ...(isBlanks ? { blankTemplate: config.blankTemplate ?? "" } : {}),
         ...(config.maxTestRuns !== undefined ? { maxTestRuns: config.maxTestRuns } : {}),
         ...(privateConfig.aiFeedback.testsEnabled !== undefined ? { testsEnabled: privateConfig.aiFeedback.testsEnabled } : {}),
+        ...(config.files ? { files: config.files.map(file => ({ ...file, starterCode: isBlanks ? "" : file.starterCode,
+          studentTemplateSource: buildCodingExerciseStudentTemplateSource(codingFilePrivate(normalizedPrivateConfig, file.id).templateSource,
+            codingFilePrivate(normalizedPrivateConfig, file.id).templateVisibleLineNumbers, config.language) })) } : {}),
         starterCode: isBlanks ? "" : config.starterCode,
         studentTemplateSource: buildCodingExerciseStudentTemplateSource(
           normalizedPrivateConfig.templateSource,
@@ -885,8 +980,8 @@ export function CodingExerciseActivityView({
         sampleTests: normalizeCodingExerciseSampleTests(config.sampleTests),
         maxEditorSeconds: config.maxEditorSeconds
       };
-      if (isBlanks && !codingBlankIds(config.blankTemplate ?? "").length) throw new Error(t("blankTemplateInvalid"));
-      const savedReferenceSolution = isBlanks
+      if (isBlanks && !codingBlankIds(codingFileBlankTemplate(config)).length) throw new Error(t("blankTemplateInvalid"));
+      const savedReferenceSolution = config.files ? projectReferenceSource : isBlanks
         ? assembleCodingBlankSource(config.blankTemplate ?? "", privateConfig.blankReferenceAnswers ?? {}) : referenceSolution;
       const hiddenTestsInput = {
         tests: hiddenTests.map((test, index) => ({
@@ -969,7 +1064,7 @@ export function CodingExerciseActivityView({
     } finally {
       setSaving(false);
     }
-  }, [activity.id, canManage, codingClient, config, course?.id, currentSnapshot, description, hiddenTests, isBlanks, notifications, onSave, privateConfig, referenceSolution, t, title]);
+  }, [activity.id, canManage, codingClient, config, course?.id, currentSnapshot, description, hiddenTests, isBlanks, notifications, onSave, privateConfig, referenceSolution, projectReferenceSource, pluginLocale, t, title]);
 
   useUnsavedChangesGuard(
     useMemo(
@@ -1043,7 +1138,7 @@ export function CodingExerciseActivityView({
       notifications.error(t("generateSolutionPromptRequired"));
       return;
     }
-    if (hasExistingGeneratedSolutionContent(config, privateConfig, referenceSolution)) {
+    if (hasExistingGeneratedSolutionContent(config, privateConfig, projectReferenceSource)) {
       setReplacementDialog("solution");
       return;
     }
@@ -1051,7 +1146,7 @@ export function CodingExerciseActivityView({
   }
 
   async function generateSolution() {
-    if (!aiGenerationClient || !config.language) {
+    if (!aiGenerationClient || !config.language || (config.files?.length ?? 0) > 1) {
       return;
     }
 
@@ -1073,10 +1168,12 @@ export function CodingExerciseActivityView({
       setConfig((current) => ({
         ...current,
         starterCode: result.starterCode,
-        studentTemplateSource: result.templateSource
+        studentTemplateSource: result.templateSource,
+        ...(current.files ? { files: current.files.map((file, index) => index === 0 ? { ...file, starterCode: result.starterCode, studentTemplateSource: result.templateSource } : file) } : {})
       }));
       setReferenceSolution(result.referenceSolution);
       const generatedPrivateConfig = mergeCodingExerciseGeneratedSolutionPrivateConfig(privateConfig, result);
+      if (config.files) generatedPrivateConfig.fileSources = { ...privateConfig.fileSources, [config.files[0].id]: { referenceSolution: result.referenceSolution, templateSource: result.templateSource, templateVisibleLineNumbers: result.templateVisibleLineNumbers } };
       setPrivateConfig(generatedPrivateConfig);
       aiGenerationDraftRef.current = {
         prompt: config.prompt,
@@ -1107,7 +1204,7 @@ export function CodingExerciseActivityView({
     }
     const draft = aiGenerationDraftRef.current;
     const promptForGeneration = config.prompt.trim() ? config.prompt : draft?.prompt ?? "";
-    const referenceSolutionForGeneration = referenceSolution.trim() ? referenceSolution : draft?.referenceSolution ?? "";
+    const referenceSolutionForGeneration = projectReferenceSource.trim() ? projectReferenceSource : draft?.referenceSolution ?? "";
     if (promptForGeneration.trim().length < 10) {
       notifications.error(t("generateTestsPromptRequired"));
       return;
@@ -1144,7 +1241,7 @@ export function CodingExerciseActivityView({
     try {
       const draft = aiGenerationDraftRef.current;
       const promptForGeneration = config.prompt.trim() ? config.prompt : draft?.prompt ?? "";
-      const referenceSolutionForGeneration = referenceSolution.trim() ? referenceSolution : draft?.referenceSolution ?? "";
+      const referenceSolutionForGeneration = projectReferenceSource.trim() ? projectReferenceSource : draft?.referenceSolution ?? "";
       const privateConfigForGeneration = draft?.referenceSolution === referenceSolutionForGeneration ? draft.privateConfig : privateConfig;
       const persistedPrivateConfig = getPersistedPrivateConfig(privateConfigForGeneration);
       const result = await aiGenerationClient.generateTests({
@@ -1155,6 +1252,7 @@ export function CodingExerciseActivityView({
         referenceSolution: referenceSolutionForGeneration,
         templateSource: persistedPrivateConfig.templateSource,
         templateVisibleLineNumbers: persistedPrivateConfig.templateVisibleLineNumbers,
+        ...(config.files ? { projectFiles: config.files, projectReferences: Object.fromEntries(referenceCodingFiles(config, persistedPrivateConfig, referenceSolutionForGeneration).map(file => [file.id, { ...codingFilePrivate(persistedPrivateConfig, file.id), referenceSolution: file.sourceCode }])) } : {}),
         visibleTestCount,
         hiddenTestCount,
         ...(input.mode === "add" ? { existingTests: { sampleTests: visibleSampleTests, hiddenTests } } : {}),
@@ -1212,7 +1310,7 @@ export function CodingExerciseActivityView({
       notifications.error(t("languageRequired"));
       return;
     }
-    if (!title.trim() || config.prompt.trim().length < 10 || !referenceSolution.trim()) {
+    if (!title.trim() || config.prompt.trim().length < 10 || !projectReferenceSource.trim()) {
       notifications.error(t("generateRubricRequirements"));
       return;
     }
@@ -1257,7 +1355,7 @@ export function CodingExerciseActivityView({
         title,
         description,
         prompt: config.prompt,
-        referenceSolution,
+        referenceSolution: projectReferenceSource,
         language: config.language,
         locale: pluginLocale,
         knowledge: knowledgeGeneration.request
@@ -1306,6 +1404,7 @@ export function CodingExerciseActivityView({
       const isPersonalizedTest = selectedSampleTestId === personalizedTestId;
       const result = await codingClient.runCode(course.id, activity.id, {
         sourceCode: editorCode,
+        ...(config.files ? { files: sourceFiles } : {}),
         ...(isBlanks ? { blankAnswers, blankTemplate: config.blankTemplate ?? "" } : {}),
         stdin: sampleInput,
         expectedOutput: isPersonalizedTest ? "" : sampleExpectedOutput,
@@ -1322,6 +1421,7 @@ export function CodingExerciseActivityView({
         if (isPreview && executionStateHost) {
           previewRunCount.current = used;
           await executionStateHost.save({ sourceCode: editorCode,
+            ...(config.files ? { files: sourceFiles } : {}),
             ...(isBlanks ? { blankAnswers, blankTemplate: config.blankTemplate ?? "" } : {}), previewPracticeRunsUsed: used });
         }
       }
@@ -1347,11 +1447,13 @@ export function CodingExerciseActivityView({
     try {
       const result = await codingClient.submitCode(course.id, activity.id, {
         sourceCode: editorCode,
+        ...(config.files ? { files: sourceFiles } : {}),
         ...(isBlanks ? { blankAnswers, blankTemplate: config.blankTemplate ?? "" } : {})
       });
       await executionStateHost?.clear?.().catch(() => undefined);
       setSubmitExecution(result.execution);
       setEditorCode(getCodingExerciseInitialStudentSource(config));
+      setSourceFiles(getCodingExerciseStudentFiles(config));
       setBlankAnswers({});
       setCodeResetVersion((version) => version + 1);
       setRunExecution(null);
@@ -1390,10 +1492,13 @@ export function CodingExerciseActivityView({
   }, [canManage, readOnly, studentViewMode, timedAutoSubmit]);
 
   function updateStudentCode(sourceCode: string) {
-    setEditorCode(sourceCode);
+    const files = config.files ? sourceFiles.map(file => file.id === activeFile.id ? { ...file, sourceCode } : file) : [];
+    const combined = config.files ? formatCodingSourceFiles(files) : sourceCode;
+    setSourceFiles(files);
+    setEditorCode(combined);
     setSubmitExecution(null);
     if (executionStateHost && executionStateLoaded && !readOnly) {
-      void executionStateHost.save({ sourceCode, ...(isPreview ? { previewPracticeRunsUsed: previewRunCount.current } : {}) }).catch((err) => {
+      void executionStateHost.save({ sourceCode: combined, ...(config.files ? { files } : {}), ...(isPreview ? { previewPracticeRunsUsed: previewRunCount.current } : {}) }).catch((err) => {
         setError(err instanceof Error ? err.message : t("submitError"));
       });
     }
@@ -1401,9 +1506,17 @@ export function CodingExerciseActivityView({
 
   function updateStudentBlanks(answers: CodingBlankAnswers) {
     let state;
-    try { state = codingBlankResponseState(config.blankTemplate ?? "", answers); }
+    try {
+      if (config.files) {
+        const files = codingFiles(config).map(file => ({ id: file.id, name: file.name, blankTemplate: file.blankTemplate ?? "", studentTemplateSource: file.studentTemplateSource,
+          sourceCode: assembleCodingBlankSource(file.blankTemplate ?? "", answers) }));
+        state = { sourceCode: Object.values(answers).some(value => value.trim()) ? formatCodingSourceFiles(files) : "", files,
+          blankAnswers: answers, blankTemplate: codingFiles(config)[0].blankTemplate ?? "" };
+      } else state = codingBlankResponseState(config.blankTemplate ?? "", answers);
+    }
     catch (err) { setError(err instanceof Error ? err.message : t("submitError")); return; }
     setBlankAnswers(answers);
+    if ("files" in state) setSourceFiles(state.files);
     setEditorCode(state.sourceCode);
     setSubmitExecution(null);
     if (executionStateHost && executionStateLoaded && !readOnly) {
@@ -1484,8 +1597,12 @@ export function CodingExerciseActivityView({
                 : null;
 
   return (
+    <MonacoModelScope key={`${activity.id}:${canManage}:${executionDocumentKey}:${studentViewMode}:${codeResetVersion}`} inherit>
     <section className="section stack">
-      {canManage ? (
+      {canManage ? (!authoringLoaded ? <section className="inline-panel stack">
+        <p className={authoringLoadFailed ? "error-text" : "muted"}>{authoringLoadFailed ? error : t("loadingFiles")}</p>
+        {authoringLoadFailed ? <button type="button" className="secondary" onClick={() => setAuthoringReload(value => value + 1)}><ActionIcon name="refresh" />{t("retryFiles")}</button> : null}
+      </section> : (
         <form className="stack" onSubmit={saveActivityAndHiddenTests}>
           <h2>{t("authoringTitle")}</h2>
 
@@ -1506,7 +1623,8 @@ export function CodingExerciseActivityView({
                 setTestGenerationDialogOpen(false);
                 setRubricGenerationDialogOpen(false);
                 setReferenceValidationSummary(null);
-                setConfig((current) => ({ ...current, language: nextLanguage }));
+                setConfig((current) => ({ ...current, language: nextLanguage,
+                  ...(current.files ? { files: current.files.map((file, index) => index === 0 && file.name === defaultCodingFileName(current.language) ? { ...file, name: defaultCodingFileName(nextLanguage) } : file) } : {}) }));
               }}
             >
               <option value="">{t("chooseLanguage")}</option>
@@ -1522,7 +1640,11 @@ export function CodingExerciseActivityView({
           <div className="field">
             <label htmlFor="coding-response-mode">{t("answerFormat")}</label>
             <select id="coding-response-mode" value={config.responseMode ?? "code"}
-              onChange={event => setConfig(current => ({ ...current, responseMode: event.target.value as "code" | "blanks" }))}>
+              onChange={event => { const responseMode = event.target.value as "code" | "blanks";
+                setConfig(current => ({ ...current, responseMode,
+                  ...(responseMode === "blanks" ? { blankTemplate: current.blankTemplate ?? current.starterCode } : {}),
+                  ...(current.files ? { files: current.files.map(file => ({ ...file,
+                    ...(responseMode === "blanks" ? { blankTemplate: file.blankTemplate ?? file.starterCode } : {}) })) } : {}) })); }}>
               <option value="code">{t("writeCode")}</option>
               <option value="blanks">{t("fillCodeBlanks")}</option>
             </select>
@@ -1572,7 +1694,8 @@ export function CodingExerciseActivityView({
             <button
               className="secondary"
               type="button"
-              disabled={isBlanks || !config.language || generatingSolution || config.prompt.trim().length < 10}
+              title={config.files && config.files.length > 1 ? t("projectSolutionManual") : undefined}
+              disabled={isBlanks || (config.files?.length ?? 0) > 1 || !config.language || generatingSolution || config.prompt.trim().length < 10}
               onClick={requestSolutionGeneration}
             >
               <ActionIcon name="generate" />
@@ -1716,34 +1839,32 @@ export function CodingExerciseActivityView({
             document.body
           ) : null}
 
-          {isBlanks ? <CodeBlanksAuthoring template={config.blankTemplate ?? ""}
-            answers={privateConfig.blankReferenceAnswers ?? {}} language={config.language} locale={pluginLocale}
+          <CodingFileTabs files={codingFiles(config)} selected={activeFile.id} onSelect={setSelectedFileId}
+            onAdd={addFile} onRename={renameFile} onRemove={id => { void removeFile(id); }} locale={pluginLocale} />
+          {isBlanks ? <CodeBlanksAuthoring key={activeFile.id} documentId={`coding-blank-template-${activeFile.id}`} template={activeFile.blankTemplate ?? ""}
+            history={blankAuthoringHistory(activeFile.id)} numberOffset={blankNumberOffset} answers={privateConfig.blankReferenceAnswers ?? {}} language={config.language} locale={pluginLocale}
             onChange={(blankTemplate, answers) => {
-              setConfig(current => ({ ...current, blankTemplate }));
-              try {
-                const referenceAnswers = Object.fromEntries(codingBlankIds(blankTemplate).map(id => [id, codingBlankAnswer(answers, id)]));
-                setPrivateConfig(current => ({ ...current, blankReferenceAnswers: referenceAnswers }));
-                setReferenceSolution(assembleCodingBlankSource(blankTemplate, referenceAnswers));
-              } catch { /* Invalid drafts remain editable without losing reference values. */ }
+              updateAuthorFile(activeFile.id, { blankTemplate });
+              const oldIds = codingBlankIds(activeFile.blankTemplate ?? "");
+              const refs = Object.fromEntries(codingBlankIds(blankTemplate).map(id => [id, codingBlankAnswer(answers, id)]));
+              setPrivateConfig(current => ({ ...current, blankReferenceAnswers: { ...Object.fromEntries(Object.entries(current.blankReferenceAnswers ?? {}).filter(([id]) => !oldIds.includes(id))), ...refs } }));
+              if (!config.files) setReferenceSolution(assembleCodingBlankSource(blankTemplate, refs));
             }} /> : <div className="stack">
             <label className="editor-section-label">{t("starterCode")}</label>
-            <CodeEditor
-              value={config.starterCode}
-              onChange={(value) => setConfig((current) => ({ ...current, starterCode: value }))}
-              language={config.language}
-              minHeight={220}
-            />
+            <CodeEditor key={`starter:${activeFile.id}`} id={`coding-starter-${activeFile.id}`} ariaLabel={t("starterCode")} value={activeFile.starterCode}
+              onChange={value => updateAuthorFile(activeFile.id, { starterCode: value })} language={config.language} minHeight={220} />
           </div>}
 
           {!isBlanks ? <div className="stack">
             <HelpLabel help={<>{t("referenceSolutionHelp")}</>}><label className="editor-section-label">{t("referenceSolution")}</label></HelpLabel>
 
             <CodeEditor
-              value={referenceSolution}
+              key={`reference:${activeFile.id}`} id={`coding-reference-${activeFile.id}`} ariaLabel={t("referenceSolution")}
+              value={activeFilePrivate.referenceSolution}
               disabled={isBlanks}
               onChange={(value) => {
                 aiGenerationDraftRef.current = null;
-                setReferenceSolution(value);
+                updateAuthorFilePrivate({ referenceSolution: value });
               }}
               language={config.language}
               minHeight={220}
@@ -1762,32 +1883,23 @@ export function CodingExerciseActivityView({
             <HelpLabel help={<><p>{t("templateSourceHelp")}</p><p>{t("templateVisibleLinesHelp")}</p></>}><label className="editor-section-label">{t("templateSource")}</label></HelpLabel>
 
             <CodeEditor
-              value={privateConfig.templateSource || buildCodingExerciseTemplateSource("", "")}
+              key={`template:${activeFile.id}`} id={`coding-template-${activeFile.id}`} ariaLabel={t("templateSource")}
+              value={activeFilePrivate.templateSource || buildCodingExerciseTemplateSource("", "")}
               onChange={(value) => {
                 aiGenerationDraftRef.current = null;
-                setPrivateConfig((current) => {
-                  const nextTemplate = value || buildCodingExerciseTemplateSource("", "");
-                  const templateParts = splitCodingExerciseTemplateSource(nextTemplate);
-                  return {
-                    ...current,
-                    templateSource: nextTemplate,
-                    templateVisibleLineNumbers: current.templateVisibleLineNumbers.filter(
-                      (lineNumber) => lineNumber < nextTemplate.split("\n").length
-                    ),
-                    templatePrefix: templateParts.prefix,
-                    templateSuffix: templateParts.suffix
-                  };
-                });
+                const nextTemplate = value || buildCodingExerciseTemplateSource("", "");
+                updateAuthorFilePrivate({ templateSource: nextTemplate,
+                  templateVisibleLineNumbers: activeFilePrivate.templateVisibleLineNumbers.filter(line => line < nextTemplate.split("\n").length) });
               }}
               language={config.language}
               getLineClassName={(lineIndex) =>
-                privateConfig.templateVisibleLineNumbers.includes(lineIndex)
+                activeFilePrivate.templateVisibleLineNumbers.includes(lineIndex)
                   ? "coding-exercise-template-line is-visible"
                   : "coding-exercise-template-line"
               }
               leftRail={renderTemplateVisibilityRail(
-                (privateConfig.templateSource || buildCodingExerciseTemplateSource("", "")).split("\n"),
-                privateConfig.templateVisibleLineNumbers,
+                (activeFilePrivate.templateSource || buildCodingExerciseTemplateSource("", "")).split("\n"),
+                activeFilePrivate.templateVisibleLineNumbers,
                 toggleTemplateVisibleLine,
                 t
               )}
@@ -1852,10 +1964,10 @@ export function CodingExerciseActivityView({
                   {aiGenerationClient ? (
                     <button
                       className="button secondary"
-                      disabled={!config.language || generatingRubric || !title.trim() || config.prompt.trim().length < 10 || !referenceSolution.trim()}
+                      disabled={!config.language || generatingRubric || !title.trim() || config.prompt.trim().length < 10 || !projectReferenceSource.trim()}
                       title={!config.language
                         ? t("languageRequired")
-                        : !title.trim() || config.prompt.trim().length < 10 || !referenceSolution.trim()
+                        : !title.trim() || config.prompt.trim().length < 10 || !projectReferenceSource.trim()
                           ? t("generateRubricRequirements")
                           : undefined}
                       type="button"
@@ -1944,7 +2056,7 @@ export function CodingExerciseActivityView({
             <button
               className="secondary"
               type="button"
-              disabled={!config.language || generatingTests || config.prompt.trim().length < 10 || !referenceSolution.trim()}
+              disabled={!config.language || generatingTests || config.prompt.trim().length < 10 || !projectReferenceSource.trim()}
               onClick={requestTestsGeneration}
             >
               <ActionIcon name="generate" />
@@ -2192,7 +2304,7 @@ export function CodingExerciseActivityView({
               <EditActionBar
                 isDirty={hasUnsavedChanges}
                 isSaving={saving}
-                saveDisabled={!config.language || aiFeedbackValidationMessages.length > 0}
+                saveDisabled={!authoringLoaded || !config.language || aiFeedbackValidationMessages.length > 0}
                 savedLabel={actionCopy.saved}
                 unsavedLabel={actionCopy.unsaved}
                 saveLabel={t("saveCodingExercise")}
@@ -2209,7 +2321,7 @@ export function CodingExerciseActivityView({
           <EditActionBar
             isDirty={hasUnsavedChanges}
             isSaving={saving}
-            saveDisabled={!config.language || aiFeedbackValidationMessages.length > 0}
+            saveDisabled={!authoringLoaded || !config.language || aiFeedbackValidationMessages.length > 0}
             savedLabel={actionCopy.saved}
             unsavedLabel={actionCopy.unsaved}
             saveLabel={t("saveCodingExercise")}
@@ -2219,7 +2331,7 @@ export function CodingExerciseActivityView({
             onSave={saveCodingExercise}
           />
         </form>
-      ) : (
+      )) : (
         <div className="stack">
           {studentViewMode === "previous" ? (
             <CodingAttemptHistoryList attempts={previousAttempts} language={config.language} locale={pluginLocale} />
@@ -2253,15 +2365,18 @@ export function CodingExerciseActivityView({
                     } as CSSProperties
                   }
                 >
+                  <MonacoModelGroup id={`sources:${activity.id}`}>
                   <div className="coding-exercise-editor-pane">
-                    {isBlanks ? (executionStateLoaded ? <CodeBlanksEditor key={`${executionDocumentKey}:${codeResetVersion}`}
-                      template={readOnly && restoredBlankTemplate !== null ? restoredBlankTemplate : config.blankTemplate ?? ""} answers={blankAnswers} onChange={updateStudentBlanks}
+                    {fileDefinitions.length > 1 ? <CodingFileTabs files={fileDefinitions} selected={activeFile.id} onSelect={setSelectedFileId} locale={pluginLocale} /> : null}
+                    {isBlanks ? (executionStateLoaded ? <CodeBlanksEditor key={`${executionDocumentKey}:${activeFile.id}:${codeResetVersion}`}
+                      template={sourceFiles.length || config.files ? activeSourceFile?.blankTemplate ?? activeFile.blankTemplate ?? "" : readOnly && restoredBlankTemplate !== null ? restoredBlankTemplate : config.blankTemplate ?? ""} numberOffset={blankNumberOffset} answers={blankAnswers} onChange={updateStudentBlanks}
                       prefix={templateProjection.readOnlyPrefix} suffix={templateProjection.readOnlySuffix}
-                      readOnly={readOnly} locale={pluginLocale} language={config.language} /> : <p>{t("loadingAnswer")}</p>) : <MonacoCodeEditor
-                      key={`${executionDocumentKey}:${codeResetVersion}`}
-                      id={`coding-exercise-student-${activity.id}`}
+                      readOnly={readOnly} locale={pluginLocale} language={config.language} /> : <p>{t("loadingAnswer")}</p>) : <CodingProjectEditor
+                      files={config.files || sourceFiles.length ? sourceFiles : [{ id: activeFile.id, name: `coding-exercise-student-${activity.id}-${activeFile.id}`, sourceCode: editorCode, studentTemplateSource: config.studentTemplateSource }]}
+                      key={`${executionDocumentKey}:${activeFile.id}:${codeResetVersion}`}
+                      id={config.files || sourceFiles.length ? activeFile.name : `coding-exercise-student-${activity.id}-${activeFile.id}`}
                       ariaLabel={activity.title || t("starterCode")}
-                      value={editorCode}
+                      value={config.files || sourceFiles.length ? activeSourceFile?.sourceCode ?? "" : editorCode}
                       onChange={updateStudentCode}
                       language={config.language}
                       height="100%"
@@ -2274,6 +2389,7 @@ export function CodingExerciseActivityView({
                     />}
                     {draftLoadFailed ? <button type="button" className="secondary" onClick={() => setDraftReload((value) => value + 1)}><ActionIcon name="refresh" /> {t("retryLoadAnswer")}</button> : null}
                   </div>
+                  </MonacoModelGroup>
 
                   {!deferSubmission ? (
                     <div className="row coding-exercise-editor-actions" style={{ alignItems: "center" }}>
@@ -2502,6 +2618,7 @@ export function CodingExerciseActivityView({
         onCancel={generatingRubric ? cancelRubricGeneration : undefined}
       />, document.body) : null}
     </section>
+    </MonacoModelScope>
   );
 }
 
@@ -2564,7 +2681,7 @@ function CodingAttemptHistoryList({
             <div className="stack coding-exercise-attempt-content">
               <div className="stack stack-tight">
                 <strong>{formatCodingExercisesMessage(locale, "submittedSolution")}</strong>
-                <CodeRenderer code={attempt.submission.sourceCode} language={language} showLineNumbers />
+                <CodingFilesView files={attempt.submission.files} sourceCode={attempt.submission.sourceCode} language={language} locale={locale} />
               </div>
               <ExecutionCard
                 execution={attempt.submission}

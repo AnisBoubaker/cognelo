@@ -6,6 +6,8 @@ CPU_EXTRA_TIME=1
 CPU_TIME_LIMIT=2
 ENABLE_COMMAND_LINE_ARGUMENTS=false
 ENABLE_COMPILER_OPTIONS=false
+# Cognelo alone constructs bounded flat project archives; build/run wrappers are always server-generated.
+ENABLE_ADDITIONAL_FILES=true
 ENABLE_NETWORK=false
 ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT=true
 ALLOW_ENABLE_PER_PROCESS_AND_THREAD_MEMORY_LIMIT=true

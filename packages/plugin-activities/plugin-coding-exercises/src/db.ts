@@ -240,6 +240,9 @@ export const codingExercisesDatabaseModule = {
     ] },
     { id: "202610260010_nullable_ai_test_score", statements: [
       `ALTER TABLE "PluginCodingExerciseAiEvaluation" ALTER COLUMN "deterministicScore" DROP NOT NULL`
+    ] },
+    { id: "202611230020_multi_file_sources", statements: [
+      `ALTER TABLE "PluginCodingExerciseExecution" ADD COLUMN IF NOT EXISTS "sourceFiles" JSONB`
     ] }
   ],
   notes: [

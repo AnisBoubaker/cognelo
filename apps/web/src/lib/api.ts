@@ -1093,6 +1093,7 @@ export type CodingExerciseExecution = {
   languageKey: string;
   judge0LanguageId: number;
   sourceCode: string;
+  files?: Array<{ id: string; name: string; sourceCode: string; blankTemplate?: string; studentTemplateSource?: string }>;
   judge0Token?: string | null;
   stdin: string;
   expectedOutput: string;

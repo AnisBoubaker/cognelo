@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ActionIcon, CodeRenderer, ConfirmationDialog } from "@cognelo/activity-ui";
+import { CodingFilesView } from "./coding-files-view";
+import { ActionIcon, ConfirmationDialog } from "@cognelo/activity-ui";
 import { CodingBlankGradingDetails } from "./coding-blank-grading-details";
 
 export type CodingExerciseAiFeedbackReviewProps = {
@@ -42,7 +43,7 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
     <div className="stack">
       <section className="inline-panel stack stack-tight">
         <h3>{t("courseDetail.feedbackReviewSubmission")}</h3>
-        {sourceCode ? <CodeRenderer code={sourceCode} language={language} showLineNumbers /> : <p className="muted">{t("courseDetail.answerUnavailable")}</p>}
+        {sourceCode ? <CodingFilesView files={submission.files} sourceCode={sourceCode} language={language} locale={locale} /> : <p className="muted">{t("courseDetail.answerUnavailable")}</p>}
         <CodingBlankGradingDetails grading={resultSummary.blankGrading} reviewRequired={reviewRequired} teacher locale={locale} />
         {tests.length ? (
           <section className="stack stack-tight">

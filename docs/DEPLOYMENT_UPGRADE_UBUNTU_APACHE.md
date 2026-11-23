@@ -10,6 +10,8 @@ Current security upgrades require the core `202610250001_security_rate_limits` a
 
 The shared grading-review capability adds core migration `202611230001_activity_grading_reviews`, applied by the same `npm run db:migrate:all` path. It creates an initially empty review table; existing exercise records and grades are unchanged. No new environment variables are required. See [required grading reviews](GRADING_REVIEWS.md).
 
+Programming Exercise file workspaces add plugin migration `202611230020_multi_file_sources`, applied by `npm run db:migrate:all`. Rebuild the maintained Judge0 image to include its archive extractor and updated language-configuration SQL, set `ENABLE_ADDITIONAL_FILES=true` in the protected runner configuration, and recreate the runner services through the existing sandbox procedure. Keep compiler options/networking disabled. Validate real separate-unit C/C++ projects and Python imports in local/preprod; after production deployment, inspect only health, project-language availability and configuration flags. No new application environment variables are required. See [file workspaces](../packages/plugin-activities/plugin-coding-exercises/docs/MULTI_FILE.md).
+
 ## Before starting
 
 You need:

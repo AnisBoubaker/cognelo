@@ -1,3 +1,4 @@
+import { codingFilesSchema, codingFilePrivateSourcesSchema } from "./coding-files";
 import { z } from "zod";
 import { codingBlankAnswersSchema, parseCodingBlankTemplate } from "./code-blanks";
 
@@ -32,6 +33,7 @@ export const codingExerciseConfigSchema = z.object({
   language: z.string().max(80).default(""),
   executionMode: codingExerciseExecutionModeSchema.default("template"),
   responseMode: z.enum(["code", "blanks"]).optional(),
+  files: codingFilesSchema.optional(),
   maxTestRuns: z.number().int().min(0).max(100000).nullable().optional(),
   testsEnabled: z.boolean().optional(),
   blankTemplate: z.string().max(40000).refine(value => {
@@ -140,6 +142,7 @@ export const codingExerciseRubricGuidanceSchema = z.string().trim().max(8000);
 export const codingExerciseRubricGuidanceInputSchema = z.object({ guidance: codingExerciseRubricGuidanceSchema });
 
 export const codingExercisePrivateConfigSchema = z.object({
+  fileSources: codingFilePrivateSourcesSchema.optional(),
   blankReferenceAnswers: codingBlankAnswersSchema.optional(),
   rubricGenerationGuidance: codingExerciseRubricGuidanceSchema.optional(),
   hiddenSupportCode: z.string().max(60000).default(""),
@@ -155,7 +158,7 @@ export type CodingExercisePrivateConfig = z.infer<typeof codingExercisePrivateCo
 export const codingExerciseHiddenTestsInputSchema = z.object({
   tests: z.array(codingExerciseHiddenTestSchema).max(codingExerciseMaxHiddenTestCount),
   sampleTests: z.array(sampleTestSchema).max(codingExerciseMaxGeneratedTestCount).default([]),
-  referenceSolution: z.string().max(60000).default(""),
+  referenceSolution: z.string().max(300000).default(""),
   privateConfig: codingExercisePrivateConfigSchema.prefault({}),
   activityConfig: codingExerciseConfigSchema.optional(),
   validateOnly: z.boolean().default(false),
@@ -287,6 +290,7 @@ export function buildCodingExerciseSource(params: {
   privateConfig: CodingExercisePrivateConfig;
   studentSourceCode: string;
   testCode?: string;
+  includeRuntimeEpilogue?: boolean;
 }) {
   const sections: string[] = [];
   const templateSource = params.privateConfig.templateSource || buildCodingExerciseTemplateSource(params.privateConfig.templatePrefix, params.privateConfig.templateSuffix);
@@ -325,7 +329,7 @@ export function buildCodingExerciseSource(params: {
     sections.push(composedTemplateSource);
   }
 
-  const runtimeEpilogue = getCodingExerciseRuntimeEpilogue(params.config.language);
+  const runtimeEpilogue = params.includeRuntimeEpilogue === false ? "" : getCodingExerciseRuntimeEpilogue(params.config.language);
   if (runtimeEpilogue) {
     sections.push(runtimeEpilogue);
   }

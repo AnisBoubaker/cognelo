@@ -1,3 +1,4 @@
+import { referenceCodingFiles, readCodingSourceFiles } from "./coding-files";
 import { codingBlankReviewRequest } from "./review-request";
 import { codingExerciseGradingInstructions } from "./grading-instructions";
 import { getCodingExerciseMaxTestRuns, parseCodingExerciseConfig } from "./coding-exercises";
@@ -60,6 +61,7 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     activityTypeKeys: ["coding-exercise"],
     getSolution: async (activity) => {
       const reference = await getCodingExerciseReferenceSolution({ activityId: activity.id });
+      if (reference && Array.isArray(activity.config?.files)) return { blocks: referenceCodingFiles(parseCodingExerciseConfig(activity.config), reference.privateConfig, reference.sourceCode).map(file => ({ kind: "code" as const, title: file.name, code: file.sourceCode, language: String(activity.config?.language ?? "text") })) };
       return reference?.sourceCode.trim()
         ? { blocks: [{ kind: "code", code: reference.sourceCode, language: String(activity.config?.language ?? "text") }] }
         : null;
@@ -69,11 +71,11 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     activityTypeKeys: ["coding-exercise"],
     reopen: async ({ activityId, userId, pluginAttemptRef, metadata, transaction }) => {
       if (!pluginAttemptRef && metadata.timedOut) return {};
-      const [execution] = await transaction.query<Array<{ sourceCode: string; resultSummary: Record<string, unknown> }>>`
-        SELECT "sourceCode", "resultSummary" FROM "PluginCodingExerciseExecution"
+      const [execution] = await transaction.query<Array<{ sourceCode: string; sourceFiles?: unknown; resultSummary: Record<string, unknown> }>>`
+        SELECT "sourceCode", "sourceFiles", "resultSummary" FROM "PluginCodingExerciseExecution"
         WHERE id = ${pluginAttemptRef} AND "activityId" = ${activityId} AND "userId" = ${userId}`;
       if (!execution) throw new AppError(409, "SUBMISSION_STATE_MISSING", "The submitted code is unavailable.");
-      return { responseState: { sourceCode: execution.sourceCode, ...(readCodingBlankResponse(execution.resultSummary?.blankResponse) ?? {}) } };
+      return { responseState: { sourceCode: execution.sourceCode, ...(readCodingSourceFiles(execution.sourceFiles) ? { files: readCodingSourceFiles(execution.sourceFiles) } : {}), ...(readCodingBlankResponse(execution.resultSummary?.blankResponse) ?? {}) } };
     }
   },
   hostCapabilities: {
@@ -244,6 +246,7 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
       }
       return {
         state: { sourceCode: execution.sourceCode ?? input.sourceCode, executionId: execution.id,
+          ...(execution.files ? { files: execution.files } : {}),
           ...(readCodingBlankResponse(execution.resultSummary.blankResponse) ?? {}) },
         pluginAttemptRef: execution.id,
         ...(execution.resultSummary.reviewRequired === true ? { reviewRequired: codingBlankReviewRequest(execution.id) } : {}),

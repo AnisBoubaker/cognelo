@@ -11,8 +11,9 @@ import { formatCodingExercisesMessage, type CodingExercisesLocale } from "./mess
 type EditorController = { sync: (document: AuthoringCodeDocument) => void; mark: () => void; remove: (id: string) => void; dispose: () => void };
 type BlankControl = { id: string; label: string; container: HTMLElement };
 
-export function CodeBlanksAuthoring({ template, answers, language, locale, onChange }: {
+export function CodeBlanksAuthoring({ template, answers, language, locale, onChange, numberOffset = 0, documentId = "coding-blank-template", history }: {
   template: string; answers: CodingBlankAnswers; language: string; locale: CodingExercisesLocale;
+  numberOffset?: number; documentId?: string; history?: Map<number, AuthoringBlankRange[]>;
   onChange: (template: string, answers: CodingBlankAnswers) => void;
 }) {
   const t = (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, number>) => formatCodingExercisesMessage(locale, key, values);
@@ -23,12 +24,12 @@ export function CodeBlanksAuthoring({ template, answers, language, locale, onCha
   const projection = useMemo(() => {
     try { return projectBlankAuthoring(template, answers); } catch { return null; }
   }, [template, answers]);
-  const current = useRef({ projection, onChange, locale });
-  current.current = { projection, onChange, locale };
+  const current = useRef({ projection, onChange, locale, numberOffset });
+  current.current = { projection, onChange, locale, numberOffset };
 
   useEffect(() => {
     if (projection) controller.current?.sync(projection);
-  }, [projection, locale]);
+  }, [projection, locale, numberOffset]);
   useEffect(() => () => { controller.current?.dispose(); controller.current = null; }, []);
 
   const mount: MonacoEditorMountHandler = (editor, monaco) => {
@@ -37,7 +38,7 @@ export function CodeBlanksAuthoring({ template, answers, language, locale, onCha
     let document = current.current.projection;
     let widgets: Parameters<typeof editor.addContentWidget>[0][] = [];
     const decorations = editor.createDecorationsCollection();
-    const rangeHistory = new Map<number, AuthoringBlankRange[]>();
+    const rangeHistory = history ?? new Map<number, AuthoringBlankRange[]>();
     let disposed = false;
 
     function selection() {
@@ -58,7 +59,7 @@ export function CodeBlanksAuthoring({ template, answers, language, locale, onCha
         return { range: new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column),
           options: { inlineClassName: "coding-authoring-blank-highlight",
             after: { content: "   ", cursorStops: monaco.editor.InjectedTextCursorStops.None },
-            hoverMessage: { value: formatCodingExercisesMessage(current.current.locale, "codeBlankNumber", { number: next.ranges.indexOf(range) + 1 }) } } };
+            hoverMessage: { value: formatCodingExercisesMessage(current.current.locale, "codeBlankNumber", { number: next.ranges.indexOf(range) + 1 + current.current.numberOffset }) } } };
       }));
       for (const widget of widgets) editor.removeContentWidget(widget);
       widgets = [];
@@ -75,7 +76,7 @@ export function CodeBlanksAuthoring({ template, answers, language, locale, onCha
         };
         widgets.push(widget);
         editor.addContentWidget(widget);
-        return { id: range.id, label: formatCodingExercisesMessage(current.current.locale, "removeCodeBlank", { number: index + 1 }), container };
+        return { id: range.id, label: formatCodingExercisesMessage(current.current.locale, "removeCodeBlank", { number: index + 1 + current.current.numberOffset }), container };
       });
       setControls(nextControls);
       updateSelection();
@@ -108,7 +109,7 @@ export function CodeBlanksAuthoring({ template, answers, language, locale, onCha
         disposed = true;
         contentListener.dispose(); selectionListener.dispose(); decorations.clear();
         for (const widget of widgets) editor.removeContentWidget(widget);
-        rangeHistory.clear();
+        if (!history) rangeHistory.clear();
       }
     };
     controller.current?.dispose();
@@ -146,17 +147,17 @@ export function CodeBlanksAuthoring({ template, answers, language, locale, onCha
     if (event.target instanceof HTMLTextAreaElement && !controller.current) setFallbackSelection({ start: event.target.selectionStart, end: event.target.selectionEnd });
   }}>
     <HelpLabel help={t("blankTemplateHelp")}><label>{t("blankTemplate")}</label></HelpLabel>
-    <MonacoCodeEditor id="coding-blank-template" ariaLabel={t("blankTemplate")} value={projection.source}
+    <MonacoCodeEditor id={documentId} ariaLabel={t("blankTemplate")} value={projection.source}
       onChange={editFallback} onEditorMount={mount} language={language} minHeight={300} />
     {portals}
     <div><button type="button" className="secondary" disabled={!canMark && !fallbackCanMark}
       onClick={() => controller.current ? controller.current.mark() : fallbackAction()}><ActionIcon name="add" />{t("markCodeBlank")}</button></div>
     {!controls.length && projection.ranges.length ? <div className="row">{projection.ranges.map((range, index) => <button
       key={range.id} type="button" className="secondary" onClick={() => fallbackAction(range.id)}>
-      <ActionIcon name="close" />{t("removeCodeBlank", { number: index + 1 })}
+      <ActionIcon name="close" />{t("removeCodeBlank", { number: index + 1 + numberOffset })}
     </button>)}</div> : null}
     {projection.ranges.length ? <><h3>{t("blankStudentPreview")}</h3>
-      <CodeBlanksEditor template={template} answers={{}} onChange={() => undefined} readOnly locale={locale} language={language} />
+      <CodeBlanksEditor numberOffset={numberOffset} template={template} answers={{}} onChange={() => undefined} readOnly locale={locale} language={language} />
     </> : null}
   </div>;
 }

@@ -290,6 +290,7 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
           mode: assessmentMode,
           executionId: execution.id,
           submittedSourceCode: execution.sourceCode ?? input.sourceCode,
+          ...(execution.files ? { files: execution.files } : {}),
           ...(readCodingBlankResponse(execution.resultSummary?.blankResponse) ?? {})
         } as Prisma.InputJsonValue;
         const coreAttempt = await startActivityAttempt(context.user, {

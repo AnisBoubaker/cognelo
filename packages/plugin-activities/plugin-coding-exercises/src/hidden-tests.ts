@@ -1,3 +1,4 @@
+import { codingSourceFilesSchema, codingFiles, referenceCodingFiles, formatCodingSourceFiles } from "./coding-files";
 import { randomUUID } from "node:crypto";
 import { assembleCodingBlankSource, codingBlankIds } from "./code-blanks";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -415,7 +416,18 @@ async function validateCodingExerciseHiddenTestsInput(params: {
 
   const activityConfig = input.activityConfig ?? params.activityConfig;
   const parsedConfig = parseCodingExerciseConfig(activityConfig);
-  if (parsedConfig.responseMode === "blanks") {
+  if (parsedConfig.files) {
+    if (codingFiles(parsedConfig).some(file => !privateConfig.fileSources?.[file.id])) {
+      throw new AppError(400, "CODING_EXERCISE_FILE_REFERENCE_REQUIRED", "Provide the reference and scaffold for each exercise file.");
+    }
+    const referenceFiles = codingSourceFilesSchema.parse(referenceCodingFiles(parsedConfig, privateConfig, input.referenceSolution));
+    if (input.referenceSolution !== formatCodingSourceFiles(referenceFiles)) {
+      throw new AppError(400, "CODING_EXERCISE_FILE_REFERENCE_INVALID", "The reference solution must match the individual reference files.");
+    }
+    if (parsedConfig.responseMode === "blanks" && !codingFiles(parsedConfig).some(file => codingBlankIds(file.blankTemplate ?? "").length)) {
+      throw new AppError(400, "CODING_EXERCISE_BLANK_REQUIRED", "Add at least one code blank across the files.");
+    }
+  } else if (parsedConfig.responseMode === "blanks") {
     const template = parsedConfig.blankTemplate ?? "";
     if (!codingBlankIds(template).length) throw new AppError(400, "CODING_EXERCISE_BLANK_REQUIRED", "Add at least one code blank.");
     const source = assembleCodingBlankSource(template, privateConfig.blankReferenceAnswers ?? {});

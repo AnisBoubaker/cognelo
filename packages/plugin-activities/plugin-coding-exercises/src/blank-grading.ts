@@ -2,10 +2,12 @@ import { AppError } from "@cognelo/core";
 import { assembleCodingBlankSource, codingBlankAnswer, codingBlankIds, type CodingBlankAnswers, type CodingBlankOutcome, type CodingBlankGrading } from "./code-blanks";
 
 /** Execution stays in the caller's sandbox adapter; this policy never persists substituted source. */
-export async function gradeCodingBlanks<T extends { summary: { accepted: boolean | null } }>(input: {
+export async function gradeCodingBlanks<T extends { summary: { accepted: boolean | null } }, Source = string>(input: {
   template: string; answers: CodingBlankAnswers; referenceAnswers: CodingBlankAnswers;
-  checkSyntax?: (source: string) => Promise<boolean>;
-  runSuite: (source: string, stopAfterFailure: boolean) => Promise<T>;
+  assembleSource?: (answers: CodingBlankAnswers) => Source;
+  sourceKey?: (source: Source) => string;
+  checkSyntax?: (source: Source) => Promise<boolean>;
+  runSuite: (source: Source, stopAfterFailure: boolean) => Promise<T>;
 }) {
   const ids = codingBlankIds(input.template);
   if (!ids.length) throw new AppError(409, "CODING_EXERCISE_BLANKS_REQUIRED", "This exercise has no code blanks to grade.");
@@ -21,11 +23,13 @@ export async function gradeCodingBlanks<T extends { summary: { accepted: boolean
   }
   const repairedAnswers = Object.fromEntries(outcomes.map(outcome => [outcome.id,
     codingBlankAnswer(outcome.answered ? input.answers : input.referenceAnswers, outcome.id)]));
-  const repairedSource = assembleCodingBlankSource(input.template, repairedAnswers);
+  const assemble = input.assembleSource ?? ((answers: CodingBlankAnswers) => assembleCodingBlankSource(input.template, answers) as Source);
+  const sourceKey = input.sourceKey ?? ((source: Source) => typeof source === "string" ? source : JSON.stringify(source));
+  const repairedSource = assemble(repairedAnswers);
   const suites = new Map<string, Promise<T>>();
-  const runSuite = (source: string, stopAfterFailure: boolean) => {
-    let promise = suites.get(source);
-    if (!promise) { promise = input.runSuite(source, stopAfterFailure); suites.set(source, promise); }
+  const runSuite = (source: Source, stopAfterFailure: boolean) => {
+    let promise = suites.get(sourceKey(source));
+    if (!promise) { promise = input.runSuite(source, stopAfterFailure); suites.set(sourceKey(source), promise); }
     return promise;
   };
   grading.syntaxPassed = input.checkSyntax ? await input.checkSyntax(repairedSource) : null;
@@ -42,10 +46,10 @@ export async function gradeCodingBlanks<T extends { summary: { accepted: boolean
       while (cursor < answered.length && failure === undefined) {
         const outcome = answered[cursor++];
         try {
-          const source = assembleCodingBlankSource(input.template, { ...input.referenceAnswers,
+          const source = assemble({ ...input.referenceAnswers,
             [outcome.id]: codingBlankAnswer(input.answers, outcome.id) });
           // A syntax-invalid combined source cannot pass when the isolated variant is identical.
-          if (source === repairedSource && grading.syntaxPassed === false) continue;
+          if (sourceKey(source) === sourceKey(repairedSource) && grading.syntaxPassed === false) continue;
           outcome.correct = (await runSuite(source, true)).summary.accepted === true;
         } catch (error) { failure = { error }; }
       }

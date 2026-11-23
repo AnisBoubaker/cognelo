@@ -1,3 +1,4 @@
+import { readCodingSourceFiles } from "./coding-files";
 import { AppError } from "@cognelo/core";
 import { exportRecord, exportText, feedbackExportBlocks, type AnswerExportBlock, type SubmissionExportHandler } from "@cognelo/activity-sdk/server";
 import { prisma } from "./db-client";
@@ -7,6 +8,7 @@ export const exportCodingSubmission: SubmissionExportHandler = async (input) => 
   const execution = ref ? await prisma.pluginCodingExerciseExecution.findFirst({ where: { id: ref, activityId: input.activity.id, ...(input.userId ? { userId: input.userId } : {}) } }) : null;
   const source = execution?.sourceCode ?? input.state?.sourceCode ?? input.metadata.submittedSourceCode ?? exportRecord(input.metadata.timedOutDraft).sourceCode;
   if (ref && !execution && typeof source !== "string") throw new AppError(409, "ANSWER_EXPORT_SOURCE_MISSING", "The submitted source is unavailable.");
+  const files = readCodingSourceFiles(execution?.sourceFiles ?? input.state?.files ?? input.metadata.files ?? exportRecord(input.metadata.timedOutDraft).files);
   const grading: AnswerExportBlock[] = [];
   if (input.includeGrading) {
     if (execution) {
@@ -23,5 +25,5 @@ export const exportCodingSubmission: SubmissionExportHandler = async (input) => 
     });
     grading.push(...feedbackExportBlocks(savedFeedback?.sanitizedFeedback ?? input.feedback, input.labels));
   }
-  return { prompt: input.includePrompt && typeof input.activity.config?.prompt === "string" && input.activity.config.prompt !== input.activity.description ? [{ kind: "markdown", text: input.activity.config.prompt }] : [], answer: [{ kind: "code", text: typeof source === "string" ? source : input.labels.noAnswer, language: exportText(input.activity.config?.language) }], grading };
+  return { prompt: input.includePrompt && typeof input.activity.config?.prompt === "string" && input.activity.config.prompt !== input.activity.description ? [{ kind: "markdown", text: input.activity.config.prompt }] : [], answer: files ? files.map(file => ({ kind: "code" as const, title: file.name, text: file.sourceCode, language: exportText(input.activity.config?.language) })) : [{ kind: "code", text: typeof source === "string" ? source : input.labels.noAnswer, language: exportText(input.activity.config?.language) }], grading };
 };

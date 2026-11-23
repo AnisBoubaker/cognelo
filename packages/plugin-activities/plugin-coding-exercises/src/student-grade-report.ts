@@ -1,3 +1,4 @@
+import { readCodingSourceFiles } from "./coding-files";
 import { codingBlankGradingSchema } from "./code-blanks";
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma as corePrisma } from "@cognelo/db";
@@ -79,6 +80,7 @@ export async function getCodingExerciseStudentGradeReport(input: {
         select: {
           id: true,
           sourceCode: true,
+          sourceFiles: true,
           languageKey: true,
           resultSummary: true,
           updatedAt: true
@@ -115,6 +117,7 @@ export async function getCodingExerciseStudentGradeReport(input: {
         submittedAt: (attempt.submittedAt ?? execution.updatedAt).toISOString(),
         language: execution.languageKey,
         sourceCode: execution.sourceCode,
+        ...(readCodingSourceFiles(execution.sourceFiles) ? { files: readCodingSourceFiles(execution.sourceFiles) } : {}),
         testScore: reviewRequired ? null : earnedWeight,
         testMaxScore: reviewRequired ? null : totalWeight,
         ...(blankGrading.success ? { blankGrading: blankGrading.data, reviewRequired } : {}),

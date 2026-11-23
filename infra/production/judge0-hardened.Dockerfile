@@ -2,6 +2,10 @@ ARG JUDGE0_BASE_IMAGE=judge0/judge0:1.13.1
 FROM ${JUDGE0_BASE_IMAGE}
 
 USER root
+RUN if [ ! -x /usr/bin/unzip ]; then \
+      apt-get update && apt-get install -y --no-install-recommends unzip \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi
 COPY infra/judge0/configure-languages.sql /api/cognelo-configure-languages.sql
 # The upstream startup scripts write the cron environment through tee, which
 # otherwise exposes service credentials in container logs. Fail if the upstream

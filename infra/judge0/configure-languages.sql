@@ -1,3 +1,15 @@
+-- Cognelo creates bounded, flat archives and trusted scripts for this built-in Judge0 project language.
+INSERT INTO languages (id, name, source_file, compile_cmd, run_cmd, is_archived)
+VALUES (89, 'Multi-file program', NULL, NULL, NULL, false)
+ON CONFLICT (id) DO UPDATE SET is_archived = false WHERE languages.name = 'Multi-file program';
+DO $project_language$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM languages WHERE id = 89 AND name = 'Multi-file program' AND is_archived = false) THEN
+    RAISE EXCEPTION 'Judge0 language 89 conflicts with the required multi-file program runtime.';
+  END IF;
+END
+$project_language$;
+
 DO $judge0_language_configuration$
 DECLARE
   configured_c_runtimes integer;

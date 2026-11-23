@@ -10,7 +10,7 @@ export const codingBlankGradingSchema = z.object({
   policy: z.literal("isolated-blanks-v1"), method: z.enum(["empty", "combined", "isolated"]),
   total: z.number().int().min(1).max(50), answered: z.number().int().min(0).max(50), correct: z.number().int().min(0).max(50),
   combinedPassed: z.boolean(), syntaxPassed: z.boolean().nullable(),
-  outcomes: z.array(z.object({ id: z.string(), number: z.number().int().min(1).max(50), answered: z.boolean(), correct: z.boolean() })).max(50)
+  outcomes: z.array(z.object({ id: z.string(), number: z.number().int().min(1).max(50), fileName: z.string().optional(), answered: z.boolean(), correct: z.boolean() })).max(50)
 });
 export type CodingBlankGrading = z.infer<typeof codingBlankGradingSchema>;
 export type CodingBlankOutcome = CodingBlankGrading["outcomes"][number];

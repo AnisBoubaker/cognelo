@@ -1,6 +1,6 @@
 import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
+import { CodingFilesView } from "./coding-files-view";
 import { CodingBlankGradingDetails } from "./coding-blank-grading-details";
-import { CodeRenderer } from "@cognelo/activity-ui";
 import { formatCodingExercisesMessage, normalizeCodingExercisesLocale } from "./messages";
 
 type StudentGradeFeedback = {
@@ -27,6 +27,7 @@ type StudentGradeReportAttempt = {
   submittedAt: string;
   language: string;
   sourceCode: string;
+  files?: unknown;
   testScore: number | null;
   testMaxScore: number | null;
   tests: StudentGradeReportTest[];
@@ -138,7 +139,7 @@ export function CodingExerciseStudentGradeReport({ score, maxScore, feedback, re
               <div className="stack coding-exercise-attempt-content">
                 <div className="stack stack-tight">
                   <strong>{t("submittedSolution")}</strong>
-                  <CodeRenderer code={attempt.sourceCode} language={attempt.language || "text"} showLineNumbers />
+                  <CodingFilesView files={attempt.files} sourceCode={attempt.sourceCode} language={attempt.language || "text"} locale={pluginLocale} />
                 </div>
                 {attempt.blankGrading ? <CodingBlankGradingDetails grading={attempt.blankGrading}
                   reviewRequired={attempt.reviewRequired === true} locale={pluginLocale} /> : <section className="stack stack-tight">
@@ -263,6 +264,7 @@ export function parseCodingExerciseStudentGradeReport(value: unknown): CodingExe
         submittedAt,
         language: stringValue(attempt.language),
         sourceCode: stringValue(attempt.sourceCode),
+        files: attempt.files,
         ...(recordValue(attempt.blankGrading).policy === "isolated-blanks-v1" ? { blankGrading: recordValue(attempt.blankGrading), reviewRequired: attempt.reviewRequired === true } : {}),
         testScore: finiteNumber(attempt.testScore),
         testMaxScore: finiteNumber(attempt.testMaxScore),

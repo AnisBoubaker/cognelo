@@ -17,7 +17,7 @@ export function CodingBlankGradingDetails({ grading, reviewRequired, teacher = f
       <h4>{t("blankChecksTitle")}</h4>
       <p>{t("blankChecksScore", { correct: parsed.data.correct, total: parsed.data.total })}</p>
       {parsed.data.outcomes.map(outcome => <div className="row" key={outcome.id} style={{ justifyContent: "space-between" }}>
-        <span>{t("codeBlankNumber", { number: outcome.number })}</span>
+        <span>{outcome.fileName ? `${outcome.fileName} · ` : ""}{t("codeBlankNumber", { number: outcome.number })}</span>
         <span>{t(!outcome.answered ? "blankUnanswered" : outcome.correct ? "blankCorrect" : "blankIncorrect")}</span>
       </div>)}
     </> : null}

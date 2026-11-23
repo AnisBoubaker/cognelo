@@ -1,3 +1,4 @@
+import { codingFilesSchema, codingFilePrivateSourcesSchema, type CodingFile, type CodingFilePrivate } from "./coding-files";
 import { z } from "zod";
 import { activityGenerationKnowledgeSchema, activityKnowledgeGenerationPrompt, AppError, generateQuestionAuthoringText, suggestActivityKnowledgeSelections, type ActivityGenerationKnowledge } from "@cognelo/core";
 import {
@@ -49,7 +50,9 @@ export const codingExerciseTestsGenerationInputSchema = z.object({
   prompt: z.string().min(10).max(12000),
   language: z.string().min(1).max(80),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
-  referenceSolution: z.string().min(1).max(60000),
+  referenceSolution: z.string().min(1).max(300000),
+  projectFiles: codingFilesSchema.optional(),
+  projectReferences: codingFilePrivateSourcesSchema.optional(),
   templateSource: z.string().min(1).max(120000),
   templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]),
   visibleTestCount: z.number().int().min(0).max(codingExerciseMaxGeneratedTestCount).prefault(codingExerciseDefaultVisibleTestCount),
@@ -66,7 +69,7 @@ export const codingExerciseRubricGenerationInputSchema = z.object({
   title: z.string().trim().min(1).max(300),
   description: z.string().max(4000).default(""),
   prompt: z.string().min(10).max(12000),
-  referenceSolution: z.string().trim().min(1).max(60000),
+  referenceSolution: z.string().trim().min(1).max(300000),
   language: z.string().min(1).max(80),
   locale: z.enum(["en", "fr", "zh", "ar"]).default("en"),
   knowledge: activityGenerationKnowledgeSchema.prefault({ mode: "ignore" })
@@ -359,6 +362,8 @@ export async function generateCodingExerciseTests(input: {
   templateVisibleLineNumbers: number[];
   visibleTestCount?: number;
   hiddenTestCount?: number;
+  projectFiles?: CodingFile[];
+  projectReferences?: Record<string, CodingFilePrivate>;
   existingTests?: ExistingTests;
   knowledge?: ActivityGenerationKnowledge;
 }) {
@@ -422,6 +427,7 @@ export async function generateCodingExerciseTests(input: {
       visibleTestCount,
       hiddenTestCount,
       existingTests: input.existingTests,
+      projectFiles: input.projectFiles, projectReferences: input.projectReferences,
       retained
     }).catch((error: unknown) => {
       if (!retained) throw error;
@@ -632,6 +638,8 @@ function buildTestsGenerationSystemPrompt(input: {
   subject: SubjectContext;
   visibleTestCount: number;
   hiddenTestCount: number;
+  projectFiles?: CodingFile[];
+  projectReferences?: Record<string, CodingFilePrivate>;
   existingTests?: ExistingTests;
   knowledge?: ActivityGenerationKnowledge;
 }) {
@@ -752,6 +760,8 @@ function buildTestsInitialPrompt(input: {
   templateSource: string;
   visibleTestCount: number;
   hiddenTestCount: number;
+  projectFiles?: CodingFile[];
+  projectReferences?: Record<string, CodingFilePrivate>;
   existingTests?: ExistingTests;
 }) {
   return [
@@ -851,6 +861,8 @@ async function validateGeneratedTests(input: {
   templateVisibleLineNumbers: number[];
   visibleTestCount: number;
   hiddenTestCount: number;
+  projectFiles?: CodingFile[];
+  projectReferences?: Record<string, CodingFilePrivate>;
   existingTests?: ExistingTests;
   retained?: ValidatedGeneratedTests;
 }) {
@@ -933,13 +945,15 @@ async function validateGeneratedTests(input: {
 
   const privateConfig = parseCodingExercisePrivateConfig({
     templateSource: input.templateSource,
-    templateVisibleLineNumbers: input.templateVisibleLineNumbers
+    templateVisibleLineNumbers: input.templateVisibleLineNumbers,
+    ...(input.projectFiles ? { fileSources: input.projectReferences } : {})
   });
   const validate = (suite: GeneratedTests, previousValidationSummary?: unknown) => validateReferenceSolutionAgainstHiddenTests({
     activityConfig: {
       prompt: input.prompt,
       language: input.language,
       executionMode: "template",
+      ...(input.projectFiles ? { files: input.projectFiles } : {}),
       starterCode: "",
       studentTemplateSource: privateConfig.templateSource,
       sampleTests: suite.sampleTests,
@@ -1241,6 +1255,8 @@ function buildTestCorrectionPrompt(
     templateSource: string;
     visibleTestCount: number;
     hiddenTestCount: number;
+    projectFiles?: CodingFile[];
+    projectReferences?: Record<string, CodingFilePrivate>;
     existingTests?: ExistingTests;
   },
   previous: string,

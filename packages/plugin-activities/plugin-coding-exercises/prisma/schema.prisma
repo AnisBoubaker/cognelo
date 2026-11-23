@@ -82,6 +82,7 @@ model PluginCodingExerciseExecution {
   languageKey              String
   judge0LanguageId         Int
   sourceCode               String
+  sourceFiles              Json?
   stdin                    String?                             @default("")
   expectedOutput           String?                             @default("")
   judge0Token              String?

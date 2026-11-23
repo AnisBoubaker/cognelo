@@ -22,6 +22,7 @@ This is the routing page for repository-maintained documentation. Read the small
 - [Email delivery and test recipients](EMAIL_DELIVERY.md): outbound mail boundary and private local capture for synthetic recipients.
 - [Durable background jobs](BACKGROUND_JOBS.md): atomic enqueue, concurrency, heartbeat/recovery and cancellation ownership.
 - [AI connections and model selection](AI_MODEL_CONNECTIONS.md): shared credentials, model catalogues, consumer preferences and compatibility.
+- [Programming Exercise file workspaces](../packages/plugin-activities/plugin-coding-exercises/docs/MULTI_FILE.md): named files in code/blanks, project execution, snapshots and runner setup.
 - [Programming Homework rubric grading](../packages/plugin-activities/plugin-coding-homework-grader/docs/GRADING.md): whole-project and generic answer rubrics, AI/manual review, shared team code scores and released results.
 - [Programming Homework editor and optional questions](PROGRAMMING_HOMEWORK_EDITOR.md): top/left navigation, question-free hand-in and ZIP-based simulation.
 - [Shared activity references and homework simulation](ACTIVITY_MATERIAL_REFERENCES.md): core reference UI, course embedding configuration and teacher-only question simulation.

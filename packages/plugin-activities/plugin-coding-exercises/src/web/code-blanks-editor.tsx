@@ -5,17 +5,17 @@ import { CodeRenderer, codeInputProtectionAttributes, type CodeInlineSlot } from
 import { codingBlankAnswer, parseCodingBlankTemplate, type CodingBlankAnswers } from "../code-blanks";
 import { formatCodingExercisesMessage, type CodingExercisesLocale } from "./messages";
 
-export function CodeBlanksEditor({ template, answers, onChange, readOnly = false, locale, language, prefix = "", suffix = "" }: {
+export function CodeBlanksEditor({ template, answers, onChange, readOnly = false, locale, language, prefix = "", suffix = "", numberOffset = 0 }: {
   template: string; answers: CodingBlankAnswers; onChange: (answers: CodingBlankAnswers) => void;
   readOnly?: boolean; locale: CodingExercisesLocale; language: string;
-  prefix?: string; suffix?: string;
+  prefix?: string; suffix?: string; numberOffset?: number;
 }) {
   const scope = useId();
   let parts;
   try { parts = parseCodingBlankTemplate(template); }
   catch { return <p role="alert">{formatCodingExercisesMessage(locale, "blankTemplateInvalid")}</p>; }
   let code = prefix;
-  let number = 0;
+  let number = numberOffset;
   const slots: CodeInlineSlot[] = [];
   for (const part of parts) {
     if (part.kind === "code") { code += part.text; continue; }

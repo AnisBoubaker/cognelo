@@ -1,3 +1,4 @@
+import { buildCodingProjectArchive, codingProjectRuntime } from "./project-runner";
 import { readExecutionServiceJson, runJudge0Job } from "@cognelo/core";
 import { getServerEnv } from "@cognelo/config";
 import { AppError, resolveExecutionRunner } from "@cognelo/core";
@@ -6,6 +7,8 @@ import { getJudge0LanguageCandidates } from "./coding-exercises";
 export type Judge0SubmissionInput = {
   languageId: number;
   sourceCode: string;
+  files?: Array<{ name: string; sourceCode: string }>;
+  syntaxOnly?: boolean;
   stdin?: string;
   expectedOutput?: string;
   cpuTimeLimit?: number;
@@ -143,9 +146,11 @@ export async function resolveJudge0Language(languageKey: string) {
 
 export async function runJudge0Submission(input: Judge0SubmissionInput): Promise<Judge0SubmissionResult> {
   const runner = await resolveExecutionRunner("judge0", getServerEnv().EMAIL_CREDENTIALS_ENCRYPTION_KEY);
+  const project = input.files ? await codingProjectRuntime(runner, input.languageId) : null;
   const result = await runJudge0Job(runner, {
-    language_id: input.languageId,
-    source_code: encodeJudge0Text(input.sourceCode),
+    language_id: project?.languageId ?? input.languageId,
+    ...(project ? { additional_files: buildCodingProjectArchive(input.files!, project.runtime, input.syntaxOnly) }
+      : { source_code: encodeJudge0Text(input.sourceCode) }),
     stdin: encodeJudge0Text(input.stdin),
     expected_output: encodeJudge0Text(input.expectedOutput),
     cpu_time_limit: input.cpuTimeLimit,

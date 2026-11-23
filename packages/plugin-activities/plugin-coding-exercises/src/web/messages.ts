@@ -2,6 +2,8 @@ export type CodingExercisesLocale = "en" | "fr" | "zh" | "ar";
 type CodingExercisesMessageLocale = Exclude<CodingExercisesLocale, "ar">;
 
 type MessageKey =
+  | "loadingFiles" | "retryFiles"
+  | "sourceFiles" | "fileName" | "addFile" | "renameFile" | "removeFile" | "invalidFileName" | "removeFileConfirm" | "projectSolutionManual"
   | "resizeCodeBlank"
   | "blankChecksTitle"
   | "blankChecksScore"
@@ -255,6 +257,16 @@ type MessageCatalog = Record<MessageKey, string>;
 
 const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
   en: {
+    loadingFiles: "Loading exercise files…",
+    retryFiles: "Retry loading files",
+    sourceFiles: "Source files",
+    fileName: "File name",
+    addFile: "Add file",
+    renameFile: "Rename {name}",
+    removeFile: "Remove {name}",
+    invalidFileName: "Use a unique filename starting with a letter, with letters, numbers, dots, underscores or hyphens. Build-script names are reserved.",
+    removeFileConfirm: "Remove {name} and its starter code and reference solution?",
+    projectSolutionManual: "Author the solution for each file using the file tabs.",
     resizeCodeBlank: "Resize blank {number}",
     blankChecksTitle: "Blank checks",
     blankChecksScore: "{correct} of {total} blanks correct",
@@ -502,6 +514,16 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noTestDetails: "No test details are available for this attempt."
   },
   fr: {
+    loadingFiles: "Chargement des fichiers de l’exercice…",
+    retryFiles: "Réessayer le chargement",
+    sourceFiles: "Fichiers source",
+    fileName: "Nom du fichier",
+    addFile: "Ajouter un fichier",
+    renameFile: "Renommer {name}",
+    removeFile: "Supprimer {name}",
+    invalidFileName: "Utilisez un nom unique commençant par une lettre, avec des lettres, chiffres, points, traits de soulignement ou traits d’union. Les noms des scripts de compilation sont réservés.",
+    removeFileConfirm: "Supprimer {name}, son code de départ et sa solution de référence ?",
+    projectSolutionManual: "Rédigez la solution de chaque fichier dans les onglets de fichiers.",
     resizeCodeBlank: "Redimensionner le blanc {number}",
     blankChecksTitle: "Vérification des blancs",
     blankChecksScore: "{correct} blanc(s) correct(s) sur {total}",
@@ -749,6 +771,16 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noTestDetails: "Aucun détail de test n’est disponible pour cette tentative."
   },
   zh: {
+    loadingFiles: "正在加载练习文件…",
+    retryFiles: "重新加载文件",
+    sourceFiles: "源文件",
+    fileName: "文件名",
+    addFile: "添加文件",
+    renameFile: "重命名 {name}",
+    removeFile: "删除 {name}",
+    invalidFileName: "文件名必须唯一，以字母开头，仅包含字母、数字、点、下划线或连字符。构建脚本名为保留名称。",
+    removeFileConfirm: "删除 {name}、起始代码及参考解答？",
+    projectSolutionManual: "请使用文件选项卡编写每个文件的解答。",
     resizeCodeBlank: "调整第 {number} 个空白的宽度",
     blankChecksTitle: "填空检查",
     blankChecksScore: "答对 {correct} / {total} 个空白",

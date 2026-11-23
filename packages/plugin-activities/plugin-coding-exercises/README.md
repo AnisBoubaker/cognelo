@@ -8,6 +8,8 @@ Teachers choose **Write code** (the existing editor) or **Fill in code blanks**.
 
 Code blanks use [equal per-blank test credit](docs/REFERENCE.md#blank-grading): fill empty values privately for the combined check, then test isolated nonempty values in the teacher context when needed. A combined failure with every isolated blank passing requests the platform’s [shared teacher review](../../../docs/GRADING_REVIEWS.md) instead of assigning 100%. Original student source remains unchanged.
 
+Teachers can author [multiple named files](docs/MULTI_FILE.md) for either answer format. File tabs have inline names, add and rename controls; each file keeps its own starter, reference and scaffold. Learners see file navigation only for multiple files, including full screen. The whole project is compiled/run together, and existing single-file activities keep their original path.
+
 New activities start with empty instructions, starter code and test lists; no greeting example is inserted. See [authoring defaults](docs/REFERENCE.md#authoring-ux).
 
 Teachers can [inspect saved work in progress](../../../docs/WORK_IN_PROGRESS_INSPECTION.md) from the Student results menu, independently of submitted-attempt history.

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { editor } from "monaco-editor";
 
 /** One mounted editing session. Never persisted or shared across attempts/accounts. */
@@ -46,14 +46,15 @@ export function useMonacoModelStore() {
 }
 
 /** Key this provider by attempt/view; unmount it on navigation, logout or closure. */
-export function MonacoModelScope({ children }: { children: ReactNode }) {
+export function MonacoModelScope({ children, inherit = false }: { children: ReactNode; inherit?: boolean }) {
+  const parent = useContext(MonacoModelContext);
   const [store] = useState(() => new MonacoModelStore());
   useEffect(() => {
     const generation = store.retain();
     return () => store.release(generation);
   }, [store]);
   const value = useMemo(() => ({ store, group: "" }), [store]);
-  return <MonacoModelContext.Provider value={value}>{children}</MonacoModelContext.Provider>;
+  return inherit && parent ? <>{children}</> : <MonacoModelContext.Provider value={value}>{children}</MonacoModelContext.Provider>;
 }
 
 /** File identifiers may be identical in different Test questions. */
