@@ -151,6 +151,8 @@ function gradebookRow(overrides: {
   gradeCompletion?: { status: "complete" | "partial" | "ungraded"; completedComponentCount: number; requiredComponentCount: number };
 }) {
   return {
+    gradingReviews: [],
+    gradingReviewRevision: null,
     gradebookItemId: overrides.gradebookItemId,
     groupId: overrides.groupId,
     groupTitle: overrides.groupTitle,

@@ -4,6 +4,8 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
+- [Required grading reviews](GRADING_REVIEWS.md) belong to core, with optional SDK requests and private plugin evidence. Pending reviews block automatic grading/release even with an older grade; explicit teacher final scores resolve them atomically with stale-review checks. Reopening withdraws the prior review with its grade. Do not implement plugin-specific gradebook scanners or new activity types for this capability.
+
 - New activity authoring starts with blank descriptions and no sample prompts, solutions, code or tests; MCQ retains its source syntax example. Keep required file/scaffold structure and valid empty drafts. See [creation defaults](reference/PLATFORM_DECISIONS.md#frontend-platform-decisions).
 
 - [System errors](SYSTEM_ERRORS.md) use stable `SYS-xxx` support categories through shared API/client helpers. Production shows only the localized system-error label and code; development adds fixed diagnoses, never raw exceptions. Keep original machine codes for control flow, log original errors privately, and preserve mounted pages on later clock/session synchronization failures.

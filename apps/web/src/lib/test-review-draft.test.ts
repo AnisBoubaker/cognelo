@@ -86,4 +86,15 @@ describe("whole-Test review drafts", () => {
     expect(restored.useRubricScore).toBe(false);
     expect(isTestItemReviewDirty(restored)).toBe(false);
   });
+  it("holds pending shared reviews for an explicit score, including re-entering the old grade", () => {
+    const required = { id: "review", attemptId: "parent", testItemAttemptId: "child", status: "required" as const,
+      reasonCode: "future.conflict", message: "Review this answer.", version: 1, requestedAt: "2026-11-23T12:00:00Z", resolvedAt: null };
+    const original = createTestItemReviewDraft(review({ gradingReviews: [required], score: 20 }));
+    const changed = updateTestItemReviewFeedback(original, feedback(100), calculate);
+    expect(changed.score).toBe("20");
+    expect(testReviewItemScore(item("one", 20, 40), changed)).toBeNull();
+    expect(isTestItemReviewDirty({ ...changed, gradeTouched: true })).toBe(true);
+    expect(testItemReviewPatch({ ...changed, gradeTouched: true })).toMatchObject({ score: 20 });
+  });
+
 });

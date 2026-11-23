@@ -10,6 +10,7 @@ For the public project overview, visit [cognelo.org](https://cognelo.org/).
 - [Architecture](docs/ARCHITECTURE.md): stable system boundaries and repository layout.
 - [Project memory](docs/PROJECT_MEMORY.md): short cross-cutting invariants and easy-to-miss constraints.
 - [Platform details](docs/reference/PLATFORM_DETAILS.md): exhaustive product, API, setup, seed, and UI reference formerly kept in this README.
+- [Required teacher grading reviews](docs/GRADING_REVIEWS.md): reusable review requests, publication gates and final-grade resolution.
 - [Plugin authoring handbook](docs/plugin-authoring/README.md): activity and content-type plugin development.
 
 Plugin-specific behavior belongs with the plugin:

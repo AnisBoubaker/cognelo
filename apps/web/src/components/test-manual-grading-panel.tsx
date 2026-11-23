@@ -1,4 +1,5 @@
 "use client";
+import { GradingReviewNotice } from "./grading-review-notice";
 import { HelpLabel } from "@cognelo/activity-ui";
 
 import { type ReactNode, useCallback, useEffect, useState } from "react";
@@ -83,6 +84,7 @@ export function TestManualGradingPanel({ embedded = false, courseId, row, attemp
     try {
       const result = await api.saveTestAttemptReview(courseId, review.id, {
         expectedUpdatedAt: review.updatedAt, expectedGradeUpdatedAt: review.gradeUpdatedAt,
+        expectedGradingReviewRevision: review.gradingReviewRevision,
         items: changedItems.map(([testItemId, value]) => ({ testItemId, ...testItemReviewPatch(value) })),
         ...(totalChanged || scoreChanges ? {
           total: draft.overrideTotal && total !== null ? { mode: "override" as const, score: total } : { mode: "calculated" as const }
@@ -133,6 +135,7 @@ export function TestManualGradingPanel({ embedded = false, courseId, row, attemp
         <button className="secondary" type="button" disabled={busy} onClick={() => { void reload().catch(reason => setError(String(reason))); }}><AppIcon name="refresh" />{t("courseDetail.reloadReview")}</button>
       </div> : null}
       {!loading && review && item ? <>
+        <GradingReviewNotice reviews={review.gradebookGradingReviews?.filter(required => required.attemptId !== review.id || !required.testItemAttemptId)} t={t} />
         <nav className="section-actions" aria-label={t("courseDetail.testActivitiesLabel")}>
           {items.map((entry, index) => <button key={entry.testItemId} type="button" className="button test-activity-step"
             aria-current={itemIndex === index ? "step" : undefined} title={entry.title}

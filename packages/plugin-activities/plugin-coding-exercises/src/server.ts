@@ -1,3 +1,4 @@
+import { codingBlankReviewRequest } from "./review-request";
 import { codingExerciseGradingInstructions } from "./grading-instructions";
 import { getCodingExerciseMaxTestRuns, parseCodingExerciseConfig } from "./coding-exercises";
 import { codingTestPracticeScope, getCodingPracticeRunAllowance, assertCodingPracticeRunsEnabled } from "./practice-runs";
@@ -21,6 +22,7 @@ import {
 import { copyBankCodingExerciseData, copyBankCodingExerciseDataToCourseActivity, copyCourseCodingExerciseData, copyCourseCodingExerciseDataToBankActivity, deleteBankCodingExerciseData, deleteCourseCodingExerciseData } from "./hidden-tests";
 import {
   getCodingExerciseReferenceSolution,
+  codingExerciseRequiresTeacherReview,
   codingExerciseRunInputSchema,
   codingExerciseSubmitInputSchema,
   runCodingExercise,
@@ -146,13 +148,15 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         return getCodingExerciseAiFeedbackTeacherSubmission({ activityId: context.activityId,
           executionId, activity: context.activity, savedSourceCode });
       },
-      reviseFeedback: ({ currentFeedback, feedback, pluginAttemptRef }) => {
-        const revisedFeedback = reviseCodingExerciseAiFeedback(currentFeedback, feedback);
+      reviseFeedback: async ({ activityId, currentFeedback, feedback, pluginAttemptRef }) => {
+        const reviewRequired = await codingExerciseRequiresTeacherReview(activityId, pluginAttemptRef ?? null);
+        const revisedFeedback: Record<string, unknown> = { ...reviseCodingExerciseAiFeedback(currentFeedback, feedback), reviewRequired,
+          ...(reviewRequired ? { deterministicScore: null, combinedScore: null } : {}) };
         const combinedScore = numberValue(revisedFeedback.combinedScore);
         const rubricScoreChanged = haveRubricScoresChanged(currentFeedback.criteria, revisedFeedback.criteria);
         return {
           feedback: revisedFeedback,
-          ...(revisedFeedback.gradingEnabled === true && combinedScore !== null && rubricScoreChanged ? {
+          ...(!reviewRequired && revisedFeedback.gradingEnabled === true && combinedScore !== null && rubricScoreChanged ? {
             gradingResult: {
               rawScore: combinedScore,
               rawMaxScore: 100,
@@ -199,7 +203,8 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         executionId: execution.id, activity: input.activity,
         feedback: (input.feedback.aiFeedback ?? {}) as Record<string, unknown>
       });
-      return { state, pluginAttemptRef: execution.id, gradingResult: "deferred" in grading ? null : {
+      return { state, pluginAttemptRef: execution.id,
+        ...("deferred" in grading && grading.reviewRequired ? { reviewRequired: grading.reviewRequired } : {}), gradingResult: "deferred" in grading ? null : {
         ...grading,
         feedback: Object.keys(grading.feedback ?? {}).length ? { aiFeedback: grading.feedback } : {}
       } };
@@ -241,7 +246,8 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         state: { sourceCode: execution.sourceCode ?? input.sourceCode, executionId: execution.id,
           ...(readCodingBlankResponse(execution.resultSummary.blankResponse) ?? {}) },
         pluginAttemptRef: execution.id,
-        gradingResult: totalWeight === 0 ? null : {
+        ...(execution.resultSummary.reviewRequired === true ? { reviewRequired: codingBlankReviewRequest(execution.id) } : {}),
+        gradingResult: totalWeight === 0 || execution.resultSummary.reviewRequired === true ? null : {
           rawScore: earnedWeight,
           rawMaxScore: totalWeight,
           analyticsPayload: execution.resultSummary,

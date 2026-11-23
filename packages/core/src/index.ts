@@ -74,3 +74,4 @@ export * from "./activity-report-actions";
 export * from "./activity-batch-actions";
 export * from "./activity-logs";
 export * from "./work-inspection";
+export * from "./grading-review";

@@ -1413,6 +1413,8 @@ export const enMessages = {
       deletedSubmissionSolutionUnavailable: "Submitted code is unavailable for this record.",
       deletedSubmissionCodeEmpty: "The submitted code was empty.",
       didNotSubmit: "Did not submit",
+      gradingReviewRequired: "Needs teacher review",
+      gradingReviewFinalScore: "Set a final grade explicitly after reviewing this submission. Saving feedback alone does not resolve the review.",
       partialGrade: "Partial",
       partialGradeDescription: "Partial grade: {completed} of {required} grading components complete.",
       overrideGrade: "Review and grade",

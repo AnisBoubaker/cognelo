@@ -1,3 +1,4 @@
+import { codingBlankGradingSchema } from "./code-blanks";
 import type { CurrentUser } from "@cognelo/contracts";
 import { prisma as corePrisma } from "@cognelo/db";
 import { getLatestCodingExerciseTestResult } from "./executions";
@@ -86,17 +87,17 @@ export async function getCodingExerciseStudentGradeReport(input: {
     : [];
   const executionById = new Map(executions.map((execution) => [execution.id, execution]));
 
-  const attempts = await Promise.all(reportAttempts.flatMap((attempt) => {
+  const attempts = await Promise.all(reportAttempts.map(async (attempt) => {
     const execution = attempt.pluginAttemptRef ? executionById.get(attempt.pluginAttemptRef) : null;
     if (!execution) {
       // Recovered/manual submissions may have saved code without runner evidence.
-      if (attempt.savedSource === null || !attempt.submittedAt) return [];
-      return [Promise.resolve({ attemptId: attempt.id, attemptNumber: attempt.attemptNumber,
+      if (attempt.savedSource === null || !attempt.submittedAt) return null;
+      return { attemptId: attempt.id, attemptNumber: attempt.attemptNumber,
         executionId: "", isSelected: true, submittedAt: attempt.submittedAt.toISOString(),
-        language: "text", sourceCode: attempt.savedSource, testScore: null, testMaxScore: null, tests: [] })];
+        language: "text", sourceCode: attempt.savedSource, testScore: null, testMaxScore: null, tests: [] };
     }
-    if (attempt.savedSource !== null && attempt.savedSource !== execution.sourceCode) return [];
-    return [getLatestCodingExerciseTestResult({
+    if (attempt.savedSource !== null && attempt.savedSource !== execution.sourceCode) return null;
+    return getLatestCodingExerciseTestResult({
       activityId: input.activityId,
       executionId: execution.id,
       originalResultSummary: execution.resultSummary
@@ -104,6 +105,8 @@ export async function getCodingExerciseStudentGradeReport(input: {
       const summary = recordValue(latest.resultSummary);
       const earnedWeight = finiteNumber(summary.earnedWeight);
       const totalWeight = finiteNumber(summary.totalWeight);
+      const blankGrading = codingBlankGradingSchema.safeParse(summary.blankGrading);
+      const reviewRequired = summary.reviewRequired === true;
       return {
         attemptId: attempt.id,
         attemptNumber: attempt.attemptNumber,
@@ -112,8 +115,9 @@ export async function getCodingExerciseStudentGradeReport(input: {
         submittedAt: (attempt.submittedAt ?? execution.updatedAt).toISOString(),
         language: execution.languageKey,
         sourceCode: execution.sourceCode,
-        testScore: earnedWeight,
-        testMaxScore: totalWeight,
+        testScore: reviewRequired ? null : earnedWeight,
+        testMaxScore: reviewRequired ? null : totalWeight,
+        ...(blankGrading.success ? { blankGrading: blankGrading.data, reviewRequired } : {}),
         tests: recordArray(summary.tests).map((test, index) => {
           const passed = typeof test.passed === "boolean" ? test.passed : null;
           const possible = finiteNumber(test.weight) ?? 1;
@@ -128,12 +132,12 @@ export async function getCodingExerciseStudentGradeReport(input: {
           };
         })
       };
-    })];
+    });
   }));
 
   return {
     kind: "coding-exercise",
-    attempts
+    attempts: attempts.filter(attempt => attempt !== null)
   };
 }
 

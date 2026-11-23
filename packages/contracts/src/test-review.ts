@@ -13,6 +13,7 @@ export const TestItemReviewInputSchema = z.object({
 export const TestAttemptReviewInputSchema = z.object({
   expectedUpdatedAt: z.iso.datetime(),
   expectedGradeUpdatedAt: z.iso.datetime().nullable(),
+  expectedGradingReviewRevision: z.string().nullable().optional(),
   items: z.array(TestItemReviewInputSchema.extend({ testItemId: z.string().min(1) })).max(100),
   feedbackText: z.string().max(10000).optional(),
   total: z.discriminatedUnion("mode", [

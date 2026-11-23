@@ -1394,6 +1394,7 @@ model ActivityAttempt {
   testItemAttempts          TestItemAttempt[]
   testSubmissionClaim       TestSubmissionClaim?
   activityConversation      ActivityConversation?
+  gradingReviews            ActivityGradingReview[]
 
   @@unique([gradebookItemId, participantId, attemptNumber])
   @@index([courseId, groupId, activityId])
@@ -1522,12 +1523,33 @@ model TestItemAttempt {
   parentAttempt             ActivityAttempt          @relation(fields: [parentAttemptId], references: [id], onDelete: Cascade)
   testItem                  TestItem                 @relation(fields: [testItemId], references: [id], onDelete: Cascade)
   activity                  Activity                 @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  gradingReview             ActivityGradingReview?
 
   @@unique([parentAttemptId, testItemId])
   @@index([testItemId])
   @@index([activityId])
   @@index([lifecycle])
   @@index([pluginAttemptRef])
+}
+
+model ActivityGradingReview {
+  id                    String          @id @default(cuid())
+  targetKey             String          @unique
+  attemptId             String
+  testItemAttemptId     String?         @unique
+  pluginKey             String
+  reasonCode            String
+  message               String
+  evidenceRef           String?
+  status                String          @default("required")
+  version               Int             @default(1)
+  requestedAt           DateTime        @default(now())
+  resolvedAt            DateTime?
+  resolvedByUserId      String?
+  attempt               ActivityAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  testItemAttempt       TestItemAttempt? @relation(fields: [testItemAttemptId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId, status])
 }
 
 model Grade {

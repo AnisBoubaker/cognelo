@@ -1,3 +1,4 @@
+import { assertNoRequiredGradingReview, requestActivityGradingReview } from "./grading-review";
 import { resolveCompositeExecutionRegradingHandler, resolveCompositeExecutionSubmissionHandler } from "@cognelo/activity-sdk/server";
 import type { CurrentUser, TestRegradeItemResult, TestRegradeProgress } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
@@ -82,6 +83,7 @@ export async function regradeTestAttempt(
           courseId, groupId: parent.groupId, parentAttemptId, testItemId,
           activity: { ...item.activity, config: asRecord(item.activity.config), metadata: asRecord(item.activity.metadata) }, payload: state
         });
+        if (result.reviewRequired && result.gradingResult) throw new AppError(422, "TEST_ITEM_REVIEW_CONFLICT", "A review request cannot also award an automatic grade.");
         const grade = result.gradingResult;
         if (grade && (!Number.isFinite(grade.rawScore) || !Number.isFinite(grade.rawMaxScore) || grade.rawMaxScore <= 0)) {
           throw new AppError(422, "TEST_ITEM_GRADING_RESULT_INVALID", "The activity returned an invalid score.");
@@ -90,6 +92,7 @@ export async function regradeTestAttempt(
         await prisma.$transaction(async (tx) => {
           await lockTestAuthoring(tx, parent.activityId);
           await assertUnchanged(tx);
+          if (grade) await assertNoRequiredGradingReview(parentAttemptId, tx, item.id);
           const updated = await tx.testItemAttempt.update({ where: { id: item.id, updatedAt: item.updatedAt, lifecycle: item.lifecycle }, data: {
             ...(result.pluginAttemptRef !== undefined ? { pluginAttemptRef: result.pluginAttemptRef } : {}),
             ...(grade ? { lifecycle: "graded", gradedAt: new Date(), rawScore: grade.rawScore, rawMaxScore: grade.rawMaxScore,
@@ -99,6 +102,7 @@ export async function regradeTestAttempt(
               ...(grade ? { analyticsPayload: grade.analyticsPayload ?? {}, metadata: grade.metadata ?? {} } : {}) } as Prisma.InputJsonValue,
             feedback: { ...asRecord(item.feedback), ...grade?.feedback } as Prisma.InputJsonValue
           } });
+          if (result.reviewRequired) await requestActivityGradingReview(user, { attemptId: parentAttemptId, testItemAttemptId: item.id, review: result.reviewRequired }, tx);
           await tx.courseAuditEvent.create({ data: { courseId, actorUserId: user.id,
             eventType: "test_item_regraded", targetType: "TestItemAttempt", targetId: item.id,
             previousValue: { lifecycle: item.lifecycle, pluginAttemptRef: item.pluginAttemptRef, result: item.result, feedback: item.feedback,

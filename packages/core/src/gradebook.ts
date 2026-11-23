@@ -4,7 +4,7 @@ import { escapeCsvCell } from "./csv";
 import { getActivityDefinition, getActivityPlugin, getActivityPluginForActivityType } from "@cognelo/activity-sdk";
 import { resolveAttemptContinuationHandler, resolvePluginSharedGrading } from "@cognelo/activity-sdk/server";
 import { Prisma, prisma } from "@cognelo/db";
-import type { CurrentUser } from "@cognelo/contracts";
+import type { CurrentUser, GradingReviewRequest } from "@cognelo/contracts";
 import {
   assertCanGradeGroup,
   assertCanManageGroupRoster,
@@ -21,6 +21,7 @@ import { getActivityContentAccess } from "./activity-content-access";
 import { applyAssignmentExceptions, applyGradebookExceptions, exceptionsForParticipant, loadAssignmentExceptions } from "./activity-assignment-exceptions";
 import { recoverExpiredTestAttempts } from "./test-timeout-recovery";
 import { hashAiFeedbackValue } from "./ai-feedback";
+import { assertNoRequiredGradingReview, getActivityGradingReviews, getGradebookGradingReviews, gradingReviewRevision, resolveGradebookGradingReviews, requestActivityGradingReview, withdrawActivityGradingReviews } from "./grading-review";
 
 type JsonInput = Prisma.InputJsonValue;
 export type ActivityAttemptAssessmentMode = "formative" | "summative";
@@ -67,6 +68,7 @@ export type StartActivityAttemptInput = ActivityAttemptSource & {
 };
 
 export type SubmitActivityAttemptInput = {
+  reviewRequired?: GradingReviewRequest;
   attemptId: string;
   pluginAttemptRef?: string | null;
   metadata?: JsonInput;
@@ -108,6 +110,7 @@ export type OverrideGradebookGradeInput = {
   reason?: string | null;
   feedbackText?: string | null;
   expectedGradeUpdatedAt?: string | null;
+  expectedGradingReviewRevision?: string | null;
   metadata?: JsonInput;
   now?: Date;
 };
@@ -333,10 +336,11 @@ async function activityAttemptAvailabilityDetails(
       attemptsRemaining: null
     };
   }
+  const gradesReleased = item.gradesReleased && !(await getGradebookGradingReviews(item.id, context.participant.id)).length;
   if (item.attemptLimitMode !== "max_attempts" || item.maxAttempts === null) {
     return {
       attemptLimitMode: item.attemptLimitMode,
-      gradesReleased: item.gradesReleased,
+      gradesReleased,
       maxAttempts: item.maxAttempts,
       usedAttempts: null,
       attemptsRemaining: null
@@ -354,7 +358,7 @@ async function activityAttemptAvailabilityDetails(
 
   return {
     attemptLimitMode: item.attemptLimitMode,
-    gradesReleased: item.gradesReleased,
+    gradesReleased,
     maxAttempts: item.maxAttempts,
     usedAttempts,
     attemptsRemaining: Math.max(0, item.maxAttempts - usedAttempts)
@@ -405,25 +409,30 @@ export async function submitActivityAttempt(user: CurrentUser, input: SubmitActi
   const lateness = computeAttemptLateness(due, attempt.gradebookItem.lateGracePeriodMinutes, now);
   const durationSeconds = Math.max(0, Math.round((now.getTime() - attempt.startedAt.getTime()) / 1000));
 
-  return db.activityAttempt.update({
-    where: { id: attempt.id },
-    data: {
-      lifecycle: "submitted",
-      submittedAt: now,
-      durationSeconds,
-      isLate: lateness.isLate,
-      lateBySeconds: lateness.lateBySeconds,
-      pluginAttemptRef: input.pluginAttemptRef ?? attempt.pluginAttemptRef,
-      metadata: {
-        ...(asJsonObject(attempt.metadata) ?? {}),
-        ...attemptInputMetadata(input.metadata),
-        // Preserve the original attempt/manifest; record final timing separately.
-        submittedTimeLimitMinutes: assignmentTimeLimitMinutes(effectiveAssignment.metadata),
-        submittedAvailableUntil: effectiveAssignment.availableUntil?.toISOString() ?? null,
-        ...(stageMetadata?.submissionAssessmentStage ? { submittedStageDeadline: due?.toISOString() ?? null, submittedStageId: stageMetadata.submissionAssessmentStage } : {})
-      } as JsonInput
-    }
-  });
+  const write = async (tx: Prisma.TransactionClient) => {
+    const submitted = await tx.activityAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        lifecycle: "submitted",
+        submittedAt: now,
+        durationSeconds,
+        isLate: lateness.isLate,
+        lateBySeconds: lateness.lateBySeconds,
+        pluginAttemptRef: input.pluginAttemptRef ?? attempt.pluginAttemptRef,
+        metadata: {
+          ...(asJsonObject(attempt.metadata) ?? {}),
+          ...attemptInputMetadata(input.metadata),
+          // Preserve the original attempt/manifest; record final timing separately.
+          submittedTimeLimitMinutes: assignmentTimeLimitMinutes(effectiveAssignment.metadata),
+          submittedAvailableUntil: effectiveAssignment.availableUntil?.toISOString() ?? null,
+          ...(stageMetadata?.submissionAssessmentStage ? { submittedStageDeadline: due?.toISOString() ?? null, submittedStageId: stageMetadata.submissionAssessmentStage } : {})
+        } as JsonInput
+      }
+    });
+    if (input.reviewRequired) await requestActivityGradingReview(user, { attemptId: attempt.id, review: input.reviewRequired }, tx);
+    return submitted;
+  };
+  return transaction ? write(transaction) : prisma.$transaction(write);
 }
 
 export async function recordActivityAttemptGradingResult(user: CurrentUser, input: RecordActivityAttemptGradingResultInput, transaction?: Prisma.TransactionClient, synchronizeShared = true) {
@@ -453,6 +462,8 @@ export async function recordActivityAttemptGradingResult(user: CurrentUser, inpu
   const effectiveAttempt = { ...attempt, gradebookItem: applyGradebookExceptions(attempt.gradebookItem, overrides) };
 
   const record = async (tx: Prisma.TransactionClient) => {
+    await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id=${attempt.id} FOR UPDATE`;
+    await assertNoRequiredGradingReview(attempt.id, tx);
     const previousGrade = await tx.grade.findUnique({
       where: {
         gradebookItemId_participantId: {
@@ -659,6 +670,8 @@ export async function reopenActivitySubmission(user: CurrentUser, courseId: stri
       if (assignmentAssessmentMode(attempt.groupActivity.metadata) !== attempt.assessmentMode) {
         throw new AppError(409, "ATTEMPT_MODE_MISMATCH", "The attempt mode no longer matches the activity assignment mode.");
       }
+      await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id=${attempt.id} FOR UPDATE`;
+      await withdrawActivityGradingReviews(tx, { attemptId: attempt.id, courseId, userId: user.id });
       const metadata = { ...(asJsonObject(attempt.metadata) ?? {}) };
       const now = new Date();
       let restored: { responseState?: Record<string, unknown>; audit?: Record<string, unknown> } = {};
@@ -966,6 +979,8 @@ export async function overrideGradebookGrade(user: CurrentUser, courseId: string
   });
   try {
     const override = async (tx: Prisma.TransactionClient) => {
+    await resolveGradebookGradingReviews(tx, { gradebookItemId: item.id, participantId: participant.id,
+      courseId, userId: user.id, expectedRevision: input.expectedGradingReviewRevision });
     const previousGrade = await tx.grade.findUnique({
       where: {
         gradebookItemId_participantId: {
@@ -1574,6 +1589,8 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
   ) && (!filters.conceptId || item.activity.knowledgeConcepts?.some((link) => link.conceptId === filters.conceptId)));
 
   const exceptions = await loadAssignmentExceptions(items.map((item) => item.groupActivity.id));
+  const requiredReviews = await getActivityGradingReviews(items.flatMap(item => item.attempts.filter(attempt =>
+    ["submitted", "graded"].includes(attempt.lifecycle)).map(attempt => attempt.id)));
   const rows = items.flatMap((baseItem) => {
 
     return baseItem.group.participants.flatMap((participant) => {
@@ -1587,10 +1604,11 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         attempt.assessmentMode === "formative" ? "formative" : "summative"
       ) === assessmentMode);
       const currentModeSubmittedAttempts = currentModeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
+      const gradingReviews = requiredReviews.filter(review => currentModeSubmittedAttempts.some(attempt => attempt.id === review.attemptId));
       const summativeAttempts = activeAttempts.filter((attempt) => attempt.assessmentMode !== "formative");
       const summativeSubmittedAttempts = summativeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
       const effectiveGrade = grade && grade.isActive !== false && (summativeSubmittedAttempts.length || grade.source === "override") ? grade : null;
-      const status = getGradebookRowStatus(effectiveGrade, summativeAttempts);
+      const status = gradingReviews.length ? "needs_grading" as const : getGradebookRowStatus(effectiveGrade, summativeAttempts);
       if (statusFilter !== "all" && status !== statusFilter) {
         return [];
       }
@@ -1617,6 +1635,8 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         maxScore: effectiveGrade?.normalizedMaxScore ?? item.pointsPossible,
         gradeUpdatedAt: effectiveGrade?.updatedAt?.toISOString() ?? null,
         gradeSource: effectiveGrade?.source ?? null,
+        gradingReviews,
+        gradingReviewRevision: gradingReviewRevision(gradingReviews),
         isPass: effectiveGrade?.isPass ?? null,
         latePenaltyApplied: effectiveGrade?.latePenaltyApplied ?? false,
         latePenaltyPercent: effectiveGrade?.latePenaltyPercent ?? null,
@@ -1778,7 +1798,7 @@ export async function setGradebookItemRelease(
       },
       attempts: {
         where: { lifecycle: { in: ["submitted", "graded"] }, assessmentMode: "summative" },
-        select: { participantId: true, lifecycle: true }
+        select: { id: true, participantId: true, lifecycle: true }
       }
     }
   });
@@ -1790,6 +1810,9 @@ export async function setGradebookItemRelease(
     throw new AppError(409, "FORMATIVE_GRADES_NOT_RELEASABLE", "Formative activities do not have releasable grades.");
   }
 
+  if (input.released && (await getActivityGradingReviews(item.attempts.map(attempt => attempt.id))).length) {
+    throw new AppError(409, "GRADING_REVIEW_REQUIRED", "Resolve the required teacher reviews before releasing grades.");
+  }
   if (item.gradesReleased === input.released) {
     return item;
   }
@@ -1936,13 +1959,14 @@ export async function getStudentReleasedGrades(user: CurrentUser, courseId: stri
   await Promise.all(items.filter((item) => courseActivityHidesAfterAttempts(item.activity.metadata)).map(async (item) => {
     if ((await getActivityContentAccess(user, courseId, groupId, item.activityId)).locked) closed.add(item.activityId);
   }));
+  const pendingReviews = await getActivityGradingReviews(items.flatMap(item => item.attempts.map(attempt => attempt.id)));
   const rows = items.flatMap((item) => {
       const contentClosed = closed.has(item.activityId);
       const grade = item.grades[0] && item.grades[0].isActive !== false ? item.grades[0] : null;
       const activeAttempts = item.attempts.filter((attempt) => attempt.lifecycle !== "deleted");
       const submittedAttempts = activeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
       const effectiveGrade = submittedAttempts.length || grade?.source === "override" ? grade : null;
-      if (!item.gradesReleased) {
+      if (!item.gradesReleased || pendingReviews.some(review => submittedAttempts.some(attempt => attempt.id === review.attemptId))) {
         return [];
       }
       const displayedScore = effectiveGrade?.normalizedScore ?? null;

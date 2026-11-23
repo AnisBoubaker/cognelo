@@ -76,7 +76,8 @@ export async function createCodingExerciseTeacherFeedbackDraft(input: {
   const resultSummary = toRecord(latestTests.resultSummary);
   const earnedWeight = finiteNumber(resultSummary.earnedWeight);
   const totalWeight = finiteNumber(resultSummary.totalWeight);
-  const deterministicScore = earnedWeight !== null && totalWeight !== null && totalWeight > 0
+  const reviewRequired = resultSummary.reviewRequired === true;
+  const deterministicScore = !reviewRequired && earnedWeight !== null && totalWeight !== null && totalWeight > 0
     ? clampPercent(earnedWeight / totalWeight * 100)
     : null;
   const rubricScore = feedbackConfig.criteria.length ? 0 : null;
@@ -103,6 +104,7 @@ export async function createCodingExerciseTeacherFeedbackDraft(input: {
     ...(rubricScore !== null ? { aiScore: rubricScore } : {}),
     ...(combinedScore !== null ? { combinedScore } : {}),
     gradingEnabled: feedbackConfig.gradingEnabled,
+    ...(reviewRequired ? { reviewRequired: true } : {}),
     testWeightPercent: feedbackConfig.gradingEnabled ? feedbackConfig.testWeightPercent : 100,
     aiWeightPercent: feedbackConfig.gradingEnabled ? feedbackConfig.aiWeightPercent : 0
   };
@@ -290,13 +292,14 @@ export async function evaluateCodingExerciseAttemptWithAi(input: {
     }
     return recordEmptyCodingExerciseFeedback({ input, attempt, feedbackConfig, teachingLanguage });
   }
-  const connection = await getCourseAssessmentFeedbackAiAgentConnection(input.user, input.courseId);
   const latestTests = await getLatestCodingExerciseTestResult({
     activityId: input.activityId,
     executionId: execution.id,
     originalResultSummary: execution.resultSummary
   });
   const resultSummary = toRecord(latestTests.resultSummary);
+  if (resultSummary.reviewRequired === true) throw new AppError(409, "CODING_EXERCISE_TEACHER_REVIEW_REQUIRED", "The complete program and isolated blank checks disagree. A teacher must set the final grade.");
+  const connection = await getCourseAssessmentFeedbackAiAgentConnection(input.user, input.courseId);
   const earnedWeight = finiteNumber(resultSummary.earnedWeight);
   const totalWeight = finiteNumber(resultSummary.totalWeight);
   if (earnedWeight === null || totalWeight === null || totalWeight < 0 || earnedWeight < 0 || earnedWeight > totalWeight) {

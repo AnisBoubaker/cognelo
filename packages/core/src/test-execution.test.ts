@@ -516,7 +516,7 @@ describe("compound Test execution", () => {
     expect(gradebook.submitActivityAttempt).toHaveBeenCalledWith(student, expect.objectContaining({
       attemptId: "parent-attempt-1",
       pluginAttemptRef: "parent-attempt-1"
-    }));
+    }), expect.anything());
     expect(gradebook.recordActivityAttemptGradingResult).toHaveBeenCalledWith(student, expect.objectContaining({
       attemptId: "parent-attempt-1",
       rawScore: 5,
@@ -575,7 +575,7 @@ describe("compound Test execution", () => {
       rawMaxScore: 10,
       source: "manual",
       reason: "Accepted alternate answer"
-    }));
+    }), expect.anything());
   });
 
   it("returns submitted child state for teacher review without requiring a parent grade", async () => {

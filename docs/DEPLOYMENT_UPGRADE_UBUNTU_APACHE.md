@@ -8,6 +8,8 @@ The normal upgrade does **not** copy `/srv/cognelo/instance1/shared` or its pote
 
 Current security upgrades require the core `202610250001_security_rate_limits` and homework `202610250010_bounded_upload_requirements` migrations through `npm run db:migrate:all`. That command also encrypts legacy model keys with the existing instance credential key and disables legacy model URLs containing embedded credentials/query/fragment data after removing those components. Preserve that key with database backups. Personal model endpoints now require public HTTPS; configure private/local models as administrator-owned personal or global connections. The local credential helper is for development only. See [Security boundaries](SECURITY_BOUNDARIES.md) for request limits and compatibility details.
 
+The shared grading-review capability adds core migration `202611230001_activity_grading_reviews`, applied by the same `npm run db:migrate:all` path. It creates an initially empty review table; existing exercise records and grades are unchanged. No new environment variables are required. See [required grading reviews](GRADING_REVIEWS.md).
+
 ## Before starting
 
 You need:

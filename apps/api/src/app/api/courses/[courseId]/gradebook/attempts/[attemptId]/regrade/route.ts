@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { resolvePluginGradingHandler } from "@cognelo/activity-sdk/server";
-import { AppError, getActivityAttemptRegradeContext, recordActivityAttemptGradingResult, regradeTestAttempt } from "@cognelo/core";
+import { AppError, getActivityAttemptRegradeContext, recordActivityAttemptGradingResult, regradeTestAttempt, requestActivityGradingReview } from "@cognelo/core";
 import type { Prisma } from "@cognelo/db";
 import type { TestRegradeProgress } from "@cognelo/contracts";
 import { handleRoute, json, options, progressJson, readJson, requireUser } from "@/lib/http";
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     });
 
     if ("deferred" in gradingResult) {
+      if (gradingResult.reviewRequired) await requestActivityGradingReview(user, { attemptId, review: gradingResult.reviewRequired });
       return json({ result: null, deferred: gradingResult.reason, metadata: gradingResult.metadata ?? {} });
     }
 

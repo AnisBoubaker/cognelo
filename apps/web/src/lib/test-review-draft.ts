@@ -27,6 +27,7 @@ export function parseTestReviewScore(value: string, max: number) {
 export function isTestItemReviewDirty(draft: TestItemReviewDraft) {
   return !draft.review.readOnly && (JSON.stringify(draft.feedback) !== JSON.stringify(draft.review.feedback)
     || draft.feedbackText !== draft.review.feedbackText || draft.useRubricScore
+    || (draft.gradeTouched && Boolean(draft.review.gradingReviews?.length))
     || (draft.gradeTouched && draft.score !== (draft.review.score === null ? "" : formatTestReviewScore(draft.review.score))));
 }
 
@@ -41,6 +42,7 @@ export function testReviewRubricScoresChanged(before: Record<string, unknown> | 
 
 export function updateTestItemReviewFeedback(draft: TestItemReviewDraft, feedback: Record<string, unknown>,
   calculate: (type: string, feedback: Record<string, unknown>) => number | null): TestItemReviewDraft {
+  if (draft.review.gradingReviews?.length) return { ...draft, feedback };
   const next = calculate(draft.review.activityTypeKey, feedback);
   const previous = draft.feedback ? calculate(draft.review.activityTypeKey, draft.feedback) : null;
   const original = draft.review.feedback ? calculate(draft.review.activityTypeKey, draft.review.feedback) : null;
@@ -66,6 +68,8 @@ export function testItemReviewPatch(draft: TestItemReviewDraft): TestItemReviewI
 }
 
 export function testReviewItemScore(item: CourseTestAttemptReview["items"][number], draft?: TestItemReviewDraft) {
+  if (draft?.review.gradingReviews?.length && !draft.gradeTouched) return null;
+  if (item.itemAttempt.gradingReviews?.length && !draft?.gradeTouched) return null;
   if (draft) return draft.gradeTouched ? parseTestReviewScore(draft.score, draft.review.maxScore) : draft.calculatedScore;
   return item.itemAttempt.lifecycle === "graded" ? item.itemAttempt.normalizedScore : null;
 }

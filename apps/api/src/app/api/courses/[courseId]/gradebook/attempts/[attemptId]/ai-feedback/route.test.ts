@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  getReviews: vi.fn(),
   getContext: vi.fn(),
   getReview: vi.fn(),
   recordGrading: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("@cognelo/activity-sdk/server", () => ({
   resolvePluginAiFeedbackTeacherReviewHandler: mocks.resolveTeacherReview
 }));
 vi.mock("@cognelo/core", () => ({
+  getActivityGradingReviews: mocks.getReviews,
   AppError: class AppError extends Error {},
   getActivityAttemptRegradeContext: mocks.getContext,
   getTeacherAttemptAiFeedbackReview: mocks.getReview,
@@ -44,6 +46,7 @@ const params = { params: Promise.resolve({ courseId: "course-1", attemptId: "att
 describe("teacher feedback revision route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getReviews.mockResolvedValue([]);
     mocks.requireUser.mockResolvedValue({ id: "teacher-1", roles: ["teacher"] });
     mocks.readJson.mockResolvedValue({ feedback: { summary: "Reviewed" }, expectedFeedbackHash: "original-hash" });
     mocks.getContext.mockResolvedValue({
@@ -114,4 +117,14 @@ describe("teacher feedback revision route", () => {
       grade: { id: "grade-1", normalizedScore: 82 }
     });
   });
+  it("saves feedback without applying a plugin-derived grade while shared review is pending", async () => {
+    mocks.getReviews.mockResolvedValue([{ id: "required-review" }]);
+    const response = await PATCH(new Request("http://test.local", { method: "PATCH" }) as never, params);
+    expect(response.status).toBe(200);
+    expect(mocks.reviseCoreFeedback).toHaveBeenCalled();
+    expect(mocks.recordGrading).not.toHaveBeenCalled();
+    expect(mocks.recordResearch).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toMatchObject({ grade: null, feedback: { summary: "Reviewed" } });
+  });
+
 });

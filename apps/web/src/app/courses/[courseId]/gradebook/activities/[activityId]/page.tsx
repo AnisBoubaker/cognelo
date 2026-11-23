@@ -745,7 +745,8 @@ export default function GradebookActivityResultsPage() {
             score: parsedGrade,
             maxScore: row.maxScore,
             reason: t("courseDetail.reviewAndGradeReason"),
-            expectedGradeUpdatedAt: feedbackResult?.grade?.updatedAt ?? feedbackResult?.gradeUpdatedAt ?? row.gradeUpdatedAt
+            expectedGradeUpdatedAt: feedbackResult?.grade?.updatedAt ?? feedbackResult?.gradeUpdatedAt ?? row.gradeUpdatedAt,
+            expectedGradingReviewRevision: row.gradingReviewRevision
           })
         : null;
       const finalGrade = overrideResult?.grade.normalizedScore ?? feedbackResult?.grade?.normalizedScore ?? feedbackReview.initialGrade;
@@ -1383,7 +1384,7 @@ function GradebookStudentRow({
       <div className="gradebook-progress-column" data-label={t("courseDetail.progressHeader")}>{!progress && progressUnavailable ? <span className="muted">{t("courseDetail.progressUnavailable")}</span> : <ActivityProgressBadge progress={progress} locale={locale} t={t} />}</div>
       <div className="gradebook-grade-cell">
         <strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong>
-        {row.gradeCompletion?.status === "partial" ? (
+        {row.gradingReviews?.length ? <span className="grade-completion-badge grade-completion-badge-partial">{t("courseDetail.gradingReviewRequired")}</span> : row.gradeCompletion?.status === "partial" ? (
           <span
             className="grade-completion-badge grade-completion-badge-partial"
             title={t("courseDetail.partialGradeDescription", {

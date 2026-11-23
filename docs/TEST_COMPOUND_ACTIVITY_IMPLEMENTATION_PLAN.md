@@ -361,6 +361,8 @@ Manual-grading behavior:
 
 ### Teacher review and grading
 
+Plugins can return a neutral [required grading review](GRADING_REVIEWS.md) for a submitted child. The host displays its reason and evidence, blocks automatic child/parent grading and release, and resolves that child only when the teacher explicitly enters its final score. A Test-total override acknowledges all pending reviews with the loaded review revision. Rubric/narrative changes alone do not resolve a required review.
+
 **Review and grade** opens one submitted Test with the same numbered activity navigation as the learner workspace. Selecting a child loads its review on demand. Programming Exercises and MCQ reuse their standalone feedback renderers and `aiFeedback.teacherReview` handlers; other types retain their answer inspector with comments and a final item score. **Review and grade all** uses this same dialog with student navigation. The legacy manual-grading page links to it too.
 
 Programming children expose Summary, Strengths, Improvements, criterion comments and scores, the calculated component breakdown, and the final item grade. One **Save all** action persists every changed question, the overall comment, and any explicit Test-total override together. Question drafts stay in memory while moving between numbered questions in the same submission. Changing student or submission, closing, leaving the page, or rerunning grading still warns about unsaved changes; saving blocks those navigation actions. Older submissions remain read-only.
@@ -375,7 +377,7 @@ Each save carries the child update time and a hash of its loaded feedback or rub
 
 Overall comments live in the Test attempt metadata (`testReviewFeedbackText`) and are projected into its selected/overridden grade with an audit record. They survive later recalculation and can be edited without creating a total override. The single-question GET/PATCH endpoint remains available for existing integrations, preserving its default override semantics; `useRubricScore` explicitly clears a prior item override when a valid rubric score revision accompanies it.
 
-Regression coverage is in `test-manual-feedback.spec.ts` (including cross-question draft retention and warnings when changing students), the API-only `test-review-save-all.spec.ts`, the broader activity workflow, and core/plugin/draft-state unit tests. No schema migration is required.
+Regression coverage is in `test-manual-feedback.spec.ts` (including cross-question draft retention and warnings when changing students), the API-only `test-review-save-all.spec.ts`, the broader activity workflow, and core/plugin/draft-state unit tests. The base manual-review workflow has no separate migration; required-review state uses the shared migration linked above.
 
 ### Atomic AI grading
 

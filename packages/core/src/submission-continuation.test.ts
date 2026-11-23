@@ -4,6 +4,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 const mocks = vi.hoisted(() => ({
   authorize: vi.fn(), scope: vi.fn(), restore: vi.fn(), resolve: vi.fn(),
   tx: {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     activityAttempt: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     activityResponseDraft: { upsert: vi.fn() },
     activityAssignmentException: { findMany: vi.fn() },

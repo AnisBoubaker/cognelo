@@ -80,7 +80,7 @@ export async function resolveCourseGradebookCompletions(user: CurrentUser, cours
 
 function isUngradedRow(row: CoreCourseGradebook["rows"][number]) {
   return row.assessmentMode !== "formative" && row.submittedAttemptCount > 0 && (
-    row.score === null || (row.needsGradingCount > 0 && row.gradeSource !== "override")
+    row.score === null || row.gradingReviews?.length > 0 || (row.needsGradingCount > 0 && row.gradeSource !== "override")
   );
 }
 

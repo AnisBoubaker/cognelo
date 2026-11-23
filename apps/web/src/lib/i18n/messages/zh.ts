@@ -1411,6 +1411,8 @@ export const zhMessages = {
       deletedSubmissionSolutionUnavailable: "此记录的提交代码不可用。",
       deletedSubmissionCodeEmpty: "提交的代码为空。",
       didNotSubmit: "未提交",
+      gradingReviewRequired: "需要教师审核",
+      gradingReviewFinalScore: "审核此提交后，请明确填写最终成绩。仅保存反馈不会完成审核。",
       partialGrade: "部分完成",
       partialGradeDescription: "部分成绩：{required} 个评分组成部分中已完成 {completed} 个。",
       overrideGrade: "审核并评分",

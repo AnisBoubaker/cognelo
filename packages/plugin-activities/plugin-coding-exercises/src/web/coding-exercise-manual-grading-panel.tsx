@@ -23,6 +23,7 @@ type CodingExerciseReviewRow = {
 
 export type CodingExerciseManualGradingPanelProps = {
   embedded?: boolean;
+  locale?: string;
   row: CodingExerciseReviewRow;
   attempts: CodingExerciseReviewAttempt[];
   attemptCount: number;
@@ -37,6 +38,7 @@ export type CodingExerciseManualGradingPanelProps = {
 
 export function CodingExerciseManualGradingPanel({
   embedded = false,
+  locale,
   row,
   attemptCount,
   selectedAttempt,
@@ -82,6 +84,7 @@ export function CodingExerciseManualGradingPanel({
             <time className="muted" dateTime={selectedAttempt.createdAt}>{formatZonedDateTime(new Date(selectedAttempt.createdAt), timeZone, undefined, { dateStyle: "medium", timeStyle: "medium" })}</time>
           </div>
           <CodingExerciseAiFeedbackReview
+            locale={locale}
             feedback={feedback ?? {}}
             hideFeedbackWhenEmpty
             onFeedbackChange={() => undefined}

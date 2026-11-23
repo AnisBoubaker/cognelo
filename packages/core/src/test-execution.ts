@@ -1,10 +1,12 @@
+import { GradingReviewRequestSchema } from "@cognelo/contracts";
+import { assertNoRequiredGradingReview, getActivityGradingReviews, gradingReviewRevision, requestActivityGradingReview, resolveTestItemGradingReview } from "./grading-review";
 import { projectStudentActivity } from "./student-activity";
 import { orderedLiveTestItems as orderedLiveItems } from "./test-item-order";
 import { applyAssignmentExceptions, exceptionsForParticipant, loadAssignmentExceptions } from "./activity-assignment-exceptions";
 import { lockTestAuthoring } from "./activity-authoring-live";
 import { createHash } from "node:crypto";
 import { getActivityDefinition, type ActivityGradingResult } from "@cognelo/activity-sdk";
-import type { CurrentUser } from "@cognelo/contracts";
+import type { CurrentUser, GradingReviewRequest } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { AppError, forbidden, notFound } from "./errors";
 import {
@@ -224,6 +226,7 @@ export async function submitTestItemAttemptResult(
   input: {
     state: Record<string, unknown>;
     gradingResult: ActivityGradingResult | null;
+    reviewRequired?: GradingReviewRequest;
     pluginAttemptRef?: string | null;
     now?: Date;
   }
@@ -243,6 +246,8 @@ export async function submitTestItemAttemptResult(
   if (input.gradingResult && (!Number.isFinite(input.gradingResult.rawMaxScore) || input.gradingResult.rawMaxScore <= 0)) {
     throw new AppError(422, "TEST_ITEM_GRADING_RESULT_INVALID", "The activity returned an invalid maximum score.");
   }
+  if (input.reviewRequired && input.gradingResult) throw new AppError(422, "TEST_ITEM_REVIEW_CONFLICT", "A review request cannot also award an automatic grade.");
+  const reviewRequest = input.reviewRequired ? GradingReviewRequestSchema.parse(input.reviewRequired) : null;
   const now = input.now ?? new Date();
   const normalizedScore = input.gradingResult ? (input.gradingResult.rawScore / input.gradingResult.rawMaxScore) * context.item.pointsPossible : null;
   return prisma.testItemAttempt.upsert({
@@ -258,6 +263,7 @@ export async function submitTestItemAttemptResult(
         ...asRecord(context.itemAttempt?.result),
         state: input.state,
         configSnapshot: context.item.activity.config,
+        ...(reviewRequest ? { gradingReviewRequest: reviewRequest } : {}),
         analyticsPayload: input.gradingResult?.analyticsPayload ?? {},
         metadata: input.gradingResult?.metadata ?? {}
       } as Prisma.InputJsonValue,
@@ -279,6 +285,7 @@ export async function submitTestItemAttemptResult(
       result: {
         state: input.state,
         configSnapshot: context.item.activity.config,
+        ...(reviewRequest ? { gradingReviewRequest: reviewRequest } : {}),
         analyticsPayload: input.gradingResult?.analyticsPayload ?? {},
         metadata: input.gradingResult?.metadata ?? {}
       } as Prisma.InputJsonValue,
@@ -335,13 +342,21 @@ export async function submitTestAttempt(
     });
   }
   await prisma.activityAttempt.update({ where: { id: parentAttempt.id }, data: { testRevisionId: revision.id } });
-  await submitActivityAttempt(user, {
-    attemptId: parentAttempt.id,
-    pluginAttemptRef: parentAttempt.id,
-    metadata: {
-      ...asRecord(parentAttempt.metadata),
-      submittedItemIds: [...completedIds], submissionManifest
-    } as Prisma.InputJsonValue
+  await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id=${parentAttempt.id} FOR UPDATE`;
+    await submitActivityAttempt(user, {
+      attemptId: parentAttempt.id,
+      pluginAttemptRef: parentAttempt.id,
+      metadata: {
+        ...asRecord(parentAttempt.metadata),
+        submittedItemIds: [...completedIds], submissionManifest
+      } as Prisma.InputJsonValue
+    }, tx);
+    for (const child of parentAttempt.testItemAttempts.filter(child => currentItems.some(item => item.id === child.testItemId))) {
+      const request = asRecord(child.result).gradingReviewRequest;
+      if (request) await requestActivityGradingReview(user, { attemptId: parentAttempt.id, testItemAttemptId: child.id,
+        review: GradingReviewRequestSchema.parse(request) }, tx);
+    }
   });
   // Submission is final even when one child needs manual/rubric grading.
   if (currentItems.every((item) => parentAttempt.testItemAttempts.some((attempt) => attempt.testItemId === item.id && attempt.lifecycle === "graded"))) {
@@ -475,10 +490,13 @@ export async function getTestAttemptReview(user: CurrentUser, courseId: string, 
     }
   });
   if (!parentAttempt) throw notFound("Submitted Test attempt");
+  const gradingReviews = await getActivityGradingReviews([parentAttempt.id]);
   const attemptByItemId = new Map(parentAttempt.testItemAttempts.map((attempt) => [attempt.testItemId, attempt]));
   const revisionItemBySourceId = new Map((parentAttempt.testRevision?.items ?? []).map((item) => [item.sourceTestItemId, item]));
   return {
     id: parentAttempt.id,
+    gradingReviews,
+    gradingReviewRevision: gradingReviewRevision(gradingReviews),
     groupId: parentAttempt.groupId,
     gradebookItemId: parentAttempt.gradebookItemId,
     participantId: parentAttempt.participantId,
@@ -518,6 +536,7 @@ export async function getTestAttemptReview(user: CurrentUser, courseId: string, 
         itemAttempt: {
           id: itemAttempt.id,
           updatedAt: itemAttempt.updatedAt.toISOString(),
+          gradingReviews: gradingReviews.filter(review => review.testItemAttemptId === itemAttempt.id),
           manuallyGraded: Boolean(asRecord(itemAttempt.result).manualGrading),
           pluginAttemptRef: itemAttempt.pluginAttemptRef,
           lifecycle: itemAttempt.lifecycle,
@@ -561,6 +580,7 @@ export async function recordTestItemAiFeedback(
   if (input.expectedUpdatedAt && itemAttempt.updatedAt.toISOString() !== input.expectedUpdatedAt) {
     throw new AppError(409, "TEST_REVIEW_CONFLICT", "This question was reviewed while feedback was being generated. Reload the latest review.");
   }
+  await assertNoRequiredGradingReview(parentAttemptId, transaction ?? prisma, itemAttempt.id);
   const pointsPossible = manifestItem.pointsPossible ?? itemAttempt.normalizedMaxScore ?? 0;
   const grading = input.gradingResult && input.gradingResult.rawMaxScore > 0
     ? {
@@ -622,32 +642,37 @@ export async function gradeTestItemManually(
   }
 
   const gradedAt = new Date();
-  await prisma.testItemAttempt.update({
-    where: { id: itemAttempt.id },
-    data: {
-      lifecycle: "graded",
-      rawScore: input.score,
-      rawMaxScore: pointsPossible,
-      normalizedScore: input.score,
-      normalizedMaxScore: pointsPossible,
-      feedback: {
-        ...asRecord(itemAttempt.feedback),
-        ...(input.feedbackText === undefined ? {} : { feedbackText: input.feedbackText })
-      } as Prisma.InputJsonValue,
-      result: {
-        ...asRecord(itemAttempt.result),
-        manualGrading: {
-          score: input.score,
-          pointsPossible,
-          graderUserId: user.id,
-          reason: input.reason ?? null,
-          gradedAt: gradedAt.toISOString()
-        }
-      } as Prisma.InputJsonValue,
-      gradedAt
-    }
+  return prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id=${parentAttemptId} FOR UPDATE`;
+    await tx.testItemAttempt.update({
+      where: { id: itemAttempt.id },
+      data: {
+        lifecycle: "graded",
+        rawScore: input.score,
+        rawMaxScore: pointsPossible,
+        normalizedScore: input.score,
+        normalizedMaxScore: pointsPossible,
+        feedback: {
+          ...asRecord(itemAttempt.feedback),
+          ...(input.feedbackText === undefined ? {} : { feedbackText: input.feedbackText })
+        } as Prisma.InputJsonValue,
+        result: {
+          ...asRecord(itemAttempt.result),
+          manualGrading: {
+            score: input.score,
+            pointsPossible,
+            graderUserId: user.id,
+            reason: input.reason ?? null,
+            gradedAt: gradedAt.toISOString()
+          }
+        } as Prisma.InputJsonValue,
+        gradedAt
+      }
+    });
+    await resolveTestItemGradingReview(tx, { parentAttemptId, testItemAttemptId: itemAttempt.id, courseId, userId: user.id });
+    try { return await recordTestAttemptGrade(user, courseId, parentAttemptId, "manual", input.reason, tx); }
+    catch (error) { if (error instanceof AppError && error.code === "TEST_ITEMS_NOT_GRADED") return null; throw error; }
   });
-  return recordTestAttemptGrade(user, courseId, parentAttemptId, "manual", input.reason);
 }
 
 async function loadTestGradingAttempt(courseId: string, parentAttemptId: string, database: Prisma.TransactionClient | typeof prisma = prisma) {
@@ -741,6 +766,9 @@ function testAttemptGradingInput(parentAttempt: Awaited<ReturnType<typeof loadTe
 async function recordTestAttemptGrade(user: CurrentUser, courseId: string, parentAttemptId: string,
   source: "auto" | "manual" | "regrade", reason?: string | null, transaction?: Prisma.TransactionClient) {
   const parent = await loadTestGradingAttempt(courseId, parentAttemptId, transaction);
+  if ((await getActivityGradingReviews([parentAttemptId], transaction ?? prisma)).length) {
+    throw new AppError(409, "TEST_ITEMS_NOT_GRADED", "Resolve the required teacher reviews before calculating this Test grade.");
+  }
   const gradingInput = testAttemptGradingInput(parent, source, reason);
   return transaction ? recordActivityAttemptGradingResult(user, gradingInput, transaction) : recordActivityAttemptGradingResult(user, gradingInput);
 }

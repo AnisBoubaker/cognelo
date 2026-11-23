@@ -1,7 +1,8 @@
 import { AppError } from "@cognelo/core";
 import { z } from "zod";
+import { gradeCodingBlanks } from "./blank-grading";
 import { assertCodingPracticeRunsEnabled, createCodingPracticeRun } from "./practice-runs";
-import { codingBlankAnswersSchema, readCodingBlankResponse, resolveCodingBlankInput } from "./code-blanks";
+import { assembleCodingBlankSource, codingBlankAnswersSchema, readCodingBlankResponse, resolveCodingBlankInput, type CodingBlankResponse } from "./code-blanks";
 import {
   buildCodingExerciseSource,
   getCodingExerciseMaxTestRuns,
@@ -468,7 +469,7 @@ export async function submitCodingExercise(params: {
   const config = parseCodingExerciseConfig(params.activityConfig);
   const input = resolveExecutionInput(config, codingExerciseSubmitInputSchema.parse(params.input));
   const privateConfig = await getCodingExercisePrivateConfig({ activityId: params.activityId });
-  const runtime = privateConfig.aiFeedback.testsEnabled === false
+  const runtime = privateConfig.aiFeedback.testsEnabled === false || (config.responseMode === "blanks" && !input.sourceCode.trim())
     ? { languageKey: config.language, languageId: 0, languageName: config.language } : await resolveJudge0Language(config.language);
   const hiddenTests = privateConfig.aiFeedback.testsEnabled === false ? [] : await prisma.pluginCodingExerciseHiddenTest.findMany({
     where: { activityId: params.activityId, isEnabled: true },
@@ -497,8 +498,20 @@ export async function submitCodingExercise(params: {
     }
   });
 
+  let blankEvaluationId: string | null = null;
   try {
-    const evaluated = await executeHiddenTests({ config, privateConfig, runtime, hiddenTests: normalizedHiddenTests, sourceCode: input.sourceCode });
+    if (config.responseMode === "blanks" && normalizedHiddenTests.length) {
+      const evaluation = await prisma.pluginCodingExerciseTestEvaluation.create({ data: {
+        activityId: params.activityId, executionId: pendingExecution.id, actorUserId: params.userId, status: "pending",
+        resultSummary: { phase: "pending" }, configSnapshot: { purpose: "initial-blank-grading", policy: "isolated-blanks-v1",
+          activityConfig: config, privateConfig, hiddenTests: normalizedHiddenTests, blankResponse: readCodingBlankResponse(input) } as Prisma.InputJsonValue
+      } });
+      blankEvaluationId = evaluation.id;
+    }
+    const evaluated = await evaluateCodingSubmissionTests({ config, privateConfig, runtime, hiddenTests: normalizedHiddenTests,
+      sourceCode: input.sourceCode, blankResponse: readCodingBlankResponse(input) });
+    if (blankEvaluationId) await prisma.pluginCodingExerciseTestEvaluation.update({ where: { id: blankEvaluationId },
+      data: { status: "completed", resultSummary: evaluated.summary as Prisma.InputJsonValue } });
     const updatedExecution = await codingExerciseExecutionClient.pluginCodingExerciseExecution.update({
       where: { id: pendingExecution.id },
       data: {
@@ -518,6 +531,9 @@ export async function submitCodingExercise(params: {
 
     return toCodingExerciseExecutionRecord(updatedExecution);
   } catch (error) {
+    if (blankEvaluationId) await prisma.pluginCodingExerciseTestEvaluation.update({ where: { id: blankEvaluationId }, data: {
+      status: "failed", resultSummary: { phase: "failed-before-result" }, error: error instanceof Error ? error.message.slice(0, 4000) : "Blank grading failed."
+    } }).catch(() => undefined);
     await codingExerciseExecutionClient.pluginCodingExerciseExecution.update({
       where: { id: pendingExecution.id },
       data: {
@@ -547,7 +563,7 @@ export async function submitCodingExercisePreview(params: {
   const input = resolveExecutionInput(config, codingExerciseSubmitInputSchema.parse(params.input));
   const privateConfig = await getCodingExercisePrivateConfig({ activityId: params.activityId });
   const [runtime, hiddenTests] = await Promise.all([
-    privateConfig.aiFeedback.testsEnabled === false
+    privateConfig.aiFeedback.testsEnabled === false || (config.responseMode === "blanks" && !input.sourceCode.trim())
       ? Promise.resolve({ languageKey: config.language, languageId: 0, languageName: config.language }) : resolveJudge0Language(config.language),
     privateConfig.aiFeedback.testsEnabled === false ? Promise.resolve([]) : prisma.pluginCodingExerciseHiddenTest.findMany({
       where: { activityId: params.activityId, isEnabled: true },
@@ -556,7 +572,8 @@ export async function submitCodingExercisePreview(params: {
   ]);
   const normalizedHiddenTests = hiddenTests.map(toHiddenTestCase);
   try {
-    const evaluated = await executeHiddenTests({ config, privateConfig, runtime, hiddenTests: normalizedHiddenTests, sourceCode: input.sourceCode });
+    const evaluated = await evaluateCodingSubmissionTests({ config, privateConfig, runtime, hiddenTests: normalizedHiddenTests,
+      sourceCode: input.sourceCode, blankResponse: readCodingBlankResponse(input) });
     return previewCodingExecutionRecord({
       activityId: params.activityId,
       userId: params.userId,
@@ -584,12 +601,61 @@ export async function submitCodingExercisePreview(params: {
   }
 }
 
+async function evaluateCodingSubmissionTests(input: Parameters<typeof executeHiddenTests>[0] & {
+  blankResponse: CodingBlankResponse | null; checkReference?: boolean;
+}) {
+  if (input.config.responseMode !== "blanks" || !input.hiddenTests.length) return executeHiddenTests(input);
+  const response = input.blankResponse;
+  if (!response) throw new AppError(409, "CODING_EXERCISE_BLANK_RESPONSE_REQUIRED", "Saved blank values are required for automatic grading.");
+  const suites = new Map<string, Promise<Awaited<ReturnType<typeof executeHiddenTests>>>>();
+  const runSuite = (sourceCode: string, stopAfterFailure: boolean) => {
+    let result = suites.get(sourceCode);
+    if (!result) {
+      result = executeHiddenTests({ ...input, sourceCode, stopAfterFailure, stopAfterCompilationFailure: true });
+      suites.set(sourceCode, result);
+    }
+    return result;
+  };
+  if (input.checkReference && Object.values(response.blankAnswers).some(answer => answer.trim())) {
+    const reference = assembleCodingBlankSource(response.blankTemplate, input.privateConfig.blankReferenceAnswers ?? {});
+    if (!(await runSuite(reference, true)).summary.accepted) throw new AppError(409, "CODING_EXERCISE_BLANK_REFERENCE_INVALID", "The saved reference completion does not pass the current tests for this submitted blank layout.");
+  }
+  const checkSyntax = ["python", "python2"].includes(input.runtime.languageKey) ? async (source: string) => {
+    const assembled = buildCodingExerciseSource({ config: input.config, privateConfig: input.privateConfig,
+      studentSourceCode: source, testCode: input.hiddenTests[0].testCode });
+    const encoded = Buffer.from(assembled, "utf8").toString("base64");
+    const marker = "COGNELO_SYNTAX_OK";
+    const result = await runJudge0Submission({ languageId: input.runtime.languageId,
+      sourceCode: `import base64\ncompile(base64.b64decode("${encoded}"), "<student>", "exec", 0, True)\nprint("${marker}")`,
+      expectedOutput: marker + "\n", cpuTimeLimit: 2, wallTimeLimit: 5, memoryLimitKb: 128000 });
+    return result.status?.id === 3 && (result.stdout ?? "").trim() === marker;
+  } : undefined;
+  const { grading, combined, reviewRequired } = await gradeCodingBlanks({ template: response.blankTemplate,
+    answers: response.blankAnswers, referenceAnswers: input.privateConfig.blankReferenceAnswers ?? {}, checkSyntax, runSuite });
+  // Compilation is part of the first sandbox test for compiled runtimes; never enable learner compiler options.
+  if (grading.syntaxPassed === null && combined) grading.syntaxPassed = !combined.summary.tests.some(test => test.statusId === 6);
+  const tests = (combined?.summary.tests ?? []).map(test => ({ ...test, message: null }));
+  return {
+    summary: { judge0LanguageName: input.runtime.languageName, executionMode: input.config.executionMode, phase: "finished",
+      accepted: reviewRequired ? null : grading.correct === grading.total, gradingPending: reviewRequired,
+      reviewRequired, blankGrading: grading, outputTruncated: false,
+      testCount: combined?.summary.testCount ?? 0, passedCount: combined?.summary.passedCount ?? 0,
+      earnedWeight: grading.correct, totalWeight: grading.total, hiddenTestCount: input.hiddenTests.length, tests },
+    // Substitutions can appear in stdout/compiler diagnostics; retain only original student source on the execution.
+    firstFailureMessage: reviewRequired ? "Automatic checks require teacher review." : grading.correct < grading.total ? "Some code blanks did not pass the checks." : null,
+    latestToken: null, latestStdout: null, latestStderr: null, latestCompileOutput: null,
+    latestStatusId: null, latestStatusLabel: null, latestTime: null, latestMemory: null
+  };
+}
+
 async function executeHiddenTests(input: {
   config: ReturnType<typeof parseCodingExerciseConfig>;
   privateConfig: CodingExercisePrivateConfig;
   runtime: Awaited<ReturnType<typeof resolveJudge0Language>>;
   hiddenTests: HiddenTestCase[];
   sourceCode: string;
+  stopAfterFailure?: boolean;
+  stopAfterCompilationFailure?: boolean;
 }) {
   const { config, privateConfig, runtime, hiddenTests } = input;
   const testResults = [];
@@ -659,6 +725,7 @@ async function executeHiddenTests(input: {
       timeSeconds: result.time ?? null,
       memoryKb: result.memory ?? null
     });
+    if ((!passed && input.stopAfterFailure) || (result.status?.id === 6 && input.stopAfterCompilationFailure)) break;
   }
 
   return {
@@ -694,7 +761,7 @@ export async function getLatestCodingExerciseTestResult(input: {
 }) {
   const latest = await prisma.pluginCodingExerciseTestEvaluation.findFirst({
     where: { activityId: input.activityId, executionId: input.executionId, status: "completed" },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }]
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true, resultSummary: true }
   });
   return {
     resultSummary: capExecutionResultSummary(latest?.resultSummary ?? input.originalResultSummary).value,
@@ -717,8 +784,8 @@ export async function regradeCodingExerciseTests(input: {
   if (isCodingExerciseOperationalFailure(execution)) {
     throw new AppError(503, "CODING_EXERCISE_RESULT_UNAVAILABLE", "This submission was interrupted by the code execution service and cannot be regraded.");
   }
-  const config = parseCodingExerciseConfig(input.activityConfig);
-  const privateConfig = await getCodingExercisePrivateConfig({ activityId: input.activityId });
+  let config = parseCodingExerciseConfig(input.activityConfig);
+  let privateConfig = await getCodingExercisePrivateConfig({ activityId: input.activityId });
   if (privateConfig.aiFeedback.testsEnabled === false) return {
     testEvaluationId: null,
     resultSummary: { earnedWeight: 0, totalWeight: 0, testsEnabled: false },
@@ -732,6 +799,24 @@ export async function regradeCodingExerciseTests(input: {
   if (!hiddenTests.length) {
     throw new AppError(400, "HIDDEN_TESTS_REQUIRED", "This coding exercise does not have any enabled hidden tests yet.");
   }
+  const blankResponse = readCodingBlankResponse(normalizeResultSummary(execution.resultSummary).blankResponse);
+  let checkReference = false;
+  if (blankResponse) config = { ...config, responseMode: "blanks" };
+  if (config.responseMode === "blanks" && blankResponse && config.blankTemplate !== blankResponse.blankTemplate) {
+    const original = await prisma.pluginCodingExerciseTestEvaluation.findFirst({ where: {
+      activityId: input.activityId, executionId: input.executionId, status: "completed"
+    }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { configSnapshot: true } });
+    const snapshot = normalizeResultSummary(original?.configSnapshot);
+    const savedConfig = normalizeResultSummary(snapshot.activityConfig);
+    const savedPrivate = normalizeResultSummary(snapshot.privateConfig);
+    const references = codingBlankAnswersSchema.safeParse(savedPrivate.blankReferenceAnswers);
+    if (savedConfig.blankTemplate !== blankResponse.blankTemplate || !references.success) {
+      throw new AppError(409, "CODING_EXERCISE_BLANK_REFERENCE_UNAVAILABLE", "The saved blank layout no longer has a compatible reference completion for automatic regrading.");
+    }
+    config = { ...config, blankTemplate: blankResponse.blankTemplate };
+    privateConfig = { ...privateConfig, blankReferenceAnswers: references.data };
+    checkReference = true;
+  }
   const evaluation = await prisma.pluginCodingExerciseTestEvaluation.create({
     data: {
       activityId: input.activityId,
@@ -739,11 +824,12 @@ export async function regradeCodingExerciseTests(input: {
       actorUserId: input.actorUserId,
       status: "pending",
       resultSummary: { phase: "pending", testCount: hiddenTests.length },
-      configSnapshot: { activityConfig: config, privateConfig, hiddenTests } as Prisma.InputJsonValue
+      configSnapshot: { activityConfig: config, currentActivityConfig: input.activityConfig, privateConfig, hiddenTests, blankResponse } as Prisma.InputJsonValue
     }
   });
   try {
-    const result = await executeHiddenTests({ config, privateConfig, runtime, hiddenTests, sourceCode: execution.sourceCode });
+    const result = await evaluateCodingSubmissionTests({ config, privateConfig, runtime, hiddenTests,
+      sourceCode: execution.sourceCode, blankResponse, checkReference });
     const completed = await prisma.pluginCodingExerciseTestEvaluation.update({
       where: { id: evaluation.id },
       data: { status: "completed", resultSummary: result.summary as Prisma.InputJsonValue }
@@ -1220,4 +1306,12 @@ function resolveExecutionInput<T extends { sourceCode: string; blankAnswers?: Re
 function blankExecutionSnapshot(input: unknown) {
   const response = readCodingBlankResponse(input);
   return response ? { blankResponse: response } : {};
+}
+
+export async function codingExerciseRequiresTeacherReview(activityId: string, executionId: string | null) {
+  if (!executionId) return false;
+  const execution = await prisma.pluginCodingExerciseExecution.findFirst({ where: { id: executionId, activityId, kind: "submit" }, select: { resultSummary: true } });
+  if (!execution) return false;
+  const latest = await getLatestCodingExerciseTestResult({ activityId, executionId, originalResultSummary: execution.resultSummary });
+  return normalizeResultSummary(latest.resultSummary).reviewRequired === true;
 }

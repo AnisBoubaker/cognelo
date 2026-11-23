@@ -11,7 +11,8 @@ const overrideInputSchema = z.object({
   isPass: z.boolean().nullable().optional(),
   reason: z.string().max(1000).nullable().optional(),
   feedbackText: z.string().max(4000).nullable().optional(),
-  expectedGradeUpdatedAt: z.string().datetime().nullable()
+  expectedGradeUpdatedAt: z.string().datetime().nullable(),
+  expectedGradingReviewRevision: z.string().nullable().optional()
 });
 
 export function OPTIONS() {
@@ -32,7 +33,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         isPass: input.isPass,
         reason: input.reason,
         feedbackText: input.feedbackText,
-        expectedGradeUpdatedAt: input.expectedGradeUpdatedAt
+        expectedGradeUpdatedAt: input.expectedGradeUpdatedAt,
+        expectedGradingReviewRevision: input.expectedGradingReviewRevision
       })
     });
   });

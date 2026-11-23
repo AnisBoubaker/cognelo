@@ -1,5 +1,7 @@
 "use client";
 
+import { GradingReviewNotice } from "./grading-review-notice";
+
 import { DialogCloseButton, DialogHeader } from "@cognelo/activity-ui";
 
 import { ActivityChatDialog } from "@/components/activity-chat";
@@ -140,7 +142,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
         return;
       }
       const calculatedGrade = gradeFollowsCalculated
-        ? calculatedNormalizedGrade(row, result.review.activityTypeKey, result.review.feedback)
+        ? result.review.gradingReviews?.length ? null : calculatedNormalizedGrade(row, result.review.activityTypeKey, result.review.feedback)
         : null;
       setFeedbackReview({
         attemptReferences,
@@ -313,7 +315,8 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
             score: parsedGrade,
             maxScore: row.maxScore,
             reason: t("courseDetail.reviewAndGradeReason"),
-            expectedGradeUpdatedAt: feedbackResult?.grade?.updatedAt ?? feedbackResult?.gradeUpdatedAt ?? row.gradeUpdatedAt
+            expectedGradeUpdatedAt: feedbackResult?.grade?.updatedAt ?? feedbackResult?.gradeUpdatedAt ?? row.gradeUpdatedAt,
+            expectedGradingReviewRevision: feedbackReview.review.gradingReviewRevision
           })
         : null;
       const finalGrade = overrideResult?.grade.normalizedScore ?? feedbackResult?.grade?.normalizedScore ?? feedbackReview.initialGrade;
@@ -321,7 +324,8 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
       setFeedbackReview((current) => current ? {
         ...current,
         saving: false,
-        review: current.review ? { ...current.review, feedback: savedFeedback } : current.review,
+        review: current.review ? { ...current.review, feedback: savedFeedback,
+          ...(overrideResult ? { gradingReviews: [], gradebookGradingReviews: [], gradingReviewRevision: null } : {}) } : current.review,
         draft: savedFeedback,
         gradeDraft: finalGrade === null ? "" : formatGradeNumber(finalGrade),
         gradeTouched: false,
@@ -346,7 +350,8 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
         maxScore: input.maxScore,
         reason: input.reason,
         feedbackText: input.feedbackText ?? input.reason,
-        expectedGradeUpdatedAt: row.gradeUpdatedAt
+        expectedGradeUpdatedAt: row.gradeUpdatedAt,
+        expectedGradingReviewRevision: row.gradingReviewRevision
       });
       await onSaved?.();
     } catch (err) {
@@ -478,6 +483,7 @@ export function ReviewAndGradeDialog({ courseId, row, onClose, onSaved, classRow
           <button type="button" className="secondary" aria-label={t("activityMessenger.title")} title={t("activityMessenger.title")} onClick={() => setShowMessages(true)}><AppIcon name="messages" /><span className="review-toolbar-label">{t("activityMessenger.title")}</span></button>
           <DialogCloseButton label={t("common.close")} onClose={close} disabled={manualSaving || Boolean(savingAction) || Boolean(feedbackReview?.saving)} />
         </div>
+      {!useFeedbackReview && row.activityTypeKey !== "test" ? <GradingReviewNotice reviews={row.gradingReviews} t={t} /> : null}
       {useFeedbackReview ? feedbackReview ? (
           <AiFeedbackReviewPanel
           row={row}
@@ -605,6 +611,7 @@ function AiFeedbackReviewPanel({ row, state, onFeedbackChange, onGradeChange, on
           </button>
         </div>
       ) : null}
+      <GradingReviewNotice reviews={state.review?.gradebookGradingReviews ?? state.review?.gradingReviews} t={t} />
       {state.loading ? <p className="muted">{t("courseDetail.loadingStudentAnswers")}</p> : null}
       {state.error ? <p className="error-text">{state.error}</p> : null}
       {state.review?.gradesReleased ? <p className="inline-panel muted">{t("courseDetail.feedbackReviewReleasedNote")}</p> : null}

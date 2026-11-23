@@ -290,7 +290,8 @@ export default function ManualActivityGradingPage() {
           maxScore: row.maxScore,
           reason: draft.feedback.trim() || null,
           feedbackText: draft.feedback.trim() || null,
-          expectedGradeUpdatedAt: row.gradeUpdatedAt
+          expectedGradeUpdatedAt: row.gradeUpdatedAt,
+          expectedGradingReviewRevision: row.gradingReviewRevision
         });
         setSaveProgress({ completed: index + 1, total: rowsToSave.length });
       }

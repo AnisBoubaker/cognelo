@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 const mocks = vi.hoisted(() => ({ context: vi.fn(), parent: vi.fn(), grade: vi.fn(), guidance: vi.fn(), evaluate: vi.fn(), publish: vi.fn(), recordChild: vi.fn(), recalculate: vi.fn(), research: vi.fn() }));
-vi.mock("@cognelo/db", () => ({ prisma: { activityAttempt: { findUniqueOrThrow: mocks.parent }, grade: { findUnique: mocks.grade } } }));
+vi.mock("@cognelo/db", () => ({ prisma: { $queryRaw: vi.fn().mockResolvedValue([]), activityAttempt: { findUniqueOrThrow: mocks.parent }, grade: { findUnique: mocks.grade } } }));
 vi.mock("./gradebook", () => ({ getActivityAttemptRegradeContext: mocks.context }));
 vi.mock("./ai-feedback", () => ({ recordAiFeedbackResearchEvent: mocks.research }));
 vi.mock("./test-ai-grading", () => ({ resolveTestAiGradingGuidance: mocks.guidance }));

@@ -6,7 +6,7 @@ import {
   type PluginAiFeedbackTeacherReviewContext,
   type PluginAiGradingBatchGuidance
 } from "@cognelo/activity-sdk/server";
-import { AppError, getActivityAttemptRegradeContext, getTeacherAttemptAiFeedbackReview, recordActivityAttemptAiFeedback, recordActivityAttemptGradingResult, recordAiFeedbackResearchEvent, prepareAiGradingAttempt, commitPreparedAiGrading, reviseTeacherAttemptAiFeedback } from "@cognelo/core";
+import { AppError, getActivityAttemptRegradeContext, getTeacherAttemptAiFeedbackReview, recordActivityAttemptAiFeedback, recordActivityAttemptGradingResult, recordAiFeedbackResearchEvent, prepareAiGradingAttempt, commitPreparedAiGrading, reviseTeacherAttemptAiFeedback, getActivityGradingReviews } from "@cognelo/core";
 import { prisma, type Prisma } from "@cognelo/db";
 import { z } from "zod";
 import { handleRoute, json, options, readJson, requireUser } from "@/lib/http";
@@ -91,8 +91,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         body.expectedFeedbackHash,
         tx
       );
+      const reviewPending = (await getActivityGradingReviews([attemptId], tx)).length > 0;
       const revisedAiWeightPercent = (revised.feedback as Record<string, unknown>).aiWeightPercent;
-      const grading = revision.gradingResult
+      const grading = revision.gradingResult && !reviewPending
         ? await recordActivityAttemptGradingResult(user, {
             attemptId: context.attemptId,
             rawScore: revision.gradingResult.rawScore,
@@ -114,7 +115,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             reason: "Teacher rubric review"
           }, tx)
         : null;
-      if (revision.gradingResult) {
+      if (revision.gradingResult && !reviewPending) {
         await recordAiFeedbackResearchEvent({
           eventType: "feedback_teacher_grade_adjusted",
           courseId,
@@ -286,7 +287,7 @@ async function resolveBatchGuidance(input: {
       activity: context.activity
     };
     const review = await getTeacherAttemptAiFeedbackReview(input.user, input.courseId, templateAttemptId);
-    if (!review.feedback || !await batchGrading.isTemplateComplete({ ...reviewContext, feedback: review.feedback })) {
+    if (review.gradingReviews?.length || !review.feedback || !await batchGrading.isTemplateComplete({ ...reviewContext, feedback: review.feedback })) {
       throw new AppError(400, "AI_BATCH_TEMPLATE_INCOMPLETE", "Every grading template must contain a completed rubric and teacher comments.");
     }
     return {

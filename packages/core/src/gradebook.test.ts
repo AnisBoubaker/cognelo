@@ -29,6 +29,7 @@ const tx = vi.hoisted(() => ({
 }));
 
 const mockPrisma = vi.hoisted(() => ({
+  $queryRaw: vi.fn().mockResolvedValue([]),
   activityAssignmentException: { findMany: vi.fn() },
   $transaction: vi.fn(async (handler: (transaction: typeof tx) => unknown) => handler(tx)),
   activityAttempt: {

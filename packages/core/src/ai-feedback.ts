@@ -1,3 +1,4 @@
+import { getActivityGradingReviews, getGradebookGradingReviews, gradingReviewRevision } from "./grading-review";
 import { createHash } from "node:crypto";
 import { prisma, type Prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -103,8 +104,13 @@ export async function getTeacherAttemptAiFeedbackReview(user: CurrentUser, cours
     : isStoredTeacherFeedback(attemptFeedback)
       ? attemptFeedback
       : null;
+  const gradingReviews = await getActivityGradingReviews([attempt.id], database);
+  const allReviews = await getGradebookGradingReviews(attempt.gradebookItemId, attempt.participantId, database);
   return {
     attemptId: attempt.id,
+    gradingReviews,
+    gradebookGradingReviews: allReviews,
+    gradingReviewRevision: gradingReviewRevision(allReviews),
     gradeId: selectedGrade?.id ?? null,
     gradeUpdatedAt: selectedGrade?.updatedAt.toISOString() ?? null,
     gradesReleased: attempt.gradebookItem.gradesReleased,

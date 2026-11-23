@@ -1488,9 +1488,14 @@ export function getManualGradingRenderer(activityTypeKey: string) {
 
 export const aiFeedbackReviewRenderers: Record<string, (context: AiFeedbackReviewRendererContext) => ReactNode> = {
   "homework-rubric-review": context => <HomeworkRubricReviewRenderer {...context} />,
-  "coding-exercise-ai-feedback-review": (context) => <CodingExerciseAiFeedbackReview {...context} />,
+  "coding-exercise-ai-feedback-review": context => <CodingFeedbackReviewRenderer {...context} />,
   "mcq-ai-feedback-review": (context) => <McqAiFeedbackReview {...context} />
 };
+
+function CodingFeedbackReviewRenderer(context: AiFeedbackReviewRendererContext) {
+  const { locale } = useI18n();
+  return <CodingExerciseAiFeedbackReview {...context} locale={locale} />;
+}
 
 function HomeworkRubricReviewRenderer(context: AiFeedbackReviewRendererContext) {
   const { locale } = useI18n();

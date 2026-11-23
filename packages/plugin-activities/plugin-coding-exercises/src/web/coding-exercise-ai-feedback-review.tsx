@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ActionIcon, CodeRenderer, ConfirmationDialog } from "@cognelo/activity-ui";
+import { CodingBlankGradingDetails } from "./coding-blank-grading-details";
 
 export type CodingExerciseAiFeedbackReviewProps = {
   feedback: Record<string, unknown>;
@@ -9,6 +10,7 @@ export type CodingExerciseAiFeedbackReviewProps = {
   onFeedbackChange: (feedback: Record<string, unknown>) => void;
   readOnly?: boolean;
   hideFeedbackWhenEmpty?: boolean;
+  locale?: string;
   t: (key: string, params?: Record<string, string | number>) => string;
 };
 
@@ -20,17 +22,19 @@ export type CodingExerciseGradingBreakdown = {
   totalGrade: number | null;
 };
 
-export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbackChange, readOnly = false, hideFeedbackWhenEmpty = false, t }: CodingExerciseAiFeedbackReviewProps) {
+export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbackChange: onChange, readOnly = false, hideFeedbackWhenEmpty = false, t, locale }: CodingExerciseAiFeedbackReviewProps) {
   const [clearConfirmationOpen, setClearConfirmationOpen] = useState(false);
   const sourceCode = typeof submission.sourceCode === "string" ? submission.sourceCode : "";
   const language = typeof submission.language === "string" ? submission.language : "text";
   const resultSummary = recordValue(submission.resultSummary);
+  const reviewRequired = resultSummary.reviewRequired === true;
+  const onFeedbackChange = (value: Record<string, unknown>) => onChange({ ...value, reviewRequired });
   const tests = recordArray(resultSummary.tests);
   const passedCount = tests.filter((test) => test.passed === true).length;
   const strengths = stringArray(feedback.strengths).join("\n\n");
   const improvements = stringArray(feedback.improvements).join("\n\n");
   const criteria = recordArray(feedback.criteria);
-  const gradingBreakdown = getCodingExerciseGradingBreakdown(feedback);
+  const gradingBreakdown = getCodingExerciseGradingBreakdown({ ...feedback, reviewRequired });
   const hasFeedbackContent = hasCodingExerciseFeedbackContent(feedback);
   const showFeedback = !hideFeedbackWhenEmpty || !readOnly || hasFeedbackContent || criteria.length > 0;
 
@@ -39,6 +43,7 @@ export function CodingExerciseAiFeedbackReview({ feedback, submission, onFeedbac
       <section className="inline-panel stack stack-tight">
         <h3>{t("courseDetail.feedbackReviewSubmission")}</h3>
         {sourceCode ? <CodeRenderer code={sourceCode} language={language} showLineNumbers /> : <p className="muted">{t("courseDetail.answerUnavailable")}</p>}
+        <CodingBlankGradingDetails grading={resultSummary.blankGrading} reviewRequired={reviewRequired} teacher locale={locale} />
         {tests.length ? (
           <section className="stack stack-tight">
             <div className="row" style={{ alignItems: "baseline", justifyContent: "space-between" }}>
@@ -201,6 +206,7 @@ export function clearCodingExerciseFeedbackContent(feedback: Record<string, unkn
 }
 
 export function getCodingExerciseGradingBreakdown(feedback: Record<string, unknown>): CodingExerciseGradingBreakdown | null {
+  if (feedback.reviewRequired === true) return null;
   const deterministicScore = finiteNumber(feedback.deterministicScore);
   const gradingEnabled = feedback.gradingEnabled === true;
   const automaticMax = gradingEnabled ? finiteNumber(feedback.testWeightPercent) : 100;

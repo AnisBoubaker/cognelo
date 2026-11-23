@@ -1,3 +1,4 @@
+import { codingBlankReviewRequest } from "./review-request";
 import { getActivityResponseDraft } from "@cognelo/core";
 import { getCodingPracticeRunAllowance, resolveCodingPracticeScope, assertCodingPracticeRunsEnabled } from "./practice-runs";
 import { canShowStudentActivityGrade } from "@cognelo/core";
@@ -303,6 +304,7 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
         });
         const submittedAttempt = await submitActivityAttempt(context.user, {
           attemptId: coreAttempt.id,
+          ...(execution.resultSummary?.reviewRequired === true ? { reviewRequired: codingBlankReviewRequest(execution.id) } : {}),
           pluginAttemptRef: execution.id,
           metadata
         });
@@ -314,7 +316,7 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
         if (earnedWeight === null || totalWeight === null || totalWeight < 0) {
           throw new AppError(409, "CODING_EXERCISE_RESULT_INVALID", "The coding exercise did not return a valid weighted result.");
         }
-        if (totalWeight > 0 && (!aiFeedbackSetup.effective || !aiFeedbackSetup.config.gradingEnabled)) {
+        if (execution.resultSummary.reviewRequired !== true && totalWeight > 0 && (!aiFeedbackSetup.effective || !aiFeedbackSetup.config.gradingEnabled)) {
           await recordActivityAttemptGradingResult(context.user, {
             attemptId: submittedCoreAttemptId,
             rawScore: earnedWeight,
@@ -337,7 +339,7 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
         context.courseId &&
         context.groupId &&
         assignmentUsesAutomaticAiFeedback(context.activity.assignment?.metadata) &&
-        aiFeedbackSetup.effective
+        aiFeedbackSetup.effective && execution.resultSummary?.reviewRequired !== true
       ) {
         try {
           aiFeedback = await evaluateCodingExerciseAttemptWithAi({

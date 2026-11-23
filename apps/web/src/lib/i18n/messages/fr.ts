@@ -1412,6 +1412,8 @@ export const frMessages = {
       deletedSubmissionSolutionUnavailable: "Le code soumis n’est pas disponible pour cet enregistrement.",
       deletedSubmissionCodeEmpty: "Le code soumis était vide.",
       didNotSubmit: "Non soumis",
+      gradingReviewRequired: "Révision enseignante requise",
+      gradingReviewFinalScore: "Après avoir examiné cette réponse, saisissez explicitement une note finale. Enregistrer les commentaires seuls ne termine pas la révision.",
       partialGrade: "Partielle",
       partialGradeDescription: "Note partielle : {completed} composante(s) sur {required} sont terminees.",
       overrideGrade: "Réviser et noter",

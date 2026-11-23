@@ -53,6 +53,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       if (context.activityTypeKey !== first.activityTypeKey || !isSubmittedAttempt(context.lifecycle)) return null;
       const review = await getTeacherAttemptAiFeedbackReview(user, courseId, context.attemptId);
       if (!review.feedback) return null;
+      if (review.gradingReviews?.length) return null;
       const complete = await batchGrading.isTemplateComplete({
         ...toReviewContext(user, context),
         feedback: review.feedback

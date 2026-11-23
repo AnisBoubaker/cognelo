@@ -1,4 +1,5 @@
 import { useApplicationTime, formatZonedDateTime } from "@cognelo/activity-ui";
+import { CodingBlankGradingDetails } from "./coding-blank-grading-details";
 import { CodeRenderer } from "@cognelo/activity-ui";
 import { formatCodingExercisesMessage, normalizeCodingExercisesLocale } from "./messages";
 
@@ -29,6 +30,8 @@ type StudentGradeReportAttempt = {
   testScore: number | null;
   testMaxScore: number | null;
   tests: StudentGradeReportTest[];
+  blankGrading?: Record<string, unknown>;
+  reviewRequired?: boolean;
 };
 
 export type CodingExerciseStudentGradeReportData = {
@@ -137,7 +140,8 @@ export function CodingExerciseStudentGradeReport({ score, maxScore, feedback, re
                   <strong>{t("submittedSolution")}</strong>
                   <CodeRenderer code={attempt.sourceCode} language={attempt.language || "text"} showLineNumbers />
                 </div>
-                <section className="stack stack-tight">
+                {attempt.blankGrading ? <CodingBlankGradingDetails grading={attempt.blankGrading}
+                  reviewRequired={attempt.reviewRequired === true} locale={pluginLocale} /> : <section className="stack stack-tight">
                   <div className="row wrap" style={{ alignItems: "baseline", justifyContent: "space-between" }}>
                     <strong>{t("testResultsTitle")}</strong>
                     {attempt.testScore !== null && attempt.testMaxScore !== null ? (
@@ -177,7 +181,7 @@ export function CodingExerciseStudentGradeReport({ score, maxScore, feedback, re
                       </div>
                     );
                   }) : <p className="muted">{t("noTestDetails")}</p>}
-                </section>
+                </section>}
               </div>
             </details>
           ))}
@@ -259,6 +263,7 @@ export function parseCodingExerciseStudentGradeReport(value: unknown): CodingExe
         submittedAt,
         language: stringValue(attempt.language),
         sourceCode: stringValue(attempt.sourceCode),
+        ...(recordValue(attempt.blankGrading).policy === "isolated-blanks-v1" ? { blankGrading: recordValue(attempt.blankGrading), reviewRequired: attempt.reviewRequired === true } : {}),
         testScore: finiteNumber(attempt.testScore),
         testMaxScore: finiteNumber(attempt.testMaxScore),
         tests: recordArray(attempt.tests).map((value, index) => ({

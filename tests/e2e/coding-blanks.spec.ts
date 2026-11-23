@@ -143,7 +143,7 @@ test("authors blanks and accepts equivalent completions with protected code, aut
     expect(attempt.metadata).toMatchObject({ blankTemplate, blankAnswers, submittedSourceCode: "def square(x):\n    return x ** 2 + 0" });
     const [execution] = await prisma.$queryRaw<Array<{ sourceCode: string; resultSummary: { earnedWeight: number; totalWeight: number } }>>`
       SELECT "sourceCode", "resultSummary" FROM "PluginCodingExerciseExecution" WHERE id = ${attempt.pluginAttemptRef}`;
-    expect(execution.resultSummary).toMatchObject({ earnedWeight: 3, totalWeight: 3 });
+    expect(execution.resultSummary).toMatchObject({ earnedWeight: 2, totalWeight: 2 });
     await responseJson(await teacher.post(`/api/courses/${data.courseId}/gradebook/attempts/${attempt.id}/reopen`, { data: {} }));
     await page.goto(assigned.replace("/api", ""));
     await expect(first).toHaveValue("x ** 2");

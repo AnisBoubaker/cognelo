@@ -237,6 +237,7 @@ describe("coding exercise executions", () => {
   });
 
   it("assembles blanks on the server for persisted and stateless execution", async () => {
+    dbMocks.hiddenTests = [];
     const blankTemplate = "print({{ BLANK:value }})";
     const config = { ...activityConfig, responseMode: "blanks", blankTemplate, maxTestRuns: null };
     const input = { sourceCode: "print('forged')", blankTemplate, blankAnswers: { value: "2" } };

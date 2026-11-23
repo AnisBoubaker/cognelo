@@ -1,5 +1,7 @@
 # Browser user flows
 
+`coding-blank-grading.spec.ts` covers equal partial credit for missing and syntax/compile-invalid Python/C blanks, the combined/isolated interaction conflict, generic review/release gates, stale final-grade protection, teacher resolution, current-test regrading, private substituted output, and Test-question resolution/reopening. All executions and academic fixtures are local.
+
 `coding-grading-general.spec.ts` checks General component switches/weights and keyboard navigation, persistence, blank-zero/ordinary-unlimited defaults, full runner hiding, per-run confirmation/cancellation/countdown, concurrent last-run reservation, forged scope rejection, reload/new-attempt/reopening behavior, independent Test-question budgets and new sittings, final submission after exhaustion, and rubric-only manual grading with disabled retained cases and re-enablement validation.
 
 `coding-blanks.spec.ts` checks teacher answer-format selection, in-place highlighted blank authoring with multiline selections disabled, syntax-colored fixed learner code, equally sized single-line fields with horizontal-only resizing, visually separated prompts/answers, private reference editing, text undo, unmarking without deleting code and persistence, equivalent completions against real Judge0 tests, authoritative source reconstruction, stale-template rejection, autosave/reload, desktop/mobile containment, submission/reopening and compound Test answer review/submission.

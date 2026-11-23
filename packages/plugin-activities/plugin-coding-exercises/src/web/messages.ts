@@ -2,6 +2,14 @@ export type CodingExercisesLocale = "en" | "fr" | "zh" | "ar";
 type CodingExercisesMessageLocale = Exclude<CodingExercisesLocale, "ar">;
 
 type MessageKey =
+  | "blankChecksTitle"
+  | "blankChecksScore"
+  | "blankCorrect"
+  | "blankIncorrect"
+  | "blankUnanswered"
+  | "blankReviewedGradeTitle"
+  | "blankReviewedGradeMessage"
+
   | "gradingGeneralTab"
   | "enableRubricGrading"
   | "enableTests"
@@ -246,6 +254,13 @@ type MessageCatalog = Record<MessageKey, string>;
 
 const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
   en: {
+    blankChecksTitle: "Blank checks",
+    blankChecksScore: "{correct} of {total} blanks correct",
+    blankCorrect: "Correct",
+    blankIncorrect: "Incorrect",
+    blankUnanswered: "Unanswered",
+    blankReviewedGradeTitle: "Teacher-reviewed grade",
+    blankReviewedGradeMessage: "The complete program and individual blank checks disagreed. Your teacher determined the final grade.",
     gradingGeneralTab: "General",
     enableRubricGrading: "Enable grading",
     enableTests: "Enable tests",
@@ -485,6 +500,13 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noTestDetails: "No test details are available for this attempt."
   },
   fr: {
+    blankChecksTitle: "Vérification des blancs",
+    blankChecksScore: "{correct} blanc(s) correct(s) sur {total}",
+    blankCorrect: "Correct",
+    blankIncorrect: "Incorrect",
+    blankUnanswered: "Sans réponse",
+    blankReviewedGradeTitle: "Note vérifiée par l’enseignant",
+    blankReviewedGradeMessage: "Les résultats du programme complet et des blancs vérifiés séparément ne concordaient pas. Votre enseignant a déterminé la note finale.",
     gradingGeneralTab: "Général",
     enableRubricGrading: "Activer la notation",
     enableTests: "Activer les tests",
@@ -724,6 +746,13 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noTestDetails: "Aucun détail de test n’est disponible pour cette tentative."
   },
   zh: {
+    blankChecksTitle: "填空检查",
+    blankChecksScore: "答对 {correct} / {total} 个空白",
+    blankCorrect: "正确",
+    blankIncorrect: "错误",
+    blankUnanswered: "未作答",
+    blankReviewedGradeTitle: "教师审核的成绩",
+    blankReviewedGradeMessage: "完整程序与单独填空的检查结果不一致。最终成绩由教师确定。",
     gradingGeneralTab: "常规",
     enableRubricGrading: "启用评分",
     enableTests: "启用测试",

@@ -78,8 +78,12 @@ Regression coverage lives in `submission-deletion.spec.ts`: mandatory/whitespace
   - normalized gradebook score/result
 - There is no standalone grade status enum.
 - A grade exists when an attempt has been graded automatically or manually.
-- Manual grading and override UI is provided by the plugin because it must show plugin-specific attempt details.
+- Plugins render activity-specific submission and feedback evidence; the shared host owns final-grade controls and audited overrides.
 - Grade changes create an audit trail.
+
+### Required teacher review
+
+The shared [grading-review capability](GRADING_REVIEWS.md) lets any plugin defer an ambiguous automatic result. Core retains pending status, blocks automatic grading/release, shows **Needs teacher review**, and resolves it only with an explicit final score or teacher reopening. Regrade conflicts retain old grades privately but withhold learner publication. Final overrides include the displayed review revision so stale decisions cannot dismiss newer evidence.
 
 ### Submission And Grading
 
@@ -94,7 +98,7 @@ Regression coverage lives in `submission-deletion.spec.ts`: mandatory/whitespace
 - Summative changing to either formative policy requires explicit UI and API confirmation because it converts existing summative attempts to formative, deactivates current grades, hides released grades, and appends per-student audit events. Grade snapshots and history are retained rather than deleted. Switching between the two formative policies does not rewrite attempt history.
 - Every submission creates an attempt.
 - A successful final submission clears its standalone response draft on a best-effort basis; draft cleanup failure must not turn an already-recorded submission into a client-visible submission failure.
-- An attempt should not remain submitted without grading.
+- Automatically gradeable submissions normally receive a grade; manual, incomplete rubric and required-review work remains submitted until complete.
 - Teachers can manually grade or override automatic grades.
 - Teachers can regrade after tests/rubrics/reference answers change.
 - Regrading preserves old grade records for audit and research.

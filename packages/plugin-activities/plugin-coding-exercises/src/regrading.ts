@@ -1,3 +1,4 @@
+import { codingBlankReviewRequest } from "./review-request";
 import type { CurrentUser } from "@cognelo/contracts";
 import { randomUUID } from "node:crypto";
 import type { PluginGradingDeferredResult, PluginGradingResult, ServerActivityRecord } from "@cognelo/activity-sdk/server";
@@ -31,6 +32,11 @@ export async function regradeCodingExerciseAttempt(input: {
     activityConfig: input.activity.config
   });
   const resultSummary = asRecord(testRun.resultSummary);
+  if (resultSummary.reviewRequired === true) return {
+    deferred: true, reason: codingBlankReviewRequest(testRun.testEvaluationId ?? input.executionId).message,
+    reviewRequired: codingBlankReviewRequest(testRun.testEvaluationId ?? input.executionId),
+    metadata: { reviewRequired: true, executionId: input.executionId, testEvaluationId: testRun.testEvaluationId }
+  };
   const earnedWeight = percentWeight(resultSummary.earnedWeight);
   const totalWeight = percentWeight(resultSummary.totalWeight);
   if (earnedWeight === null || totalWeight === null || (totalWeight <= 0 && testRun.feedbackConfig.testsEnabled !== false)) {
@@ -99,6 +105,7 @@ export async function regradeCodingExerciseAttempt(input: {
         ...(rubricScore !== null ? { aiScore: rubricScore } : {}),
         combinedScore,
         gradingEnabled: hasRubric,
+        reviewRequired: false,
         testWeightPercent: hasRubric ? policy.testWeightPercent : 100,
         aiWeightPercent: hasRubric ? policy.aiWeightPercent : 0,
         challengeAllowed: hasRubric && feedback.challengeAllowed === true,

@@ -1,3 +1,4 @@
+import type { GradingReview } from "@cognelo/contracts";
 import type { CodingPracticeRunAllowance } from "@cognelo/plugin-coding-exercises";
 import type { GradebookActionDefinition } from "@cognelo/activity-sdk";
 import type { ActivityLogCursor, ActivityLogPage, ActivityStudentActionList, ActivityBatchActionList } from "@cognelo/contracts";
@@ -1300,6 +1301,8 @@ export type GradeCompletion = {
 };
 
 export type CourseGradebookRow = {
+  gradingReviews?: GradingReview[];
+  gradingReviewRevision?: string | null;
   gradebookItemId: string;
   groupId: string;
   groupTitle: string;
@@ -1462,6 +1465,9 @@ export type StudentGradeFeedback = {
 };
 
 export type TeacherAiFeedbackReview = {
+  gradebookGradingReviews?: GradingReview[];
+  gradingReviews?: GradingReview[];
+  gradingReviewRevision?: string | null;
   attemptId: string;
   gradeId: string | null;
   gradeUpdatedAt: string | null;
@@ -1488,6 +1494,9 @@ export type AiGradingBatchSetup = {
 };
 
 export type CourseTestAttemptReview = {
+  gradebookGradingReviews?: GradingReview[];
+  gradingReviews?: GradingReview[];
+  gradingReviewRevision?: string | null;
   id: string;
   feedbackText: string;
   updatedAt: string;
@@ -1506,6 +1515,7 @@ export type CourseTestAttemptReview = {
     pointsPossible: number;
     activity: Activity;
     itemAttempt: {
+      gradingReviews?: GradingReview[];
       id: string;
       updatedAt: string;
       manuallyGraded: boolean;
@@ -1522,6 +1532,7 @@ export type CourseTestAttemptReview = {
 };
 
 export type TestItemTeacherReview = {
+  gradingReviews?: GradingReview[];
   testItemId: string;
   activityTypeKey: string;
   submission: Record<string, unknown> | null;
@@ -2133,6 +2144,7 @@ export const api = {
       reason?: string | null;
       feedbackText?: string | null;
       expectedGradeUpdatedAt: string | null;
+      expectedGradingReviewRevision?: string | null;
     }
   ) =>
     request<{ grade: GradebookMutationGrade }>(

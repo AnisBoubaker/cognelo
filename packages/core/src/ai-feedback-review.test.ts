@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const mockPrisma = vi.hoisted(() => ({
+  $queryRaw: vi.fn().mockResolvedValue([]),
   activityAttempt: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   grade: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   gradeChallenge: { findFirst: vi.fn() },

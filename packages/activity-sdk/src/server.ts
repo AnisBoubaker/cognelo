@@ -3,6 +3,7 @@ export * from "./gradebook-actions";
 import type { SubmissionExportHandler } from "./submission-export";
 export * from "./submission-export";
 import type { ActivityStudentProgress, CurrentUser } from "@cognelo/contracts";
+import type { GradingReviewRequest } from "@cognelo/contracts";
 import type { ActivityLogCursor, ActivityLogEvidence, ActivityStudentActionList, ActivityBatchAction } from "@cognelo/contracts";
 import type { GradebookActionContext } from "./gradebook-actions";
 import type { WorkInspectionFile, WorkInspectionSection } from "@cognelo/contracts";
@@ -163,6 +164,8 @@ export type PluginGradingResult = {
 
 export type PluginGradingDeferredResult = {
   deferred: true;
+  /** Core records the request, blocks automatic publication/release and resolves it through teacher grading. */
+  reviewRequired?: GradingReviewRequest;
   reason: string;
   metadata?: Record<string, unknown>;
 };
@@ -325,6 +328,8 @@ export type CompositeExecutionSubmissionHandler = (input: {
   pluginAttemptRef?: string | null;
   /** Null preserves submitted work awaiting teacher/rubric grading. */
   gradingResult: PluginGradingResult | null;
+  /** A grading conflict or other uncertainty requiring a human decision; detailed evidence remains plugin-owned. */
+  reviewRequired?: GradingReviewRequest;
 }>;
 
 export type CompositeExecutionActionHandler = (input: {

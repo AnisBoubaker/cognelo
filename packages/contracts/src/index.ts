@@ -7,6 +7,7 @@ export * from "./activity-reports";
 export * from "./work-inspection";
 export * from "./material-references";
 export * from "./ai-grading-runs";
+export * from "./grading-review";
 import { z } from "zod";
 
 // Zod 4 applies inner defaults through optional properties. Patch schemas must

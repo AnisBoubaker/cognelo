@@ -10,6 +10,7 @@ const hiddenTestMocks = vi.hoisted(() => ({
 const executionMocks = vi.hoisted(() => ({
   codingExerciseRunInputSchema: { parse: vi.fn((value) => value) },
   codingExerciseSubmitInputSchema: { parse: vi.fn((value) => value) },
+  codingExerciseRequiresTeacherReview: vi.fn(),
   getCodingExercisePrivateConfig: vi.fn(),
   getCodingExerciseReferenceSolution: vi.fn(),
   runCodingExercise: vi.fn(),
@@ -56,6 +57,7 @@ const { codingExercisesServerPlugin } = await import("./server");
 describe("coding exercises server plugin lifecycle hooks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    executionMocks.codingExerciseRequiresTeacherReview.mockResolvedValue(false);
     aiFeedbackMocks.snapshotCodingExerciseAiFeedbackConfig.mockResolvedValue({ enabled: false });
     aiFeedbackMocks.createCodingExerciseTeacherFeedbackDraft.mockResolvedValue({ kind: "assessment_feedback", criteria: [] });
     executionMocks.getCodingExercisePrivateConfig.mockResolvedValue({

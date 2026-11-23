@@ -22,6 +22,7 @@ async function completeTemplateQuestion(user: CurrentUser, courseId: string, rev
   const batch = resolvePluginAiGradingBatchHandler(item.activityTypeKey);
   const teacher = resolvePluginAiFeedbackTeacherReviewHandler(item.activityTypeKey);
   if (!batch || !teacher || item.itemAttempt.lifecycle !== "graded") return null;
+  if (item.itemAttempt.gradingReviews?.length) return null;
   const feedback = record(item.itemAttempt.feedback.aiFeedback);
   const context = childContext(user, courseId, review, item);
   return await batch.isTemplateComplete({ ...context, feedback }) ? { context, feedback, teacher } : null;

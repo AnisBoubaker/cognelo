@@ -1,3 +1,4 @@
+import { assertNoRequiredGradingReview, getGradebookGradingReviews, gradingReviewRevision, resolveTestItemGradingReview } from "./grading-review";
 import { resolvePluginAiFeedbackTeacherReviewHandler, type PluginAiFeedbackTeacherReviewContext } from "@cognelo/activity-sdk/server";
 import type { CurrentUser, TestItemReviewInput, TestAttemptReviewInput } from "@cognelo/contracts";
 import { prisma, type Prisma } from "@cognelo/db";
@@ -36,6 +37,7 @@ async function loadReview(user: CurrentUser, courseId: string, parentAttemptId: 
     handler.getSubmission(context), hasFeedback ? stored : handler.createFeedbackDraft(context)
   ]) : [null, null];
   return { parent, item, handler, context, hasFeedback, review: {
+    gradingReviews: item.itemAttempt.gradingReviews ?? [],
     testItemId, activityTypeKey: item.activityTypeKey, submission, feedback,
     feedbackHash: feedback ? hashAiFeedbackValue(feedback) : null,
     feedbackText: typeof item.itemAttempt.feedback.feedbackText === "string" ? item.itemAttempt.feedback.feedbackText : "",
@@ -72,7 +74,7 @@ async function saveTestItemReview(user: CurrentUser, courseId: string, parentAtt
   }
   // A new rubric-score edit can explicitly replace an older item override.
   const grading = input.score !== undefined ? { rawScore: input.score, rawMaxScore: item.pointsPossible }
-    : review.manuallyGraded && !input.useRubricScore ? null : revision?.gradingResult ?? null;
+    : review.gradingReviews?.length || (review.manuallyGraded && !input.useRubricScore) ? null : revision?.gradingResult ?? null;
   if (grading && (!Number.isFinite(grading.rawScore) || !Number.isFinite(grading.rawMaxScore) || grading.rawMaxScore <= 0
     || grading.rawScore < 0 || grading.rawScore > grading.rawMaxScore)) {
     throw new AppError(400, "TEST_ITEM_GRADING_RESULT_INVALID", "The activity returned an invalid score.");
@@ -90,6 +92,8 @@ async function saveTestItemReview(user: CurrentUser, courseId: string, parentAtt
     if ((await latestSubmittedAttempt(parent, tx))?.id !== parent.id) throw reviewConflict();
     const current = await tx.testItemAttempt.findUnique({ where: { id: item.itemAttempt.id } });
     if (!current || current.updatedAt.toISOString() !== input.expectedUpdatedAt) throw reviewConflict();
+    if (input.score !== undefined) await resolveTestItemGradingReview(tx, { parentAttemptId, testItemAttemptId: current.id, courseId, userId: user.id });
+    else if (grading) await assertNoRequiredGradingReview(parentAttemptId, tx, current.id);
     const previousGrade = grading && !transaction ? await tx.grade.findUnique({ where: {
       gradebookItemId_participantId: { gradebookItemId: parent.gradebookItemId, participantId: parent.participantId }
     } }) : null;
@@ -134,7 +138,7 @@ async function saveTestItemReview(user: CurrentUser, courseId: string, parentAtt
     if (!grading) return { grade: await refreshTestAttemptFeedback(user, courseId, parent.id, tx) };
     try {
       const result = await recalculateTestAttemptGrade(user, courseId, parent.id, input.reason ?? "Teacher Test review", tx);
-      if (previousGrade?.isActive && previousGrade.source === "override") {
+      if (previousGrade?.isActive && previousGrade.source === "override" && !(await getGradebookGradingReviews(parent.gradebookItemId, parent.participantId, tx)).length) {
         const previousFeedback = record(record(previousGrade.normalizedResult).studentFeedback);
         const grade = await overrideGradebookGrade(user, courseId, {
           gradebookItemId: parent.gradebookItemId, participantId: parent.participantId,
@@ -170,7 +174,8 @@ export async function getTestAttemptTeacherReview(user: CurrentUser, courseId: s
   const grade = await prisma.grade.findUnique({ where: { gradebookItemId_participantId: {
     gradebookItemId: review.gradebookItemId, participantId: review.participantId
   } } });
-  return { ...review, readOnly: (await latestSubmittedAttempt(review))?.id !== review.id,
+  const gradebookGradingReviews = await getGradebookGradingReviews(review.gradebookItemId, review.participantId);
+  return { ...review, gradebookGradingReviews, gradingReviewRevision: gradingReviewRevision(gradebookGradingReviews), readOnly: (await latestSubmittedAttempt(review))?.id !== review.id,
     feedbackText: review.feedbackText ?? String(record(record(grade?.normalizedResult).studentFeedback).feedbackText ?? ""),
     grade: grade?.isActive ? { score: grade.normalizedScore, maxScore: grade.normalizedMaxScore,
       source: grade.source, updatedAt: grade.updatedAt.toISOString() } : null,
@@ -195,6 +200,11 @@ export async function saveTestAttemptTeacherReview(user: CurrentUser, courseId: 
   }
 
   await prisma.$transaction(async tx => {
+    if (input.total?.mode === "override") {
+      await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE "gradebookItemId"=${parent.gradebookItemId} AND "participantId"=${parent.participantId} ORDER BY id FOR UPDATE`;
+      const revision = gradingReviewRevision(await getGradebookGradingReviews(parent.gradebookItemId, parent.participantId, tx));
+      if ((revision !== null || input.expectedGradingReviewRevision !== undefined) && revision !== input.expectedGradingReviewRevision) throw reviewConflict();
+    }
     await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id = ${parent.id} FOR UPDATE`;
     const current = await tx.activityAttempt.findUnique({ where: { id: parent.id } });
     if (!current || current.updatedAt.toISOString() !== input.expectedUpdatedAt || !["submitted", "graded"].includes(current.lifecycle)) throw reviewConflict();
@@ -231,6 +241,7 @@ export async function saveTestAttemptTeacherReview(user: CurrentUser, courseId: 
       const previousFeedback = record(record(previousGrade?.normalizedResult).studentFeedback);
       await overrideGradebookGrade(user, courseId, {
         gradebookItemId: parent.gradebookItemId, participantId: parent.participantId,
+        expectedGradingReviewRevision: gradingReviewRevision(await getGradebookGradingReviews(parent.gradebookItemId, parent.participantId, tx)),
         score: input.total.score, reason: input.reason ?? "Teacher Test total override",
         ...(typeof previousFeedback.feedbackText === "string" ? { feedbackText: previousFeedback.feedbackText } : {})
       }, tx);

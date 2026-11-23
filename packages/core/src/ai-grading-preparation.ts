@@ -8,6 +8,7 @@ import { getActivityAttemptRegradeContext, recordActivityAttemptGradingResult, r
 import { getTeacherAttemptAiFeedbackReview, recordAiFeedbackResearchEvent } from "./ai-feedback";
 import { resolveTestAiGradingGuidance } from "./test-ai-grading";
 import { recordTestItemAiFeedback, recalculateTestAttemptGrade } from "./test-execution";
+import { assertNoRequiredGradingReview } from "./grading-review";
 
 export type AiGradingGuidance = { instructions?: string; templateAttemptIds?: string[] };
 type Evaluation = { activityId: string; activityTypeKey: string; testItemId?: string; expectedUpdatedAt?: string; evaluation: PluginAiFeedbackResult };
@@ -21,6 +22,7 @@ export type PreparedAiGrading = {
 export async function prepareAiGradingAttempt(user: CurrentUser, courseId: string, attemptId: string,
   options: AiGradingGuidance = {}, checkRunning: () => Promise<void> = async () => {}) : Promise<PreparedAiGrading> {
   const context = await getActivityAttemptRegradeContext(user, courseId, attemptId);
+  await assertNoRequiredGradingReview(attemptId);
   if (!["submitted", "graded"].includes(context.lifecycle)) throw new AppError(409, "SUBMISSION_NOT_COMPLETED", "A submitted attempt is required.");
   const before = await prisma.activityAttempt.findUniqueOrThrow({ where: { id: attemptId }, include: { testItemAttempts: true } });
   const grade = await prisma.grade.findUnique({ where: { gradebookItemId_participantId: {
@@ -77,6 +79,7 @@ export async function prepareAiGradingAttempt(user: CurrentUser, courseId: strin
 export async function commitPreparedAiGrading(user: CurrentUser, courseId: string, prepared: PreparedAiGrading, tx: Prisma.TransactionClient, synchronizeShared = true) {
   const context = await getActivityAttemptRegradeContext(user, courseId, prepared.attemptId);
   await tx.$queryRaw`SELECT id FROM "ActivityAttempt" WHERE id = ${prepared.attemptId} FOR UPDATE`;
+  await assertNoRequiredGradingReview(prepared.attemptId, tx);
   const attempt = await tx.activityAttempt.findUniqueOrThrow({ where: { id: prepared.attemptId }, include: { testItemAttempts: true } });
   await tx.$queryRaw`SELECT id FROM "Grade" WHERE "gradebookItemId" = ${attempt.gradebookItemId} AND "participantId" = ${attempt.participantId} FOR UPDATE`;
   const grade = await tx.grade.findUnique({ where: { gradebookItemId_participantId: {
@@ -167,7 +170,7 @@ async function resolveBatchGuidance(input: {
       activity: context.activity
     };
     const review = await getTeacherAttemptAiFeedbackReview(input.user, input.courseId, templateAttemptId);
-    if (!review.feedback || !await batchGrading.isTemplateComplete({ ...reviewContext, feedback: review.feedback })) {
+    if (review.gradingReviews?.length || !review.feedback || !await batchGrading.isTemplateComplete({ ...reviewContext, feedback: review.feedback })) {
       throw new AppError(400, "AI_BATCH_TEMPLATE_INCOMPLETE", "Every grading template must contain a completed rubric and teacher comments.");
     }
     return {

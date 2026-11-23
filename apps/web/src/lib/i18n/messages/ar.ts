@@ -1352,6 +1352,8 @@ export const arMessages = {
       noReleasedGrades: "لم تنشر أي درجات بعد.",
       notGradedYet: "لم تصحح بعد",
       didNotSubmit: "لم يسلّم",
+      gradingReviewRequired: "تتطلب مراجعة المدرس",
+      gradingReviewFinalScore: "أدخل الدرجة النهائية صراحةً بعد مراجعة هذا التسليم. حفظ الملاحظات وحده لا يُنهي المراجعة.",
       partialGrade: "جزئية",
       partialGradeDescription: "درجة جزئية: اكتمل {completed} من أصل {required} من مكونات التقييم.",
       studentCount: "{count} طلاب",

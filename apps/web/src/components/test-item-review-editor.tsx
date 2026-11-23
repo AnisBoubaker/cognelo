@@ -1,5 +1,7 @@
 "use client";
 
+import { GradingReviewNotice } from "./grading-review-notice";
+
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useDialogs } from "@cognelo/activity-ui";
 import { api, type CourseTestAttemptReview } from "@/lib/api";
@@ -46,6 +48,7 @@ export function TestItemReviewEditor({ courseId, parentAttemptId, item, readOnly
       }}><AppIcon name="refresh" />{t("courseDetail.reloadReview")}</button>
     </div> : null}
     {!loading && review && draft ? <>
+      <GradingReviewNotice reviews={review.gradingReviews} t={t} />
       {review.gradesReleased ? <p className="inline-panel muted">{t("courseDetail.feedbackReviewReleasedNote")}</p> : null}
       {renderer && draft.feedback && review.submission
         ? renderer({ feedback: draft.feedback, submission: review.submission,
