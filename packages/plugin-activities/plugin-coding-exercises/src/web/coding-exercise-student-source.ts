@@ -1,3 +1,4 @@
+import { codingBlankAnswer, codingBlankIds, readCodingBlankResponse } from "../code-blanks";
 import {
   alignCodingExerciseStarterCodeToTemplate,
   buildCodingExerciseTemplateSource,
@@ -22,10 +23,14 @@ export function getCodingExerciseActivityConfig(activityConfig: Record<string, u
 
 export function getCodingExerciseInitialStudentSource(activityConfig: Record<string, unknown> | undefined): string {
   const config = getCodingExerciseActivityConfig(activityConfig);
-  return alignCodingExerciseStarterCodeToTemplate(config.starterCode, config.studentTemplateSource);
+  return config.responseMode === "blanks" ? "" : alignCodingExerciseStarterCodeToTemplate(config.starterCode, config.studentTemplateSource);
 }
 
 export function hasCodingExerciseAnswer(config: Record<string, unknown>, state: Record<string, unknown> | null) {
+  if (config.responseMode === "blanks") {
+    const response = readCodingBlankResponse(state);
+    return !!response && codingBlankIds(typeof config.blankTemplate === "string" ? config.blankTemplate : "").some(id => codingBlankAnswer(response.blankAnswers, id).trim().length > 0);
+  }
   const source = typeof state?.sourceCode === "string" ? state.sourceCode.trim() : "";
   return source.length > 0 && source !== getCodingExerciseInitialStudentSource(config).trim();
 }

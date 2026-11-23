@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { codingBlankAnswersSchema, parseCodingBlankTemplate } from "./code-blanks";
 
 export const codingExerciseTemplateInsertionToken = "{{ STUDENT_CODE }}";
 export const codingExerciseTestInsertionToken = "{{ TEST_CODE }}";
@@ -30,6 +31,10 @@ export const codingExerciseConfigSchema = z.object({
   prompt: z.string().min(10).max(12000).or(z.literal("")),
   language: z.string().max(80).default(""),
   executionMode: codingExerciseExecutionModeSchema.default("template"),
+  responseMode: z.enum(["code", "blanks"]).optional(),
+  blankTemplate: z.string().max(40000).refine(value => {
+    try { parseCodingBlankTemplate(value); return true; } catch { return false; }
+  }, "Use unique {{ BLANK:id }} markers (at most 50).").optional(),
   starterCode: z.string().max(40000).default(""),
   studentTemplateSource: z.string().max(120000).default(""),
   sampleTests: z.array(sampleTestSchema).max(codingExerciseMaxGeneratedTestCount).default([]),
@@ -119,6 +124,7 @@ export const codingExerciseRubricGuidanceSchema = z.string().trim().max(8000);
 export const codingExerciseRubricGuidanceInputSchema = z.object({ guidance: codingExerciseRubricGuidanceSchema });
 
 export const codingExercisePrivateConfigSchema = z.object({
+  blankReferenceAnswers: codingBlankAnswersSchema.optional(),
   rubricGenerationGuidance: codingExerciseRubricGuidanceSchema.optional(),
   hiddenSupportCode: z.string().max(60000).default(""),
   templateSource: z.string().max(120000).default(""),

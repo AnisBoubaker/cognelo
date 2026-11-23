@@ -1,6 +1,7 @@
 import { getActivityResponseDraft } from "@cognelo/core";
 import { canShowStudentActivityGrade } from "@cognelo/core";
 import { randomUUID } from "node:crypto";
+import { readCodingBlankResponse } from "./code-blanks";
 import type { PluginRouteDefinition } from "@cognelo/activity-sdk/server";
 import {
   AppError,
@@ -282,7 +283,8 @@ export const codingExerciseSubmitRoute: PluginRouteDefinition = {
         const metadata = {
           mode: assessmentMode,
           executionId: execution.id,
-          submittedSourceCode: input.sourceCode
+          submittedSourceCode: execution.sourceCode ?? input.sourceCode,
+          ...(readCodingBlankResponse(execution.resultSummary?.blankResponse) ?? {})
         } as Prisma.InputJsonValue;
         const coreAttempt = await startActivityAttempt(context.user, {
           courseId: context.courseId,

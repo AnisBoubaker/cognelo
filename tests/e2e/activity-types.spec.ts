@@ -113,7 +113,7 @@ async function selectCodingSampleTest(page: Page, triggerId: string, label: stri
   await page.evaluate(({ id, optionLabel }) => new Promise<void>((resolve, reject) => {
     const selectMountedOption = () => {
       const option = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
-        .find((candidate) => candidate.textContent?.trim() === optionLabel);
+        .find((candidate) => candidate.title === optionLabel);
       if (!option) return false;
       option.click();
       resolve();

@@ -1045,10 +1045,17 @@ export type CodingExerciseHiddenTest = {
   updatedAt: string;
 };
 
+export type CodingExerciseResponseInput = {
+  sourceCode: string;
+  blankAnswers?: Record<string, string>;
+  blankTemplate?: string;
+};
+
 export type CodingExerciseReferenceSolution = {
   sourceCode: string;
   privateConfig: {
     rubricGenerationGuidance?: string;
+    blankReferenceAnswers?: Record<string, string>;
     hiddenSupportCode: string;
     templateSource: string;
     templateVisibleLineNumbers: number[];
@@ -2467,8 +2474,7 @@ export const api = {
   runCodingExercise: (
     courseId: string,
     activityId: string,
-    input: {
-      sourceCode: string;
+    input: CodingExerciseResponseInput & {
       stdin?: string;
       expectedOutput?: string;
       testCode?: string;
@@ -2483,7 +2489,7 @@ export const api = {
     }),
   codingExerciseRuns: (courseId: string, activityId: string) =>
     request<{ executions: CodingExerciseExecution[] }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/run`),
-  submitCodingExercise: (courseId: string, activityId: string, input: { sourceCode: string }) =>
+  submitCodingExercise: (courseId: string, activityId: string, input: CodingExerciseResponseInput) =>
     request<CodingExerciseSubmitResponse>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`, {
       method: "POST",
       body: JSON.stringify(input)
@@ -3016,8 +3022,7 @@ export const api = {
     courseId: string,
     groupId: string,
     activityId: string,
-    input: {
-      sourceCode: string;
+    input: CodingExerciseResponseInput & {
       stdin?: string;
       expectedOutput?: string;
       testCode?: string;
@@ -3037,7 +3042,7 @@ export const api = {
     request<{ executions: CodingExerciseExecution[] }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/run`
     ),
-  submitGroupCodingExercise: (courseId: string, groupId: string, activityId: string, input: { sourceCode: string }) =>
+  submitGroupCodingExercise: (courseId: string, groupId: string, activityId: string, input: CodingExerciseResponseInput) =>
     request<CodingExerciseSubmitResponse>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/submit`,
       {

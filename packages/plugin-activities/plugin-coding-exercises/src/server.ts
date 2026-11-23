@@ -1,4 +1,5 @@
 import { codingExerciseGradingInstructions } from "./grading-instructions";
+import { readCodingBlankResponse } from "./code-blanks";
 import { codingExerciseStudentProgress } from "./student-progress";
 import { codingWorkInspection } from "./work-inspection";
 import { exportCodingSubmission } from "./submission-export";
@@ -64,11 +65,11 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
     activityTypeKeys: ["coding-exercise"],
     reopen: async ({ activityId, userId, pluginAttemptRef, metadata, transaction }) => {
       if (!pluginAttemptRef && metadata.timedOut) return {};
-      const [execution] = await transaction.query<Array<{ sourceCode: string }>>`
-        SELECT "sourceCode" FROM "PluginCodingExerciseExecution"
+      const [execution] = await transaction.query<Array<{ sourceCode: string; resultSummary: Record<string, unknown> }>>`
+        SELECT "sourceCode", "resultSummary" FROM "PluginCodingExerciseExecution"
         WHERE id = ${pluginAttemptRef} AND "activityId" = ${activityId} AND "userId" = ${userId}`;
       if (!execution) throw new AppError(409, "SUBMISSION_STATE_MISSING", "The submitted code is unavailable.");
-      return { responseState: { sourceCode: execution.sourceCode } };
+      return { responseState: { sourceCode: execution.sourceCode, ...(readCodingBlankResponse(execution.resultSummary?.blankResponse) ?? {}) } };
     }
   },
   hostCapabilities: {
@@ -226,7 +227,8 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
         throw new AppError(409, "CODING_EXERCISE_RESULT_INVALID", "The coding exercise did not return a valid weighted result.");
       }
       return {
-        state: { sourceCode: input.sourceCode, executionId: execution.id },
+        state: { sourceCode: execution.sourceCode ?? input.sourceCode, executionId: execution.id,
+          ...(readCodingBlankResponse(execution.resultSummary.blankResponse) ?? {}) },
         pluginAttemptRef: execution.id,
         gradingResult: totalWeight === 0 ? null : {
           rawScore: earnedWeight,

@@ -32,7 +32,10 @@ type MonacoCodeEditorProps = {
   readOnlySuffix?: string;
   loading?: boolean;
   loadingLabel?: string;
+  onEditorMount?: OnMount;
 };
+
+export type MonacoEditorMountHandler = OnMount;
 
 export function MonacoCodeEditor({
   value,
@@ -46,7 +49,8 @@ export function MonacoCodeEditor({
   readOnlyPrefix = "",
   readOnlySuffix = "",
   loading = false,
-  loadingLabel = "Loading editor…"
+  loadingLabel = "Loading editor…",
+  onEditorMount
 }: MonacoCodeEditorProps) {
   const editorLanguage = useMemo(() => normalizeMonacoLanguage(language), [language]);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
@@ -372,6 +376,7 @@ export function MonacoCodeEditor({
         editor.setSelection(nextSelection);
       }
     });
+    onEditorMount?.(editor, monaco);
   }
 
   function synchronizeValue(editor: Parameters<OnMount>[0]) {

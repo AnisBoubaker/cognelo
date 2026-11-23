@@ -1,5 +1,7 @@
 # Programming Exercises Memory
 
+- [Code blanks](docs/REFERENCE.md#code-blanks) are a response format within the existing template execution model. Every learner execution path must reconstruct source from the server-owned public blank template and stable-ID answer values, ignoring caller-supplied surrounding source. Private reference answers stay in `privateConfig`; retain public template/answer snapshots with original execution evidence and continuation state. Untouched fixed code is not an answer. New marks must stay within one line. Learner blanks start at identical dimensions, resize horizontally only, and never derive their size from reference or answer length. Teacher authoring edits the complete reference code with highlighted ranges and unmark crosses; serialize those ranges back to public markers and private answers, never publish the displayed reference code as the blank template.
+
 - New defaults must remain valid empty authoring drafts, including an empty prompt and no sample tests. Populated prompts retain their length limits. See [authoring defaults](docs/REFERENCE.md#authoring-ux).
 
 - [Saved-work inspection](../../../docs/WORK_IN_PROGRESS_INSPECTION.md): Inspection reads only the generic saved source; it needs no execution or submitted core attempt. Embedded Tests pass their selected saved state directly. It never runs code or loads grading evidence.
@@ -13,7 +15,7 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 
 - The compound Test answer-review check must inspect response presence only, never correctness or grading evidence; automatically persisted initial state is not a new answer. See [the reference](docs/REFERENCE.md) for this plugin’s criteria.
 
-- Public activity config is student-visible. Reference solutions, full templates, hidden tests, rubrics, and raw evaluation artifacts must remain private.
+- Public activity config is student-visible. Reference solutions, hidden execution scaffolds, hidden tests, rubrics, and raw evaluation artifacts must remain private.
 - Judge0 is server-only and all source/input/output fields cross its boundary as Base64. Status 13 is an infrastructure failure, never a learner result or consumed attempt.
 - Judge0 endpoint, auth header/token, enablement, and per-process/thread flag are admin-managed core runner settings. Plugins must resolve the service through core rather than read runner environment variables; core currently selects the first enabled runner and preserves the boundary for later round-robin pools.
 - Bank/course private rows require copy, sync, duplication, and deletion hooks. Reusable bank Tests must invoke those hooks per independently owned child rather than referencing a source bank activity. Duplication must copy the complete private configuration; generated reference solutions must merge rather than erase rubrics.

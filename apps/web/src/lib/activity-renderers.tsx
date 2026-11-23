@@ -371,7 +371,7 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
           : await api.codingExerciseRuns(courseId, activityId);
         return { executions: result.executions as CodingExerciseExecution[] };
       },
-      submitCode: async (courseId: string, activityId: string, input: { sourceCode: string }) => {
+      submitCode: async (courseId: string, activityId: string, input: Parameters<typeof api.submitCodingExercise>[2]) => {
         const result = studentPreview && groupId
           ? await api.executeStudentPreviewAction<Awaited<ReturnType<typeof api.submitGroupCodingExercise>>>(courseId, groupId, activityId, "submit", input)
           : groupId

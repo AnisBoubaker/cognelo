@@ -1,6 +1,8 @@
 # Plugin: Programming Exercises
 
-`@cognelo/plugin-coding-exercises` provides the `coding-exercise` activity type. Teachers author prompts, starter/template code, reference solutions, visible and hidden tests, rubrics, and optional automatic feedback. Learners write and run code in Monaco, submit against hidden tests through Judge0, resume drafts, and review prior submissions.
+`@cognelo/plugin-coding-exercises` provides the `coding-exercise` activity type. Teachers author prompts, starter/template code, reference solutions, visible and hidden tests, rubrics, and optional automatic feedback. Learners write code in Monaco or complete code blanks, run and submit through Judge0, resume drafts, and review prior submissions.
+
+Teachers choose **Write code** (the existing editor) or **Fill in code blanks**. In blanks mode, teachers edit the complete code in one editor and mark selected fragments within one line. Marked code stays visible with an amber background; an adjacent cross restores it to ordinary code. Reference completions remain private, with the same visible/hidden tests and grading tools. Students see a separate answering panel with syntax-colored fixed code and equally sized single-line fields that resize horizontally only; the server reconstructs the completed program from the authoritative template. Equivalent completions are accepted by behavior, without text matching. See [code blanks](docs/REFERENCE.md#code-blanks).
 
 New activities start with empty instructions, starter code and test lists; no greeting example is inserted. See [authoring defaults](docs/REFERENCE.md#authoring-ux).
 

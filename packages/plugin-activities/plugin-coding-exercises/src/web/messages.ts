@@ -2,6 +2,18 @@ export type CodingExercisesLocale = "en" | "fr" | "zh" | "ar";
 type CodingExercisesMessageLocale = Exclude<CodingExercisesLocale, "ar">;
 
 type MessageKey =
+  | "answerFormat"
+  | "writeCode"
+  | "fillCodeBlanks"
+  | "blankTemplate"
+  | "blankTemplateHelp"
+  | "markCodeBlank"
+  | "removeCodeBlank"
+  | "codeBlankNumber"
+  | "codeBlankAnswerArea"
+  | "blankStudentPreview"
+  | "blankTemplateInvalid"
+
   | "authoringTitle"
   | "title"
   | "description"
@@ -216,6 +228,17 @@ type MessageCatalog = Record<MessageKey, string>;
 
 const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
   en: {
+    answerFormat: "Answer format",
+    writeCode: "Write code",
+    fillCodeBlanks: "Fill in code blanks",
+    blankTemplate: "Code with blanks",
+    blankTemplateHelp: "Write and edit the complete code here. Select a fragment within one line and mark it as a blank: its code stays visible with a highlighted background. Use its × control to turn it back into ordinary code. Reference values stay private; students are assessed by the tests.",
+    removeCodeBlank: "Remove blank {number}",
+    markCodeBlank: "Mark selection as blank",
+    codeBlankAnswerArea: "Complete the code",
+    codeBlankNumber: "Blank {number}",
+    blankStudentPreview: "Student preview",
+    blankTemplateInvalid: "Use unique {{ BLANK:id }} markers, with at least one blank and at most 50.",
     authoringTitle: "Coding exercise authoring",
     title: "Title",
     description: "Description",
@@ -427,6 +450,17 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noTestDetails: "No test details are available for this attempt."
   },
   fr: {
+    answerFormat: "Format de réponse",
+    writeCode: "Écrire du code",
+    fillCodeBlanks: "Compléter les blancs du code",
+    blankTemplate: "Code à compléter",
+    blankTemplateHelp: "Écrivez et modifiez tout le code ici. Sélectionnez un fragment sur une seule ligne et marquez-le comme blanc : le code reste visible sur un fond coloré. La croix le remet en code ordinaire. Les réponses de référence restent privées ; les tests évaluent les étudiants.",
+    removeCodeBlank: "Retirer le blanc {number}",
+    markCodeBlank: "Transformer la sélection en blanc",
+    codeBlankAnswerArea: "Complétez le code",
+    codeBlankNumber: "Blanc {number}",
+    blankStudentPreview: "Aperçu étudiant",
+    blankTemplateInvalid: "Utilisez des marqueurs {{ BLANK:id }} uniques, avec au moins un blanc et au plus 50.",
     authoringTitle: "Configuration de l'exercice de programmation",
     title: "Titre",
     description: "Description",
@@ -638,6 +672,17 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noTestDetails: "Aucun détail de test n’est disponible pour cette tentative."
   },
   zh: {
+    answerFormat: "作答方式",
+    writeCode: "编写代码",
+    fillCodeBlanks: "代码填空",
+    blankTemplate: "填空代码",
+    blankTemplateHelp: "在此编写和编辑完整代码。选中同一行内的片段并标记为空白后，代码保留并显示高亮背景。点击其 × 按钮可恢复普通代码。参考答案保持私有，学生答案由测试评估。",
+    removeCodeBlank: "取消空白 {number}",
+    markCodeBlank: "将所选代码设为空白",
+    codeBlankAnswerArea: "补全代码",
+    codeBlankNumber: "空白 {number}",
+    blankStudentPreview: "学生预览",
+    blankTemplateInvalid: "请使用唯一的 {{ BLANK:id }} 标记，空白数量为 1 至 50。",
     authoringTitle: "编程练习设置",
     title: "标题",
     description: "说明",

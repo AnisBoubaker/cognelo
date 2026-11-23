@@ -1,4 +1,7 @@
 "use client";
+import { assembleCodingBlankSource, codingBlankAnswer, codingBlankIds, codingBlankResponseState, readCodingBlankResponse, type CodingBlankAnswers } from "../code-blanks";
+import { CodeBlanksAuthoring } from "./code-blanks-authoring";
+import { CodeBlanksEditor } from "./code-blanks-editor";
 import { HelpLabel } from "@cognelo/activity-ui";
 
 import { DialogCloseButton, DialogHeader, getDialogCloseLabel } from "@cognelo/activity-ui";
@@ -10,7 +13,6 @@ import { createPortal } from "react-dom";
 import type { ActivityExecutionStateHost, TimedActivityAutoSubmit } from "@cognelo/activity-sdk";
 import { CodeEditor, CodeRenderer, ContextMenu, EditActionBar, KnowledgeGenerationModeField, MarkdownRenderer, MonacoCodeEditor, ProgressDialog, RichTextEditor, getEditActionBarCopy, useActivityKnowledgeGeneration, useNotifications, useUnsavedChangesGuard, type ActivityKnowledgeGenerationRequest, type GeneratedKnowledgeSelection } from "@cognelo/activity-ui";
 import {
-  alignCodingExerciseStarterCodeToTemplate,
   balanceCodingExerciseAiRubricCriterionWeights,
   buildCodingExerciseStudentTemplateProjectionFromSource,
   buildCodingExerciseStudentTemplateSource,
@@ -178,6 +180,8 @@ type CodingExerciseClient = {
     activityId: string,
     input: {
       sourceCode: string;
+      blankAnswers?: CodingBlankAnswers;
+      blankTemplate?: string;
       stdin?: string;
       expectedOutput?: string;
       testCode?: string;
@@ -190,7 +194,7 @@ type CodingExerciseClient = {
   submitCode: (
     courseId: string,
     activityId: string,
-    input: { sourceCode: string }
+    input: { sourceCode: string; blankAnswers?: CodingBlankAnswers; blankTemplate?: string }
   ) => Promise<{
     execution: CodingExecution;
     availability: CodingAttemptAvailability;
@@ -377,6 +381,9 @@ export function CodingExerciseActivityView({
   const [hiddenTestGenerationCount, setHiddenTestGenerationCount] = useState(codingExerciseDefaultHiddenTestCount);
   const [error, setError] = useState("");
   const [editorCode, setEditorCode] = useState(() => getCodingExerciseInitialStudentSource(activity.config));
+  const [restoredBlankTemplate, setRestoredBlankTemplate] = useState<string | null>(null);
+  const [blankAnswers, setBlankAnswers] = useState<CodingBlankAnswers>({});
+  const isBlanks = config.responseMode === "blanks";
   const [sampleInput, setSampleInput] = useState("");
   const [sampleExpectedOutput, setSampleExpectedOutput] = useState("");
   const [sampleTestCode, setSampleTestCode] = useState("");
@@ -458,7 +465,8 @@ export function CodingExerciseActivityView({
       );
     }
     if (isNewActivity || canManage) {
-      setEditorCode(alignCodingExerciseStarterCodeToTemplate(nextConfig.starterCode, nextConfig.studentTemplateSource));
+      setEditorCode(getCodingExerciseInitialStudentSource(nextConfig));
+      setBlankAnswers({});
     }
     setSelectedSampleTestId(sampleTests[0]?.id ?? personalizedTestId);
     setPersonalizedInput("");
@@ -541,8 +549,16 @@ export function CodingExerciseActivityView({
     );
     executionStateHost.load()
       .then((saved) => {
-        const sourceCode = typeof saved?.sourceCode === "string" ? saved.sourceCode : initialSourceCode;
+        const nextConfig = getCodingExerciseActivityConfig(JSON.parse(activityConfigKey));
+        const restored = readCodingBlankResponse(saved);
+        const displayTemplate = readOnly && restored ? restored.blankTemplate : nextConfig.blankTemplate ?? "";
+        const answers = nextConfig.responseMode === "blanks" ? Object.fromEntries(codingBlankIds(displayTemplate).map(id => [id, codingBlankAnswer(restored?.blankAnswers ?? {}, id)])) : {};
+        const sourceCode = nextConfig.responseMode === "blanks"
+          ? codingBlankResponseState(displayTemplate, answers).sourceCode
+          : typeof saved?.sourceCode === "string" ? saved.sourceCode : initialSourceCode;
         if (cancelled) return;
+        setRestoredBlankTemplate(displayTemplate);
+        setBlankAnswers(answers);
         setEditorCode(sourceCode);
         if (!cancelled) setLoadedExecutionKey(executionKey);
       })
@@ -804,11 +820,13 @@ export function CodingExerciseActivityView({
         throw new Error(t("templateTestCodeMissingMarker"));
       }
 
-      const persistedActivityConfig = {
+      const persistedActivityConfig: CodingExerciseConfig = {
         prompt: config.prompt,
         language: config.language,
         executionMode: "template",
-        starterCode: config.starterCode,
+        ...(config.responseMode ? { responseMode: config.responseMode } : {}),
+        ...(isBlanks ? { blankTemplate: config.blankTemplate ?? "" } : {}),
+        starterCode: isBlanks ? "" : config.starterCode,
         studentTemplateSource: buildCodingExerciseStudentTemplateSource(
           normalizedPrivateConfig.templateSource,
           normalizedPrivateConfig.templateVisibleLineNumbers,
@@ -817,13 +835,16 @@ export function CodingExerciseActivityView({
         sampleTests: normalizeCodingExerciseSampleTests(config.sampleTests),
         maxEditorSeconds: config.maxEditorSeconds
       };
+      if (isBlanks && !codingBlankIds(config.blankTemplate ?? "").length) throw new Error(t("blankTemplateInvalid"));
+      const savedReferenceSolution = isBlanks
+        ? assembleCodingBlankSource(config.blankTemplate ?? "", privateConfig.blankReferenceAnswers ?? {}) : referenceSolution;
       const hiddenTestsInput = {
         tests: hiddenTests.map((test, index) => ({
           ...test,
           orderIndex: index
         })),
         sampleTests: normalizeCodingExerciseSampleTests(config.sampleTests),
-        referenceSolution,
+        referenceSolution: savedReferenceSolution,
         privateConfig: normalizedPrivateConfig,
         activityConfig: persistedActivityConfig
       };
@@ -853,11 +874,12 @@ export function CodingExerciseActivityView({
         setHiddenTests(result.tests);
         setReferenceSolution(result.referenceSolution?.sourceCode ?? "");
         setPrivateConfig(parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {}));
+        setConfig(persistedActivityConfig);
         setSavedSnapshot(
           buildCodingExerciseSnapshot({
             title,
             description,
-            config,
+            config: persistedActivityConfig,
             hiddenTests: result.tests,
             referenceSolution: result.referenceSolution?.sourceCode ?? "",
             privateConfig: parseCodingExercisePrivateConfig(result.referenceSolution?.privateConfig ?? {})
@@ -865,7 +887,8 @@ export function CodingExerciseActivityView({
         );
         setReferenceValidationSummary(result.referenceSolution?.validationSummary ?? null);
       } else {
-        setSavedSnapshot(currentSnapshot);
+        setConfig(persistedActivityConfig);
+        setSavedSnapshot({ ...currentSnapshot, config: persistedActivityConfig });
       }
 
       notifications.success(t("saved"));
@@ -896,7 +919,7 @@ export function CodingExerciseActivityView({
     } finally {
       setSaving(false);
     }
-  }, [activity.id, canManage, codingClient, config, course?.id, currentSnapshot, description, hiddenTests, notifications, onSave, privateConfig, referenceSolution, t, title]);
+  }, [activity.id, canManage, codingClient, config, course?.id, currentSnapshot, description, hiddenTests, isBlanks, notifications, onSave, privateConfig, referenceSolution, t, title]);
 
   useUnsavedChangesGuard(
     useMemo(
@@ -1216,6 +1239,7 @@ export function CodingExerciseActivityView({
       const isPersonalizedTest = selectedSampleTestId === personalizedTestId;
       const result = await codingClient.runCode(course.id, activity.id, {
         sourceCode: editorCode,
+        ...(isBlanks ? { blankAnswers, blankTemplate: config.blankTemplate ?? "" } : {}),
         stdin: sampleInput,
         expectedOutput: isPersonalizedTest ? "" : sampleExpectedOutput,
         testCode: isPersonalizedTest ? "" : sampleTestCode,
@@ -1240,11 +1264,13 @@ export function CodingExerciseActivityView({
     setError("");
     try {
       const result = await codingClient.submitCode(course.id, activity.id, {
-        sourceCode: editorCode
+        sourceCode: editorCode,
+        ...(isBlanks ? { blankAnswers, blankTemplate: config.blankTemplate ?? "" } : {})
       });
       await executionStateHost?.clear?.().catch(() => undefined);
       setSubmitExecution(result.execution);
-      setEditorCode(alignCodingExerciseStarterCodeToTemplate(config.starterCode, config.studentTemplateSource));
+      setEditorCode(getCodingExerciseInitialStudentSource(config));
+      setBlankAnswers({});
       setCodeResetVersion((version) => version + 1);
       setRunExecution(null);
       setPreviousAttempts((current) => [
@@ -1283,6 +1309,18 @@ export function CodingExerciseActivityView({
       void executionStateHost.save({ sourceCode }).catch((err) => {
         setError(err instanceof Error ? err.message : t("submitError"));
       });
+    }
+  }
+
+  function updateStudentBlanks(answers: CodingBlankAnswers) {
+    let state;
+    try { state = codingBlankResponseState(config.blankTemplate ?? "", answers); }
+    catch (err) { setError(err instanceof Error ? err.message : t("submitError")); return; }
+    setBlankAnswers(answers);
+    setEditorCode(state.sourceCode);
+    setSubmitExecution(null);
+    if (executionStateHost && executionStateLoaded && !readOnly) {
+      void executionStateHost.save(state).catch(err => setError(err instanceof Error ? err.message : t("submitError")));
     }
   }
 
@@ -1395,6 +1433,15 @@ export function CodingExerciseActivityView({
           </div>
 
           <div className="field">
+            <label htmlFor="coding-response-mode">{t("answerFormat")}</label>
+            <select id="coding-response-mode" value={config.responseMode ?? "code"}
+              onChange={event => setConfig(current => ({ ...current, responseMode: event.target.value as "code" | "blanks" }))}>
+              <option value="code">{t("writeCode")}</option>
+              <option value="blanks">{t("fillCodeBlanks")}</option>
+            </select>
+          </div>
+
+          <div className="field">
             <label htmlFor="coding-description">{t("description")}</label>
             <textarea
               id="coding-description"
@@ -1438,7 +1485,7 @@ export function CodingExerciseActivityView({
             <button
               className="secondary"
               type="button"
-              disabled={!config.language || generatingSolution || config.prompt.trim().length < 10}
+              disabled={isBlanks || !config.language || generatingSolution || config.prompt.trim().length < 10}
               onClick={requestSolutionGeneration}
             >
               <ActionIcon name="generate" />
@@ -1582,7 +1629,16 @@ export function CodingExerciseActivityView({
             document.body
           ) : null}
 
-          <div className="stack">
+          {isBlanks ? <CodeBlanksAuthoring template={config.blankTemplate ?? ""}
+            answers={privateConfig.blankReferenceAnswers ?? {}} language={config.language} locale={pluginLocale}
+            onChange={(blankTemplate, answers) => {
+              setConfig(current => ({ ...current, blankTemplate }));
+              try {
+                const referenceAnswers = Object.fromEntries(codingBlankIds(blankTemplate).map(id => [id, codingBlankAnswer(answers, id)]));
+                setPrivateConfig(current => ({ ...current, blankReferenceAnswers: referenceAnswers }));
+                setReferenceSolution(assembleCodingBlankSource(blankTemplate, referenceAnswers));
+              } catch { /* Invalid drafts remain editable without losing reference values. */ }
+            }} /> : <div className="stack">
             <label className="editor-section-label">{t("starterCode")}</label>
             <CodeEditor
               value={config.starterCode}
@@ -1590,13 +1646,14 @@ export function CodingExerciseActivityView({
               language={config.language}
               minHeight={220}
             />
-          </div>
+          </div>}
 
-          <div className="stack">
+          {!isBlanks ? <div className="stack">
             <HelpLabel help={<>{t("referenceSolutionHelp")}</>}><label className="editor-section-label">{t("referenceSolution")}</label></HelpLabel>
 
             <CodeEditor
               value={referenceSolution}
+              disabled={isBlanks}
               onChange={(value) => {
                 aiGenerationDraftRef.current = null;
                 setReferenceSolution(value);
@@ -1612,7 +1669,7 @@ export function CodingExerciseActivityView({
                 })}
               </p>
             ) : null}
-          </div>
+          </div> : null}
 
           <div className="stack">
             <HelpLabel help={<><p>{t("templateSourceHelp")}</p><p>{t("templateVisibleLinesHelp")}</p></>}><label className="editor-section-label">{t("templateSource")}</label></HelpLabel>
@@ -2179,14 +2236,15 @@ export function CodingExerciseActivityView({
             <CodingAttemptHistoryList attempts={previousAttempts} language={config.language} locale={pluginLocale} />
           ) : (
             <>
-              <MarkdownRenderer className="coding-exercise-student-prompt" markdown={config.prompt} />
+              <MarkdownRenderer className={`coding-exercise-student-prompt${isBlanks ? " is-code-blanks" : ""}`} markdown={config.prompt} />
               <div
-                aria-label={isWorkspaceFullScreen ? t("fullScreen") : undefined}
+                aria-label={isWorkspaceFullScreen ? t("fullScreen") : isBlanks ? t("codeBlankAnswerArea") : undefined}
                 aria-modal={isWorkspaceFullScreen || undefined}
-                className={`coding-exercise-workspace-shell${isWorkspaceFullScreen ? " is-full-screen" : ""}`}
-                role={isWorkspaceFullScreen ? "dialog" : undefined}
+                className={`coding-exercise-workspace-shell${isBlanks ? " is-code-blanks" : ""}${isWorkspaceFullScreen ? " is-full-screen" : ""}`}
+                role={isWorkspaceFullScreen ? "dialog" : isBlanks ? "region" : undefined}
               >
                 <div className="coding-exercise-workspace-toolbar">
+                  {isBlanks ? <h2 className="coding-blank-answer-heading">{t("codeBlankAnswerArea")}</h2> : null}
                   {isWorkspaceFullScreen ? <DialogCloseButton label={t("exitFullScreen")} onClose={() => setIsWorkspaceFullScreen(false)} /> : <button
                     className="secondary"
                     type="button"
@@ -2207,7 +2265,10 @@ export function CodingExerciseActivityView({
                   }
                 >
                   <div className="coding-exercise-editor-pane">
-                    <MonacoCodeEditor
+                    {isBlanks ? (executionStateLoaded ? <CodeBlanksEditor key={`${executionDocumentKey}:${codeResetVersion}`}
+                      template={readOnly && restoredBlankTemplate !== null ? restoredBlankTemplate : config.blankTemplate ?? ""} answers={blankAnswers} onChange={updateStudentBlanks}
+                      prefix={templateProjection.readOnlyPrefix} suffix={templateProjection.readOnlySuffix}
+                      readOnly={readOnly} locale={pluginLocale} language={config.language} /> : <p>{t("loadingAnswer")}</p>) : <MonacoCodeEditor
                       key={`${executionDocumentKey}:${codeResetVersion}`}
                       id={`coding-exercise-student-${activity.id}`}
                       ariaLabel={activity.title || t("starterCode")}
@@ -2221,13 +2282,13 @@ export function CodingExerciseActivityView({
                       loadingLabel={t("loadingAnswer")}
                       readOnlyPrefix={templateProjection.readOnlyPrefix}
                       readOnlySuffix={templateProjection.readOnlySuffix}
-                    />
+                    />}
                     {draftLoadFailed ? <button type="button" className="secondary" onClick={() => setDraftReload((value) => value + 1)}><ActionIcon name="refresh" /> {t("retryLoadAnswer")}</button> : null}
                   </div>
 
                   {!deferSubmission ? (
                     <div className="row coding-exercise-editor-actions" style={{ alignItems: "center" }}>
-                      <button type="button" onClick={submitCode} disabled={!config.language || readOnly || workingAction === "submit" || !editorCode.trim()}>
+                      <button type="button" onClick={submitCode} disabled={!config.language || !executionStateLoaded || readOnly || workingAction === "submit" || !editorCode.trim()}>
                         <ActionIcon name="submit" />
                         {workingAction === "submit" ? t("submitting") : t("submitForGrading")}
                       </button>
@@ -2337,7 +2398,7 @@ export function CodingExerciseActivityView({
                     </div>
                   )}
 
-                  <button type="button" onClick={runCode} disabled={!config.language || readOnly || workingAction === "run" || !editorCode.trim()}>
+                  <button type="button" onClick={runCode} disabled={!config.language || !executionStateLoaded || readOnly || workingAction === "run" || !editorCode.trim()}>
                     <ActionIcon name="run" />
                     {workingAction === "run" ? t("running") : t("runTest")}
                   </button>

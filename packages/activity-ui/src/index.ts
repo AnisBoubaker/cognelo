@@ -1,5 +1,6 @@
 export { ActionIcon, type ActionIconName } from "./action-icon";
 export * from "./code-editor";
+export { codeInputProtectionAttributes } from "./code-input-protection";
 export { useBodyScrollLock } from "./body-scroll-lock";
 export * from "./activity-version-diff-view";
 export * from "./code-language";

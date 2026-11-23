@@ -1,5 +1,6 @@
 import { AppError } from "@cognelo/core";
 import { z } from "zod";
+import { codingBlankAnswersSchema, readCodingBlankResponse, resolveCodingBlankInput } from "./code-blanks";
 import {
   buildCodingExerciseSource,
   codingExerciseOutputMatchModeSchema,
@@ -65,25 +66,25 @@ const codingExerciseExecutionClient = prisma as typeof prisma & {
   };
 };
 
-const codingExerciseStudentSourceSchema = z
-  .string()
-  .max(60000)
-  .refine((sourceCode) => sourceCode.trim().length > 0, "Enter code before running or submitting.");
-
 export const codingExerciseRunInputSchema = z.object({
-  sourceCode: codingExerciseStudentSourceSchema,
+  sourceCode: z.string().max(60000).default(""),
+  blankAnswers: codingBlankAnswersSchema.optional(),
+  blankTemplate: z.string().max(40000).optional(),
   stdin: z.string().max(12000).optional().default(""),
   expectedOutput: z.string().max(12000).optional().default(""),
   testCode: z.string().max(40000).optional().default(""),
   outputMatchMode: codingExerciseOutputMatchModeSchema.optional().default("exact"),
   containsLinesOrderMatters: z.boolean().optional().default(false),
   compareOutput: z.boolean().optional().default(true)
-});
+}).refine(value => value.sourceCode.trim().length > 0 || Object.values(value.blankAnswers ?? {}).some(answer => answer.trim()),
+  "Enter code before running or submitting.");
 
 export type CodingExerciseRunInput = z.input<typeof codingExerciseRunInputSchema>;
 
 export const codingExerciseSubmitInputSchema = z.object({
-  sourceCode: z.string().max(60000).default("")
+  sourceCode: z.string().max(60000).default(""),
+  blankAnswers: codingBlankAnswersSchema.optional(),
+  blankTemplate: z.string().max(40000).optional()
 });
 
 type HiddenTestCase = {
@@ -189,7 +190,8 @@ export async function runCodingExercise(params: {
   input: CodingExerciseRunInput;
 }) {
   const config = parseCodingExerciseConfig(params.activityConfig);
-  const input = codingExerciseRunInputSchema.parse(params.input);
+  const input = resolveExecutionInput(config, codingExerciseRunInputSchema.parse(params.input));
+  if (!input.sourceCode.trim()) throw new AppError(400, "CODING_EXERCISE_ANSWER_REQUIRED", "Enter code before running.");
   const outputMatcher = toOutputMatcher(input);
   if (input.compareOutput) {
     assertValidOutputMatcher(input.expectedOutput, outputMatcher);
@@ -215,6 +217,7 @@ export async function runCodingExercise(params: {
       stdin: input.stdin,
       expectedOutput: input.expectedOutput,
       resultSummary: {
+        ...blankExecutionSnapshot(input),
         judge0LanguageName: runtime.languageName,
         executionMode: config.executionMode,
         phase: "pending"
@@ -251,6 +254,7 @@ export async function runCodingExercise(params: {
         judge0StatusId: result.status?.id,
         judge0StatusLabel: result.status?.description,
         resultSummary: {
+          ...blankExecutionSnapshot(input),
           judge0LanguageName: runtime.languageName,
           accepted: comparison.matched,
           outputCompared: input.compareOutput,
@@ -293,7 +297,8 @@ export async function runCodingExercisePreview(params: {
   input: CodingExerciseRunInput;
 }) {
   const config = parseCodingExerciseConfig(params.activityConfig);
-  const input = codingExerciseRunInputSchema.parse(params.input);
+  const input = resolveExecutionInput(config, codingExerciseRunInputSchema.parse(params.input));
+  if (!input.sourceCode.trim()) throw new AppError(400, "CODING_EXERCISE_ANSWER_REQUIRED", "Enter code before running.");
   const outputMatcher = toOutputMatcher(input);
   if (input.compareOutput) assertValidOutputMatcher(input.expectedOutput, outputMatcher);
   const [privateConfig, runtime] = await Promise.all([
@@ -340,6 +345,7 @@ export async function runCodingExercisePreview(params: {
       judge0StatusId: result.status?.id ?? null,
       judge0StatusLabel: result.status?.description ?? null,
       resultSummary: {
+        ...blankExecutionSnapshot(input),
         judge0LanguageName: runtime.languageName,
         accepted: comparison.matched,
         outputCompared: input.compareOutput,
@@ -452,7 +458,7 @@ export async function submitCodingExercise(params: {
   input: z.infer<typeof codingExerciseSubmitInputSchema>;
 }) {
   const config = parseCodingExerciseConfig(params.activityConfig);
-  const input = codingExerciseSubmitInputSchema.parse(params.input);
+  const input = resolveExecutionInput(config, codingExerciseSubmitInputSchema.parse(params.input));
   const privateConfig = await getCodingExercisePrivateConfig({ activityId: params.activityId });
   const runtime = await resolveJudge0Language(config.language);
   const hiddenTests = await prisma.pluginCodingExerciseHiddenTest.findMany({
@@ -473,6 +479,7 @@ export async function submitCodingExercise(params: {
       stdin: "",
       expectedOutput: "",
       resultSummary: {
+        ...blankExecutionSnapshot(input),
         judge0LanguageName: runtime.languageName,
         executionMode: config.executionMode,
         phase: "pending",
@@ -496,7 +503,7 @@ export async function submitCodingExercise(params: {
         memoryKb: evaluated.latestMemory ?? undefined,
         judge0StatusId: evaluated.latestStatusId ?? undefined,
         judge0StatusLabel: evaluated.latestStatusLabel ?? undefined,
-        resultSummary: evaluated.summary as Prisma.InputJsonValue
+        resultSummary: { ...evaluated.summary, ...blankExecutionSnapshot(input) } as Prisma.InputJsonValue
       }
     });
 
@@ -528,7 +535,7 @@ export async function submitCodingExercisePreview(params: {
   input: z.infer<typeof codingExerciseSubmitInputSchema>;
 }) {
   const config = parseCodingExerciseConfig(params.activityConfig);
-  const input = codingExerciseSubmitInputSchema.parse(params.input);
+  const input = resolveExecutionInput(config, codingExerciseSubmitInputSchema.parse(params.input));
   const [privateConfig, runtime, hiddenTests] = await Promise.all([
     getCodingExercisePrivateConfig({ activityId: params.activityId }),
     resolveJudge0Language(config.language),
@@ -559,7 +566,7 @@ export async function submitCodingExercisePreview(params: {
       memoryKb: evaluated.latestMemory,
       judge0StatusId: evaluated.latestStatusId,
       judge0StatusLabel: evaluated.latestStatusLabel,
-      resultSummary: { ...evaluated.summary, studentPreview: true }
+      resultSummary: { ...evaluated.summary, ...blankExecutionSnapshot(input), studentPreview: true }
     });
   } catch (error) {
     if (error instanceof AppError) throw error;
@@ -1183,4 +1190,18 @@ function toReferenceSolutionRecord(referenceSolution: {
     createdAt: referenceSolution.createdAt.toISOString(),
     updatedAt: referenceSolution.updatedAt.toISOString()
   };
+}
+
+function resolveExecutionInput<T extends { sourceCode: string; blankAnswers?: Record<string, string>; blankTemplate?: string }>(
+  config: { responseMode?: string; blankTemplate?: string }, input: T
+): T {
+  try { return resolveCodingBlankInput(config, input); }
+  catch (error) {
+    throw new AppError(409, "CODING_EXERCISE_BLANK_RESPONSE_INVALID", error instanceof Error ? error.message : "Invalid code blank response.");
+  }
+}
+
+function blankExecutionSnapshot(input: unknown) {
+  const response = readCodingBlankResponse(input);
+  return response ? { blankResponse: response } : {};
 }

@@ -7149,3 +7149,101 @@ button.help-tooltip-trigger:hover, button.help-tooltip-trigger:focus-visible { c
 @media (max-width: 900px) {
   .homework-rubric-review-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Teacher code blanks preserve the editable source; marking is metadata only. */
+.coding-authoring-blank-highlight {
+  background: #fff0b3;
+  border-bottom: 2px solid #a26709;
+  border-radius: 3px;
+}
+.coding-authoring-blank-control {
+  margin-top: 1px;
+  margin-left: 1px;
+}
+button.coding-authoring-blank-remove {
+  background: #fff8df;
+  border-color: #a26709;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 1px;
+  line-height: 1;
+}
+button.coding-authoring-blank-remove [data-action-icon] {
+  width: 12px;
+  height: 12px;
+}
+
+.coding-exercise-student-prompt.is-code-blanks {
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 78%);
+  border-radius: 10px;
+  padding: 20px;
+}
+.coding-exercise-workspace-shell.is-code-blanks {
+  background: #f8fbff;
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 68%);
+  border-radius: 10px;
+  padding: 16px;
+}
+.coding-exercise-workspace-shell.is-code-blanks.is-full-screen {
+  border-radius: 0;
+}
+.is-code-blanks .coding-exercise-workspace-toolbar {
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+.coding-blank-answer-heading {
+  font-size: 1.05rem;
+  margin: 0;
+}
+.coding-blank-editor {
+  min-width: 0;
+}
+.coding-blank-editor .code-renderer-line {
+  display: block;
+}
+.coding-blank-editor .code-renderer-line-content {
+  display: block;
+  font-family: "SFMono-Regular", SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.coding-blank-editor .coding-blank-field {
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--brand-blue), white 72%);
+  border-radius: 8px;
+  display: inline-block;
+  vertical-align: middle;
+  width: 20ch;
+  min-width: 10ch;
+  max-width: 100%;
+  height: 2.6em;
+  min-height: 2.6em;
+  max-height: 2.6em;
+  margin: 3px 2px;
+  overflow: hidden;
+  resize: horizontal;
+}
+.coding-blank-editor .coding-blank-field:focus-within {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+.coding-blank-editor input.coding-blank-input {
+  background: #fff;
+  border: 0;
+  border-radius: inherit;
+  box-sizing: border-box;
+  color: var(--brand-ink);
+  display: block;
+  font: inherit;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0.3em 0.5em;
+}

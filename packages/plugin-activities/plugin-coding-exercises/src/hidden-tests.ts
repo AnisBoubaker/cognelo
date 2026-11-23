@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { assembleCodingBlankSource, codingBlankIds } from "./code-blanks";
 import type { CurrentUser } from "@cognelo/contracts";
 import { getServerEnv } from "@cognelo/config";
 import { withActivityAuthoringChange, assertCanManageActivityBank, assertCanManageCourse, AppError } from "@cognelo/core";
@@ -413,6 +414,13 @@ async function validateCodingExerciseHiddenTestsInput(params: {
   }
 
   const activityConfig = input.activityConfig ?? params.activityConfig;
+  const parsedConfig = parseCodingExerciseConfig(activityConfig);
+  if (parsedConfig.responseMode === "blanks") {
+    const template = parsedConfig.blankTemplate ?? "";
+    if (!codingBlankIds(template).length) throw new AppError(400, "CODING_EXERCISE_BLANK_REQUIRED", "Add at least one code blank.");
+    const source = assembleCodingBlankSource(template, privateConfig.blankReferenceAnswers ?? {});
+    if (input.referenceSolution !== source) throw new AppError(400, "CODING_EXERCISE_BLANK_REFERENCE_INVALID", "The reference completion must match the code blank template.");
+  }
   if (!parseCodingExerciseConfig(activityConfig).language) {
     throw new AppError(
       409,

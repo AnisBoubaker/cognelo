@@ -236,6 +236,28 @@ describe("coding exercise executions", () => {
     ];
   });
 
+  it("assembles blanks on the server for persisted and stateless execution", async () => {
+    const blankTemplate = "print({{ BLANK:value }})";
+    const config = { ...activityConfig, responseMode: "blanks", blankTemplate };
+    const input = { sourceCode: "print('forged')", blankTemplate, blankAnswers: { value: "2" } };
+    judge0Mocks.runJudge0Submission.mockResolvedValue({ token: "blank-run", stdout: "2", status: { id: 3, description: "Accepted" } });
+    const params = { activityId: "activity-1", userId: "student-1", activityConfig: config, input };
+    const run = await runCodingExercise({ ...params, input: { ...input, expectedOutput: "2" } });
+    expect(dbMocks.prisma.pluginCodingExerciseExecution.create).toHaveBeenLastCalledWith({ data: expect.objectContaining({ sourceCode: "print(2)" }) });
+    expect(run.resultSummary).toMatchObject({ blankResponse: { blankTemplate, blankAnswers: { value: "2" } } });
+    expect(judge0Mocks.runJudge0Submission.mock.calls[0][0].sourceCode).toContain("print(2)");
+    expect(judge0Mocks.runJudge0Submission.mock.calls[0][0].sourceCode).not.toContain("forged");
+    const submitted = await submitCodingExercise(params);
+    expect(dbMocks.prisma.pluginCodingExerciseExecution.create).toHaveBeenLastCalledWith({ data: expect.objectContaining({ sourceCode: "print(2)" }) });
+    expect(submitted.resultSummary).toMatchObject({ blankResponse: { blankTemplate, blankAnswers: { value: "2" } } });
+    const writes = dbMocks.prisma.pluginCodingExerciseExecution.create.mock.calls.length;
+    await runCodingExercisePreview({ ...params, input: { ...input, expectedOutput: "2" } });
+    const preview = await submitCodingExercisePreview(params);
+    expect(preview.sourceCode).toBe("print(2)");
+    expect(dbMocks.prisma.pluginCodingExerciseExecution.create).toHaveBeenCalledTimes(writes);
+    await expect(runCodingExercise({ ...params, input: { ...input, blankTemplate: "old" } })).rejects.toMatchObject({ code: "CODING_EXERCISE_BLANK_RESPONSE_INVALID" });
+  });
+
   it("keeps a submission without enabled hidden tests for later grading", async () => {
     dbMocks.hiddenTests = [];
     const execution = await submitCodingExercise({ activityId: "activity-1", userId: "student-1", activityConfig, input: { sourceCode: "print(1)" } });

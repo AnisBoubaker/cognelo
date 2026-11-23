@@ -1,7 +1,10 @@
 "use client";
 
-import { Highlight, Prism, themes } from "prism-react-renderer";
+import { Fragment, type ReactNode } from "react";
+import { Highlight, Prism, themes, type RenderProps, type Token } from "prism-react-renderer";
 import { normalizeCodeLanguage } from "./code-language";
+
+export type CodeInlineSlot = { key: string; start: number; end: number; content: ReactNode };
 
 type CodeRendererProps = {
   code: string;
@@ -11,6 +14,7 @@ type CodeRendererProps = {
   className?: string;
   contentOffset?: number;
   getLineClassName?: (lineIndex: number) => string | undefined;
+  inlineSlots?: CodeInlineSlot[];
 };
 
 export function CodeRenderer({
@@ -20,11 +24,14 @@ export function CodeRenderer({
   startingLineNumber = 1,
   className,
   contentOffset = 0,
-  getLineClassName
+  getLineClassName,
+  inlineSlots
 }: CodeRendererProps) {
   const normalizedLanguage = normalizeCodeLanguage(language);
+  const lineOffsets = inlineSlots?.length
+    ? [0, ...Array.from(code.matchAll(/\r\n|\r|\n/g), match => match.index + match[0].length)] : [];
 
-  if (normalizedLanguage === "markdown") {
+  if (normalizedLanguage === "markdown" && !inlineSlots?.length) {
     return (
       <MarkdownCodeRenderer
         code={code}
@@ -54,7 +61,7 @@ export function CodeRenderer({
                 >
                   {showLineNumbers ? <span className="code-renderer-line-number">{lineNumber}</span> : null}
                   <span className="code-renderer-line-content" style={contentOffset ? { paddingLeft: `${contentOffset}px` } : undefined}>
-                    {line.map((token, tokenIndex) => {
+                    {inlineSlots?.length ? renderInlineTokens(line, getTokenProps, lineOffsets[index] ?? 0, inlineSlots) : line.map((token, tokenIndex) => {
                       const tokenProps = getTokenProps({ token });
                       return <span key={tokenIndex} {...tokenProps} />;
                     })}
@@ -67,6 +74,30 @@ export function CodeRenderer({
       )}
     </Highlight>
   );
+}
+
+/** Highlight the complete public code, then replace designated token ranges with controls. */
+function renderInlineTokens(tokens: Token[], getTokenProps: RenderProps["getTokenProps"], lineOffset: number, slots: CodeInlineSlot[]) {
+  const rendered: ReactNode[] = [];
+  let offset = lineOffset;
+  tokens.forEach((token, tokenIndex) => {
+    const tokenEnd = offset + token.content.length;
+    const props = getTokenProps({ token });
+    let cursor = offset;
+    const text = (end: number) => {
+      if (end > cursor) rendered.push(<span key={`token-${tokenIndex}-${cursor}`} {...props}>{token.content.slice(cursor - offset, end - offset)}</span>);
+      cursor = end;
+    };
+    for (const slot of slots) {
+      if (slot.end <= offset || slot.start >= tokenEnd) continue;
+      if (slot.start > cursor) text(slot.start);
+      if (slot.start >= offset) rendered.push(<Fragment key={slot.key}>{slot.content}</Fragment>);
+      cursor = Math.max(cursor, Math.min(slot.end, tokenEnd));
+    }
+    text(tokenEnd);
+    offset = tokenEnd;
+  });
+  return rendered.length ? rendered : " ";
 }
 
 function MarkdownCodeRenderer({
