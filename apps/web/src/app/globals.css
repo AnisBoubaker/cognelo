@@ -7217,16 +7217,17 @@ button.coding-authoring-blank-remove [data-action-icon] {
   border: 1px solid color-mix(in srgb, var(--brand-blue), white 72%);
   border-radius: 8px;
   display: inline-block;
+  position: relative;
   vertical-align: middle;
   width: 20ch;
   min-width: 10ch;
-  max-width: 100%;
+  max-width: calc(100% - 4px);
   height: 2.6em;
   min-height: 2.6em;
   max-height: 2.6em;
   margin: 3px 2px;
   overflow: hidden;
-  resize: horizontal;
+  resize: none;
 }
 .coding-blank-editor .coding-blank-field:focus-within {
   outline: 2px solid var(--brand-blue);
@@ -7245,7 +7246,37 @@ button.coding-authoring-blank-remove [data-action-icon] {
   max-width: 100%;
   height: 100%;
   min-height: 0;
-  padding: 0.3em 0.5em;
+  padding: 0.3em 22px 0.3em 0.5em;
+}
+.coding-blank-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--brand-blue), white 94%);
+  border-left: 1px solid var(--line);
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+.coding-blank-resize-handle::after {
+  content: "";
+  width: 4px;
+  height: 45%;
+  border-left: 1px solid var(--muted);
+  border-right: 1px solid var(--muted);
+}
+.coding-blank-resize-handle:hover,
+.coding-blank-resize-handle:focus-visible {
+  background: color-mix(in srgb, var(--brand-blue), white 80%);
+}
+.coding-blank-resize-handle:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: -2px;
 }
 
 .coding-exercise-student-workspace.without-test-runner {

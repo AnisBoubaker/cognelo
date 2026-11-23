@@ -2,6 +2,7 @@ export type CodingExercisesLocale = "en" | "fr" | "zh" | "ar";
 type CodingExercisesMessageLocale = Exclude<CodingExercisesLocale, "ar">;
 
 type MessageKey =
+  | "resizeCodeBlank"
   | "blankChecksTitle"
   | "blankChecksScore"
   | "blankCorrect"
@@ -254,6 +255,7 @@ type MessageCatalog = Record<MessageKey, string>;
 
 const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
   en: {
+    resizeCodeBlank: "Resize blank {number}",
     blankChecksTitle: "Blank checks",
     blankChecksScore: "{correct} of {total} blanks correct",
     blankCorrect: "Correct",
@@ -500,6 +502,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noTestDetails: "No test details are available for this attempt."
   },
   fr: {
+    resizeCodeBlank: "Redimensionner le blanc {number}",
     blankChecksTitle: "Vérification des blancs",
     blankChecksScore: "{correct} blanc(s) correct(s) sur {total}",
     blankCorrect: "Correct",
@@ -746,6 +749,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noTestDetails: "Aucun détail de test n’est disponible pour cette tentative."
   },
   zh: {
+    resizeCodeBlank: "调整第 {number} 个空白的宽度",
     blankChecksTitle: "填空检查",
     blankChecksScore: "答对 {correct} / {total} 个空白",
     blankCorrect: "正确",

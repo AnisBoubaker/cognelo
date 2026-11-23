@@ -100,11 +100,11 @@ test("authors blanks and accepts equivalent completions with protected code, aut
     expect(await answerArea.locator(".coding-exercise-student-prompt").count()).toBe(0);
     await expect(answerArea.locator(".token.keyword").first()).toBeVisible();
     const sizes = () => answerArea.locator(".coding-blank-field").evaluateAll(fields => fields.map(field => ({
-      width: field.getBoundingClientRect().width, height: field.getBoundingClientRect().height, resize: getComputedStyle(field).resize
+      width: field.getBoundingClientRect().width, height: field.getBoundingClientRect().height
     })));
     const defaults = await sizes();
     expect(defaults[0]).toEqual(defaults[1]);
-    expect(defaults[0].resize).toBe("horizontal");
+    await expect(answerArea.getByRole("separator", { name: "Resize blank 1", exact: true })).toBeVisible();
     expect(defaults[0].width).toBeGreaterThan(140);
     await first.fill("x ** 2"); await first.press("Enter");
     await expect(first).toHaveValue("x ** 2");
@@ -197,7 +197,7 @@ test("saves, reviews and submits code blanks inside a Test", async ({ studentPag
   } finally { await teacher.dispose(); await removeActivitySuite(data); }
 });
 
-test("shows highlighted C code with uniform single-line blanks and horizontal-only resizing", async ({ studentPage: page }, testInfo) => {
+test("shows highlighted C code with uniform single-line blanks and horizontal-only resizing", async ({ studentPage: page, browser }, testInfo) => {
   test.setTimeout(90_000);
   const data = await provisionActivitySuite();
   try {
@@ -233,12 +233,24 @@ test("shows highlighted C code with uniform single-line blanks and horizontal-on
     expect((await area.boundingBox())!.y).toBeGreaterThan((await prompt.boundingBox())!.y + (await prompt.boundingBox())!.height);
     expect(await prompt.evaluate(el => getComputedStyle(el).borderTopStyle)).toBe("solid");
     const first = fields.first();
+    const resizeHandle = area.getByRole("separator", { name: "Resize blank 1", exact: true });
+    await expect(resizeHandle).toBeVisible();
+    await expect(resizeHandle).toHaveCSS("cursor", "ew-resize");
+    const siblingBefore = await fields.nth(1).boundingBox();
     const before = (await first.boundingBox())!;
-    await page.mouse.move(before.x + before.width - 3, before.y + before.height - 3);
+    await page.mouse.move(before.x + before.width - 3, before.y + before.height / 2);
     await page.mouse.down();
-    await page.mouse.move(before.x + before.width + 65, before.y + before.height + 45, { steps: 6 });
+    await page.mouse.move(before.x + before.width + 65, before.y + before.height / 2 + 45, { steps: 6 });
     await page.mouse.up();
     await expect.poll(async () => (await first.boundingBox())!.width).toBeGreaterThan(before.width + 20);
+    expect((await first.boundingBox())!.height).toBe(before.height);
+    const afterDrag = (await first.boundingBox())!.width;
+    await resizeHandle.focus();
+    await resizeHandle.press("ArrowLeft");
+    await expect.poll(async () => (await first.boundingBox())!.width).toBeCloseTo(afterDrag - 8, 0);
+    await resizeHandle.press("Shift+ArrowRight");
+    await expect.poll(async () => (await first.boundingBox())!.width).toBeCloseTo(afterDrag + 32, 0);
+    expect((await fields.nth(1).boundingBox())!.width).toBe(siblingBefore!.width);
     expect((await first.boundingBox())!.height).toBe(before.height);
     const resizedWidth = (await first.boundingBox())!.width;
     await page.getByRole("textbox", { name: "Blank 1", exact: true }).fill("x".repeat(120));
@@ -256,5 +268,31 @@ test("shows highlighted C code with uniform single-line blanks and horizontal-on
       expect(await area.locator(".coding-blank-editor").evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
       await page.screenshot({ fullPage: true, path: testInfo.outputPath(`c-blanks-${name}.png`) });
     }
+    const touchContext = await browser.newContext({ hasTouch: true, viewport: { width: 390, height: 844 },
+      storageState: await page.context().storageState() });
+    try {
+      const touchPage = await touchContext.newPage();
+      await touchPage.goto(page.url());
+      const touchHandle = touchPage.getByRole("separator", { name: "Resize blank 1", exact: true });
+      await expect(touchHandle).toBeVisible();
+      await touchHandle.scrollIntoViewIfNeeded();
+      const handleBounds = (await touchHandle.boundingBox())!;
+      const touchField = touchPage.locator(".coding-blank-field").first();
+      const touchBefore = (await touchField.boundingBox())!;
+      const cdp = await touchContext.newCDPSession(touchPage);
+      const x = handleBounds.x + handleBounds.width / 2, y = handleBounds.y + handleBounds.height / 2;
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: x + 64, y: y + 35 }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await expect.poll(async () => (await touchField.boundingBox())!.width).toBeGreaterThan(touchBefore.width + 25);
+      expect((await touchField.boundingBox())!.height).toBe(touchBefore.height);
+      await touchHandle.focus();
+      await touchHandle.press("End");
+      expect(await touchPage.locator(".coding-blank-editor").evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+      expect((await touchField.boundingBox())!.height).toBe(touchBefore.height);
+      await touchHandle.press("Home");
+      expect((await touchField.boundingBox())!.width).toBeLessThan(touchBefore.width);
+      await touchPage.screenshot({ fullPage: true, path: testInfo.outputPath("c-blanks-touch-resized.png") });
+    } finally { await touchContext.close(); }
   } finally { await removeActivitySuite(data); }
 });
