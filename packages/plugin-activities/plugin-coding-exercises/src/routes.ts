@@ -1,4 +1,5 @@
 import { getActivityResponseDraft } from "@cognelo/core";
+import { getCodingPracticeRunAllowance, resolveCodingPracticeScope, assertCodingPracticeRunsEnabled } from "./practice-runs";
 import { canShowStudentActivityGrade } from "@cognelo/core";
 import { randomUUID } from "node:crypto";
 import { readCodingBlankResponse } from "./code-blanks";
@@ -217,18 +218,22 @@ export const codingExerciseRunRoute: PluginRouteDefinition = {
         userId: context.user.id
       });
 
-      return { executions: await studentExecutions(context, executions) };
+      return { executions: await studentExecutions(context, executions), ...await practiceRunResponse({ activityId: context.activity.id,
+        userId: context.user.id, activityConfig: context.activity.config, scope: await resolveCodingPracticeScope(context) }) };
     },
     POST: async ({ context, readJson }) => {
       const input = codingExerciseRunInputSchema.parse(await readJson());
+      assertCodingPracticeRunsEnabled(context.activity.config);
+      const practiceScope = await resolveCodingPracticeScope(context);
       const execution = await runCodingExercise({
         activityId: context.activity.id,
         userId: context.user.id,
         activityConfig: context.activity.config,
-        input
+        input, practiceScope
       });
 
-      return { execution };
+      return { execution, ...await practiceRunResponse({ activityId: context.activity.id, userId: context.user.id,
+        activityConfig: context.activity.config, scope: practiceScope }) };
     }
   }
 };
@@ -692,4 +697,9 @@ function hideSubmissionGrade<T extends { status: string; resultSummary: unknown 
   return { ...execution, status: "completed", resultSummary: { gradingWithheld: true },
     judge0Token: null, stdout: null, stderr: null, compileOutput: null, message: null,
     judge0StatusId: null, judge0StatusLabel: null, timeSeconds: null, memoryKb: null };
+}
+
+async function practiceRunResponse(input: Parameters<typeof getCodingPracticeRunAllowance>[0]) {
+  const practiceRuns = await getCodingPracticeRunAllowance(input);
+  return practiceRuns.limit === null ? {} : { practiceRuns };
 }

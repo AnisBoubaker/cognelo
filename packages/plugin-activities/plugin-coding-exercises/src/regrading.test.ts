@@ -119,6 +119,18 @@ describe("programming exercise test-only regrading", () => {
     await expect(regradeCodingExerciseAttempt(input())).resolves.toMatchObject({ rawScore: 40, rawMaxScore: 100 });
   });
 
+  it("recomposes rubric-only grades without inventing a test score or test-evaluation reference", async () => {
+    mocks.regradeTests.mockResolvedValue({
+      testEvaluationId: null, resultSummary: { earnedWeight: 0, totalWeight: 0, testsEnabled: false },
+      feedbackConfig: { gradingEnabled: true, testsEnabled: false, testWeightPercent: 0, aiWeightPercent: 100 }
+    });
+    const result = await regradeCodingExerciseAttempt(input());
+    expect(result).toMatchObject({ rawScore: 90, rawMaxScore: 100,
+      metadata: { testEvaluationId: null, deterministicScore: null, aiScore: 90,
+        studentFeedback: { feedbackRef: expect.stringMatching(/^rubric-recompose:/), deterministicScore: null } } });
+    expect(mocks.recordResearch).toHaveBeenCalledWith(expect.objectContaining({ eventType: "coding_grade_recomposed" }));
+  });
+
   it("uses the Test child's reviewed rubric without loading the parent as a programming attempt", async () => {
     const result = await regradeCodingExerciseAttempt({ ...input(), coreAttemptId: "test-parent", feedback: { aiScore: 60, summary: "Child review" } });
     expect(mocks.getReview).not.toHaveBeenCalled();

@@ -2,7 +2,8 @@
 import { assembleCodingBlankSource, codingBlankAnswer, codingBlankIds, codingBlankResponseState, readCodingBlankResponse, type CodingBlankAnswers } from "../code-blanks";
 import { CodeBlanksAuthoring } from "./code-blanks-authoring";
 import { CodeBlanksEditor } from "./code-blanks-editor";
-import { HelpLabel } from "@cognelo/activity-ui";
+import { HelpLabel, SideNavigation, useDialogs } from "@cognelo/activity-ui";
+import { CodingExerciseGradingGeneral } from "./coding-exercise-grading-general";
 
 import { DialogCloseButton, DialogHeader, getDialogCloseLabel } from "@cognelo/activity-ui";
 
@@ -24,12 +25,14 @@ import {
   codingExerciseMaxHiddenTestCount,
   codingExerciseTemplateRequiresTestCodeMarker,
   codingExerciseTemplateInsertionToken,
+  getCodingExerciseMaxTestRuns,
   getCodingExerciseAiFeedbackValidationMessages,
   mergeCodingExerciseGeneratedSolutionPrivateConfig,
   normalizeCodingExerciseSampleTests,
   parseCodingExercisePrivateConfig,
   splitCodingExerciseTemplateSource,
   type CodingExerciseConfig,
+  type CodingPracticeRunAllowance,
   type CodingExerciseOutputMatchMode,
   type CodingExercisePrivateConfig
 } from "../coding-exercises";
@@ -189,8 +192,8 @@ type CodingExerciseClient = {
       containsLinesOrderMatters?: boolean;
       compareOutput?: boolean;
     }
-  ) => Promise<{ execution: CodingExecution }>;
-  listRuns: (courseId: string, activityId: string) => Promise<{ executions: CodingExecution[] }>;
+  ) => Promise<{ execution: CodingExecution; practiceRuns?: CodingPracticeRunAllowance }>;
+  listRuns: (courseId: string, activityId: string) => Promise<{ executions: CodingExecution[]; practiceRuns?: CodingPracticeRunAllowance }>;
   submitCode: (
     courseId: string,
     activityId: string,
@@ -201,7 +204,7 @@ type CodingExerciseClient = {
     aiFeedback?: { feedback?: CodingExerciseAiFeedback } | null;
     aiFeedbackError?: string | null;
   }>;
-  listSubmissions: (courseId: string, activityId: string) => Promise<{ executions: CodingExecution[] }>;
+  listSubmissions: (courseId: string, activityId: string) => Promise<{ executions: CodingExecution[]; practiceRuns?: CodingPracticeRunAllowance }>;
   listHistory?: (
     courseId: string,
     activityId: string
@@ -325,6 +328,7 @@ export function CodingExerciseActivityView({
   const t = (key: Parameters<typeof formatCodingExercisesMessage>[1], values?: Record<string, string | number>) =>
     formatCodingExercisesMessage(pluginLocale, key, values);
   const notifications = useNotifications();
+  const dialogs = useDialogs();
   const knowledgeGeneration = useActivityKnowledgeGeneration();
   const aiGenerationDraftRef = useRef<{
     prompt: string;
@@ -373,7 +377,7 @@ export function CodingExerciseActivityView({
   const [rubricGuidanceDraft, setRubricGuidanceDraft] = useState("");
   const rubricGuidanceId = useId();
   useBodyScrollLock(rubricGenerationDialogOpen);
-  const [gradingSection, setGradingSection] = useState<"rubric" | "tests">("rubric");
+  const [gradingSection, setGradingSection] = useState<"general" | "rubric" | "tests">("general");
   const [replacementDialog, setReplacementDialog] = useState<"prompt" | "solution" | null>(null);
   const [testGenerationDialogOpen, setTestGenerationDialogOpen] = useState(false);
   const [testGenerationMode, setTestGenerationMode] = useState<TestGenerationMode>("add");
@@ -384,6 +388,16 @@ export function CodingExerciseActivityView({
   const [restoredBlankTemplate, setRestoredBlankTemplate] = useState<string | null>(null);
   const [blankAnswers, setBlankAnswers] = useState<CodingBlankAnswers>({});
   const isBlanks = config.responseMode === "blanks";
+  const maxPracticeRuns = getCodingExerciseMaxTestRuns(config);
+  const practiceRunLoadError = t("loadPracticeRunsError");
+  const showPracticeRuns = maxPracticeRuns !== 0;
+  const [practiceRuns, setPracticeRuns] = useState<CodingPracticeRunAllowance | null>(null);
+  const [practiceRunError, setPracticeRunError] = useState("");
+  const [practiceRunReload, setPracticeRunReload] = useState(0);
+  const [confirmingRun, setConfirmingRun] = useState(false);
+  const runRequestPending = useRef<object | null>(null);
+  const previewRunCount = useRef(0);
+  const isPreview = executionStateHost?.context.kind === "student_preview";
   const [sampleInput, setSampleInput] = useState("");
   const [sampleExpectedOutput, setSampleExpectedOutput] = useState("");
   const [sampleTestCode, setSampleTestCode] = useState("");
@@ -416,6 +430,10 @@ export function CodingExerciseActivityView({
     : executionContext?.kind === "standalone" ? `${executionContext.groupActivityId}:${executionContext.activityAttemptId ?? "draft"}`
       : executionContext?.kind === "student_preview" ? executionContext.previewSessionId : activity.id;
   const executionKey = JSON.stringify([activity.id, activityConfigKey, executionDocumentKey, readOnly]);
+  useEffect(() => {
+    setWorkingAction(null);
+    return () => { runRequestPending.current = null; };
+  }, [activity.id, executionDocumentKey]);
   const executionStateLoaded = canManage || !executionStateHost || loadedExecutionKey === executionKey;
   const sampleValidationTests = getReferenceValidationTests(referenceValidationSummary, "sampleTests");
   const hiddenValidationTests = getReferenceValidationTests(referenceValidationSummary, "hiddenTests");
@@ -636,6 +654,36 @@ export function CodingExerciseActivityView({
     };
   }, [activity.id, canManage, codingClient, course?.id, deferSubmission, onNewAttemptAvailabilityChange, onPreviousSubmissionsAvailabilityChange, readOnly]);
 
+  useEffect(() => {
+    if (canManage || readOnly || studentViewMode === "previous") return;
+    setPracticeRunError("");
+    if (maxPracticeRuns === null || maxPracticeRuns === 0) {
+      setPracticeRuns({ limit: maxPracticeRuns, used: 0, remaining: maxPracticeRuns });
+      return;
+    }
+    if (!course?.id || !codingClient) return;
+    let cancelled = false;
+    setPracticeRuns(null);
+    void (async () => {
+      if (isPreview && executionStateHost) {
+        const saved = await executionStateHost.load();
+        previewRunCount.current = typeof saved?.previewPracticeRunsUsed === "number" ? saved.previewPracticeRunsUsed : 0;
+        return { limit: maxPracticeRuns, used: previewRunCount.current, remaining: Math.max(0, maxPracticeRuns - previewRunCount.current) };
+      }
+      const result = await codingClient.listRuns(course.id!, activity.id);
+      if (!result.practiceRuns) throw new Error(practiceRunLoadError);
+      return result.practiceRuns;
+    })().then(value => { if (!cancelled) setPracticeRuns(value); })
+      .catch(err => { if (!cancelled) setPracticeRunError(err instanceof Error ? err.message : practiceRunLoadError); });
+    return () => { cancelled = true; };
+  }, [activity.id, canManage, readOnly, studentViewMode, maxPracticeRuns, codingClient, course?.id, executionStateHost, isPreview, practiceRunReload, practiceRunLoadError]);
+
+  async function refreshPracticeRuns() {
+    if (maxPracticeRuns === null || maxPracticeRuns === 0 || !course?.id || !codingClient) return;
+    const result = await codingClient.listRuns(course.id, activity.id);
+    if (result.practiceRuns) setPracticeRuns(result.practiceRuns);
+  }
+
   function updateSampleTest(index: number, field: keyof CodingExerciseConfig["sampleTests"][number], value: string | boolean) {
     setConfig((current) => {
       const next = [...normalizeCodingExerciseSampleTests(current.sampleTests)];
@@ -826,6 +874,8 @@ export function CodingExerciseActivityView({
         executionMode: "template",
         ...(config.responseMode ? { responseMode: config.responseMode } : {}),
         ...(isBlanks ? { blankTemplate: config.blankTemplate ?? "" } : {}),
+        ...(config.maxTestRuns !== undefined ? { maxTestRuns: config.maxTestRuns } : {}),
+        ...(privateConfig.aiFeedback.testsEnabled !== undefined ? { testsEnabled: privateConfig.aiFeedback.testsEnabled } : {}),
         starterCode: isBlanks ? "" : config.starterCode,
         studentTemplateSource: buildCodingExerciseStudentTemplateSource(
           normalizedPrivateConfig.templateSource,
@@ -1232,6 +1282,23 @@ export function CodingExerciseActivityView({
     if (!course?.id || !codingClient || !config.language || !editorCode.trim()) {
       return;
     }
+    if (runRequestPending.current || !showPracticeRuns || (maxPracticeRuns !== null && (!practiceRuns || practiceRuns.remaining === 0))) return;
+    const runRequest = {};
+    runRequestPending.current = runRequest;
+    try {
+      if (maxPracticeRuns !== null) {
+        setConfirmingRun(true);
+        const confirmed = await dialogs.confirm({ title: t("confirmTestRunTitle"),
+          message: t("confirmTestRunMessage", { remaining: practiceRuns!.remaining!, after: Math.max(0, practiceRuns!.remaining! - 1) }),
+          confirmLabel: t("runTest"), cancelLabel: actionCopy.cancel });
+        if (runRequestPending.current !== runRequest) return;
+        setConfirmingRun(false);
+        if (!confirmed) { runRequestPending.current = null; return; }
+      }
+    } catch (err) {
+      if (runRequestPending.current === runRequest) { runRequestPending.current = null; setConfirmingRun(false); setError(err instanceof Error ? err.message : t("runError")); }
+      return;
+    }
     setWorkingAction("run");
     setError("");
     setRunExecution(null);
@@ -1247,12 +1314,25 @@ export function CodingExerciseActivityView({
         containsLinesOrderMatters: isPersonalizedTest ? false : sampleContainsLinesOrderMatters,
         compareOutput: !isPersonalizedTest
       });
+      if (runRequestPending.current !== runRequest) return;
+      if (result.practiceRuns) setPracticeRuns(result.practiceRuns);
+      else if (maxPracticeRuns !== null) {
+        const used = (practiceRuns?.used ?? 0) + 1;
+        setPracticeRuns({ limit: maxPracticeRuns, used, remaining: Math.max(0, maxPracticeRuns - used) });
+        if (isPreview && executionStateHost) {
+          previewRunCount.current = used;
+          await executionStateHost.save({ sourceCode: editorCode,
+            ...(isBlanks ? { blankAnswers, blankTemplate: config.blankTemplate ?? "" } : {}), previewPracticeRunsUsed: used });
+        }
+      }
       setRunExecution(result.execution);
       setRecentRuns((current) => [result.execution, ...current]);
     } catch (err) {
+      if (runRequestPending.current !== runRequest) return;
       setError(err instanceof Error ? err.message : t("runError"));
+      if (!isPreview) await refreshPracticeRuns().catch(() => undefined);
     } finally {
-      setWorkingAction(null);
+      if (runRequestPending.current === runRequest) { runRequestPending.current = null; setWorkingAction(null); }
     }
   }
 
@@ -1260,6 +1340,8 @@ export function CodingExerciseActivityView({
     if (!course?.id || !codingClient || !config.language || !editorCode.trim()) {
       return false;
     }
+    runRequestPending.current = null;
+    setConfirmingRun(false);
     setWorkingAction("submit");
     setError("");
     try {
@@ -1278,6 +1360,11 @@ export function CodingExerciseActivityView({
         ...current
       ]);
       setRecentRuns([]);
+      previewRunCount.current = 0;
+      if (result.availability.canStart) {
+        if (isPreview) setPracticeRuns({ limit: maxPracticeRuns, used: 0, remaining: maxPracticeRuns });
+        else await refreshPracticeRuns().catch(() => undefined);
+      }
       setIsWorkspaceFullScreen(false);
       setSubmissionConfirmation(result);
       onPreviousSubmissionsAvailabilityChange?.(true);
@@ -1306,7 +1393,7 @@ export function CodingExerciseActivityView({
     setEditorCode(sourceCode);
     setSubmitExecution(null);
     if (executionStateHost && executionStateLoaded && !readOnly) {
-      void executionStateHost.save({ sourceCode }).catch((err) => {
+      void executionStateHost.save({ sourceCode, ...(isPreview ? { previewPracticeRunsUsed: previewRunCount.current } : {}) }).catch((err) => {
         setError(err instanceof Error ? err.message : t("submitError"));
       });
     }
@@ -1320,7 +1407,7 @@ export function CodingExerciseActivityView({
     setEditorCode(state.sourceCode);
     setSubmitExecution(null);
     if (executionStateHost && executionStateLoaded && !readOnly) {
-      void executionStateHost.save(state).catch(err => setError(err instanceof Error ? err.message : t("submitError")));
+      void executionStateHost.save({ ...state, ...(isPreview ? { previewPracticeRunsUsed: previewRunCount.current } : {}) }).catch(err => setError(err instanceof Error ? err.message : t("submitError")));
     }
   }
 
@@ -1732,82 +1819,28 @@ export function CodingExerciseActivityView({
 
             </div>
             <div className="settings-layout coding-exercise-grading-layout">
-              <aside className="settings-nav coding-exercise-grading-nav" aria-label={t("gradingSections")} role="tablist">
-                <button
-                  aria-controls="coding-exercise-rubric-panel"
-                  aria-selected={gradingSection === "rubric"}
-                  className={gradingSection === "rubric" ? "is-active" : ""}
-                  role="tab"
-                  type="button"
-                  onClick={() => setGradingSection("rubric")}
-                >
-                  <span>{t("rubricSectionTab")}</span>
-                </button>
-                <button
-                  aria-controls="coding-exercise-tests-panel"
-                  aria-selected={gradingSection === "tests"}
-                  className={gradingSection === "tests" ? "is-active" : ""}
-                  role="tab"
-                  type="button"
-                  onClick={() => setGradingSection("tests")}
-                >
-                  <span>{t("testCasesSectionTab")}</span>
-                </button>
-              </aside>
+              <SideNavigation ariaLabel={t("gradingSections")} items={[
+                { id: "general", label: t("gradingGeneralTab"), isActive: gradingSection === "general" },
+                ...(privateConfig.aiFeedback.gradingEnabled || privateConfig.aiFeedback.enabled
+                  ? [{ id: "rubric", label: t("rubricSectionTab"), isActive: gradingSection === "rubric" }] : []),
+                ...(privateConfig.aiFeedback.testsEnabled !== false
+                  ? [{ id: "tests", label: t("testCasesSectionTab"), isActive: gradingSection === "tests" }] : [])
+              ]} tabs={{ idPrefix: "coding-exercise-grading-tab", panelId: "coding-exercise-grading-panel",
+                onSelect: id => setGradingSection(id as "general" | "rubric" | "tests") }} />
+              <div className="stack coding-exercise-grading-panels" id="coding-exercise-grading-panel" role="tabpanel"
+                aria-labelledby={`coding-exercise-grading-tab-${gradingSection}`}>
+
+              <div className="stack" id="coding-exercise-general-panel" hidden={gradingSection !== "general"}>
+                <CodingExerciseGradingGeneral config={config} feedback={privateConfig.aiFeedback} locale={pluginLocale}
+                  onConfigChange={value => setConfig(current => ({ ...current, ...value }))}
+                  onFeedbackChange={value => setPrivateConfig(current => ({ ...current, aiFeedback: value }))}
+                  validationMessages={aiFeedbackValidationMessages} />
+              </div>
               <div
                 className="stack"
-                hidden={gradingSection !== "rubric"}
+                hidden={gradingSection !== "rubric" || (!privateConfig.aiFeedback.gradingEnabled && !privateConfig.aiFeedback.enabled)}
                 id="coding-exercise-rubric-panel"
-                role="tabpanel"
               >
-            <section className="stack">
-              <label className="checkbox-row">
-                <input
-                  checked={privateConfig.aiFeedback.gradingEnabled}
-                  type="checkbox"
-                  onChange={(event) => setPrivateConfig((current) => ({
-                    ...current,
-                    aiFeedback: {
-                      ...current.aiFeedback,
-                      gradingEnabled: event.target.checked,
-                      criteria: event.target.checked && current.aiFeedback.criteria.length === 0
-                        ? [{ id: "correctness", title: "Correctness and approach", description: "Evaluate the correctness, clarity, and suitability of the submitted approach.", weightPercent: 100 }]
-                        : current.aiFeedback.criteria
-                    }
-                  }))}
-                />
-                <span>{t("aiGradingEnabled")}</span>
-              </label>
-              {privateConfig.aiFeedback.gradingEnabled ? (
-                <div className="form-grid two-columns">
-                  <div className="field">
-                    <label htmlFor="coding-ai-test-weight">{t("testWeightPercent")}</label>
-                    <input
-                      id="coding-ai-test-weight"
-                      min={0}
-                      max={100}
-                      required
-                      type="number"
-                      value={privateConfig.aiFeedback.testWeightPercent}
-                      onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, testWeightPercent: Number(event.target.value) } }))}
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="coding-ai-rubric-weight">{t("aiWeightPercent")}</label>
-                    <input
-                      id="coding-ai-rubric-weight"
-                      min={0}
-                      max={100}
-                      required
-                      type="number"
-                      value={privateConfig.aiFeedback.aiWeightPercent}
-                      onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, aiWeightPercent: Number(event.target.value) } }))}
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </section>
-
             <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
               <div>
                 <HelpLabel help={<>{t("rubricHelp")}</>}><h3>{t("rubricTitle")}</h3></HelpLabel>
@@ -1900,56 +1933,11 @@ export function CodingExerciseActivityView({
               ))}
             </section>
 
-            <section className="stack" style={{ borderTop: "1px solid rgba(13, 27, 71, 0.08)", paddingTop: 20 }}>
-              <div>
-                <HelpLabel help={<>{t("aiFeedbackHelp")}</>}><h3>{t("aiFeedbackTitle")}</h3></HelpLabel>
-
-              </div>
-              <label className="checkbox-row">
-                <input
-                  checked={privateConfig.aiFeedback.enabled}
-                  type="checkbox"
-                  onChange={(event) => setPrivateConfig((current) => ({
-                    ...current,
-                    aiFeedback: {
-                      ...current.aiFeedback,
-                      enabled: event.target.checked,
-                      criteria: event.target.checked && current.aiFeedback.criteria.length === 0
-                        ? [{ id: "correctness", title: "Correctness and approach", description: "Evaluate the correctness, clarity, and suitability of the submitted approach.", weightPercent: 100 }]
-                        : current.aiFeedback.criteria
-                    }
-                  }))}
-                />
-                <span>{t("aiFeedbackEnabled")}</span>
-              </label>
-              {privateConfig.aiFeedback.enabled ? (
-                <div className="field">
-                  <label htmlFor="coding-ai-instructions">{t("feedbackInstructions")}</label>
-                  <textarea
-                    id="coding-ai-instructions"
-                    maxLength={8000}
-                    required
-                    rows={5}
-                    value={privateConfig.aiFeedback.instructions}
-                    onChange={(event) => setPrivateConfig((current) => ({ ...current, aiFeedback: { ...current.aiFeedback, instructions: event.target.value } }))}
-                  />
-                </div>
-              ) : null}
-              {aiFeedbackValidationMessages.length ? (
-                <div className="error" role="alert">
-                  <ul style={{ margin: 0, paddingInlineStart: 20 }}>
-                    {aiFeedbackValidationMessages.map((message) => <li key={message}>{message}</li>)}
-                  </ul>
-                </div>
-              ) : null}
-            </section>
-
               </div>
               <div
                 className="stack"
-                hidden={gradingSection !== "tests"}
+                hidden={gradingSection !== "tests" || privateConfig.aiFeedback.testsEnabled === false}
                 id="coding-exercise-tests-panel"
-                role="tabpanel"
               >
 
           {aiGenerationClient ? (
@@ -2196,6 +2184,7 @@ export function CodingExerciseActivityView({
             ))}
           </section>
               </div>
+              </div>
             </div>
           {authoringGradingPortalTarget !== undefined ? (
             <>
@@ -2256,7 +2245,7 @@ export function CodingExerciseActivityView({
                 </div>
 
                 <div
-                  className={`coding-exercise-student-workspace${deferSubmission ? "" : " has-actions"}`}
+                  className={`coding-exercise-student-workspace${deferSubmission ? "" : " has-actions"}${showPracticeRuns ? "" : " without-test-runner"}`}
                   ref={studentWorkspaceRef}
                   style={
                     {
@@ -2298,7 +2287,7 @@ export function CodingExerciseActivityView({
                     </div>
                   ) : null}
 
-                  <div
+                  {showPracticeRuns ? <><div
                     className="coding-exercise-workspace-divider"
                     role="separator"
                     aria-label={t("resizeWorkspace")}
@@ -2340,6 +2329,11 @@ export function CodingExerciseActivityView({
                       padding: 18
                     }}
                   >
+                    {maxPracticeRuns !== null && !readOnly ? <div>
+                      <p role="status">{practiceRuns ? t("practiceRunsRemaining", { remaining: practiceRuns.remaining ?? 0, total: maxPracticeRuns }) : t("loadingPracticeRuns")}</p>
+                      {practiceRunError ? <div className="error">{practiceRunError}<button type="button" className="secondary" onClick={() => setPracticeRunReload(value => value + 1)}><ActionIcon name="refresh" />{t("retryPracticeRuns")}</button></div> : null}
+                    </div> : null}
+
                   <TestSelector
                     id="coding-visible-sample"
                     label={t("testSelection")}
@@ -2398,7 +2392,7 @@ export function CodingExerciseActivityView({
                     </div>
                   )}
 
-                  <button type="button" onClick={runCode} disabled={!config.language || !executionStateLoaded || readOnly || workingAction === "run" || !editorCode.trim()}>
+                  <button type="button" onClick={runCode} disabled={!config.language || !executionStateLoaded || readOnly || workingAction === "run" || confirmingRun || !editorCode.trim() || (maxPracticeRuns !== null && (!practiceRuns || practiceRuns.remaining === 0))}>
                     <ActionIcon name="run" />
                     {workingAction === "run" ? t("running") : t("runTest")}
                   </button>
@@ -2431,11 +2425,12 @@ export function CodingExerciseActivityView({
                   </div>
 
                     {error ? <p className="error">{error}</p> : null}
-                  </section>
+                  </section> </> : null}
                 </div>
               </div>
 
-              <CodingRunHistory key={activity.id} executions={recentRuns} locale={pluginLocale} />
+              {showPracticeRuns ? <CodingRunHistory key={activity.id} executions={recentRuns} locale={pluginLocale} /> : null}
+              {!showPracticeRuns && error ? <p className="error" role="alert">{error}</p> : null}
             </>
           )}
           {submissionConfirmation ? (

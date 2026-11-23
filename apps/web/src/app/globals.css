@@ -7247,3 +7247,16 @@ button.coding-authoring-blank-remove [data-action-icon] {
   min-height: 0;
   padding: 0.3em 0.5em;
 }
+
+.coding-exercise-student-workspace.without-test-runner {
+  grid-template-areas: "editor";
+  grid-template-columns: minmax(0, 1fr);
+}
+.coding-exercise-student-workspace.has-actions.without-test-runner {
+  grid-template-areas: "editor" "actions";
+}
+
+.coding-exercise-grading-panels > [hidden] { display: none !important; }
+@media (max-width: 720px) {
+  .coding-exercise-grading-panels { padding-bottom: 120px; }
+}

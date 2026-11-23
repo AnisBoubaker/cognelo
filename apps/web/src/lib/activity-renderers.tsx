@@ -362,14 +362,14 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
           : groupId
           ? await api.runGroupCodingExercise(courseId, groupId, activityId, input)
           : await api.runCodingExercise(courseId, activityId, input);
-        return { execution: result.execution as CodingExerciseExecution };
+        return { execution: result.execution as CodingExerciseExecution, practiceRuns: "practiceRuns" in result ? result.practiceRuns as import("@cognelo/plugin-coding-exercises").CodingPracticeRunAllowance : undefined };
       },
       listRuns: async (courseId: string, activityId: string) => {
-        if (studentPreview) return { executions: [] };
+        if (studentPreview && groupId) return api.executeStudentPreviewAction<{ executions: CodingExerciseExecution[]; practiceRuns?: import("@cognelo/plugin-coding-exercises").CodingPracticeRunAllowance }>(courseId, groupId, activityId, "practiceRunAllowance", {});
         const result = groupId
           ? await api.groupCodingExerciseRuns(courseId, groupId, activityId)
           : await api.codingExerciseRuns(courseId, activityId);
-        return { executions: result.executions as CodingExerciseExecution[] };
+        return { executions: result.executions as CodingExerciseExecution[], practiceRuns: result.practiceRuns };
       },
       submitCode: async (courseId: string, activityId: string, input: Parameters<typeof api.submitCodingExercise>[2]) => {
         const result = studentPreview && groupId
@@ -759,9 +759,13 @@ function CodingExerciseTestItemRenderer({ courseId, executionHost, item, locale,
     saveHiddenTests: async () => ({ tests: [], referenceSolution: null }),
     runCode: async (_courseId: string, _activityId: string, input: unknown) => {
       if (!executionHost.executeAction) throw new Error("This Test cannot run sample code.");
-      return executionHost.executeAction<{ execution: CodingExerciseExecution }>("run", input);
+      return executionHost.executeAction<{ execution: CodingExerciseExecution; practiceRuns?: import("@cognelo/plugin-coding-exercises").CodingPracticeRunAllowance }>("run", input);
     },
-    listRuns: async () => ({ executions: [] }),
+    listRuns: async () => {
+      if (!executionHost.executeAction) return { executions: [] };
+      const result = await executionHost.executeAction<{ practiceRuns: import("@cognelo/plugin-coding-exercises").CodingPracticeRunAllowance }>("practiceRunAllowance", {});
+      return { executions: [], ...result };
+    },
     submitCode: async () => { throw new Error("Submit the whole Test to grade this activity."); },
     listSubmissions: async () => ({ executions: [] })
   }), [executionHost]);

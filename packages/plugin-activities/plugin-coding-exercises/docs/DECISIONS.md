@@ -4,6 +4,8 @@ This document preserves detailed Programming Exercises decisions. Load only the 
 
 ## Long-Term Plugin Decisions
 
+- Grading General owns independent rubric/test component switches, valid 100% active weights, automatic feedback and practice-run policy. Run quotas are per core attempt and enforced by locked plugin execution reservations; zero hides the runner, finite policies require confirmation and a remaining-count display, and unlimited preserves the prior ordinary-code behavior. Use the same boundary for standalone and Test actions, and retain counts after reopening. Never charge final submission, teacher validation/regrading or stateless preview to a learner allowance. See [the policy and persistence contract](REFERENCE.md#grading-general-and-learner-test-runs).
+
 - Code blanks use an additive response format within `coding-exercise`, with a dedicated authoring/learner component and server-side reconstruction before the existing execution pipeline. Keep the single `template` execution mode and existing Monaco path. Stable blank IDs and public response snapshots preserve values and original evidence; private reference completions are validation examples, never a student answer allowlist. Limit new selections to one line; render fixed learner code through shared syntax highlighting and give all single-line fields identical defaults with horizontal-only resizing. See [code blanks](REFERENCE.md#code-blanks).
 
 - Use Judge0 as a remote execution backend instead of running untrusted student code inside the Cognelo API app.

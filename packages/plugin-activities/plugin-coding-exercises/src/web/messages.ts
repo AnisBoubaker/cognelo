@@ -2,6 +2,24 @@ export type CodingExercisesLocale = "en" | "fr" | "zh" | "ar";
 type CodingExercisesMessageLocale = Exclude<CodingExercisesLocale, "ar">;
 
 type MessageKey =
+  | "gradingGeneralTab"
+  | "enableRubricGrading"
+  | "enableTests"
+  | "defaultCriterionTitle"
+  | "defaultCriterionDescription"
+  | "practiceRunsTitle"
+  | "practiceRunsHelp"
+  | "practiceRunLimitMode"
+  | "unlimitedTestRuns"
+  | "limitedTestRuns"
+  | "maxTestRuns"
+  | "practiceRunsRemaining"
+  | "loadingPracticeRuns"
+  | "loadPracticeRunsError"
+  | "retryPracticeRuns"
+  | "confirmTestRunTitle"
+  | "confirmTestRunMessage"
+
   | "answerFormat"
   | "writeCode"
   | "fillCodeBlanks"
@@ -228,6 +246,23 @@ type MessageCatalog = Record<MessageKey, string>;
 
 const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
   en: {
+    gradingGeneralTab: "General",
+    enableRubricGrading: "Enable grading",
+    enableTests: "Enable tests",
+    defaultCriterionTitle: "Correctness and approach",
+    defaultCriterionDescription: "Evaluate the correctness, clarity, and suitability of the submitted approach.",
+    practiceRunsTitle: "Learner test runs",
+    practiceRunsHelp: "The allowance resets for each new attempt. Reopening keeps used runs. Set 0 to hide the run section. Visible and personalized runs count; final submissions and teacher validation do not.",
+    practiceRunLimitMode: "Test-run allowance",
+    unlimitedTestRuns: "Unlimited",
+    limitedTestRuns: "Limited",
+    maxTestRuns: "Maximum test runs per attempt",
+    practiceRunsRemaining: "{remaining} of {total} test runs remaining",
+    loadingPracticeRuns: "Loading test-run allowance…",
+    loadPracticeRunsError: "Unable to load the test-run allowance.",
+    retryPracticeRuns: "Retry loading test-run allowance",
+    confirmTestRunTitle: "Run this test?",
+    confirmTestRunMessage: "You have {remaining} test run(s) remaining. This run will use one, leaving {after}. Continue?",
     answerFormat: "Answer format",
     writeCode: "Write code",
     fillCodeBlanks: "Fill in code blanks",
@@ -450,6 +485,23 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noTestDetails: "No test details are available for this attempt."
   },
   fr: {
+    gradingGeneralTab: "Général",
+    enableRubricGrading: "Activer la notation",
+    enableTests: "Activer les tests",
+    defaultCriterionTitle: "Justesse et démarche",
+    defaultCriterionDescription: "Évaluez la justesse, la clarté et la pertinence de la démarche soumise.",
+    practiceRunsTitle: "Exécutions de tests par les étudiants",
+    practiceRunsHelp: "Le quota est renouvelé à chaque nouvelle tentative. Une réouverture conserve les exécutions utilisées. La valeur 0 masque la zone de tests. Les tests visibles et personnalisés comptent ; la remise finale et la validation enseignante ne comptent pas.",
+    practiceRunLimitMode: "Quota d’exécutions de tests",
+    unlimitedTestRuns: "Illimité",
+    limitedTestRuns: "Limité",
+    maxTestRuns: "Nombre maximal d’exécutions par tentative",
+    practiceRunsRemaining: "{remaining} exécution(s) restante(s) sur {total}",
+    loadingPracticeRuns: "Chargement du quota de tests…",
+    loadPracticeRunsError: "Impossible de charger le quota de tests.",
+    retryPracticeRuns: "Réessayer de charger le quota",
+    confirmTestRunTitle: "Exécuter ce test ?",
+    confirmTestRunMessage: "Il vous reste {remaining} exécution(s). Ce test en utilisera une ; il en restera {after}. Continuer ?",
     answerFormat: "Format de réponse",
     writeCode: "Écrire du code",
     fillCodeBlanks: "Compléter les blancs du code",
@@ -672,6 +724,23 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     noTestDetails: "Aucun détail de test n’est disponible pour cette tentative."
   },
   zh: {
+    gradingGeneralTab: "常规",
+    enableRubricGrading: "启用评分",
+    enableTests: "启用测试",
+    defaultCriterionTitle: "正确性与方法",
+    defaultCriterionDescription: "评估所提交方法的正确性、清晰度和适用性。",
+    practiceRunsTitle: "学生测试运行",
+    practiceRunsHelp: "每次新尝试会重置额度，重新开放同一次尝试则保留已用次数。设为 0 会隐藏运行区域。示例和自定义测试计入额度，最终提交和教师验证不计入。",
+    practiceRunLimitMode: "测试运行额度",
+    unlimitedTestRuns: "不限次数",
+    limitedTestRuns: "限制次数",
+    maxTestRuns: "每次尝试最多运行次数",
+    practiceRunsRemaining: "剩余 {remaining} / {total} 次测试运行",
+    loadingPracticeRuns: "正在加载测试额度…",
+    loadPracticeRunsError: "无法加载测试运行额度。",
+    retryPracticeRuns: "重新加载测试额度",
+    confirmTestRunTitle: "运行此测试？",
+    confirmTestRunMessage: "您还可运行 {remaining} 次测试。本次运行将使用一次，之后剩余 {after} 次。是否继续？",
     answerFormat: "作答方式",
     writeCode: "编写代码",
     fillCodeBlanks: "代码填空",

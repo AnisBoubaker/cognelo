@@ -6,7 +6,8 @@ export const getCodingExerciseGradeCompletions: PluginGradeCompletionHandler = a
   const requiresRubric = privateConfig.aiFeedback.gradingEnabled;
 
   return Object.fromEntries(rows.map((row) => {
-    const requiredComponentCount = requiresRubric ? 2 : 1;
+    const testsContribute = !requiresRubric || (privateConfig.aiFeedback.testsEnabled !== false && privateConfig.aiFeedback.testWeightPercent !== 0);
+    const requiredComponentCount = (requiresRubric ? 1 : 0) + (testsContribute ? 1 : 0);
     const rubricScore = numberValue(row.gradingResult.aiScore)
       ?? numberValue(asRecord(row.gradingResult.studentFeedback).aiScore)
       ?? numberValue(row.feedback?.aiScore);
@@ -14,7 +15,7 @@ export const getCodingExerciseGradeCompletions: PluginGradeCompletionHandler = a
 
     return [row.participantId, {
       status: isComplete ? "complete" : "partial",
-      completedComponentCount: isComplete ? requiredComponentCount : 1,
+      completedComponentCount: isComplete ? requiredComponentCount : testsContribute ? 1 : 0,
       requiredComponentCount
     }];
   }));

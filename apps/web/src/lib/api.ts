@@ -1,3 +1,4 @@
+import type { CodingPracticeRunAllowance } from "@cognelo/plugin-coding-exercises";
 import type { GradebookActionDefinition } from "@cognelo/activity-sdk";
 import type { ActivityLogCursor, ActivityLogPage, ActivityStudentActionList, ActivityBatchActionList } from "@cognelo/contracts";
 import type { WorkInspection, WorkInspectionFile } from "@cognelo/contracts";
@@ -1064,6 +1065,7 @@ export type CodingExerciseReferenceSolution = {
     aiFeedback: {
       enabled: boolean;
       gradingEnabled: boolean;
+      testsEnabled?: boolean;
       instructions: string;
       testWeightPercent: number;
       aiWeightPercent: number;
@@ -2483,19 +2485,19 @@ export const api = {
       compareOutput?: boolean;
     }
   ) =>
-    request<{ execution: CodingExerciseExecution }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/run`, {
+    request<{ execution: CodingExerciseExecution; practiceRuns?: CodingPracticeRunAllowance }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/run`, {
       method: "POST",
       body: JSON.stringify(input)
     }),
   codingExerciseRuns: (courseId: string, activityId: string) =>
-    request<{ executions: CodingExerciseExecution[] }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/run`),
+    request<{ executions: CodingExerciseExecution[]; practiceRuns?: CodingPracticeRunAllowance }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/run`),
   submitCodingExercise: (courseId: string, activityId: string, input: CodingExerciseResponseInput) =>
     request<CodingExerciseSubmitResponse>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`, {
       method: "POST",
       body: JSON.stringify(input)
     }),
   codingExerciseSubmissions: (courseId: string, activityId: string) =>
-    request<{ executions: CodingExerciseExecution[] }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`),
+    request<{ executions: CodingExerciseExecution[]; practiceRuns?: CodingPracticeRunAllowance }>(`/courses/${courseId}/activities/${activityId}/coding-exercises/submit`),
   codingExerciseHistory: (courseId: string, activityId: string) =>
     request<{ currentRuns: CodingExerciseExecution[]; attempts: CodingExerciseAttemptHistory[]; availability: CodingExerciseAttemptAvailability }>(
       `/courses/${courseId}/activities/${activityId}/coding-exercises/history`
@@ -3031,7 +3033,7 @@ export const api = {
       compareOutput?: boolean;
     }
   ) =>
-    request<{ execution: CodingExerciseExecution }>(
+    request<{ execution: CodingExerciseExecution; practiceRuns?: CodingPracticeRunAllowance }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/run`,
       {
         method: "POST",
@@ -3039,7 +3041,7 @@ export const api = {
       }
     ),
   groupCodingExerciseRuns: (courseId: string, groupId: string, activityId: string) =>
-    request<{ executions: CodingExerciseExecution[] }>(
+    request<{ executions: CodingExerciseExecution[]; practiceRuns?: CodingPracticeRunAllowance }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/run`
     ),
   submitGroupCodingExercise: (courseId: string, groupId: string, activityId: string, input: CodingExerciseResponseInput) =>
@@ -3056,7 +3058,7 @@ export const api = {
       { method: "POST", body: JSON.stringify({ answers }) }
     ),
   groupCodingExerciseSubmissions: (courseId: string, groupId: string, activityId: string) =>
-    request<{ executions: CodingExerciseExecution[] }>(
+    request<{ executions: CodingExerciseExecution[]; practiceRuns?: CodingPracticeRunAllowance }>(
       `/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/coding-exercises/submit`
     ),
   groupCodingExerciseHistory: (courseId: string, groupId: string, activityId: string) =>

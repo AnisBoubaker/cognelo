@@ -50,6 +50,13 @@ for (const scope of ["course", "bank"] as const) {
     });
     async function openGeneration() {
       await page.getByRole("tab", { name: "Grading", exact: true }).click();
+      const rubric = page.getByRole("tab", { name: "Rubric", exact: true });
+      if (!await rubric.isVisible()) {
+        await page.getByRole("tab", { name: "General", exact: true }).click();
+        await page.getByRole("switch", { name: "Enable grading", exact: true }).check();
+        await rubric.click();
+        if (!originalCriteria.length) await page.getByRole("button", { name: "Remove criterion", exact: true }).click();
+      } else await rubric.click();
       await page.getByRole("button", { name: "Generate rubric automatically", exact: true }).click();
     }
     const dialog = page.getByRole("dialog", { name: "Generate rubric automatically", exact: true });

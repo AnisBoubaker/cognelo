@@ -238,7 +238,7 @@ describe("coding exercise executions", () => {
 
   it("assembles blanks on the server for persisted and stateless execution", async () => {
     const blankTemplate = "print({{ BLANK:value }})";
-    const config = { ...activityConfig, responseMode: "blanks", blankTemplate };
+    const config = { ...activityConfig, responseMode: "blanks", blankTemplate, maxTestRuns: null };
     const input = { sourceCode: "print('forged')", blankTemplate, blankAnswers: { value: "2" } };
     judge0Mocks.runJudge0Submission.mockResolvedValue({ token: "blank-run", stdout: "2", status: { id: 3, description: "Accepted" } });
     const params = { activityId: "activity-1", userId: "student-1", activityConfig: config, input };
@@ -256,6 +256,20 @@ describe("coding exercise executions", () => {
     expect(preview.sourceCode).toBe("print(2)");
     expect(dbMocks.prisma.pluginCodingExerciseExecution.create).toHaveBeenCalledTimes(writes);
     await expect(runCodingExercise({ ...params, input: { ...input, blankTemplate: "old" } })).rejects.toMatchObject({ code: "CODING_EXERCISE_BLANK_RESPONSE_INVALID" });
+  });
+
+  it("skips test execution and test-evaluation rows when tests are disabled for a regrade", async () => {
+    dbMocks.prisma.pluginCodingExerciseReferenceSolution.findUnique.mockImplementationOnce(async () => ({
+      sourceCode: "print(1)", privateConfig: { templateSource: "{{ STUDENT_CODE }}", aiFeedback: {
+        enabled: false, gradingEnabled: true, testsEnabled: false, testWeightPercent: 0, aiWeightPercent: 100,
+        criteria: [{ id: "quality", title: "Quality", description: "Assess the code.", weightPercent: 100 }]
+      } }, validationSummary: { accepted: true }, createdAt: new Date(), updatedAt: new Date()
+    }));
+    await expect(regradeCodingExerciseTests({ activityId: "activity-1", executionId: "execution-1", actorUserId: "teacher", activityConfig }))
+      .resolves.toMatchObject({ testEvaluationId: null, resultSummary: { totalWeight: 0, testsEnabled: false } });
+    expect(judge0Mocks.resolveJudge0Language).not.toHaveBeenCalled();
+    expect(judge0Mocks.runJudge0Submission).not.toHaveBeenCalled();
+    expect(dbMocks.prisma.pluginCodingExerciseTestEvaluation.create).not.toHaveBeenCalled();
   });
 
   it("keeps a submission without enabled hidden tests for later grading", async () => {

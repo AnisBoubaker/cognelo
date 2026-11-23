@@ -32,6 +32,8 @@ export const codingExerciseConfigSchema = z.object({
   language: z.string().max(80).default(""),
   executionMode: codingExerciseExecutionModeSchema.default("template"),
   responseMode: z.enum(["code", "blanks"]).optional(),
+  maxTestRuns: z.number().int().min(0).max(100000).nullable().optional(),
+  testsEnabled: z.boolean().optional(),
   blankTemplate: z.string().max(40000).refine(value => {
     try { parseCodingBlankTemplate(value); return true; } catch { return false; }
   }, "Use unique {{ BLANK:id }} markers (at most 50).").optional(),
@@ -44,6 +46,7 @@ export const codingExerciseConfigSchema = z.object({
 export type CodingExerciseConfig = z.infer<typeof codingExerciseConfigSchema>;
 export type CodingExerciseSampleTest = z.infer<typeof sampleTestSchema>;
 export type CodingExerciseExecutionMode = z.infer<typeof codingExerciseExecutionModeSchema>;
+export type CodingPracticeRunAllowance = { limit: number | null; used: number; remaining: number | null };
 
 export const codingExerciseHiddenTestSchema = z.object({
   id: z.string().min(1).max(80),
@@ -66,6 +69,7 @@ export const codingExerciseAiRubricCriterionSchema = z.object({
 export const codingExerciseAiFeedbackConfigSchema = z.object({
   enabled: z.boolean().default(false),
   gradingEnabled: z.boolean().default(false),
+  testsEnabled: z.boolean().optional(),
   instructions: z.string().trim().max(8000).default(""),
   testWeightPercent: z.number().int().min(0).max(100).default(60),
   aiWeightPercent: z.number().int().min(0).max(100).default(40),
@@ -90,7 +94,19 @@ export const codingExerciseAiFeedbackConfigSchema = z.object({
   if (value.gradingEnabled && value.aiWeightPercent === 0) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["aiWeightPercent"], message: "The rubric grading weight must be greater than zero." });
   }
+  if (value.testsEnabled === true && !value.gradingEnabled && (value.testWeightPercent !== 100 || value.aiWeightPercent !== 0)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["testWeightPercent"], message: "With rubric grading disabled, the test weight must be 100%." });
+  }
+  if (value.testsEnabled === false) {
+    if (!value.gradingEnabled) context.addIssue({ code: z.ZodIssueCode.custom, path: ["testsEnabled"], message: "Enable rubric grading or tests." });
+    if (value.testWeightPercent !== 0 || value.aiWeightPercent !== 100) context.addIssue({ code: z.ZodIssueCode.custom, path: ["testWeightPercent"], message: "With tests disabled, the rubric weight must be 100%." });
+  }
 });
+
+export function getCodingExerciseMaxTestRuns(config: { responseMode?: string; maxTestRuns?: number | null; testsEnabled?: boolean }) {
+  if (config.testsEnabled === false) return 0;
+  return config.maxTestRuns === undefined ? config.responseMode === "blanks" ? 0 : null : config.maxTestRuns;
+}
 
 export type CodingExerciseAiRubricCriterion = z.infer<typeof codingExerciseAiRubricCriterionSchema>;
 

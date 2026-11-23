@@ -1,4 +1,6 @@
 import { codingExerciseGradingInstructions } from "./grading-instructions";
+import { getCodingExerciseMaxTestRuns, parseCodingExerciseConfig } from "./coding-exercises";
+import { codingTestPracticeScope, getCodingPracticeRunAllowance, assertCodingPracticeRunsEnabled } from "./practice-runs";
 import { readCodingBlankResponse } from "./code-blanks";
 import { codingExerciseStudentProgress } from "./student-progress";
 import { codingWorkInspection } from "./work-inspection";
@@ -203,14 +205,23 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
       } };
     },
     actions: {
-      run: async ({ activity, payload, user }) => ({
-        execution: await runCodingExercise({
+      practiceRunAllowance: async ({ activity, user, parentAttemptId, testItemId }) => ({
+        practiceRuns: await getCodingPracticeRunAllowance({ activityId: activity.id, userId: user.id,
+          activityConfig: activity.config, scope: codingTestPracticeScope(parentAttemptId, testItemId) })
+      }),
+      run: async ({ activity, payload, user, parentAttemptId, testItemId }) => {
+        assertCodingPracticeRunsEnabled(activity.config);
+        const practiceScope = codingTestPracticeScope(parentAttemptId, testItemId);
+        const execution = await runCodingExercise({
           activityId: activity.id,
           userId: user.id,
           activityConfig: activity.config,
-          input: codingExerciseRunInputSchema.parse(payload)
-        })
-      })
+          input: codingExerciseRunInputSchema.parse(payload), practiceScope
+        });
+        const practiceRuns = await getCodingPracticeRunAllowance({ activityId: activity.id, userId: user.id,
+          activityConfig: activity.config, scope: practiceScope });
+        return { execution, ...(practiceRuns.limit === null ? {} : { practiceRuns }) };
+      }
     },
     submit: async ({ activity, payload, user }) => {
       const input = codingExerciseSubmitInputSchema.parse(payload);
@@ -242,6 +253,10 @@ export const codingExercisesServerPlugin: ServerActivityPlugin = {
   studentPreview: {
     activityTypeKeys: ["coding-exercise"],
     actions: {
+      practiceRunAllowance: async ({ activity }) => {
+        const limit = getCodingExerciseMaxTestRuns(parseCodingExerciseConfig(activity.config));
+        return { executions: [], practiceRuns: { limit, used: 0, remaining: limit } };
+      },
       run: async ({ activity, payload, user }) => ({
         execution: await runCodingExercisePreview({
           activityId: activity.id,

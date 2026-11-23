@@ -1,8 +1,10 @@
 import { AppError } from "@cognelo/core";
 import { z } from "zod";
+import { assertCodingPracticeRunsEnabled, createCodingPracticeRun } from "./practice-runs";
 import { codingBlankAnswersSchema, readCodingBlankResponse, resolveCodingBlankInput } from "./code-blanks";
 import {
   buildCodingExerciseSource,
+  getCodingExerciseMaxTestRuns,
   codingExerciseOutputMatchModeSchema,
   parseCodingExerciseConfig,
   parseCodingExercisePrivateConfig,
@@ -188,15 +190,18 @@ export async function runCodingExercise(params: {
   userId: string;
   activityConfig: unknown;
   input: CodingExerciseRunInput;
+  practiceScope?: string;
 }) {
   const config = parseCodingExerciseConfig(params.activityConfig);
   const input = resolveExecutionInput(config, codingExerciseRunInputSchema.parse(params.input));
   if (!input.sourceCode.trim()) throw new AppError(400, "CODING_EXERCISE_ANSWER_REQUIRED", "Enter code before running.");
+  assertCodingPracticeRunsEnabled(config);
   const outputMatcher = toOutputMatcher(input);
   if (input.compareOutput) {
     assertValidOutputMatcher(input.expectedOutput, outputMatcher);
   }
   const privateConfig = await getCodingExercisePrivateConfig({ activityId: params.activityId });
+  if (privateConfig.aiFeedback.testsEnabled === false) throw new AppError(403, "CODING_EXERCISE_RUN_DISABLED", "Tests are disabled for this exercise.");
   const runtime = await resolveJudge0Language(config.language);
   const sourceCode = buildCodingExerciseSource({
     config,
@@ -205,25 +210,24 @@ export async function runCodingExercise(params: {
     testCode: input.compareOutput ? input.testCode : ""
   });
 
-  const pendingExecution = await codingExerciseExecutionClient.pluginCodingExerciseExecution.create({
-    data: {
-      activityId: params.activityId,
-      userId: params.userId,
-      kind: "run",
-      status: "pending",
-      languageKey: runtime.languageKey,
-      judge0LanguageId: runtime.languageId,
-      sourceCode: input.sourceCode,
-      stdin: input.stdin,
-      expectedOutput: input.expectedOutput,
-      resultSummary: {
-        ...blankExecutionSnapshot(input),
-        judge0LanguageName: runtime.languageName,
-        executionMode: config.executionMode,
-        phase: "pending"
-      } as Prisma.InputJsonValue
-    }
-  });
+  const pendingExecution = await createCodingPracticeRun({
+    activityId: params.activityId,
+    userId: params.userId,
+    kind: "run",
+    status: "pending",
+    languageKey: runtime.languageKey,
+    judge0LanguageId: runtime.languageId,
+    sourceCode: input.sourceCode,
+    stdin: input.stdin,
+    expectedOutput: input.expectedOutput,
+    resultSummary: {
+      ...(params.practiceScope ? { practiceRunScope: params.practiceScope } : {}),
+      ...blankExecutionSnapshot(input),
+      judge0LanguageName: runtime.languageName,
+      executionMode: config.executionMode,
+      phase: "pending"
+    } as Prisma.InputJsonValue
+  }, getCodingExerciseMaxTestRuns(config), params.practiceScope);
 
   try {
     const result = await runJudge0Submission({
@@ -254,6 +258,7 @@ export async function runCodingExercise(params: {
         judge0StatusId: result.status?.id,
         judge0StatusLabel: result.status?.description,
         resultSummary: {
+          ...(params.practiceScope ? { practiceRunScope: params.practiceScope } : {}),
           ...blankExecutionSnapshot(input),
           judge0LanguageName: runtime.languageName,
           accepted: comparison.matched,
@@ -275,6 +280,7 @@ export async function runCodingExercise(params: {
       data: {
         status: "failed",
         resultSummary: {
+          ...(params.practiceScope ? { practiceRunScope: params.practiceScope } : {}),
           phase: "failed-before-result",
           outputCompared: input.compareOutput
         } as Prisma.InputJsonValue,
@@ -299,12 +305,14 @@ export async function runCodingExercisePreview(params: {
   const config = parseCodingExerciseConfig(params.activityConfig);
   const input = resolveExecutionInput(config, codingExerciseRunInputSchema.parse(params.input));
   if (!input.sourceCode.trim()) throw new AppError(400, "CODING_EXERCISE_ANSWER_REQUIRED", "Enter code before running.");
+  assertCodingPracticeRunsEnabled(config);
   const outputMatcher = toOutputMatcher(input);
   if (input.compareOutput) assertValidOutputMatcher(input.expectedOutput, outputMatcher);
   const [privateConfig, runtime] = await Promise.all([
     getCodingExercisePrivateConfig({ activityId: params.activityId }),
     resolveJudge0Language(config.language)
   ]);
+  if (privateConfig.aiFeedback.testsEnabled === false) throw new AppError(403, "CODING_EXERCISE_RUN_DISABLED", "Tests are disabled for this exercise.");
   const sourceCode = buildCodingExerciseSource({
     config,
     privateConfig,
@@ -460,8 +468,9 @@ export async function submitCodingExercise(params: {
   const config = parseCodingExerciseConfig(params.activityConfig);
   const input = resolveExecutionInput(config, codingExerciseSubmitInputSchema.parse(params.input));
   const privateConfig = await getCodingExercisePrivateConfig({ activityId: params.activityId });
-  const runtime = await resolveJudge0Language(config.language);
-  const hiddenTests = await prisma.pluginCodingExerciseHiddenTest.findMany({
+  const runtime = privateConfig.aiFeedback.testsEnabled === false
+    ? { languageKey: config.language, languageId: 0, languageName: config.language } : await resolveJudge0Language(config.language);
+  const hiddenTests = privateConfig.aiFeedback.testsEnabled === false ? [] : await prisma.pluginCodingExerciseHiddenTest.findMany({
     where: { activityId: params.activityId, isEnabled: true },
     orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }]
   });
@@ -536,10 +545,11 @@ export async function submitCodingExercisePreview(params: {
 }) {
   const config = parseCodingExerciseConfig(params.activityConfig);
   const input = resolveExecutionInput(config, codingExerciseSubmitInputSchema.parse(params.input));
-  const [privateConfig, runtime, hiddenTests] = await Promise.all([
-    getCodingExercisePrivateConfig({ activityId: params.activityId }),
-    resolveJudge0Language(config.language),
-    prisma.pluginCodingExerciseHiddenTest.findMany({
+  const privateConfig = await getCodingExercisePrivateConfig({ activityId: params.activityId });
+  const [runtime, hiddenTests] = await Promise.all([
+    privateConfig.aiFeedback.testsEnabled === false
+      ? Promise.resolve({ languageKey: config.language, languageId: 0, languageName: config.language }) : resolveJudge0Language(config.language),
+    privateConfig.aiFeedback.testsEnabled === false ? Promise.resolve([]) : prisma.pluginCodingExerciseHiddenTest.findMany({
       where: { activityId: params.activityId, isEnabled: true },
       orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }]
     })
@@ -709,6 +719,11 @@ export async function regradeCodingExerciseTests(input: {
   }
   const config = parseCodingExerciseConfig(input.activityConfig);
   const privateConfig = await getCodingExercisePrivateConfig({ activityId: input.activityId });
+  if (privateConfig.aiFeedback.testsEnabled === false) return {
+    testEvaluationId: null,
+    resultSummary: { earnedWeight: 0, totalWeight: 0, testsEnabled: false },
+    feedbackConfig: privateConfig.aiFeedback
+  };
   const runtime = await resolveJudge0Language(config.language);
   const hiddenTests = (await prisma.pluginCodingExerciseHiddenTest.findMany({
     where: { activityId: input.activityId, isEnabled: true },
@@ -780,7 +795,8 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
   allowPartialResults?: boolean;
 }) {
   const config = parseCodingExerciseConfig(params.activityConfig);
-  const sampleTests = params.sampleTests.map((test) => withReferenceValidationFingerprint({
+  const testsEnabled = params.privateConfig.aiFeedback.testsEnabled !== false;
+  const sampleTests = (testsEnabled ? params.sampleTests : []).map((test) => withReferenceValidationFingerprint({
     id: test.id,
     name: test.title.trim() || test.id,
     stdin: test.input,
@@ -790,7 +806,7 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
     containsLinesOrderMatters: test.containsLinesOrderMatters,
     weight: 1
   }, config, params.privateConfig, params.sourceCode));
-  const enabledHiddenTests = params.hiddenTests
+  const enabledHiddenTests = (testsEnabled ? params.hiddenTests : [])
     .filter((test) => test.isEnabled)
     .map((test) => withReferenceValidationFingerprint({
       id: test.id,
@@ -1138,7 +1154,7 @@ function toCodingExerciseExecutionRecord(execution: CodingExerciseExecutionRow) 
   const compileOutput = capExecutionText(execution.compileOutput);
   const message = capExecutionText(execution.message, MAX_EXECUTION_MESSAGE_BYTES);
   const summary = capExecutionResultSummary(normalizeResultSummary(execution.resultSummary));
-  const resultSummary = summary.value as Record<string, unknown>;
+  const { practiceRunScope: _scope, ...resultSummary } = summary.value as Record<string, unknown>;
   return {
     id: execution.id,
     activityId: execution.activityId,

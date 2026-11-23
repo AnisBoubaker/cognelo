@@ -1,4 +1,5 @@
 import type { CurrentUser } from "@cognelo/contracts";
+import { randomUUID } from "node:crypto";
 import type { PluginGradingDeferredResult, PluginGradingResult, ServerActivityRecord } from "@cognelo/activity-sdk/server";
 import { AppError, getTeacherAttemptAiFeedbackReview, hashAiFeedbackValue, recordAiFeedbackResearchEvent } from "@cognelo/core";
 import { regradeCodingExerciseTests } from "./executions";
@@ -32,10 +33,10 @@ export async function regradeCodingExerciseAttempt(input: {
   const resultSummary = asRecord(testRun.resultSummary);
   const earnedWeight = percentWeight(resultSummary.earnedWeight);
   const totalWeight = percentWeight(resultSummary.totalWeight);
-  if (earnedWeight === null || totalWeight === null || totalWeight <= 0) {
+  if (earnedWeight === null || totalWeight === null || (totalWeight <= 0 && testRun.feedbackConfig.testsEnabled !== false)) {
     throw new AppError(409, "CODING_EXERCISE_RESULT_INVALID", "The regraded test result does not contain a valid weighted score.");
   }
-  const deterministicScore = Math.max(0, Math.min(100, earnedWeight / totalWeight * 100));
+  const deterministicScore = totalWeight > 0 ? Math.max(0, Math.min(100, earnedWeight / totalWeight * 100)) : null;
   const [review, latestEvaluation] = await Promise.all([
     input.feedback !== undefined
       ? Promise.resolve({ feedback: input.feedback })
@@ -51,7 +52,7 @@ export async function regradeCodingExerciseAttempt(input: {
   const hasRubric = policy.gradingEnabled;
 
   await recordAiFeedbackResearchEvent({
-    eventType: "coding_tests_regraded",
+    eventType: policy.testsEnabled === false ? "coding_grade_recomposed" : "coding_tests_regraded",
     courseId: input.courseId,
     groupId: input.groupId,
     activityId: input.activityId,
@@ -66,6 +67,7 @@ export async function regradeCodingExerciseAttempt(input: {
       testEvaluationId: testRun.testEvaluationId,
       deterministicScore,
       rubricScore,
+      testsEnabled: policy.testsEnabled !== false,
       testWeightPercent: hasRubric ? policy.testWeightPercent : 100,
       rubricWeightPercent: hasRubric ? policy.aiWeightPercent : 0
     }
@@ -74,22 +76,24 @@ export async function regradeCodingExerciseAttempt(input: {
   if (hasRubric && rubricScore === null) {
     return {
       deferred: true,
-      reason: "Tests were regraded, but a rubric score is required before the final grade can be recalculated.",
+      reason: policy.testsEnabled === false ? "Tests are disabled; rubric grading is required before the grade can be calculated."
+        : "Tests were regraded, but a rubric score is required before the final grade can be recalculated.",
       metadata: { testEvaluationId: testRun.testEvaluationId, deterministicScore }
     };
   }
 
   const combinedScore = hasRubric
-    ? deterministicScore * policy.testWeightPercent / 100 + (rubricScore ?? 0) * policy.aiWeightPercent / 100
-    : deterministicScore;
+    ? (deterministicScore ?? 0) * policy.testWeightPercent / 100 + (rubricScore ?? 0) * policy.aiWeightPercent / 100
+    : deterministicScore ?? 0;
   const priorFeedbackRef = typeof feedback.feedbackRef === "string" ? feedback.feedbackRef : latestEvaluation?.id ?? null;
+  const feedbackRef = testRun.testEvaluationId ? `test-regrade:${testRun.testEvaluationId}` : `rubric-recompose:${randomUUID()}`;
   const { feedbackHash: _previousFeedbackHash, ...feedbackWithoutHash } = feedback;
   const updatedFeedback = Object.keys(feedback).length
     ? {
         ...feedbackWithoutHash,
         sourceFeedbackRef: priorFeedbackRef,
         sourceFeedbackVersion: typeof feedback.feedbackVersion === "number" ? feedback.feedbackVersion : latestEvaluation?.version ?? null,
-        feedbackRef: `test-regrade:${testRun.testEvaluationId}`,
+        feedbackRef,
         feedbackVersion: 1,
         deterministicScore,
         ...(rubricScore !== null ? { aiScore: rubricScore } : {}),

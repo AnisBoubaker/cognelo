@@ -64,7 +64,7 @@ for (const expired of [false, true]) {
     await expect(page.getByRole("checkbox", { name: `Select all learning targets for ${conceptTitle}`, exact: true })).toBeChecked();
 
     await page.getByRole("tab", { name: "Grading", exact: true }).click();
-    await expect(page.getByRole("tab", { name: "Rubric", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "General", exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Test cases", exact: true }).click();
     await expect(page.getByRole("tab", { name: "Test cases", exact: true })).toHaveAttribute("aria-selected", "true");
     await page.screenshot({ path: testInfo.outputPath("teacher-grading-tab.png") });

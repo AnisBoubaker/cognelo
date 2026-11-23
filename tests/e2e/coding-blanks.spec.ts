@@ -18,7 +18,7 @@ test("authors blanks and accepts equivalent completions with protected code, aut
   const teacher = await createAuthenticatedApi("teacher"), student = await createAuthenticatedApi("student");
   try {
     const title = `Code blanks ${data.token}`;
-    const activityId = await createCourseActivity(data, { activityTypeKey: "coding-exercise", title, config: { language: "python", prompt: config.prompt, starterCode: "print('old starter')" } });
+    const activityId = await createCourseActivity(data, { activityTypeKey: "coding-exercise", title, config: { language: "python", prompt: config.prompt, starterCode: "print('old starter')", maxTestRuns: null } });
     const authorPath = `/api/courses/${data.courseId}/activities/${activityId}`;
     await teacherPage.goto(authorPath.replace("/api", ""));
     await teacherPage.getByLabel("Answer format", { exact: true }).selectOption("blanks");
