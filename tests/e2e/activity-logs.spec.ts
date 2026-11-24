@@ -33,6 +33,9 @@ test("shared logs show lifecycle and grading events, page tied timestamps, and p
     await expect(teacher.locator(".activity-log-entry")).toHaveCount(50);
     await teacher.getByRole("button", { name: "Load older events", exact: true }).click();
     await expect(teacher.locator(".activity-log-entry").filter({ hasText: "Submission completed" })).toHaveCount(1);
+    // The menu closes on outside scroll; finish scrolling back to its trigger before opening it.
+    await teacher.getByRole("button", { name: "Activity actions", exact: true }).scrollIntoViewIfNeeded();
+    await teacher.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     await openActivityReportActions(teacher);
     await teacher.getByRole("menuitem", { name: "Edit activity", exact: true }).click();
     await expect(teacher).toHaveURL(/report=logs/);

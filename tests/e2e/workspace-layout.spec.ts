@@ -23,7 +23,7 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
       { path: `/courses/${data.courseId}?tab=participants`, title: `${data.subjectTitle} - ${data.courseTitle}`, button: "Add course staff", screenshot: "course-staff" },
       { path: data.editorPath, title: data.title, link: "Back to course", screenshot: "editor" },
       { path: `/activity-banks/${data.activityBankId}/activities/${data.bankActivityId}`, title: data.title, link: "Back to bank" },
-      { path: `/courses/${data.courseId}/gradebook/activities/${data.activityId}`, title: data.title, button: "Export grades", screenshot: "results" },
+      { path: `/courses/${data.courseId}/gradebook/activities/${data.activityId}`, title: data.title, button: "Activity actions", exportMenu: true, screenshot: "results" },
       { path: `/courses/${data.courseId}/gradebook/activities/${data.activityId}/manual`, title: data.title, link: "Detailed results" },
       { path: `/courses/${data.courseId}/groups/${data.groupId}/student-view`, title: data.subjectTitle },
       { path: `/courses/${data.courseId}/groups/${data.groupId}/student-view/activities/${data.activityId}`, title: data.title, link: "Back to course" }
@@ -33,6 +33,11 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
         await page.goto(target.path);
         await expect(page.getByRole("heading", { name: target.title, level: 1, exact: true })).toBeVisible();
         if (target.button) await expect(page.getByRole("button", { name: target.button, exact: true })).toBeVisible();
+        if (target.exportMenu) {
+          await page.getByRole("button", { name: "Activity actions", exact: true }).click();
+          await expect(page.getByRole("menuitem", { name: "Export grades", exact: true })).toBeVisible();
+          await page.keyboard.press("Escape");
+        }
         if (target.link) await expect(page.getByRole("link", { name: target.link, exact: true })).toBeVisible();
         if (target.path.includes("/student-view")) await expect(page.getByText("Published", { exact: true })).toHaveCount(0);
         if (target.path.endsWith("/student-view")) await expectStudentSectionHeading(page, data);

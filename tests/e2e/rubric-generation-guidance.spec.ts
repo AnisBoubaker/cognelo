@@ -50,6 +50,7 @@ for (const scope of ["course", "bank"] as const) {
     });
     async function openGeneration() {
       await page.getByRole("tab", { name: "Grading", exact: true }).click();
+      await expect(page.getByRole("tab", { name: "General", exact: true })).toBeVisible();
       const rubric = page.getByRole("tab", { name: "Rubric", exact: true });
       if (!await rubric.isVisible()) {
         await page.getByRole("tab", { name: "General", exact: true }).click();

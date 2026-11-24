@@ -12,7 +12,7 @@ test("Programming Homework keeps core top tabs and shared left sections, rich te
   await responseJson(await api.post(`${base}/assignment-pdf`, { data: { fileName: "assignment.pdf", mimeType: "application/pdf", base64: textPdf("Implement a C function.").toString("base64") } }));
   await page.goto(`/courses/${data.courseId}/activities/${id}`);
   const top = page.getByRole("tablist", { name: "Activity editor", exact: true }), left = page.getByRole("tablist", { name: "Programming Homework settings", exact: true });
-  await expect(top.getByRole("tab")).toHaveText(["Activity", "Concepts", "Reference materials"]);
+  await expect(top.getByRole("tab")).toHaveText(["Activity", "Concepts", "Reference materials", "Grading"]);
   await expect(left.getByRole("tab")).toHaveText(["Activity", "Teacher solution", "Submission requirements", "Question Generation", "Submission settings", "Simulation"]);
   await expect(page.getByRole("heading", { name: "Student submissions", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Preview", exact: true })).toHaveCount(0);
