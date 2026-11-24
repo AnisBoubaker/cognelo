@@ -12,7 +12,7 @@ Teacher contextual-help triggers use the compact shared circled-question-mark co
 
 Every teacher activity report uses one three-dot **Activity actions** menu for editing, settings, messaging, exports/downloads, class-wide grading and activity-contributed batch operations. The context-sensitive Back link stays visible beside the menu. Class overview, Student results and Logs share the same menu; capability, assessment-mode, role, section, busy and disabled guards stay with the existing handlers. Unsupported operations are omitted.
 
-The host menu uses the shared portaled ContextMenu, with viewport bounds, scrollable overflow and wrapping labels on narrow screens. Arrow keys, Home/End and Tab navigate enabled items, Escape restores trigger focus, and selecting an entry closes the menu before opening its dialog or navigating. Internal menu scrolling must not dismiss it. Destructive entries retain red styling and their existing confirmation/reason flow. Unread message counts remain visible on the trigger and in the existing alert banner.
+The host menu uses the shared portaled ContextMenu, with viewport bounds, scrollable overflow and wrapping labels on narrow screens. Arrow keys, Home/End and Tab navigate enabled items, Escape restores trigger focus, and selecting an entry closes the menu before opening its dialog or navigating. Internal menu scrolling must not dismiss it. Scrolling outside the menu after it opens dismisses it; a delayed event from scrolling that was already complete when it opened does not. Destructive entries retain red styling and their existing confirmation/reason flow. Unread message counts remain visible on the trigger and in the existing alert banner.
 
 ## Shared edit bars
 

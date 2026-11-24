@@ -65,6 +65,15 @@ export function ContextMenu({
 
   useLayoutEffect(() => {
     if (!open) return;
+    // Scroll events can be delivered after a click has opened the menu, even
+    // though the scrolling itself finished before the menu was positioned.
+    // Remember current offsets so that only subsequent movement dismisses it.
+    const scrollOffsets = new WeakMap<Element, { left: number; top: number }>();
+    function rememberScroll(element: Element | null) {
+      if (element) scrollOffsets.set(element, { left: element.scrollLeft, top: element.scrollTop });
+    }
+    for (let element: Element | null = anchor ?? null; element; element = element.parentElement) rememberScroll(element);
+    rememberScroll(document.scrollingElement);
     function handlePointerDown(event: PointerEvent) {
       if (!menuRef.current?.contains(event.target as Node) && !anchor?.contains(event.target as Node)) onClose();
     }
@@ -73,6 +82,11 @@ export function ContextMenu({
     }
     function handleScroll(event: Event) {
       if (event.target instanceof Node && menuRef.current?.contains(event.target)) return;
+      const element = event.target === document || event.target === window ? document.scrollingElement : event.target;
+      if (element instanceof Element) {
+        const previous = scrollOffsets.get(element);
+        if (previous && previous.left === element.scrollLeft && previous.top === element.scrollTop) return;
+      }
       onClose();
     }
     document.addEventListener("pointerdown", handlePointerDown);

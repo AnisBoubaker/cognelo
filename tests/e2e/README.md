@@ -30,7 +30,7 @@ Mocked HTTP 5xx recovery checks use `SYS-001` and verify that raw diagnostics st
 
 `activity-logs.spec.ts` checks shared core and pre-attempt Homework history, tied-timestamp pagination, private-field exclusion, section-staff boundaries, Logs editor return links, desktop/mobile layout, cancellation/reset reason prompts and stale-target rejection. `homework-workflow.spec.ts` cancels completed work from the student row menu.
 
-The log navigation scenario lets the page finish scrolling to the Activity actions trigger before opening its menu, which intentionally dismisses on outside scroll. Workspace layout checks the report export inside that same menu. Rubric guidance waits for private authoring to load before deciding whether grading needs enabling.
+The log navigation scenario checks that a delayed scroll event does not close a newly opened Activity actions menu, while subsequent outside scrolling does. Workspace layout checks the report export inside that same menu. Rubric guidance waits for private authoring to load before deciding whether grading needs enabling.
 
 `activity-student-progress.spec.ts` covers both Content/Gradebook entry points, a dedicated desktop Progress column, live untimed participation and Done, narrow layouts, Homework preparation/frozen hand-in/cancellation/file-only completion before grading, and private Parsons edits after formative checks. `submission-stage-activation.spec.ts` also checks question-answering and completed progress against real staged homework. Progress reads create no academic attempts.
 
