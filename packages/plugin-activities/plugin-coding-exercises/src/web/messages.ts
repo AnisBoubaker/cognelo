@@ -2,6 +2,7 @@ export type CodingExercisesLocale = "en" | "fr" | "zh" | "ar";
 type CodingExercisesMessageLocale = Exclude<CodingExercisesLocale, "ar">;
 
 type MessageKey =
+  | "fileEditorSections" | "placeStudentCode" | "placeTestCode"
   | "loadingFiles" | "retryFiles"
   | "sourceFiles" | "fileName" | "addFile" | "renameFile" | "removeFile" | "invalidFileName" | "removeFileConfirm" | "projectSolutionManual"
   | "resizeCodeBlank"
@@ -113,6 +114,7 @@ type MessageKey =
   | "templateVisibleLine"
   | "lastValidationSummary"
   | "editorTimeLimit"
+  | "editorTimeLimitHelp"
   | "gradingTitle"
   | "gradingHelp"
   | "gradingSections"
@@ -276,7 +278,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     blankReviewedGradeTitle: "Teacher-reviewed grade",
     blankReviewedGradeMessage: "The complete program and individual blank checks disagreed. Your teacher determined the final grade.",
     gradingGeneralTab: "General",
-    enableRubricGrading: "Enable grading",
+    enableRubricGrading: "Enable rubric",
     enableTests: "Enable tests",
     defaultCriterionTitle: "Correctness and approach",
     defaultCriterionDescription: "Evaluate the correctness, clarity, and suitability of the submitted approach.",
@@ -365,14 +367,18 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     starterCode: "Starter code",
     referenceSolution: "Reference solution",
     referenceSolutionHelp: "Teacher-only answer key. Hidden tests are validated against this code before they are saved.",
+    fileEditorSections: "File editor",
+    placeStudentCode: "Place student code here",
+    placeTestCode: "Place test code here",
     templateSource: "Template",
-    templateSourceHelp: "Write the full scaffold here. Place {{ STUDENT_CODE }} where the student answer should be inserted, and optionally place {{ TEST_CODE }} where per-test harness code should run.",
+    templateSourceHelp: "Edit the template for the selected file. Place {{ STUDENT_CODE }} where this file's answer belongs, and {{ TEST_CODE }} where test code belongs. Use the buttons at the cursor to move an insertion point. Put markers on their own lines. A multi-file template without {{ STUDENT_CODE }} uses only its fixed/test code; that file is read-only for students. Place {{ TEST_CODE }} only once across the files.",
     templateSourceMissingMarker: "The template must include {{ STUDENT_CODE }}.",
     templateTestCodeMissingMarker: "Add {{ TEST_CODE }} to the template before saving tests that include Test code.",
     templateVisibleLinesHelp: "Click the gutter markers to choose which scaffold lines stay visible and read-only for students. Unselected blocks are replaced with a hidden-code placeholder.",
     templateVisibleLine: "Toggle student-visible line {line}",
     lastValidationSummary: "Last validation: {passedCount}/{testCount} tests passed.",
-    editorTimeLimit: "Editor time limit (seconds)",
+    editorTimeLimit: "Program execution limit (CPU seconds)",
+    editorTimeLimitHelp: "CPU time allowed for each program run or test (1–5 seconds). Student working time is configured in Activity settings.",
     gradingTitle: "Grading",
     gradingHelp: "Configure deterministic tests and an optional rubric. Teachers can complete and edit rubric feedback even when automatic feedback is off.",
     gradingSections: "Grading sections",
@@ -533,7 +539,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     blankReviewedGradeTitle: "Note vérifiée par l’enseignant",
     blankReviewedGradeMessage: "Les résultats du programme complet et des blancs vérifiés séparément ne concordaient pas. Votre enseignant a déterminé la note finale.",
     gradingGeneralTab: "Général",
-    enableRubricGrading: "Activer la notation",
+    enableRubricGrading: "Activer la grille",
     enableTests: "Activer les tests",
     defaultCriterionTitle: "Justesse et démarche",
     defaultCriterionDescription: "Évaluez la justesse, la clarté et la pertinence de la démarche soumise.",
@@ -622,14 +628,18 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     starterCode: "Code de départ",
     referenceSolution: "Solution de référence",
     referenceSolutionHelp: "Corrigé réservé à l'enseignant. Les tests cachés sont validés avec ce code avant l'enregistrement.",
+    fileEditorSections: "Éditeur de fichier",
+    placeStudentCode: "Placer le code étudiant ici",
+    placeTestCode: "Placer le code de test ici",
     templateSource: "Gabarit",
-    templateSourceHelp: "Écrivez ici tout le gabarit. Placez {{ STUDENT_CODE }} là où la réponse étudiante doit être insérée et, au besoin, {{ TEST_CODE }} là où le code de harnais propre au test doit s’exécuter.",
+    templateSourceHelp: "Modifiez le gabarit du fichier sélectionné. Placez {{ STUDENT_CODE }} à l’emplacement de sa réponse et {{ TEST_CODE }} à celui du code de test. Les boutons déplacent le point d’insertion au curseur. Placez les marqueurs sur leurs propres lignes. Dans un projet, un gabarit sans {{ STUDENT_CODE }} utilise seulement son code fixe/de test et le fichier est en lecture seule pour l’étudiant. Utilisez {{ TEST_CODE }} une seule fois dans l’ensemble des fichiers.",
     templateSourceMissingMarker: "Le gabarit doit contenir {{ STUDENT_CODE }}.",
     templateTestCodeMissingMarker: "Ajoutez {{ TEST_CODE }} au gabarit avant d’enregistrer des tests qui contiennent du code de test.",
     templateVisibleLinesHelp: "Cliquez sur les marqueurs dans la gouttière pour choisir quelles lignes du gabarit restent visibles et en lecture seule pour les étudiants. Les blocs non sélectionnés sont remplacés par un espace réservé de code caché.",
     templateVisibleLine: "Afficher ou masquer la ligne étudiante {line}",
     lastValidationSummary: "Dernière validation : {passedCount}/{testCount} tests réussis.",
-    editorTimeLimit: "Limite de temps dans l'éditeur (secondes)",
+    editorTimeLimit: "Limite d’exécution du programme (secondes CPU)",
+    editorTimeLimitHelp: "Temps CPU permis pour chaque exécution ou test (1 à 5 secondes). La durée de travail des étudiants se configure dans les paramètres de l’activité.",
     gradingTitle: "Évaluation",
     gradingHelp: "Configurez les tests déterministes et une grille facultative. L’enseignant peut remplir et modifier la rétroaction de la grille même si la rétroaction automatique est désactivée.",
     gradingSections: "Sections d’évaluation",
@@ -790,7 +800,7 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     blankReviewedGradeTitle: "教师审核的成绩",
     blankReviewedGradeMessage: "完整程序与单独填空的检查结果不一致。最终成绩由教师确定。",
     gradingGeneralTab: "常规",
-    enableRubricGrading: "启用评分",
+    enableRubricGrading: "启用评分量规",
     enableTests: "启用测试",
     defaultCriterionTitle: "正确性与方法",
     defaultCriterionDescription: "评估所提交方法的正确性、清晰度和适用性。",
@@ -879,14 +889,18 @@ const messages: Record<CodingExercisesMessageLocale, MessageCatalog> = {
     starterCode: "起始代码",
     referenceSolution: "参考答案",
     referenceSolutionHelp: "仅教师可见的答案。隐藏测试会先用这段代码验证，再保存。",
+    fileEditorSections: "文件编辑器",
+    placeStudentCode: "在此放置学生代码",
+    placeTestCode: "在此放置测试代码",
     templateSource: "模板",
-    templateSourceHelp: "在这里编写完整脚手架。将 {{ STUDENT_CODE }} 放在应插入学生答案的位置，并可选地将 {{ TEST_CODE }} 放在每个测试脚手架代码应执行的位置。",
+    templateSourceHelp: "编辑所选文件的模板。将 {{ STUDENT_CODE }} 放在该文件答案的位置，将 {{ TEST_CODE }} 放在测试代码的位置。按钮会把插入点移至光标处，请将标记独占一行。多文件模板不含 {{ STUDENT_CODE }} 时仅使用固定代码或测试代码，该文件对学生只读。所有文件中只能有一个 {{ TEST_CODE }}。",
     templateSourceMissingMarker: "模板中必须包含 {{ STUDENT_CODE }}。",
     templateTestCodeMissingMarker: "如果测试包含测试代码，请先在模板中加入 {{ TEST_CODE }} 再保存。",
     templateVisibleLinesHelp: "点击左侧标记来选择哪些脚手架行会以只读方式显示给学生。未选中的连续代码块会被替换为隐藏代码占位符。",
     templateVisibleLine: "切换第 {line} 行是否对学生可见",
     lastValidationSummary: "最近一次验证：通过 {passedCount}/{testCount} 个测试。",
-    editorTimeLimit: "编辑器时间限制（秒）",
+    editorTimeLimit: "程序执行限制（CPU 秒）",
+    editorTimeLimitHelp: "每次程序运行或测试允许的 CPU 时间（1–5 秒）。学生作答时限在活动设置中配置。",
     gradingTitle: "评分",
     gradingHelp: "配置确定性测试和可选量规。即使关闭自动反馈，教师也可以填写和编辑量规反馈。",
     gradingSections: "评分区域",

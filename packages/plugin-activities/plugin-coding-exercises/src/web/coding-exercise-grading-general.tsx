@@ -1,7 +1,7 @@
 "use client";
 
 import { HelpLabel, ToggleSwitch } from "@cognelo/activity-ui";
-import { getCodingExerciseMaxTestRuns, type CodingExerciseConfig, type CodingExercisePrivateConfig } from "../coding-exercises";
+import { getCodingExerciseCpuTimeLimit, getCodingExerciseMaxTestRuns, type CodingExerciseConfig, type CodingExercisePrivateConfig } from "../coding-exercises";
 import { formatCodingExercisesMessage, type CodingExercisesLocale } from "./messages";
 
 type FeedbackConfig = CodingExercisePrivateConfig["aiFeedback"];
@@ -62,6 +62,12 @@ export function CodingExerciseGradingGeneral({ config, feedback, onConfigChange,
           onChange={event => onConfigChange({ maxTestRuns: Number(event.target.value) })} />
       </div> : null}
     </section>
+    <div className="field">
+      <HelpLabel help={t("editorTimeLimitHelp")}><label htmlFor="coding-max-editor-seconds">{t("editorTimeLimit")}</label></HelpLabel>
+      <input id="coding-max-editor-seconds" type="number" min={1} max={5} disabled={!tests}
+        value={getCodingExerciseCpuTimeLimit(config.maxEditorSeconds)}
+        onChange={event => onConfigChange({ maxEditorSeconds: Number(event.target.value || "1") * 60 })} />
+    </div>
     <section className="stack">
       <HelpLabel help={t("aiFeedbackHelp")}><h3>{t("aiFeedbackTitle")}</h3></HelpLabel>
       <ToggleSwitch label={t("aiFeedbackEnabled")} checked={feedback.enabled} locale={locale} onChange={enabled => {

@@ -1043,6 +1043,7 @@ export const zhMessages = {
       settingsTab: "设置",
       simulationTab: "模拟",
       referenceMaterialsTab: "参考资料",
+      solutionTab: "解答",
       tabsLabel: "活动编辑器", activityTab: "活动", conceptsTab: "概念", gradingTab: "评分", title: "知识概念",
       description: "选择此活动帮助学习者练习或展示的学科概念。", search: "搜索概念",
       empty: "此学科尚无知识概念。请先在学科知识图谱中添加概念。", noMatches: "没有符合搜索条件的概念。",

@@ -9,6 +9,11 @@ export const codingExerciseDefaultHiddenTestCount = 8;
 export const codingExerciseMaxGeneratedTestCount = 15;
 export const codingExerciseMaxHiddenTestCount = 50;
 
+/** Retain the persisted legacy field while presenting its actual runner budget. */
+export function getCodingExerciseCpuTimeLimit(maxEditorSeconds: number) {
+  return Math.min(Math.max(Math.round(maxEditorSeconds / 60), 1), 5);
+}
+
 export const codingExerciseExecutionModeSchema = z.literal("template");
 
 export const codingExerciseOutputMatchModeSchema = z.enum(["exact", "contains_lines", "regex"]);
@@ -291,9 +296,11 @@ export function buildCodingExerciseSource(params: {
   studentSourceCode: string;
   testCode?: string;
   includeRuntimeEpilogue?: boolean;
+  exactTemplate?: boolean;
 }) {
   const sections: string[] = [];
-  const templateSource = params.privateConfig.templateSource || buildCodingExerciseTemplateSource(params.privateConfig.templatePrefix, params.privateConfig.templateSuffix);
+  const templateSource = params.exactTemplate ? params.privateConfig.templateSource
+    : params.privateConfig.templateSource || buildCodingExerciseTemplateSource(params.privateConfig.templatePrefix, params.privateConfig.templateSuffix);
   const testCode = (params.testCode ?? "").trim();
   if (testCode && !templateSource.includes(codingExerciseTestInsertionToken)) {
     throw new Error("The template must include {{ TEST_CODE }} before test code can be used.");
@@ -306,11 +313,11 @@ export function buildCodingExerciseSource(params: {
       codingExerciseTemplateInsertionToken,
       params.studentSourceCode
     );
-  } else if (composedTemplateSource.trim().length > 0) {
+  } else if (!params.exactTemplate && composedTemplateSource.trim().length > 0) {
     sections.push(composedTemplateSource);
     sections.push(params.studentSourceCode);
     composedTemplateSource = "";
-  } else {
+  } else if (!params.exactTemplate) {
     sections.push(params.studentSourceCode);
     composedTemplateSource = "";
   }

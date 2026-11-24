@@ -7303,6 +7303,9 @@ button.coding-authoring-blank-remove [data-action-icon] {
 .coding-file-tab.is-active > button:focus-visible { outline-color: white; }
 .coding-file-tabs input { width: 170px; flex: 0 0 auto; min-width: 100px; }
 .coding-file-add { margin-inline-start: auto; position: sticky; right: 0; background: var(--surface); }
+.coding-file-editor-layout { align-items: start; }
+.coding-file-editor-panels { min-width: 0; }
+.coding-file-editor-panels > [hidden] { display: none !important; }
 .coding-exercise-editor-pane:has(> .coding-file-tabs) { display: flex; flex-direction: column; }
 .coding-exercise-editor-pane:has(> .coding-file-tabs) > .monaco-code-editor { flex: 1; min-height: 0; }
 @media (pointer: coarse) {

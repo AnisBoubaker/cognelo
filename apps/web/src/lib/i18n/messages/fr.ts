@@ -1043,6 +1043,7 @@ export const frMessages = {
       settingsTab: "Paramètres",
       simulationTab: "Simulation",
       referenceMaterialsTab: "Documents de référence",
+      solutionTab: "Solution",
       tabsLabel: "Éditeur d’activité", activityTab: "Activité", conceptsTab: "Concepts", gradingTab: "Évaluation", title: "Concepts de connaissances",
       description: "Sélectionnez les concepts de la matière que cette activité permet de pratiquer ou de démontrer.", search: "Rechercher des concepts",
       empty: "Cette matière ne contient encore aucun concept. Ajoutez-en d’abord au graphe de connaissances.",

@@ -8,6 +8,8 @@
 
 `coding-blanks-coverage.spec.ts` submits an untouched blank question inside a Test and verifies zero credit without running or exposing the private reference or requesting teacher review.
 
+`coding-template-placement.spec.ts` checks the mounted Solution tab, execution CPU display/persistence, horizontal files and left editor sections, draft retention, marker placement/moving, dedicated test-only files, desktop/mobile layout, long-code growth without inner vertical scrolling, and real code/blanks grading with fixtures outside the entry file. AI generation coverage also compiles and saves a selected non-entry fixture file.
+
 `coding-blank-grading.spec.ts` covers equal partial credit for missing and syntax/compile-invalid Python/C blanks, the combined/isolated interaction conflict, generic review/release gates, stale final-grade protection, teacher resolution, current-test regrading, private substituted output, and Test-question resolution/reopening. All executions and academic fixtures are local.
 
 `coding-grading-general.spec.ts` checks General component switches/weights and keyboard navigation, persistence, blank-zero/ordinary-unlimited defaults, full runner hiding, per-run confirmation/cancellation/countdown, concurrent last-run reservation, forged scope rejection, reload/new-attempt/reopening behavior, independent Test-question budgets and new sittings, final submission after exhaustion, and rubric-only manual grading with disabled retained cases and re-enablement validation.

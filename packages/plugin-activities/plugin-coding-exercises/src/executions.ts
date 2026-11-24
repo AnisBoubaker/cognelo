@@ -7,6 +7,7 @@ import { assertCodingPracticeRunsEnabled, createCodingPracticeRun } from "./prac
 import { assembleCodingBlankSource, codingBlankIds, codingBlankAnswersSchema, readCodingBlankResponse, resolveCodingBlankInput, type CodingBlankResponse } from "./code-blanks";
 import {
   getCodingExerciseMaxTestRuns,
+  getCodingExerciseCpuTimeLimit,
   codingExerciseOutputMatchModeSchema,
   parseCodingExerciseConfig,
   parseCodingExercisePrivateConfig,
@@ -241,7 +242,7 @@ export async function runCodingExercise(params: {
       ...executionSources,
       stdin: input.stdin,
       expectedOutput: input.compareOutput ? getJudge0ExpectedOutput(input.expectedOutput, outputMatcher) : undefined,
-      cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
+      cpuTimeLimit: getCodingExerciseCpuTimeLimit(config.maxEditorSeconds),
       wallTimeLimit: 10,
       memoryLimitKb: 128000
     });
@@ -327,7 +328,7 @@ export async function runCodingExercisePreview(params: {
       ...executionSources,
       stdin: input.stdin,
       expectedOutput: input.compareOutput ? getJudge0ExpectedOutput(input.expectedOutput, outputMatcher) : undefined,
-      cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
+      cpuTimeLimit: getCodingExerciseCpuTimeLimit(config.maxEditorSeconds),
       wallTimeLimit: 10,
       memoryLimitKb: 128000
     });
@@ -701,7 +702,7 @@ async function executeHiddenTests(input: {
       ...executionSources,
       stdin: hiddenTest.stdin,
       expectedOutput: getJudge0ExpectedOutput(hiddenTest.expectedOutput, hiddenTest),
-      cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5),
+      cpuTimeLimit: getCodingExerciseCpuTimeLimit(config.maxEditorSeconds),
       wallTimeLimit: 10,
       memoryLimitKb: 128000
     });
@@ -1019,7 +1020,7 @@ export async function validateReferenceSolutionAgainstHiddenTests(params: {
       languageId: runtime.languageId,
       sourceCode: params.sourceCode,
       allowPartialResults: params.allowPartialResults,
-      cpuTimeLimit: Math.min(Math.max(Math.round(config.maxEditorSeconds / 60), 1), 5)
+      cpuTimeLimit: getCodingExerciseCpuTimeLimit(config.maxEditorSeconds)
     };
     sampleExecutedResults = (await validateReferenceSolutionTestGroup({
       ...executionParams,

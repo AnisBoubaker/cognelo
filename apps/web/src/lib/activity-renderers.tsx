@@ -41,7 +41,7 @@ import {
 import { WebDesignCodingExerciseActivityView } from "@cognelo/plugin-web-design-coding-exercises";
 import { TestActivityView, type TestStudentItemRendererContext } from "@/components/test-activity-view";
 import { TestManualGradingPanel } from "@/components/test-manual-grading-panel";
-import { useActivityEditorGradingPortalTarget } from "@/components/activity-editor-tabs";
+import { useActivityEditorGradingPortalTarget, useActivityEditorSolutionPortalTarget } from "@/components/activity-editor-tabs";
 import { createStandaloneActivityDraftHost } from "@/lib/activity-response-draft-host";
 import { createStudentPreviewStateHost } from "@/lib/student-preview-state-host";
 import { isTestItemAnswered } from "@/lib/test-item-answer-status";
@@ -291,6 +291,7 @@ function ParsonsActivityRenderer(props: ActivityRendererProps<typeof ParsonsActi
 
 function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof CodingExerciseActivityView>) {
   const authoringGradingPortalTarget = useActivityEditorGradingPortalTarget();
+  const authoringSolutionPortalTarget = useActivityEditorSolutionPortalTarget();
   const {
     activityRouteCourseId,
     groupId,
@@ -412,6 +413,7 @@ function CodingExerciseActivityRenderer(props: ActivityRendererProps<typeof Codi
       onPreviousSubmissionsAvailabilityChange={onPreviousSubmissionsAvailabilityChange}
       onSubmitted={onSubmitted}
       authoringGradingPortalTarget={authoringGradingPortalTarget}
+      authoringSolutionPortalTarget={authoringSolutionPortalTarget}
     />
   );
 }
@@ -1272,6 +1274,7 @@ function ParsonsBankActivityRenderer(context: BankActivityRendererContext) {
 
 function CodingExerciseBankActivityRenderer(context: BankActivityRendererContext) {
   const authoringGradingPortalTarget = useActivityEditorGradingPortalTarget();
+  const authoringSolutionPortalTarget = useActivityEditorSolutionPortalTarget();
   return (
     <CodingExerciseActivityView
       activity={context.activity}
@@ -1280,6 +1283,7 @@ function CodingExerciseBankActivityRenderer(context: BankActivityRendererContext
       onSave={context.onSave}
       locale={context.locale}
       authoringGradingPortalTarget={authoringGradingPortalTarget}
+      authoringSolutionPortalTarget={authoringSolutionPortalTarget}
       codingClient={{
         listProgrammingLanguages: () => api.programmingLanguages(),
         listHiddenTests: async (_courseId, activityId) => api.bankCodingExerciseHiddenTests(context.activityBankId, activityId),

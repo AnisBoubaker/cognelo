@@ -22,6 +22,7 @@ test("authors blanks and accepts equivalent completions with protected code, aut
     const authorPath = `/api/courses/${data.courseId}/activities/${activityId}`;
     await teacherPage.goto(authorPath.replace("/api", ""));
     await teacherPage.getByLabel("Answer format", { exact: true }).selectOption("blanks");
+    await teacherPage.getByRole("tab", { name: "Solution", exact: true }).click();
     const editor = teacherPage.getByRole("textbox", { name: "Code with blanks", exact: true });
     await expect(editor).toBeVisible();
     await teacherPage.evaluate(() => {
@@ -68,6 +69,7 @@ test("authors blanks and accepts equivalent completions with protected code, aut
     await expect(teacherPage.getByText("You have unsaved changes.", { exact: true })).toHaveCount(0);
     await teacherPage.reload();
     await expect(teacherPage.getByLabel("Answer format", { exact: true })).toHaveValue("blanks");
+    await teacherPage.getByRole("tab", { name: "Solution", exact: true }).click();
     await expect.poll(source).toBe(referenceSolution);
     await expect(author.getByRole("button", { name: "Remove blank 1", exact: true })).toBeVisible();
     for (const [name, viewport] of Object.entries({ desktop: { width: 1440, height: 900 }, mobile: { width: 390, height: 844 } })) {

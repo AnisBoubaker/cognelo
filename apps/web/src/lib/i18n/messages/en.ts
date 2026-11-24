@@ -1037,6 +1037,7 @@ export const enMessages = {
       settingsTab: "Settings",
       simulationTab: "Simulation",
       referenceMaterialsTab: "Reference materials",
+      solutionTab: "Solution",
       tabsLabel: "Activity editor", activityTab: "Activity", conceptsTab: "Concepts", gradingTab: "Grading", title: "Knowledge concepts",
       description: "Select the subject concepts this activity helps learners practice or demonstrate.", search: "Search concepts",
       empty: "This subject does not have any knowledge concepts yet. Add concepts to the subject knowledge graph first.",

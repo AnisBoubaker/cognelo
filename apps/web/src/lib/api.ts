@@ -700,6 +700,7 @@ export type ActivityDefinition = {
     supportsCompositeExecution?: boolean;
   };
   authoring?: {
+    solutionTab?: boolean;
     simulationTab?: boolean;
     gradingTab?: boolean;
     referenceMaterialsTab?: boolean;

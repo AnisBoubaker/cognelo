@@ -64,17 +64,26 @@ export function CodeEditor({
       return;
     }
 
-    const nextHeight = height === undefined
-      ? (() => {
-          textarea.style.height = "0px";
-          return `${Math.max(minHeight, textarea.scrollHeight)}px`;
-        })()
-      : typeof height === "number"
-        ? `${height}px`
-        : height;
-    textarea.style.height = nextHeight;
-    overlay.style.height = nextHeight;
-    container.style.height = nextHeight;
+    const size = () => {
+      if (height === undefined && !textarea.clientWidth) return;
+      const nextHeight = height === undefined
+        ? (() => { textarea.style.height = "0px"; return `${Math.max(minHeight, textarea.scrollHeight)}px`; })()
+        : typeof height === "number" ? `${height}px` : height;
+      textarea.style.height = nextHeight;
+      overlay.style.height = nextHeight;
+      container.style.height = nextHeight;
+    };
+    size();
+    // A loaded editor may initially be inside a hidden authoring tab. Measure
+    // again when it becomes visible or its width changes and lines wrap.
+    if (height !== undefined) return;
+    let previousWidth = -1;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width === previousWidth) return;
+      previousWidth = entry.contentRect.width; size();
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
   }, [height, minHeight, value]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {

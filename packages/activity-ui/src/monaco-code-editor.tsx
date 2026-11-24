@@ -33,6 +33,7 @@ type MonacoCodeEditorProps = {
   loading?: boolean;
   loadingLabel?: string;
   onEditorMount?: OnMount;
+  autoHeight?: boolean;
 };
 
 export type MonacoEditorMountHandler = OnMount;
@@ -50,10 +51,12 @@ export function MonacoCodeEditor({
   readOnlySuffix = "",
   loading = false,
   loadingLabel = "Loading editor…",
-  onEditorMount
+  onEditorMount,
+  autoHeight = false
 }: MonacoCodeEditorProps) {
   const editorLanguage = useMemo(() => normalizeMonacoLanguage(language), [language]);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const fallbackRef = useRef<HTMLTextAreaElement | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const decorationsRef = useRef<ReturnType<Parameters<OnMount>[0]["createDecorationsCollection"]> | null>(null);
   const synchronizingRef = useRef(false);
@@ -64,6 +67,8 @@ export function MonacoCodeEditor({
     loader.__getMonacoInstance() ? "ready" : "loading"
   );
   const displayedValue = `${readOnlyPrefix}${value}${readOnlySuffix}`;
+  const [contentHeight, setContentHeight] = useState(minHeight);
+  const effectiveHeight = autoHeight ? contentHeight : height;
   const hasRestrictedEditableRegion = !readOnly && (readOnlyPrefix.length > 0 || readOnlySuffix.length > 0);
   const displayedValueRef = useRef(displayedValue);
   const readOnlyRegionRef = useRef({ readOnly, readOnlyPrefix, readOnlySuffix });
@@ -156,12 +161,31 @@ export function MonacoCodeEditor({
     updateDecorations();
   }, [displayedValue, hasRestrictedEditableRegion, readOnlyPrefix, readOnlySuffix, updateDecorations]);
 
+  useEffect(() => {
+    const textarea = fallbackRef.current;
+    if (!autoHeight || !textarea) return;
+    const size = () => {
+      if (!textarea.clientWidth) return;
+      textarea.style.height = "0px";
+      textarea.style.height = `${Math.max(minHeight, textarea.scrollHeight)}px`;
+    };
+    size();
+    let previousWidth = -1;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width === previousWidth) return;
+      previousWidth = entry.contentRect.width; size();
+    });
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, [autoHeight, displayedValue, minHeight, monacoLoadState]);
+
   if (loading) return <div className="monaco-code-editor" role="status" style={editorContainerStyle(height, minHeight)}><span style={{ margin: "auto" }}>{loadingLabel}</span></div>;
 
   if (monacoLoadState === "failed") {
     return (
       <div className="monaco-code-editor notranslate" translate="no" style={editorContainerStyle(height, minHeight)}>
         <textarea
+          ref={fallbackRef}
           {...codeInputProtectionAttributes}
           aria-label={ariaLabel}
           id={id}
@@ -177,6 +201,7 @@ export function MonacoCodeEditor({
             minHeight,
             padding: 12,
             resize: "none",
+            overflowY: autoHeight ? "hidden" : "auto",
             width: "100%"
           }}
           value={displayedValue}
@@ -225,14 +250,14 @@ export function MonacoCodeEditor({
     <div
       className="monaco-code-editor notranslate"
       translate="no"
-      style={editorContainerStyle(height, minHeight)}
+      style={editorContainerStyle(effectiveHeight, minHeight)}
     >
       <Editor
         beforeMount={configureMonaco}
         onMount={handleEditorMount}
         defaultLanguage={editorLanguage}
         defaultValue={displayedValue}
-        height={height ?? minHeight}
+        height={effectiveHeight ?? minHeight}
         language={editorLanguage}
         onChange={(nextValue) => {
           if (synchronizingRef.current) return;
@@ -283,7 +308,9 @@ export function MonacoCodeEditor({
           roundedSelection: false,
           scrollBeyondLastLine: false,
           scrollbar: {
-            alwaysConsumeMouseWheel: false
+            alwaysConsumeMouseWheel: false,
+            vertical: autoHeight ? "hidden" : "auto",
+            handleMouseWheel: !autoHeight
           },
           tabSize: 2,
           wordWrap: "on"
@@ -310,6 +337,12 @@ export function MonacoCodeEditor({
     };
     decorationsRef.current = editor.createDecorationsCollection();
     attachModel();
+    if (autoHeight) {
+      const size = () => setContentHeight(Math.max(minHeight, Math.ceil(editor.getContentHeight())));
+      const subscription = editor.onDidContentSizeChange(size);
+      editor.onDidDispose(() => subscription.dispose());
+      size();
+    }
     editor.onDidChangeModel(() => {
       if (currentModel && !currentModel.isDisposed()) currentModel.pushStackElement();
       attachModel();

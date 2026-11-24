@@ -54,7 +54,7 @@ for (const scope of ["course", "bank"] as const) {
       const rubric = page.getByRole("tab", { name: "Rubric", exact: true });
       if (!await rubric.isVisible()) {
         await page.getByRole("tab", { name: "General", exact: true }).click();
-        await page.getByRole("switch", { name: "Enable grading", exact: true }).check();
+        await page.getByRole("switch", { name: "Enable rubric", exact: true }).check();
         await rubric.click();
         if (!originalCriteria.length) await page.getByRole("button", { name: "Remove criterion", exact: true }).click();
       } else await rubric.click();

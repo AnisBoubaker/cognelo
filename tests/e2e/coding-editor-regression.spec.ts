@@ -35,17 +35,11 @@ test.describe("coding exercise editor boundaries", () => {
     await teacherPage.getByLabel("Description").fill("Verify protected editor boundaries.");
     await teacherPage.getByRole("textbox", { name: "Prompt" }).fill("Write a short Python program for this regression check.");
     await teacherPage.getByLabel("Language", { exact: true }).selectOption("python");
-    await teacherPage
-      .getByText("Reference solution", { exact: true })
-      .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' stack ')][1]")
-      .getByRole("textbox")
-      .fill("print(f'Hello, {input().strip()}!')");
-    await teacherPage
-      .locator("label.editor-section-label")
-      .filter({ hasText: /^Template$/ })
-      .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' stack ')][1]")
-      .locator("textarea.code-editor-input")
-      .fill("{{ STUDENT_CODE }}\n\n{{ TEST_CODE }}");
+    await teacherPage.getByRole("tab", { name: "Solution", exact: true }).click();
+    await teacherPage.getByRole("tab", { name: "Reference solution", exact: true }).click();
+    await teacherPage.getByRole("textbox", { name: "Reference solution", exact: true }).fill("print(f'Hello, {input().strip()}!')");
+    await teacherPage.getByRole("tab", { name: "Template", exact: true }).click();
+    await teacherPage.getByRole("textbox", { name: "Template", exact: true }).fill("{{ STUDENT_CODE }}\n\n{{ TEST_CODE }}");
     await teacherPage.getByRole("button", { name: "Save coding exercise" }).click();
     await expect(teacherPage.getByText("Coding exercise saved.", { exact: true })).toBeVisible();
     await publishCurrentBankActivity(teacherPage);

@@ -38,14 +38,14 @@ test("General grading settings, confirmed runs, concurrent limits, new attempts 
     await expect(general).toHaveAttribute("aria-selected", "true");
     await expect(teacherPage.getByRole("switch", { name: "Enable tests", exact: true })).toBeChecked();
     await expect(teacherPage.getByLabel("Test-run allowance", { exact: true })).toHaveValue("unlimited");
-    await teacherPage.getByRole("switch", { name: "Enable grading", exact: true }).check();
+    await teacherPage.getByRole("switch", { name: "Enable rubric", exact: true }).check();
     await teacherPage.getByLabel("Rubric (%)", { exact: true }).fill("30");
     await expect(teacherPage.getByLabel("Deterministic tests (%)", { exact: true })).toHaveValue("70");
     await teacherPage.getByRole("switch", { name: "Enable tests", exact: true }).uncheck();
     await expect(teacherPage.getByLabel("Rubric (%)", { exact: true })).toHaveValue("100");
     await expect(teacherPage.getByRole("tab", { name: "Test cases", exact: true })).toBeHidden();
     await teacherPage.getByRole("switch", { name: "Enable tests", exact: true }).check();
-    await teacherPage.getByRole("switch", { name: "Enable grading", exact: true }).uncheck();
+    await teacherPage.getByRole("switch", { name: "Enable rubric", exact: true }).uncheck();
     await expect(teacherPage.getByLabel("Deterministic tests (%)", { exact: true })).toHaveValue("100");
     await teacherPage.getByLabel("Test-run allowance", { exact: true }).selectOption("limited");
     await teacherPage.getByLabel("Maximum test runs per attempt", { exact: true }).fill("2");

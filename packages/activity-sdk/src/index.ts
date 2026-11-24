@@ -93,6 +93,7 @@ export type ActivityAiFeedbackContract = {
 };
 
 export type ActivityAuthoringContract = {
+  solutionTab?: boolean;
   gradingTab?: boolean;
   simulationTab?: boolean;
   /** Course reference preparation rendered through the host editor portal. */

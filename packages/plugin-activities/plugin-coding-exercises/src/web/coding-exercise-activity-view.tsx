@@ -3,6 +3,7 @@ import { defaultCodingFileName, codingFiles, codingFilePrivate, codingFileNameSc
 import { CodingFileTabs } from "./coding-file-tabs";
 import { CodingFilesView } from "./coding-files-view";
 import { CodingProjectEditor } from "./coding-project-editor";
+import { codingTemplateHasTestCode, codingTemplateLayoutIssues, placeCodingTemplateMarker } from "../template-layout";
 import type { AuthoringBlankRange } from "./code-blanks-authoring-model";
 import { assembleCodingBlankSource, codingBlankAnswer, codingBlankIds, codingBlankResponseState, readCodingBlankResponse, type CodingBlankAnswers } from "../code-blanks";
 import { CodeBlanksAuthoring } from "./code-blanks-authoring";
@@ -28,7 +29,7 @@ import {
   codingExerciseDefaultVisibleTestCount,
   codingExerciseMaxGeneratedTestCount,
   codingExerciseMaxHiddenTestCount,
-  codingExerciseTemplateRequiresTestCodeMarker,
+  codingExerciseTestInsertionToken,
   codingExerciseTemplateInsertionToken,
   getCodingExerciseMaxTestRuns,
   getCodingExerciseAiFeedbackValidationMessages,
@@ -299,6 +300,7 @@ type CodingExerciseActivityViewProps = {
   aiGenerationClient?: CodingExerciseAiGenerationClient;
   locale?: string;
   authoringGradingPortalTarget?: HTMLElement | null;
+  authoringSolutionPortalTarget?: HTMLElement | null;
   executionStateHost?: ActivityExecutionStateHost<Record<string, unknown>>;
   deferSubmission?: boolean;
   readOnly?: boolean;
@@ -323,6 +325,7 @@ export function CodingExerciseActivityView({
   aiGenerationClient,
   locale,
   authoringGradingPortalTarget,
+  authoringSolutionPortalTarget,
   executionStateHost,
   deferSubmission = false,
   readOnly = false,
@@ -403,7 +406,9 @@ export function CodingExerciseActivityView({
   const [blankAnswers, setBlankAnswers] = useState<CodingBlankAnswers>({});
   const [sourceFiles, setSourceFiles] = useState<CodingSourceFile[]>(() => getCodingExerciseStudentFiles(getCodingExerciseActivityConfig(activity.config)));
   const [selectedFileId, setSelectedFileId] = useState("main");
+  const [fileEditorSection, setFileEditorSection] = useState<"starter" | "reference" | "template">("reference");
   const isBlanks = config.responseMode === "blanks";
+  const activeEditorSection = isBlanks && fileEditorSection === "reference" ? "starter" : fileEditorSection;
   const fileDefinitions = readOnly && sourceFiles.length ? sourceFiles.map(file => ({ ...file, starterCode: "", studentTemplateSource: file.studentTemplateSource ?? "{{ STUDENT_CODE }}" })) : codingFiles(config);
   const activeFile = fileDefinitions.find(file => file.id === selectedFileId) ?? fileDefinitions[0];
   const activeSourceFile = sourceFiles.find(file => file.id === activeFile.id);
@@ -861,6 +866,22 @@ export function CodingExerciseActivityView({
     setPrivateConfig(current => ({ ...current, fileSources: { ...current.fileSources,
       [first.id]: codingFilePrivate(current, first.id, referenceSolution) } }));
   }
+  function placeTemplateMarker(token: string) {
+    const editor = document.getElementById(`coding-template-${activeFile.id}`) as HTMLTextAreaElement | null;
+    const source = activeFilePrivate.templateSource;
+    const placed = placeCodingTemplateMarker(source, token, editor?.selectionStart ?? source.length, editor?.selectionEnd ?? source.length);
+    if (config.files && token === codingExerciseTestInsertionToken) {
+      const definitions = config.files;
+      setPrivateConfig(current => {
+        const fileSources = Object.fromEntries(definitions.map(file => {
+          const currentFile = codingFilePrivate(current, file.id);
+          return [file.id, { ...currentFile, templateSource: file.id === activeFile.id ? placed.source : currentFile.templateSource.replaceAll(token, "") }];
+        }));
+        return { ...current, fileSources, templateSource: fileSources[definitions[0].id].templateSource };
+      });
+    } else updateAuthorFilePrivate({ templateSource: placed.source });
+    requestAnimationFrame(() => { editor?.focus(); editor?.setSelectionRange(placed.cursor, placed.cursor); });
+  }
   function validFileName(name: string, excluding?: string) {
     if (!codingFileNameSchema.safeParse(name).success || codingFiles(config).some(file => file.id !== excluding && file.name.toLowerCase() === name.toLowerCase())) {
       notifications.error(t("invalidFileName")); return false;
@@ -947,15 +968,14 @@ export function CodingExerciseActivityView({
             templateSource: index === 0 ? privateConfig.templateSource || "{{ STUDENT_CODE }}" : "{{ STUDENT_CODE }}",
             templateVisibleLineNumbers: index === 0 ? privateConfig.templateVisibleLineNumbers : [] }])) } : {}) });
 
-      if (!normalizedPrivateConfig.templateSource.includes(codingExerciseTemplateInsertionToken)) {
-        throw new Error(t("templateSourceMissingMarker"));
-      }
+      const templateIssues = codingTemplateLayoutIssues(config, normalizedPrivateConfig);
+      if (templateIssues.length) throw new Error(templateIssues[0]);
 
       if (
-        codingExerciseTemplateRequiresTestCodeMarker(normalizedPrivateConfig.templateSource, [
+        !codingTemplateHasTestCode(config, normalizedPrivateConfig) && [
           ...normalizeCodingExerciseSampleTests(config.sampleTests),
           ...hiddenTests
-        ])
+        ].some(test => test.testCode?.trim())
       ) {
         throw new Error(t("templateTestCodeMissingMarker"));
       }
@@ -1568,6 +1588,10 @@ export function CodingExerciseActivityView({
     if (authoringGradingPortalTarget === undefined) return content;
     return authoringGradingPortalTarget ? createPortal(content, authoringGradingPortalTarget) : null;
   }
+  function renderAuthoringSolution(content: ReactNode) {
+    if (authoringSolutionPortalTarget === undefined) return content;
+    return authoringSolutionPortalTarget ? createPortal(content, authoringSolutionPortalTarget) : null;
+  }
 
   const visibleTestGenerationLimit = testGenerationMode === "add"
     ? codingExerciseMaxGeneratedTestCount - visibleSampleTests.length
@@ -1690,6 +1714,7 @@ export function CodingExerciseActivityView({
             />
           </div>
 
+          {renderAuthoringSolution(<div className="section stack">
           {aiGenerationClient ? (
             <button
               className="secondary"
@@ -1841,6 +1866,14 @@ export function CodingExerciseActivityView({
 
           <CodingFileTabs files={codingFiles(config)} selected={activeFile.id} onSelect={setSelectedFileId}
             onAdd={addFile} onRename={renameFile} onRemove={id => { void removeFile(id); }} locale={pluginLocale} />
+          <div className="settings-layout coding-file-editor-layout">
+            <SideNavigation ariaLabel={t("fileEditorSections")} items={[
+              ...(!isBlanks ? [{ id: "reference", label: t("referenceSolution"), isActive: activeEditorSection === "reference" }] : []),
+              { id: "starter", label: isBlanks ? t("blankTemplate") : t("starterCode"), isActive: activeEditorSection === "starter" },
+              { id: "template", label: t("templateSource"), isActive: activeEditorSection === "template" }
+            ]} tabs={{ idPrefix: "coding-file-editor", panelId: "coding-file-editor-panel", onSelect: id => setFileEditorSection(id as "starter" | "reference" | "template") }} />
+            <div className="coding-file-editor-panels" id="coding-file-editor-panel" role="tabpanel" aria-labelledby={`coding-file-editor-${activeEditorSection}`}>
+          <div hidden={activeEditorSection !== "starter"}>
           {isBlanks ? <CodeBlanksAuthoring key={activeFile.id} documentId={`coding-blank-template-${activeFile.id}`} template={activeFile.blankTemplate ?? ""}
             history={blankAuthoringHistory(activeFile.id)} numberOffset={blankNumberOffset} answers={privateConfig.blankReferenceAnswers ?? {}} language={config.language} locale={pluginLocale}
             onChange={(blankTemplate, answers) => {
@@ -1854,8 +1887,9 @@ export function CodingExerciseActivityView({
             <CodeEditor key={`starter:${activeFile.id}`} id={`coding-starter-${activeFile.id}`} ariaLabel={t("starterCode")} value={activeFile.starterCode}
               onChange={value => updateAuthorFile(activeFile.id, { starterCode: value })} language={config.language} minHeight={220} />
           </div>}
+          </div>
 
-          {!isBlanks ? <div className="stack">
+          {!isBlanks ? <div className="stack" hidden={activeEditorSection !== "reference"}>
             <HelpLabel help={<>{t("referenceSolutionHelp")}</>}><label className="editor-section-label">{t("referenceSolution")}</label></HelpLabel>
 
             <CodeEditor
@@ -1879,15 +1913,19 @@ export function CodingExerciseActivityView({
             ) : null}
           </div> : null}
 
-          <div className="stack">
+          <div className="stack" hidden={activeEditorSection !== "template"}>
             <HelpLabel help={<><p>{t("templateSourceHelp")}</p><p>{t("templateVisibleLinesHelp")}</p></>}><label className="editor-section-label">{t("templateSource")}</label></HelpLabel>
+            <div className="row">
+              <button type="button" className="secondary" onMouseDown={event => event.preventDefault()} onClick={() => placeTemplateMarker(codingExerciseTemplateInsertionToken)}><ActionIcon name="add" />{t("placeStudentCode")}</button>
+              <button type="button" className="secondary" onMouseDown={event => event.preventDefault()} onClick={() => placeTemplateMarker(codingExerciseTestInsertionToken)}><ActionIcon name="add" />{t("placeTestCode")}</button>
+            </div>
 
             <CodeEditor
               key={`template:${activeFile.id}`} id={`coding-template-${activeFile.id}`} ariaLabel={t("templateSource")}
-              value={activeFilePrivate.templateSource || buildCodingExerciseTemplateSource("", "")}
+              value={activeFilePrivate.templateSource}
               onChange={(value) => {
                 aiGenerationDraftRef.current = null;
-                const nextTemplate = value || buildCodingExerciseTemplateSource("", "");
+                const nextTemplate = config.files ? value : value || buildCodingExerciseTemplateSource("", "");
                 updateAuthorFilePrivate({ templateSource: nextTemplate,
                   templateVisibleLineNumbers: activeFilePrivate.templateVisibleLineNumbers.filter(line => line < nextTemplate.split("\n").length) });
               }}
@@ -1898,7 +1936,7 @@ export function CodingExerciseActivityView({
                   : "coding-exercise-template-line"
               }
               leftRail={renderTemplateVisibilityRail(
-                (activeFilePrivate.templateSource || buildCodingExerciseTemplateSource("", "")).split("\n"),
+                activeFilePrivate.templateSource.split("\n"),
                 activeFilePrivate.templateVisibleLineNumbers,
                 toggleTemplateVisibleLine,
                 t
@@ -1907,23 +1945,16 @@ export function CodingExerciseActivityView({
               minHeight={260}
             />
           </div>
-
-          <div className="field">
-            <label htmlFor="coding-max-editor-seconds">{t("editorTimeLimit")}</label>
-            <input
-              id="coding-max-editor-seconds"
-              type="number"
-              min={30}
-              max={14400}
-              value={config.maxEditorSeconds}
-              onChange={(event) =>
-                setConfig((current) => ({
-                  ...current,
-                  maxEditorSeconds: Number(event.target.value || "1800")
-                }))
-              }
-            />
+            </div>
           </div>
+
+          {authoringSolutionPortalTarget !== undefined ? <EditActionBar
+            isDirty={hasUnsavedChanges} isSaving={saving}
+            saveDisabled={!authoringLoaded || !config.language || aiFeedbackValidationMessages.length > 0}
+            savedLabel={actionCopy.saved} unsavedLabel={actionCopy.unsaved} saveLabel={t("saveCodingExercise")}
+            savingLabel={t("saving")} cancelLabel={actionCopy.cancel} onCancel={discardChanges} onSave={saveCodingExercise}
+          /> : null}
+          </div>)}
 
           {renderAuthoringGrading(<div className="stack">
             <div>
@@ -2371,7 +2402,7 @@ export function CodingExerciseActivityView({
                     {isBlanks ? (executionStateLoaded ? <CodeBlanksEditor key={`${executionDocumentKey}:${activeFile.id}:${codeResetVersion}`}
                       template={sourceFiles.length || config.files ? activeSourceFile?.blankTemplate ?? activeFile.blankTemplate ?? "" : readOnly && restoredBlankTemplate !== null ? restoredBlankTemplate : config.blankTemplate ?? ""} numberOffset={blankNumberOffset} answers={blankAnswers} onChange={updateStudentBlanks}
                       prefix={templateProjection.readOnlyPrefix} suffix={templateProjection.readOnlySuffix}
-                      readOnly={readOnly} locale={pluginLocale} language={config.language} /> : <p>{t("loadingAnswer")}</p>) : <CodingProjectEditor
+                      readOnly={readOnly || !!config.files && !activeFile.studentTemplateSource.includes(codingExerciseTemplateInsertionToken)} locale={pluginLocale} language={config.language} /> : <p>{t("loadingAnswer")}</p>) : <CodingProjectEditor
                       files={config.files || sourceFiles.length ? sourceFiles : [{ id: activeFile.id, name: `coding-exercise-student-${activity.id}-${activeFile.id}`, sourceCode: editorCode, studentTemplateSource: config.studentTemplateSource }]}
                       key={`${executionDocumentKey}:${activeFile.id}:${codeResetVersion}`}
                       id={config.files || sourceFiles.length ? activeFile.name : `coding-exercise-student-${activity.id}-${activeFile.id}`}
@@ -2381,7 +2412,7 @@ export function CodingExerciseActivityView({
                       language={config.language}
                       height="100%"
                       minHeight={isWorkspaceFullScreen ? 0 : 520}
-                      readOnly={readOnly || !executionStateLoaded}
+                      readOnly={readOnly || !executionStateLoaded || !!config.files && !activeFile.studentTemplateSource.includes(codingExerciseTemplateInsertionToken)}
                       loading={!executionStateLoaded}
                       loadingLabel={t("loadingAnswer")}
                       readOnlyPrefix={templateProjection.readOnlyPrefix}

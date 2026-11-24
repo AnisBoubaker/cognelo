@@ -44,29 +44,40 @@ test("authors named C files, links separate translation units and retains edits 
       config: { language: "c", prompt: "Complete triple in ops.c. Keep the other provided files.", sampleTests: samples, maxTestRuns: 2 } });
     const authorPath = `/api/courses/${data.courseId}/activities/${id}`;
     await teacherPage.goto(authorPath.replace("/api", ""));
+    await teacherPage.getByRole("tab", { name: "Solution", exact: true }).click();
     await expect(teacherPage.getByRole("tab", { name: "main.c", exact: true })).toBeVisible();
+    await teacherPage.getByRole("tab", { name: "Starter code", exact: true }).click();
     await teacherPage.getByRole("textbox", { name: "Starter code", exact: true }).fill(mainC);
+    await teacherPage.getByRole("tab", { name: "Reference solution", exact: true }).click();
     await teacherPage.getByRole("textbox", { name: "Reference solution", exact: true }).fill(mainC);
     await addFile(teacherPage, "math.c");
     await teacherPage.getByRole("button", { name: "Rename math.c", exact: true }).click();
     const rename = teacherPage.getByRole("textbox", { name: "Rename math.c", exact: true });
     await rename.fill("ops.c"); await rename.press("Enter");
+    await teacherPage.getByRole("tab", { name: "Starter code", exact: true }).click();
     await teacherPage.getByRole("textbox", { name: "Starter code", exact: true }).fill(starterC);
+    await teacherPage.getByRole("tab", { name: "Reference solution", exact: true }).click();
     await teacherPage.getByRole("textbox", { name: "Reference solution", exact: true }).fill(referenceC);
     await addFile(teacherPage, "ops.h");
+    await teacherPage.getByRole("tab", { name: "Starter code", exact: true }).click();
     await teacherPage.getByRole("textbox", { name: "Starter code", exact: true }).fill(headerC);
+    await teacherPage.getByRole("tab", { name: "Reference solution", exact: true }).click();
     await teacherPage.getByRole("textbox", { name: "Reference solution", exact: true }).fill(headerC);
     await addFile(teacherPage, "unused.txt");
     await teacherPage.getByRole("button", { name: "Remove unused.txt", exact: true }).click();
     await confirmSharedDialog(teacherPage);
     await expect(teacherPage.getByRole("tab", { name: "unused.txt", exact: true })).toHaveCount(0);
+    await teacherPage.getByRole("tab", { name: "Reference solution", exact: true }).click();
     await expect(teacherPage.getByRole("textbox", { name: "Reference solution", exact: true })).toHaveValue(mainC);
     await teacherPage.getByRole("button", { name: "Save coding exercise", exact: true }).click();
     await expect(teacherPage.getByText("Coding exercise saved.", { exact: true })).toBeVisible();
     await teacherPage.reload();
+    await teacherPage.getByRole("tab", { name: "Solution", exact: true }).click();
     await expect(teacherPage.getByRole("tab", { name: "ops.c", exact: true })).toBeVisible();
     await teacherPage.getByRole("tab", { name: "ops.c", exact: true }).click();
+    await teacherPage.getByRole("tab", { name: "Starter code", exact: true }).click();
     await expect(teacherPage.getByRole("textbox", { name: "Starter code", exact: true })).toHaveValue(starterC);
+    await teacherPage.getByRole("tab", { name: "Reference solution", exact: true }).click();
     await expect(teacherPage.getByRole("textbox", { name: "Reference solution", exact: true })).toHaveValue(referenceC);
     const privatePath = `${authorPath}/coding-exercises/hidden-tests`;
     const saved = await privateData(teacher, privatePath);
@@ -107,6 +118,7 @@ test("authors named C files, links separate translation units and retains edits 
     expect(original.resultSummary).toMatchObject({ earnedWeight: 2, totalWeight: 2 });
     await responseJson(await teacher.post(`/api/courses/${data.courseId}/gradebook/attempts/${attempt.id}/regrade`, { data: {} }));
     await teacherPage.reload();
+    await teacherPage.getByRole("tab", { name: "Solution", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Rename ops.c", exact: true }).click();
     const renamed = teacherPage.getByRole("textbox", { name: "Rename ops.c", exact: true });
     await renamed.fill("ops_renamed.c"); await renamed.press("Enter");
@@ -136,6 +148,7 @@ test("authors blanks across Python files, preserves both answers and grades miss
     const id = await createCourseActivity(data, { activityTypeKey: "coding-exercise", title, config: {
       language: "python", prompt: "Complete the function call and the helper expression.", responseMode: "blanks", files: initialFiles, sampleTests: [] } });
     await teacherPage.goto(`/courses/${data.courseId}/activities/${id}`);
+    await teacherPage.getByRole("tab", { name: "Solution", exact: true }).click();
     async function mark(fileId: string, fragment: string) {
       await teacherPage.evaluate(({ fileId, fragment }) => {
         const monaco = (window as typeof window & { monaco?: typeof import("monaco-editor") }).monaco!;

@@ -56,6 +56,7 @@ for (const scope of ["course", "bank", "single", "single-blank"] as const) {
         referenceSolution: isProject ? bundle : singleSource, privateConfig } }));
       await page.goto(path.replace("/api", ""));
       if (scope !== "single") {
+        await page.getByRole("tab", { name: "Solution", exact: true }).click();
         if (isProject) await page.getByRole("tab", { name: "sort.c", exact: true }).click();
         await expect(page.getByRole("textbox", { name: "Code with blanks", exact: true })).toBeVisible();
         await page.evaluate((fileId) => {

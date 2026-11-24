@@ -147,11 +147,11 @@ export function CodeBlanksAuthoring({ template, answers, language, locale, onCha
     if (event.target instanceof HTMLTextAreaElement && !controller.current) setFallbackSelection({ start: event.target.selectionStart, end: event.target.selectionEnd });
   }}>
     <HelpLabel help={t("blankTemplateHelp")}><label>{t("blankTemplate")}</label></HelpLabel>
-    <MonacoCodeEditor id={documentId} ariaLabel={t("blankTemplate")} value={projection.source}
-      onChange={editFallback} onEditorMount={mount} language={language} minHeight={300} />
-    {portals}
     <div><button type="button" className="secondary" disabled={!canMark && !fallbackCanMark}
       onClick={() => controller.current ? controller.current.mark() : fallbackAction()}><ActionIcon name="add" />{t("markCodeBlank")}</button></div>
+    <MonacoCodeEditor id={documentId} ariaLabel={t("blankTemplate")} value={projection.source}
+      onChange={editFallback} onEditorMount={mount} language={language} minHeight={300} autoHeight />
+    {portals}
     {!controls.length && projection.ranges.length ? <div className="row">{projection.ranges.map((range, index) => <button
       key={range.id} type="button" className="secondary" onClick={() => fallbackAction(range.id)}>
       <ActionIcon name="close" />{t("removeCodeBlank", { number: index + 1 + numberOffset })}

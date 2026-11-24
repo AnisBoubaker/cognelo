@@ -1,4 +1,5 @@
 import { codingSourceFilesSchema, codingFiles, referenceCodingFiles, formatCodingSourceFiles } from "./coding-files";
+import { codingTemplateLayoutIssues, codingTemplateHasTestCode } from "./template-layout";
 import { randomUUID } from "node:crypto";
 import { assembleCodingBlankSource, codingBlankIds } from "./code-blanks";
 import type { CurrentUser } from "@cognelo/contracts";
@@ -8,7 +9,6 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   codingExerciseHiddenTestsInputSchema,
   codingExerciseOutputMatchModeSchema,
-  codingExerciseTemplateRequiresTestCodeMarker,
   parseCodingExerciseConfig,
   parseCodingExercisePrivateConfig,
   type CodingExerciseOutputMatchMode
@@ -406,7 +406,11 @@ async function validateCodingExerciseHiddenTestsInput(params: {
   }
 
   const privateConfig = parseCodingExercisePrivateConfig(input.privateConfig);
-  if (codingExerciseTemplateRequiresTestCodeMarker(privateConfig.templateSource, [...input.sampleTests, ...input.tests])) {
+  const activityConfig = input.activityConfig ?? params.activityConfig;
+  const parsedConfig = parseCodingExerciseConfig(activityConfig);
+  const templateIssues = codingTemplateLayoutIssues(parsedConfig, privateConfig);
+  if (templateIssues.length) throw new AppError(400, "CODING_EXERCISE_TEMPLATE_INVALID", templateIssues[0]);
+  if (!codingTemplateHasTestCode(parsedConfig, privateConfig) && [...input.sampleTests, ...input.tests].some(test => test.testCode?.trim())) {
     throw new AppError(
       400,
       "TEST_CODE_MARKER_REQUIRED",
@@ -414,8 +418,6 @@ async function validateCodingExerciseHiddenTestsInput(params: {
     );
   }
 
-  const activityConfig = input.activityConfig ?? params.activityConfig;
-  const parsedConfig = parseCodingExerciseConfig(activityConfig);
   if (parsedConfig.files) {
     if (codingFiles(parsedConfig).some(file => !privateConfig.fileSources?.[file.id])) {
       throw new AppError(400, "CODING_EXERCISE_FILE_REFERENCE_REQUIRED", "Provide the reference and scaffold for each exercise file.");

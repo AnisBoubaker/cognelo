@@ -28,7 +28,7 @@ export const codingSourceFilesSchema = z.array(codingSourceFileSchema).max(20).r
   new Set(files.map(file => file.id)).size === files.length && files.reduce((total, file) => total + file.sourceCode.length, 0) <= 200000,
 "Use unique file identifiers and at most 200,000 source characters.");
 export const codingFilePrivateSchema = z.object({ referenceSolution: z.string().max(60000).default(""),
-  templateSource: z.string().max(120000).default("{{ STUDENT_CODE }}").transform(value => value || "{{ STUDENT_CODE }}"),
+  templateSource: z.string().max(120000).default("{{ STUDENT_CODE }}"),
   templateVisibleLineNumbers: z.array(z.number().int().min(0).max(5000)).max(5000).default([]) });
 export const codingFilePrivateSourcesSchema = z.record(codingFileIdSchema, codingFilePrivateSchema).refine(value => Object.keys(value).length <= 20,
   "Use at most 20 private file records.");

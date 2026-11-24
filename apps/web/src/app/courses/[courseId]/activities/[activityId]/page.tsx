@@ -117,6 +117,7 @@ export default function ActivityPage() {
             materialReferences={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.usesMaterialEmbeddings ? { courseId, activityId } : undefined}
             showSimulationTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.simulationTab === true}
             showGradingTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.gradingTab === true}
+            showSolutionTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.solutionTab === true}
           >
           <ActivityRenderer
             activity={activity}
@@ -155,6 +156,7 @@ export default function ActivityPage() {
             materialReferences={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.usesMaterialEmbeddings ? { courseId, activityId } : undefined}
             showSimulationTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.simulationTab === true}
             showGradingTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.gradingTab === true}
+            showSolutionTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.solutionTab === true}
           >
             <section className="section stack">
               <h2>{t("parsons.unsupportedTitle")}</h2>

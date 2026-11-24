@@ -199,3 +199,37 @@ for (const problem of ["bad call", "duplicate main"] as const) {
     } finally { await fixture.close(); }
   });
 }
+
+test("AI generation validates and saves a harness in the selected non-entry file", async () => {
+  test.setTimeout(120_000);
+  const fixture = await generationFixture();
+  try {
+    const { data, owner, responses, requests } = fixture;
+    const sources = [
+      { id: "main", name: "main.c", sourceCode: "int run_case(void);\nint main(void) { return run_case(); }" },
+      { id: "cases", name: "cases.c", sourceCode: "int run_case(void) { return 0; }" },
+      { id: "solution", name: "solution.c", sourceCode: "int twice(int n) { return n * 2; }" }
+    ];
+    const projectFiles = sources.map(file => ({ id: file.id, name: file.name, starterCode: file.sourceCode, studentTemplateSource: "{{ STUDENT_CODE }}" }));
+    const projectReferences = Object.fromEntries(sources.map(file => [file.id, { referenceSolution: file.sourceCode,
+      templateSource: file.id === "cases" ? "#include <stdio.h>\nint twice(int n);\n{{ TEST_CODE }}" : "{{ STUDENT_CODE }}", templateVisibleLineNumbers: [] }]));
+    const referenceSolution = sources.map(file => `===== ${file.name} =====\n${file.sourceCode}`).join("\n\n");
+    const prompt = "Implement twice to double its integer argument.";
+    const activityId = await createCourseActivity(data, { activityTypeKey: "coding-exercise", title: `Selected fixture file ${data.token}`,
+      config: { language: "c", prompt, files: projectFiles, sampleTests: [] } });
+    const path = `/api/courses/${data.courseId}/activities/${activityId}`;
+    const testCode = 'int run_case(void) { printf("%d\\n", twice(4)); return 0; }';
+    responses.push(JSON.stringify({ sampleTests: [], hiddenTests: [{ id: "double", name: "Double four", stdin: "", expectedOutput: "8", testCode, weight: 1, isEnabled: true }] }));
+    const generated = await responseJson<Generated>(await owner.api.post(`${path}/coding-exercises/generate-tests`, { data: {
+      prompt, language: "c", referenceSolution, templateSource: "{{ STUDENT_CODE }}", projectFiles, projectReferences, visibleTestCount: 0, hiddenTestCount: 1
+    } }));
+    expect(generated).toMatchObject({ status: "ok", attempts: 1, validationSummary: { accepted: true } });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toContain("cases.c");
+    expect(requests[0]).toContain("Individual file templates");
+    await responseJson(await owner.api.put(`${path}/coding-exercises/hidden-tests`, { data: { tests: generated.hiddenTests, referenceSolution,
+      privateConfig: { templateSource: "{{ STUDENT_CODE }}", fileSources: projectReferences } } }));
+    const saved = await responseJson<{ referenceSolution: { validationSummary: { accepted: boolean } } }>(await owner.api.get(`${path}/coding-exercises/hidden-tests`));
+    expect(saved.referenceSolution.validationSummary.accepted).toBe(true);
+  } finally { await fixture.close(); }
+});

@@ -39,6 +39,7 @@ export const codingExercisesPlugin: ActivityPlugin = {
       },
       authoring: {
         gradingTab: true,
+        solutionTab: true,
         supportsVariations: true
       },
       i18n: {

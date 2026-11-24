@@ -2,6 +2,7 @@ import { AppError } from "@cognelo/core";
 import { assembleCodingBlankSource, codingBlankAnswer, codingBlankIds, type CodingBlankAnswers } from "./code-blanks";
 import { codingFiles, codingFilePrivate, codingSourceFilesSchema, formatCodingSourceFiles, type CodingSourceFile } from "./coding-files";
 import { alignCodingExerciseStarterCodeToTemplate, buildCodingExerciseSource, type CodingExerciseConfig, type CodingExercisePrivateConfig } from "./coding-exercises";
+import { codingTemplateFiles, codingTemplateLayoutIssues, codingTemplateHasTestCode } from "./template-layout";
 
 export function resolveCodingFileInput<T extends { sourceCode: string; files?: CodingSourceFile[]; blankAnswers?: CodingBlankAnswers; blankTemplate?: string }>(
   config: CodingExerciseConfig, input: T
@@ -33,15 +34,22 @@ export function resolveCodingFileInput<T extends { sourceCode: string; files?: C
   return result;
 }
 
-/** The first file is the entry point and receives the test harness; every file keeps its own scaffold. */
+/** Every file follows its own template; the test marker determines harness placement. */
 export function codingExecutionSources(input: {
   config: CodingExerciseConfig; privateConfig: CodingExercisePrivateConfig; sourceCode: string; files?: CodingSourceFile[]; testCode?: string;
 }) {
   if (!input.files) return { sourceCode: buildCodingExerciseSource({ ...input, studentSourceCode: input.sourceCode }) };
+  const issues = codingTemplateLayoutIssues(input.config, input.privateConfig);
+  if (issues.length) throw new AppError(422, "CODING_EXERCISE_TEMPLATE_INVALID", issues[0]);
+  if (input.testCode?.trim() && !codingTemplateHasTestCode(input.config, input.privateConfig)) {
+    throw new AppError(422, "TEST_CODE_MARKER_REQUIRED", "Place {{ TEST_CODE }} in the file template that should receive test code.");
+  }
+  const templates = new Map(codingTemplateFiles(input.config, input.privateConfig).map(file => [file.id, file.templateSource]));
   const files = input.files.map((file, index) => {
     const privateFile = codingFilePrivate(index === 0 || input.privateConfig.fileSources?.[file.id] ? input.privateConfig : {}, file.id);
     return { name: file.name, sourceCode: buildCodingExerciseSource({ config: input.config,
-      privateConfig: { ...input.privateConfig, ...privateFile }, studentSourceCode: file.sourceCode, testCode: index === 0 ? input.testCode : "", includeRuntimeEpilogue: index === 0 }) };
+      privateConfig: { ...input.privateConfig, ...privateFile }, studentSourceCode: file.sourceCode,
+      testCode: templates.get(file.id)?.includes("{{ TEST_CODE }}") ? input.testCode : "", exactTemplate: true, includeRuntimeEpilogue: index === 0 }) };
   });
   return { sourceCode: "", files };
 }

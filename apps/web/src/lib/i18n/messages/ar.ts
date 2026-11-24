@@ -779,6 +779,7 @@ export const arMessages = {
       settingsTab: "الإعدادات",
       simulationTab: "المحاكاة",
       referenceMaterialsTab: "المواد المرجعية",
+      solutionTab: "الحل",
       tabsLabel: "محرر النشاط", activityTab: "النشاط", conceptsTab: "المفاهيم", gradingTab: "التقييم", title: "مفاهيم المعرفة",
       description: "اختر مفاهيم المادة التي يساعد هذا النشاط المتعلمين على ممارستها أو إظهارها.", search: "البحث في المفاهيم",
       empty: "لا تحتوي هذه المادة على مفاهيم معرفة بعد. أضف مفاهيم إلى رسم المعرفة أولاً.", noMatches: "لا توجد مفاهيم تطابق هذا البحث.",

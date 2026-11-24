@@ -16,6 +16,7 @@ import {
 } from "./coding-exercises";
 import { validateReferenceSolutionAgainstHiddenTests } from "./executions";
 import { validateCodingExerciseOutputMatcher } from "./output-matcher";
+import { codingTemplateFiles, codingTemplateHasTestCode, codingTemplateLayoutIssues } from "./template-layout";
 
 type SubjectContext = {
   title: string;
@@ -636,6 +637,7 @@ function buildTestsGenerationSystemPrompt(input: {
   language: string;
   locale: GenerationLocale;
   subject: SubjectContext;
+  templateSource: string;
   visibleTestCount: number;
   hiddenTestCount: number;
   projectFiles?: CodingFile[];
@@ -643,6 +645,8 @@ function buildTestsGenerationSystemPrompt(input: {
   existingTests?: ExistingTests;
   knowledge?: ActivityGenerationKnowledge;
 }) {
+  const hasTestCode = codingTemplateHasTestCode({ files: input.projectFiles },
+    { templateSource: input.templateSource, fileSources: input.projectReferences });
   return [
     "You generate visible and hidden test cases for Cognelo coding exercises.",
     "Return only valid JSON. Do not wrap the JSON in Markdown fences. Do not add explanations.",
@@ -671,6 +675,10 @@ function buildTestsGenerationSystemPrompt(input: {
     `- Programming language: ${input.language}.`,
     "- The selected programming language is authoritative. Generate test harness code for that language only.",
     "- Base tests on the student-facing prompt, the reviewed reference solution, and the provided template.",
+    ...(input.projectFiles ? [
+      "- Follow each individual file template exactly. {{ STUDENT_CODE }} inserts only that file's reference/student source. Without that marker, that file's reference source is excluded: only its fixed template and any testCode are executed.",
+      "- The first file is the runtime entry point. Test code belongs only in the file with {{ TEST_CODE }}, which may be a different file."
+    ] : []),
     `- Generate exactly ${input.visibleTestCount} visible sample tests and exactly ${input.hiddenTestCount} hidden tests.`,
     `- Never generate more than ${codingExerciseMaxGeneratedTestCount} tests of either kind.`,
     "- Generate enough hidden tests to cover normal cases, edge cases, and common mistakes.",
@@ -691,11 +699,12 @@ function buildTestsGenerationSystemPrompt(input: {
     "- If the immutable solution/template cannot support the requested number of meaningful independent cases, return the error shape instead of fabricating ineffective tests.",
     "- Choose only inputs for which the provided reference solution terminates successfully with exit code 0. Do not test invalid-input branches that intentionally return a non-zero exit code.",
     "- For floating-point comparisons, do not use mathematically exact threshold values unless you have accounted for the language's binary floating-point behavior. Prefer values safely inside or outside the threshold so the observed branch is unambiguous.",
-    `- If the template contains ${codingExerciseTestInsertionToken}, every sample and hidden test must include non-empty testCode, and testCode must run the reference/student code and print the expected output.`,
-    `- If the template does not contain ${codingExerciseTestInsertionToken}, every testCode field must be empty and tests must use stdin plus expected output only.`,
+    hasTestCode
+      ? `- The file templates contain ${codingExerciseTestInsertionToken}. Every sample and hidden test must include non-empty testCode, inserted only at that marker in the chosen file, and print the expected output.`
+      : `- The templates do not contain ${codingExerciseTestInsertionToken}. Every testCode field must be empty; use stdin and expected output only.`,
     "- For full-program tests, put input in input/stdin and expected printed output in output/expectedOutput.",
     "- For callable-unit tests, usually leave input/stdin empty and put setup, calls, assertions, and printed output in testCode.",
-    "- For C/C++ callable tests, testCode is appended at the template's insertion point. Never redefine a function already present in the reference files, including main. If the immutable entry point prevents meaningful tests, return an actionable error describing the needed template change instead of adding another main.",
+    "- For C/C++ callable tests, insert testCode at the chosen template marker. Never redefine a function already present in the assembled reference, including main; a file's source is present only when its template includes {{ STUDENT_CODE }}. If the immutable entry point prevents meaningful tests, return actionable template guidance.",
     "- testCode must print the result named in output/expectedOutput. Assertions alone are insufficient because validation compares stdout to output/expectedOutput.",
     "- warningMessage and error message must be concise, actionable, and written in the current UI/content language.",
     "",
@@ -788,6 +797,8 @@ function buildTestsInitialPrompt(input: {
     "<template_source>",
     input.templateSource,
     "</template_source>",
+    ...(input.projectFiles ? ["", "Individual file templates (student code belongs to that file; test code goes only at its marker):",
+      JSON.stringify(codingTemplateFiles({ files: input.projectFiles }, { templateSource: input.templateSource, fileSources: input.projectReferences }), null, 2)] : []),
     ...(input.existingTests ? [
       "",
       "Complete existing tests (read-only; do not return these or similar cases):",
@@ -871,8 +882,12 @@ async function validateGeneratedTests(input: {
   if (!parsed.success) {
     return { issues: parsed.error.issues.map((issue) => `${issue.path.join(".") || "payload"}: ${issue.message}`) };
   }
-  const templateIssues = collectGeneratedTemplateShapeIssues(input.templateSource);
+  const templateConfig = { files: input.projectFiles };
+  const privateConfig = parseCodingExercisePrivateConfig({ templateSource: input.templateSource,
+    templateVisibleLineNumbers: input.templateVisibleLineNumbers, ...(input.projectFiles ? { fileSources: input.projectReferences } : {}) });
+  const templateIssues = codingTemplateLayoutIssues(templateConfig, privateConfig);
   if (templateIssues.length) return { issues: templateIssues };
+  const hasTestCode = codingTemplateHasTestCode(templateConfig, privateConfig);
 
   const issues: string[] = [];
   if (parsed.data.sampleTests.length !== input.visibleTestCount) {
@@ -894,8 +909,8 @@ async function validateGeneratedTests(input: {
         issues.push(`${kind}.${index} has invalid expected output: ${matcherIssue}`);
         return [];
       }
-      if (Boolean(test.testCode.trim()) !== input.templateSource.includes(codingExerciseTestInsertionToken)) {
-        issues.push(`${kind}.${index}: testCode must be non-empty only when templateSource contains ${codingExerciseTestInsertionToken}.`);
+      if (Boolean(test.testCode.trim()) !== hasTestCode) {
+        issues.push(`${kind}.${index}: testCode must be non-empty only when a file template contains ${codingExerciseTestInsertionToken}.`);
         return [];
       }
       if ("isEnabled" in test && !test.isEnabled) {
@@ -944,11 +959,6 @@ async function validateGeneratedTests(input: {
   };
   if (!tests.sampleTests.length && !tests.hiddenTests.length) return { issues };
 
-  const privateConfig = parseCodingExercisePrivateConfig({
-    templateSource: input.templateSource,
-    templateVisibleLineNumbers: input.templateVisibleLineNumbers,
-    ...(input.projectFiles ? { fileSources: input.projectReferences } : {})
-  });
   const validate = (suite: GeneratedTests, previousValidationSummary?: unknown) => validateReferenceSolutionAgainstHiddenTests({
     activityConfig: {
       prompt: input.prompt,
@@ -1271,8 +1281,8 @@ function buildTestCorrectionPrompt(
     "The previous JSON payload failed execution validation. Return the full corrected JSON payload only.",
     "Replace or remove every failing test; do not merely repeat its mathematically expected result.",
     "The reference solution and template are immutable. Re-read them below before changing any input, testCode, or expected output.",
-    "A compilation error in the combined program may come from your generated testCode. Correct the harness using the compiler diagnostics; do not assume the reference solution is broken. Never add a second main when the reference already defines one.",
-    "Never add stdin unless the reference solution reads it, and never add testCode unless the template contains {{ TEST_CODE }}.",
+    "A compilation error in the combined program may come from your generated testCode. Correct the harness using the compiler diagnostics; do not assume the reference solution is broken. Never add a second main when the assembled reference already defines one; check individual file templates to see which source is included.",
+    "Never add stdin unless the reference solution reads it, and never add testCode unless a file template contains {{ TEST_CODE }}.",
     "Every output/expectedOutput must contain at least one non-empty line. When testCode is used, it must print that expected result; assertions alone are insufficient.",
     "Do not include inputs for which the reference solution exits with a non-zero status.",
     "Avoid floating-point values exactly on a comparison threshold when binary representation can change the branch.",

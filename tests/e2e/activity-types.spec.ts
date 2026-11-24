@@ -392,11 +392,9 @@ test.describe.serial("authoring and completing every activity type", () => {
     await expect(markdownPrompt).toHaveValue(/\$\\pi.*\\times.*\\pi\$ Be precise; compare with \$\\sqrt\{m\}\$\./);
     await expect(markdownPrompt).toHaveValue(/\| Name \| Unit \| Value \|\n\| --- \| --- \| --- \|/);
     await expect(markdownPrompt).toHaveValue(/!\[Terminal velocity formula diagram\]\(\/api\/media-assets\/[a-z0-9]+\/content#cognelo-size=container:60 "Terminal velocity"\)/);
-    await teacherPage
-      .getByText("Reference solution", { exact: true })
-      .locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' stack ')][1]")
-      .getByRole("textbox")
-      .fill(solution);
+    await teacherPage.getByRole("tab", { name: "Solution", exact: true }).click();
+    await teacherPage.getByRole("tab", { name: "Reference solution", exact: true }).click();
+    await teacherPage.getByRole("textbox", { name: "Reference solution", exact: true }).fill(solution);
     await teacherPage.getByRole("tab", { name: "Grading", exact: true }).click();
     await teacherPage.getByRole("tab", { name: "Test cases", exact: true }).click();
     await teacherPage.getByRole("button", { name: "Add sample test" }).click();

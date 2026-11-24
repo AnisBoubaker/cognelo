@@ -233,6 +233,7 @@ export default function BankActivityAuthoringPage() {
             t={t}
             locale={locale}
             showGradingTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.gradingTab === true}
+            showSolutionTab={activityDefinitions.find((definition) => definition.key === activity.activityType.key)?.authoring?.solutionTab === true}
           >
             {renderAuthoring()}
           </ActivityEditorTabs>
