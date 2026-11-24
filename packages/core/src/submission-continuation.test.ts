@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma } from "@cognelo/db";
 import type { CurrentUser } from "@cognelo/contracts";
 
 const mocks = vi.hoisted(() => ({
@@ -50,6 +51,20 @@ beforeEach(() => {
 });
 
 describe("submission continuation", () => {
+  it.each([
+    { code: "P2034", meta: undefined },
+    { code: "P2010", meta: { code: "40001" } }
+  ])("reports database serialization conflict $code as a retryable submission conflict", async ({ code, meta }) => {
+    mocks.prisma.$transaction.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("transaction conflict", { code, clientVersion: "test", meta }));
+    await expect(reopenActivitySubmission(user, "course", "attempt")).rejects.toMatchObject({ status: 409, code: "SUBMISSION_CHANGED" });
+  });
+
+  it("does not disguise unrelated raw-query failures as submission conflicts", async () => {
+    const failure = new Prisma.PrismaClientKnownRequestError("database failure", { code: "P2010", clientVersion: "test", meta: { code: "42P01" } });
+    mocks.prisma.$transaction.mockRejectedValue(failure);
+    await expect(reopenActivitySubmission(user, "course", "attempt")).rejects.toBe(failure);
+  });
+
   it("restores answers, withdraws even an overridden grade, and audits the original completion without changing timing or policy", async () => {
     const result = await reopenActivitySubmission(user, "course", "attempt");
     expect(result.attempt).toMatchObject({ id: "attempt", attemptNumber: 2, lifecycle: "started", startedAt, submittedAt: null, gradedAt: null, durationSeconds: null });

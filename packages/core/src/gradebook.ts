@@ -765,7 +765,8 @@ export async function reopenActivitySubmission(user: CurrentUser, courseId: stri
       return { attempt: reopened };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+    if (error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === "P2034" || (error.code === "P2010" && error.meta?.code === "40001"))) {
       throw new AppError(409, "SUBMISSION_CHANGED", "The attempt changed. Refresh the results and try again.");
     }
     throw error;
