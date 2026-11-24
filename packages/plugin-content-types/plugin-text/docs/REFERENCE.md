@@ -35,6 +35,7 @@ Duplication copies Markdown and display preferences, excluding `embeddingIndex`.
 - Core media tests cover reference ownership and section/resource visibility during image delivery.
 - `tests/e2e/text-content.spec.ts` covers dedicated editing, actual image uploads and retention, tables/formulas, inline/page/modal display, new-tab behavior, focus/scroll restoration, section visibility, student permissions, and duplicate image retention, plus presentation updates on long imported notes without resending text or overwriting concurrent content edits.
 - Existing content-resource E2E coverage also checks inherited folder visibility, duplication, file and GitHub materials, and saved ordering.
+- `tests/e2e/text-fullscreen.spec.ts` verifies desktop/mobile viewport bounds in fullscreen, Visual/Markdown switching and draft retention, internal long-text scrolling, close/Escape, restored body scrolling, and saving. A card hover transform must not capture the editor's fixed positioning; the shared fullscreen CSS suppresses ancestor-card transforms without moving or remounting the editor.
 
 ## Shared action controls
 

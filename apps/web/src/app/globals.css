@@ -6163,6 +6163,11 @@ button:hover > .disclosure-indicator {
   z-index: 80;
 }
 
+/* A transformed card becomes the containing block for fixed descendants. */
+.card:has(.rich-text-editor.is-full-screen) {
+  transform: none;
+}
+
 .rich-text-editor.is-full-screen .rich-text-editor-visual-panel,
 .rich-text-editor.is-full-screen .rich-text-editor-markdown-source {
   height: auto;

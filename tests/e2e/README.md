@@ -1,5 +1,7 @@
 # Browser user flows
 
+`text-fullscreen.spec.ts` checks Text material fullscreen on desktop/mobile, both editing modes, viewport bounds, retained drafts, long-content scrolling, close/Escape, body-scroll restoration and saving.
+
 `coding-multiple-files.spec.ts` checks default filenames, inline add/rename/remove, per-file references, real separate C translation units, Python modules, full-screen navigation, autosave/reopening, cross-file annotation undo and blank partial credit, Test submission/regrading, retained source after file renames, legacy single-file regrading after workspace conversion, released reports and shared teacher-review conflicts. It also verifies TypeScript imports from unvisited files without an initial draft write. Existing single-file suites run alongside it.
 
 `coding-files-coverage.spec.ts` checks a shared run allowance across multiple blank files, public examples and personalized input, cancellation, stale/unknown file rejection, exhaustion, a new attempt and reopening. It also runs a multi-file project in teacher Student view and verifies that preview creates no academic or execution records.
