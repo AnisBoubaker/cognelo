@@ -39,6 +39,6 @@ Deployments must rebuild the maintained Judge0 image, apply language configurati
 - [x] Complete nested Test, regrade, review and legacy regression verification.
 - [x] Review documentation and deployment commands against the final implementation.
 
-Tests live in `coding-files.test.ts`, `project-runner.test.ts` and `tests/e2e/coding-multiple-files.spec.ts`, alongside the existing code/blanks/regression suites.
+Tests live in `coding-files.test.ts`, `project-runner.test.ts`, `tests/e2e/coding-multiple-files.spec.ts` and `tests/e2e/coding-files-coverage.spec.ts`, alongside the existing code/blanks/regression suites. The latter checks shared run allowances across files and public/personalized tests, rejected file revisions, reopening and stateless teacher preview. `coding-blanks-coverage.spec.ts` checks unanswered compound-Test grading without executing or exposing the private completion.
 
 Docker Desktop’s per-process fallback limits virtual address space, unlike production cgroup accounting. Managed/interpreted runtimes can fail startup under an existing profile even when their project wrappers are correct; compare the single-file control and validate required languages in the isolated deployment profile. Preserve resource isolation rather than weakening limits to make a project pass.

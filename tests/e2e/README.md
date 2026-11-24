@@ -2,6 +2,10 @@
 
 `coding-multiple-files.spec.ts` checks default filenames, inline add/rename/remove, per-file references, real separate C translation units, Python modules, full-screen navigation, autosave/reopening, cross-file annotation undo and blank partial credit, Test submission/regrading, retained source after file renames, legacy single-file regrading after workspace conversion, released reports and shared teacher-review conflicts. It also verifies TypeScript imports from unvisited files without an initial draft write. Existing single-file suites run alongside it.
 
+`coding-files-coverage.spec.ts` checks a shared run allowance across multiple blank files, public examples and personalized input, cancellation, stale/unknown file rejection, exhaustion, a new attempt and reopening. It also runs a multi-file project in teacher Student view and verifies that preview creates no academic or execution records.
+
+`coding-blanks-coverage.spec.ts` submits an untouched blank question inside a Test and verifies zero credit without running or exposing the private reference or requesting teacher review.
+
 `coding-blank-grading.spec.ts` covers equal partial credit for missing and syntax/compile-invalid Python/C blanks, the combined/isolated interaction conflict, generic review/release gates, stale final-grade protection, teacher resolution, current-test regrading, private substituted output, and Test-question resolution/reopening. All executions and academic fixtures are local.
 
 `coding-grading-general.spec.ts` checks General component switches/weights and keyboard navigation, persistence, blank-zero/ordinary-unlimited defaults, full runner hiding, per-run confirmation/cancellation/countdown, concurrent last-run reservation, forged scope rejection, reload/new-attempt/reopening behavior, independent Test-question budgets and new sittings, final submission after exhaustion, and rubric-only manual grading with disabled retained cases and re-enablement validation.
