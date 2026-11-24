@@ -157,3 +157,45 @@ test("real generation reports an invalid multi-file C reference as a compilation
     expect(activity.activity.config.sampleTests).toEqual([]);
   } finally { await fixture.close(); }
 });
+
+for (const problem of ["bad call", "duplicate main"] as const) {
+  test(`real C blank generation corrects or explains a generated harness with ${problem}`, async () => {
+    test.setTimeout(120_000);
+    const fixture = await generationFixture();
+    try {
+      const { data, owner, responses, requests } = fixture;
+      const templateSource = "{{ STUDENT_CODE }}\n\n{{ TEST_CODE }}";
+      const sources = [
+        { id: "main", name: "main.c", sourceCode: problem === "duplicate main"
+          ? '#include "test.h"\nint main(void) { int a[] = {2, 1}; sort_array(a, 2); return 0; }' : '#include "test.h"' },
+        { id: "header", name: "test.h", sourceCode: "void sort_array(int arr[], int size);" },
+        { id: "sort", name: "test.c", sourceCode: '#include "test.h"\nvoid sort_array(int arr[], int size) { for (int i = 0; i < size; i++) for (int j = i + 1; j < size; j++) if (arr[i] > arr[j]) { int t = arr[i]; arr[i] = arr[j]; arr[j] = t; } }' }
+      ];
+      const projectFiles = sources.map(file => ({ id: file.id, name: file.name, starterCode: "", studentTemplateSource: "{{ STUDENT_CODE }}",
+        blankTemplate: file.id === "sort" ? file.sourceCode.replace("arr[j] = t;", "arr[j] = {{ BLANK:swap }};") : file.sourceCode }));
+      const projectReferences = Object.fromEntries(sources.map((file, index) => [file.id, { referenceSolution: file.sourceCode,
+        templateSource: index === 0 ? templateSource : "{{ STUDENT_CODE }}", templateVisibleLineNumbers: [] }]));
+      const prompt = "Sort the array in place in ascending order.";
+      const activityId = await createCourseActivity(data, { activityTypeKey: "coding-exercise", title: `Callable sort ${data.token}`,
+        config: { language: "c", responseMode: "blanks", prompt, files: projectFiles, sampleTests: [] } });
+      const path = `/api/courses/${data.courseId}/activities/${activityId}`;
+      const validHarness = '#include <stdio.h>\nint main(void) { int a[] = {2, 1}; sort_array(a, 2); printf("%d %d\\n", a[0], a[1]); return 0; }';
+      const generated = (testCode: string) => JSON.stringify({ sampleTests: [{ id: "sort", title: "Sort reverse pair", input: "", output: "1 2", testCode }], hiddenTests: [] });
+      responses.push(generated(problem === "bad call" ? validHarness.replace("sort_array(a, 2)", "sort_array(a)") : validHarness));
+      const guidance = "The reference already defines main. Move the demonstration main into the test harness to test other arrays.";
+      responses.push(problem === "bad call" ? generated(validHarness) : JSON.stringify({ status: "error", message: guidance }));
+      const result = await responseJson<Record<string, unknown>>(await owner.api.post(`${path}/coding-exercises/generate-tests`, { data: {
+        prompt, language: "c", referenceSolution: sources.map(file => `===== ${file.name} =====\n${file.sourceCode}`).join("\n\n"),
+        templateSource, projectFiles, projectReferences, visibleTestCount: 1, hiddenTestCount: 0
+      } }));
+      expect(requests).toHaveLength(2);
+      expect(requests[1]).toContain(problem === "bad call" ? "too few arguments" : "redefinition");
+      expect(result).toMatchObject(problem === "bad call"
+        ? { status: "ok", attempts: 2, validationSummary: { accepted: true } }
+        : { status: "error", attempts: 2, message: guidance });
+      const saved = await responseJson<{ tests: unknown[]; referenceSolution: unknown }>(await owner.api.get(`${path}/coding-exercises/hidden-tests`));
+      expect(saved.tests).toEqual([]);
+      expect(saved.referenceSolution).toBeNull();
+    } finally { await fixture.close(); }
+  });
+}

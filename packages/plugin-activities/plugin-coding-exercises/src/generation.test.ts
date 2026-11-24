@@ -561,6 +561,36 @@ describe("coding exercise AI generation", () => {
     expect(mocks.generateQuestionAuthoringText).toHaveBeenCalledTimes(1);
   });
 
+  it("corrects an all-failing generated C harness without blaming the reference", async () => {
+    const bad = { id: "call", title: "Call answer", input: "", output: "1", testCode: "int main(void) { return answer(1); }" };
+    const good = { ...bad, testCode: '#include <stdio.h>\nint main(void) { printf("%d\\n", answer()); return 0; }' };
+    mocks.generateQuestionAuthoringText.mockResolvedValueOnce(JSON.stringify({ sampleTests: [bad], hiddenTests: [] }))
+      .mockResolvedValueOnce(JSON.stringify({ sampleTests: [good], hiddenTests: [] }));
+    mocks.validateReferenceSolutionAgainstHiddenTests.mockResolvedValueOnce({ accepted: false,
+      sampleTests: { tests: [{ id: "call", passed: false, statusLabel: "Compilation Error", compileOutput: "error: too many arguments to function 'answer'" }] },
+      hiddenTests: { tests: [] } });
+    await expect(generateCodingExerciseTests({ ...testsInput, language: "c", referenceSolution: "int answer(void) { return 1; }",
+      templateSource: "{{ STUDENT_CODE }}\n\n{{ TEST_CODE }}", visibleTestCount: 1, hiddenTestCount: 0 })).resolves.toMatchObject({ attempts: 2,
+      sampleTests: [{ testCode: good.testCode }], validationSummary: { accepted: true } });
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1][1].userPrompt).toContain("too many arguments");
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1][1].userPrompt).toContain("do not assume the reference solution is broken");
+    for (const [input] of mocks.validateReferenceSolutionAgainstHiddenTests.mock.calls) {
+      expect(input.sourceCode).toBe("int answer(void) { return 1; }");
+    }
+  });
+
+  it("allows an actionable template error after a generated duplicate main fails", async () => {
+    const guidance = "The reference already defines main. Move the demonstration main into the test harness to test other arrays.";
+    mocks.generateQuestionAuthoringText.mockResolvedValueOnce(JSON.stringify({ sampleTests: [{ id: "call", title: "Print array", input: "", output: "1",
+      testCode: "int main(void) { return 0; }" }], hiddenTests: [] })).mockResolvedValueOnce(JSON.stringify({ status: "error", message: guidance }));
+    mocks.validateReferenceSolutionAgainstHiddenTests.mockResolvedValueOnce({ accepted: false,
+      sampleTests: { tests: [{ id: "call", passed: false, statusLabel: "Compilation Error", compileOutput: "error: redefinition of 'main'" }] },
+      hiddenTests: { tests: [] } });
+    await expect(generateCodingExerciseTests({ ...testsInput, language: "c", referenceSolution: "int main(void) { return 0; }",
+      templateSource: "{{ STUDENT_CODE }}\n\n{{ TEST_CODE }}", visibleTestCount: 1, hiddenTestCount: 0 })).resolves.toMatchObject({ status: "error", attempts: 2, message: guidance });
+    expect(mocks.generateQuestionAuthoringText.mock.calls[1][1].userPrompt).toContain("redefinition of 'main'");
+  });
+
   it("keeps passing visible and hidden tests when one harness still fails after every retry", async () => {
     mocks.generateQuestionAuthoringText.mockResolvedValue(JSON.stringify(mixedTests));
     mocks.validateReferenceSolutionAgainstHiddenTests.mockImplementation((input: ValidationInput) => validationFor(input, ["hidden-bad"]));

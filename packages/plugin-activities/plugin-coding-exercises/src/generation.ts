@@ -695,6 +695,7 @@ function buildTestsGenerationSystemPrompt(input: {
     `- If the template does not contain ${codingExerciseTestInsertionToken}, every testCode field must be empty and tests must use stdin plus expected output only.`,
     "- For full-program tests, put input in input/stdin and expected printed output in output/expectedOutput.",
     "- For callable-unit tests, usually leave input/stdin empty and put setup, calls, assertions, and printed output in testCode.",
+    "- For C/C++ callable tests, testCode is appended at the template's insertion point. Never redefine a function already present in the reference files, including main. If the immutable entry point prevents meaningful tests, return an actionable error describing the needed template change instead of adding another main.",
     "- testCode must print the result named in output/expectedOutput. Assertions alone are insufficient because validation compares stdout to output/expectedOutput.",
     "- warningMessage and error message must be concise, actionable, and written in the current UI/content language.",
     "",
@@ -967,7 +968,8 @@ async function validateGeneratedTests(input: {
     previousValidationSummary
   });
   let validationSummary = await validate(tests, input.retained?.validationSummary);
-  const fatalError = getFatalReferenceValidationError(validationSummary);
+  const fatalError = getFatalReferenceValidationError(validationSummary,
+    [...tests.sampleTests, ...tests.hiddenTests].some(test => test.testCode.trim()));
   if (fatalError) return { issues: [...issues, ...collectValidationIssues(validationSummary)], fatalError };
 
   if (!validationSummary.accepted) {
@@ -1072,14 +1074,16 @@ function collectValidationIssues(validationSummary: Record<string, unknown>) {
   return issues;
 }
 
-function getFatalReferenceValidationError(validationSummary: Record<string, unknown>) {
+function getFatalReferenceValidationError(validationSummary: Record<string, unknown>, hasGeneratedHarness = false) {
   const results = [
     ...getValidationTests(validationSummary.sampleTests),
     ...getValidationTests(validationSummary.hiddenTests)
   ];
   const failed = results.filter((test) => test.passed === false);
   if (!failed.length || failed.length !== results.length) return null;
-  if (failed.every((test) => String(test.statusLabel ?? "").toLowerCase().includes("compilation error"))) {
+  // The compiler sees the reference together with AI-authored testCode. A
+  // broken harness can fail every case while the immutable reference is valid.
+  if (!hasGeneratedHarness && failed.every((test) => String(test.statusLabel ?? "").toLowerCase().includes("compilation error"))) {
     return {
       status: 422,
       code: "REFERENCE_SOLUTION_COMPILATION_FAILED",
@@ -1267,6 +1271,7 @@ function buildTestCorrectionPrompt(
     "The previous JSON payload failed execution validation. Return the full corrected JSON payload only.",
     "Replace or remove every failing test; do not merely repeat its mathematically expected result.",
     "The reference solution and template are immutable. Re-read them below before changing any input, testCode, or expected output.",
+    "A compilation error in the combined program may come from your generated testCode. Correct the harness using the compiler diagnostics; do not assume the reference solution is broken. Never add a second main when the reference already defines one.",
     "Never add stdin unless the reference solution reads it, and never add testCode unless the template contains {{ TEST_CODE }}.",
     "Every output/expectedOutput must contain at least one non-empty line. When testCode is used, it must print that expected result; assertions alone are insufficient.",
     "Do not include inputs for which the reference solution exits with a non-zero status.",
