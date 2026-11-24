@@ -4,6 +4,8 @@
 
 `coding-files-coverage.spec.ts` checks a shared run allowance across multiple blank files, public examples and personalized input, cancellation, stale/unknown file rejection, exhaustion, a new attempt and reopening. It also runs a multi-file project in teacher Student view and verifies that preview creates no academic or execution records.
 
+`coding-multifile-generation.spec.ts` generates and saves tests for current, unsaved C blank completions across separate files in course and bank authoring, plus ordinary single-file and single-file blank controls. `coding-ai-generation-coverage.spec.ts` exercises multi-file generation through the real route and runner: retries retain passing cases, partial results survive failed corrections, Add rejects duplicates while Replace permits them, private cases stay protected, and a truly invalid C project reports a compilation failure. Both use an isolated local model fixture.
+
 `coding-blanks-coverage.spec.ts` submits an untouched blank question inside a Test and verifies zero credit without running or exposing the private reference or requesting teacher review.
 
 `coding-blank-grading.spec.ts` covers equal partial credit for missing and syntax/compile-invalid Python/C blanks, the combined/isolated interaction conflict, generic review/release gates, stale final-grade protection, teacher resolution, current-test regrading, private substituted output, and Test-question resolution/reopening. All executions and academic fixtures are local.

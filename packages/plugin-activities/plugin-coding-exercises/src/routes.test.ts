@@ -479,6 +479,23 @@ describe("coding exercise plugin routes", () => {
     }));
   });
 
+  it("forwards individual draft files and private references for test generation", async () => {
+    const projectFiles = [
+      { id: "main", name: "main.c", starterCode: "", blankTemplate: "int main(void) { return {{ BLANK:result }}; }", studentTemplateSource: "{{ STUDENT_CODE }}" },
+      { id: "helper", name: "helper.c", starterCode: "int value(void) { return 0; }", studentTemplateSource: "{{ STUDENT_CODE }}" }
+    ];
+    const projectReferences = {
+      main: { referenceSolution: "int main(void) { return 0; }", templateSource: "{{ STUDENT_CODE }}", templateVisibleLineNumbers: [] },
+      helper: { referenceSolution: "int value(void) { return 0; }", templateSource: "{{ STUDENT_CODE }}", templateVisibleLineNumbers: [] }
+    };
+    await codingExerciseGenerateTestsRoute.methods.POST?.({
+      request: new Request("http://test.local"), context,
+      readJson: async () => ({ prompt: "Complete the program.", language: "c", referenceSolution: "labelled project snapshot",
+        templateSource: "{{ STUDENT_CODE }}", projectFiles, projectReferences, visibleTestCount: 1, hiddenTestCount: 0 })
+    });
+    expect(mocks.generateCodingExerciseTests).toHaveBeenCalledWith(expect.objectContaining({ projectFiles, projectReferences }));
+  });
+
   it("generates prompt, solution, tests, and rubrics with subject context", async () => {
     await expect(
       codingExerciseGeneratePromptRoute.methods.POST?.({

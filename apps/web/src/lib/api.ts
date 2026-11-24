@@ -290,6 +290,8 @@ export type CodingExerciseTestsGenerationInput = CodingExerciseGenerationBaseInp
   referenceSolution: string;
   templateSource: string;
   templateVisibleLineNumbers: number[];
+  projectFiles?: Array<{ id: string; name: string; starterCode: string; studentTemplateSource: string; blankTemplate?: string }>;
+  projectReferences?: Record<string, { referenceSolution: string; templateSource: string; templateVisibleLineNumbers: number[] }>;
   visibleTestCount: number;
   hiddenTestCount: number;
   existingTests?: Pick<Exclude<CodingExerciseTestsGenerationResult, { status: "error" }>, "sampleTests" | "hiddenTests">;

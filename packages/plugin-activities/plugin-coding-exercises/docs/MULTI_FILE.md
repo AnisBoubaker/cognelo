@@ -10,7 +10,7 @@ Learners edit the teacher-defined files; they cannot add, remove or rename them.
 
 Each file keeps its own editable region and public scaffold projection. Blanks have unique IDs across the project, consecutive labels and the same dimensions and horizontal resize controls as single-file blanks. Blank grading tests the entire project, then isolates values across all files under the existing equal-credit policy and shared teacher-review conflict rule.
 
-Manual reference authoring, test generation and rubric generation use the whole workspace. Automatic solution generation remains single-file; automatic variations do not regenerate file workspaces. Duplicating an exercise retains its independently owned file configuration and references.
+Manual reference authoring, test generation and rubric generation use the whole workspace. Test-generation requests carry each file and its reference/scaffold through the course or bank route; validation compiles the individual files, using current unsaved blank completions where applicable. The labelled reference snapshot is only model context and is never compiled. Automatic solution generation remains single-file; automatic variations do not regenerate file workspaces. Duplicating an exercise retains its independently owned file configuration and references.
 
 ## Contracts and persistence
 
@@ -39,6 +39,6 @@ Deployments must rebuild the maintained Judge0 image, apply language configurati
 - [x] Complete nested Test, regrade, review and legacy regression verification.
 - [x] Review documentation and deployment commands against the final implementation.
 
-Tests live in `coding-files.test.ts`, `project-runner.test.ts`, `tests/e2e/coding-multiple-files.spec.ts` and `tests/e2e/coding-files-coverage.spec.ts`, alongside the existing code/blanks/regression suites. The latter checks shared run allowances across files and public/personalized tests, rejected file revisions, reopening and stateless teacher preview. `coding-blanks-coverage.spec.ts` checks unanswered compound-Test grading without executing or exposing the private completion.
+Tests live in `coding-files.test.ts`, `project-runner.test.ts`, `tests/e2e/coding-multiple-files.spec.ts` and `tests/e2e/coding-files-coverage.spec.ts`, alongside the existing code/blanks/regression suites. The latter checks shared run allowances across files and public/personalized tests, rejected file revisions, reopening and stateless teacher preview. `coding-blanks-coverage.spec.ts` checks unanswered compound-Test grading without executing or exposing the private completion. `coding-multifile-generation.spec.ts` and `coding-ai-generation-coverage.spec.ts` exercise real course/bank generation, per-file validation, unsaved references, retries, partial results and genuine compiler errors with isolated model fixtures.
 
 Docker Desktop’s per-process fallback limits virtual address space, unlike production cgroup accounting. Managed/interpreted runtimes can fail startup under an existing profile even when their project wrappers are correct; compare the single-file control and validate required languages in the isolated deployment profile. Preserve resource isolation rather than weakening limits to make a project pass.

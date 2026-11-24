@@ -628,6 +628,8 @@ export const codingExerciseGenerateTestsRoute: PluginRouteDefinition = {
         referenceSolution: input.referenceSolution,
         templateSource: input.templateSource,
         templateVisibleLineNumbers: input.templateVisibleLineNumbers,
+        projectFiles: input.projectFiles,
+        projectReferences: input.projectReferences,
         visibleTestCount: input.visibleTestCount,
         hiddenTestCount: input.hiddenTestCount,
         existingTests: input.existingTests,
