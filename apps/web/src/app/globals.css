@@ -7293,10 +7293,18 @@ button.coding-authoring-blank-remove [data-action-icon] {
 }
 
 .coding-file-tabs { display: flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; overflow-x: auto; padding: 4px 0 8px; flex: 0 0 auto; }
-.coding-file-tab { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
-.coding-file-tab [role="tab"] { max-width: 18rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.coding-file-tab.is-active [role="tab"] { background: var(--brand-blue); color: white; }
+.coding-file-tab { display: flex; align-items: center; flex: 0 0 auto; padding-inline-end: 4px; border: 1px solid var(--button-border); border-radius: var(--button-radius); background: var(--surface); }
+.coding-file-tab > button { background: transparent; border: 0; color: inherit; }
+.coding-file-tab > [role="tab"] { min-height: calc(var(--button-height) - 2px); max-width: 18rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coding-file-tab > .icon-button { width: 30px; height: 30px; min-height: 30px; border-radius: 6px; }
+.coding-file-tab > button:hover { background: color-mix(in srgb, currentColor, transparent 92%); }
+.coding-file-tab > button:focus-visible { outline-offset: -3px; }
+.coding-file-tab.is-active { background: var(--brand-blue); border-color: var(--brand-blue); color: white; }
+.coding-file-tab.is-active > button:focus-visible { outline-color: white; }
 .coding-file-tabs input { width: 170px; flex: 0 0 auto; min-width: 100px; }
 .coding-file-add { margin-inline-start: auto; position: sticky; right: 0; background: var(--surface); }
 .coding-exercise-editor-pane:has(> .coding-file-tabs) { display: flex; flex-direction: column; }
 .coding-exercise-editor-pane:has(> .coding-file-tabs) > .monaco-code-editor { flex: 1; min-height: 0; }
+@media (pointer: coarse) {
+  .coding-file-tab > .icon-button { width: 40px; height: 40px; min-height: 40px; }
+}

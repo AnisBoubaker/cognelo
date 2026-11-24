@@ -4,7 +4,7 @@ File workspaces extend the existing `coding-exercise` activity type for both cod
 
 ## Authoring and learner behavior
 
-The authoring file tabs control the starter code, private reference and private scaffold together. The first file is the entry point, initially named for the language (`main.c`, `main.cpp`, `main.py`, `Main.java`, and equivalent names for other supported runtimes). The right-hand plus opens an inline filename field. The pen renames in place; auxiliary files can be removed with confirmation. File IDs remain stable through renaming. Imports/includes remain authored code and must match any renamed file.
+The authoring file tabs control the starter code, private reference and private scaffold together. The first file is the entry point, initially named for the language (`main.c`, `main.cpp`, `main.py`, `Main.java`, and equivalent names for other supported runtimes). The right-hand plus opens an inline filename field. Each tab contains a pen to rename in place and, for auxiliary files, a cross to remove the file with confirmation. File IDs remain stable through renaming. Imports/includes remain authored code and must match any renamed file.
 
 Learners edit the teacher-defined files; they cannot add, remove or rename them. File tabs appear only with multiple files and remain in the same workspace in full screen. Switching tabs changes no answer and consumes no run. Monaco registers real filename URIs and unvisited files in the current model group, so TypeScript imports resolve without opening every tab. The practice allowance is shared by the question/attempt across every file and test. File names, IDs and scaffolds are reconstructed from authoritative configuration at execution.
 
