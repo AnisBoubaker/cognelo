@@ -184,7 +184,8 @@ for (const expiry of ["duration", "closing date"] as const) test(`six-question C
     const proof = createHash("sha256").update(`${config.startUrl}${config.configKey}`).digest("hex");
     await responseJson(await student.post(`${ex.assigned}/seb/activate`, { data: { token, configKeyHash: proof } }));
     const cookies = (await student.storageState()).cookies;
-    for (const name of ["cognelo_session", "cognelo_seb_access"]) {
+    const cookiePrefix = process.env.E2E_COOKIE_PREFIX ?? "cognelo_";
+    for (const name of [`${cookiePrefix}session`, `${cookiePrefix}seb_access`]) {
       const cookie = cookies.find(cookie => cookie.name === name)!;
       expect(cookie).toBeDefined();
       // Both the browser cookie and server token must cover the longest accommodation.
