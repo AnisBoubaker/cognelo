@@ -1,7 +1,7 @@
 import { getWebDesignExpectedResult } from "./tests";
 import { webDesignExpectedResultTokenPattern, webDesignPromptIncludesExpectedResult } from "./web-design-coding-exercises";
 import { AppError } from "@cognelo/core";
-import { exportRecord, exportText, feedbackExportBlocks, type AnswerExportBlock, type SubmissionExportHandler } from "@cognelo/activity-sdk/server";
+import { exportRecord, exportText, feedbackExportBlocks, studentSubmissionExportInput, type AnswerExportBlock, type SubmissionExportHandler, type StudentActivityExportHandler } from "@cognelo/activity-sdk/server";
 import { prisma } from "./db-client";
 export const exportWebDesignSubmission: SubmissionExportHandler = async (input) => {
   const id = input.pluginAttemptRef ?? exportText(input.state?.submissionId);
@@ -12,7 +12,7 @@ export const exportWebDesignSubmission: SubmissionExportHandler = async (input) 
   const answer: AnswerExportBlock[] = files.map((file) => ({ kind: "code", title: exportText(file.path), text: exportText(file.content ?? file.starterCode), language: exportText(file.language) }));
   const grading: AnswerExportBlock[] = input.includeGrading ? feedbackExportBlocks(input.feedback, input.labels) : [];
   if (input.includeGrading && submission?.testResults.length) grading.unshift({ kind: "table", title: input.labels.tests,
-    headers: [input.labels.test, input.labels.result, input.labels.score, input.labels.comments], rows: submission.testResults.map((row) => [row.name, row.status === "completed" && (row.score ?? 0) >= row.weight ? input.labels.passed : input.labels.failed, `${row.score ?? "-"} / ${row.weight}`, row.message ?? ""]) });
+    headers: [input.labels.test, input.labels.result, input.labels.score, input.labels.comments], rows: submission.testResults.map((row) => [row.name, row.status === "completed" && (row.score ?? 0) >= row.weight ? input.labels.passed : input.labels.failed, `${row.score ?? "-"} / ${row.weight}`, input.audience === "student" ? "" : row.message ?? ""]) });
   const rawPrompt = exportText(input.activity.config?.prompt);
   let prompt = rawPrompt;
   if (input.includePrompt && webDesignPromptIncludesExpectedResult(rawPrompt)) {
@@ -20,4 +20,15 @@ export const exportWebDesignSubmission: SubmissionExportHandler = async (input) 
     prompt = rawPrompt.replace(webDesignExpectedResultTokenPattern, image.imageDataUrl ? `![${input.labels.prompt}](${image.imageDataUrl})` : input.labels.unavailable);
   }
   return { replaceDescription: Boolean(rawPrompt && rawPrompt === input.activity.description), prompt: input.includePrompt && prompt ? [{ kind: "markdown", text: prompt }] : [], answer: answer.length ? answer : [{ kind: "markdown", text: input.labels.noAnswer }], grading };
+};
+
+export const exportStudentWebDesign: StudentActivityExportHandler = async input => {
+  if (input.attempt) return exportWebDesignSubmission(studentSubmissionExportInput(input));
+  const rawPrompt = exportText(input.activity.config?.prompt);
+  let prompt = rawPrompt;
+  if (webDesignPromptIncludesExpectedResult(rawPrompt)) {
+    const image = await getWebDesignExpectedResult({ activityId: input.activity.id, activityConfig: input.activity.config });
+    prompt = rawPrompt.replace(webDesignExpectedResultTokenPattern, image.imageDataUrl ? `![${input.labels.prompt}](${image.imageDataUrl})` : input.labels.unavailable);
+  }
+  return { answer: [], replaceDescription: Boolean(rawPrompt && rawPrompt === input.activity.description), prompt: prompt ? [{ kind: "markdown", text: prompt }] : [] };
 };

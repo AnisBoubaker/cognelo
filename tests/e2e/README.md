@@ -1,5 +1,7 @@
 # Browser user flows
 
+`student-course-export.spec.ts` checks default-off teacher activation and save/cancel, learner-only downloads, multiple enrollments/section folders and dual-role isolation, nested/hidden content, printable links, original file integrity, Homework frozen source/assignment PDFs/original provided ZIPs and staged-feedback exclusion, feedback release, saved compound Test answers, pre-start/closed exam privacy, read-only attempts, mobile containment and cancellation of late downloads. It uses Poppler's `pdftotext` (also required by material PDF preparation) to inspect real archive PDFs. Run only against a local or isolated preprod database.
+
 `text-fullscreen.spec.ts` checks Text material fullscreen on desktop/mobile, both editing modes, viewport bounds, retained drafts, long-content scrolling, close/Escape, body-scroll restoration and saving.
 
 `coding-multiple-files.spec.ts` checks default filenames, inline add/rename/remove, per-file references, real separate C translation units, Python modules, full-screen navigation, autosave/reopening, cross-file annotation undo and blank partial credit, Test submission/regrading, retained source after file renames, legacy single-file regrading after workspace conversion, released reports and shared teacher-review conflicts. It also verifies TypeScript imports from unvisited files without an initial draft write. Existing single-file suites run alongside it.

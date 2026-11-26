@@ -45,3 +45,7 @@ Repository URLs reject embedded credentials and non-HTTP(S) schemes; HTTP is nor
 ## Prepared embedding service
 
 This material provides plugin-owned preparation/refresh through core. See [material embedding services](../../../docs/MATERIAL_EMBEDDING_SERVICES.md) for source extraction, reuse, freshness and limits. The prior deterministic index handlers remain a legacy compatibility path; Coding Homework uses the prepared semantic service.
+
+## Student course exports
+
+The optional server `studentExport` handler contributes to the teacher-enabled [course ZIP](../../../docs/STUDENT_COURSE_EXPORTS.md). Export only the normalized public repository URL and title. Do not fetch repository contents, credentials or derived indexes. Core owns actual learner enrollment, effective folder/section visibility, plugin activation and final access revalidation.

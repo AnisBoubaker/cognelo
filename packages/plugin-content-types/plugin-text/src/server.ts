@@ -12,6 +12,7 @@ const EMBEDDING_INDEX_KEY = "embeddingIndex";
 
 export const textContentServerPlugin: ServerContentTypePlugin = {
   key: "text-content",
+  studentExport: async ({ resource }) => ({ blocks: [{ kind: "markdown", text: bodyFrom(resource.metadata) }] }),
   indexing: {
     policy: resource => ({ revision: contentIndexRevision({ title: resource.title, body: bodyFrom(resource.metadata) }) }),
     prepare: async ({ resource, store }) => store(getTextEmbeddingDocuments(resource))

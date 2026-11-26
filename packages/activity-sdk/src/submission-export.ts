@@ -1,10 +1,7 @@
-import type { CurrentUser } from "@cognelo/contracts";
+import type { CurrentUser, ExportDocumentBlock } from "@cognelo/contracts";
 import type { ServerActivityRecord } from "./server";
 
-export type AnswerExportBlock =
-  | { kind: "markdown"; text: string; title?: string }
-  | { kind: "code"; text: string; title?: string; language?: string }
-  | { kind: "table"; headers: string[]; rows: string[][]; title?: string };
+export type AnswerExportBlock = ExportDocumentBlock;
 export type AnswerExportLabels = {
   prompt: string; answer: string; grading: string; question: string; choices: string; correctAnswer: string;
   noAnswer: string; unavailable: string; tests: string; test: string; result: string; score: string;
@@ -16,9 +13,27 @@ export type SubmissionExportInput = {
   coreAttemptId: string; pluginAttemptRef: string | null; activity: ServerActivityRecord;
   metadata: Record<string, unknown>; state: Record<string, unknown> | null; feedback: Record<string, unknown>;
   includePrompt: boolean; includeGrading: boolean; labels: AnswerExportLabels;
+  /** Only the explicit student-export registration may request this projection. */
+  audience?: "teacher" | "student";
+  includeAiFeedback?: boolean;
+  signal?: AbortSignal;
 };
-export type SubmissionExportContent = { replaceDescription?: boolean; promptPdfs?: Array<{ name: string; bytes: Uint8Array }>; prompt?: AnswerExportBlock[]; answer: AnswerExportBlock[]; grading?: AnswerExportBlock[] };
+export type SubmissionExportContent = { replaceDescription?: boolean; promptPdfs?: Array<{ name: string; bytes: Uint8Array }>; files?: Array<{ name: string; bytes: Uint8Array }>; prompt?: AnswerExportBlock[]; answer: AnswerExportBlock[]; grading?: AnswerExportBlock[] };
 export type SubmissionExportHandler = (input: SubmissionExportInput) => Promise<SubmissionExportContent>;
+
+/** Core supplies the learner's authorized activity and, optionally, one exact saved submission.
+ * A null attempt exports only the public prompt. Never initialize work or run assessment. */
+export type StudentActivityExportInput = {
+  user: CurrentUser; courseId: string; groupId: string; participantId: string;
+  activity: ServerActivityRecord; labels: AnswerExportLabels; signal?: AbortSignal;
+  attempt: Pick<SubmissionExportInput, "coreAttemptId" | "pluginAttemptRef" | "metadata" | "state" | "feedback" | "includeGrading" | "includeAiFeedback"> | null;
+};
+export type StudentActivityExportHandler = (input: StudentActivityExportInput) => Promise<SubmissionExportContent>;
+
+export function studentSubmissionExportInput(input: StudentActivityExportInput): SubmissionExportInput {
+  if (!input.attempt) throw new Error("A student submission export requires an exact attempt.");
+  return { ...input, ...input.attempt, userId: input.user.id, includePrompt: true, audience: "student" };
+}
 export const exportRecord = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 export const exportText = (value: unknown) => typeof value === "string" || typeof value === "number" ? String(value) : "";
 

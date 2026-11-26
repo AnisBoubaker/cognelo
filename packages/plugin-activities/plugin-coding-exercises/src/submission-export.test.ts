@@ -21,3 +21,10 @@ it("preserves recovered saved source when a timeout has no execution record", as
   const result = await exportCodingSubmission({ ...input, pluginAttemptRef: null, state: { sourceCode: "recovered answer" } });
   expect(result.answer).toMatchObject([{ text: "recovered answer" }]);
 });
+it("omits private test diagnostics and does not read AI feedback in ordinary student practice", async () => {
+  mocks.tests.mockResolvedValue({ resultSummary: { tests: [{ name: "Visible test", passed: false, weight: 1, message: "PRIVATE INPUT AND EXPECTED OUTPUT" }] } });
+  const content = await exportCodingSubmission({ ...input, audience: "student", includeGrading: true, includeAiFeedback: false });
+  expect(JSON.stringify(content)).not.toContain("PRIVATE INPUT");
+  expect(content.grading).toMatchObject([{ rows: [["Visible test", "Failed", "1", ""]] }]);
+  expect(mocks.evaluation).not.toHaveBeenCalled();
+});

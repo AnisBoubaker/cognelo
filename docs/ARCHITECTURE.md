@@ -188,6 +188,8 @@ No course table rewrite is required.
 
 Teacher [answer exports](ANSWER_EXPORTS.md) use the capability-driven `submissionExport` server contract. Core authorizes and selects exact submitted attempts, plugins return their own safe document blocks, and the API prints escaped HTML with scripts/network disabled in a separate local Chromium context. PDF/ZIP generation is read-only and independent of the untrusted-code execution runners.
 
+Default-off [student course exports](STUDENT_COURSE_EXPORTS.md) use separate explicit activity/content `studentExport` projections. Core forces actual learner enrollment, tree visibility, assignment exceptions, content closure, SEB and grade-release checks even for dual-role accounts. The archive preserves course folders, item PDFs and original visible files; private source/feedback remains plugin-owned. Authentication, permissions and stored projections are revalidated before delivery. Student and teacher exports share bounded, cancellable offline print capacity.
+
 ## Content Type Extensibility
 
 Content type plugins are the sibling system for non-activity course content. Their contracts/registry API live in `packages/content-type-sdk`, their installed composition lives in `packages/plugin-registry`, and implementations live under `packages/plugin-content-types/*`.

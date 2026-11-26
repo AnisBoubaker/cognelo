@@ -11,8 +11,9 @@ export async function mergeAnswerPdfParts(parts: Array<{ bytes: Uint8Array; atta
       for (const page of await output.copyPages(input, input.getPageIndices())) output.addPage(page);
     } else {
       for (const source of input.getPages()) {
-        const embedded = await output.embedPage(source);
         const page = output.addPage([595.28, 841.89]);
+        if (!source.node.Contents()) continue;
+        const embedded = await output.embedPage(source);
         const rotation = ((source.getRotation().angle % 360) + 360) % 360;
         const sideways = rotation === 90 || rotation === 270;
         const width = sideways ? embedded.height : embedded.width, height = sideways ? embedded.width : embedded.height;

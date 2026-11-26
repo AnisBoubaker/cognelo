@@ -29,6 +29,12 @@ function readUrl(metadata: Record<string, unknown> | undefined) {
 
 export const githubRepoContentServerPlugin: ServerContentTypePlugin = {
   key: "github-repo-content",
+  studentExport: async ({ resource }) => {
+    const raw = readUrl(resource.metadata);
+    if (!raw) return { blocks: [] };
+    try { return { blocks: [{ kind: "link", url: normalizeGithubRepoUrl(raw), text: resource.title }] }; }
+    catch { return { blocks: [] }; }
+  },
   indexing: githubMaterialIndexing,
   handlers: {
     async duplicate(input) {

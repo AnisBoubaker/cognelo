@@ -32,7 +32,7 @@ export function providedArchiveNames(files: Array<{ originalName: string; metada
 }
 
 
-async function* archiveChunks(files: Attachment[], signal?: AbortSignal) {
+async function* archiveChunks(files: Attachment[], signal?: AbortSignal, deterministic = false) {
   const names = providedArchiveNames(files);
   const pending: Uint8Array[] = [];
   let failure: Error | null = null;
@@ -48,13 +48,13 @@ async function* archiveChunks(files: Attachment[], signal?: AbortSignal) {
     }
     for (const folder of folders) {
       signal?.throwIfAborted();
-      const entry = new ZipPassThrough(`${folder}/`); zip.add(entry); entry.push(new Uint8Array(), true);
+      const entry = new ZipPassThrough(`${folder}/`); if (deterministic) entry.mtime = new Date(1980, 0, 1); zip.add(entry); entry.push(new Uint8Array(), true);
       if (failure) throw failure;
       while (pending.length) yield pending.shift()!;
     }
     for (const [index, file] of files.entries()) {
       signal?.throwIfAborted();
-      const entry = new ZipPassThrough(names[index]); zip.add(entry);
+      const entry = new ZipPassThrough(names[index]); if (deterministic) entry.mtime = new Date(1980, 0, 1); zip.add(entry);
       while (pending.length) yield pending.shift()!;
       for await (const chunk of readProvidedAttachmentChunks(file, signal)) {
         entry.push(chunk); if (failure) throw failure;
@@ -68,12 +68,12 @@ async function* archiveChunks(files: Attachment[], signal?: AbortSignal) {
   } finally { zip.terminate(); }
 }
 
-export async function downloadHomeworkProvidedFiles(owner: Owner, signal?: AbortSignal) {
+export async function downloadHomeworkProvidedFiles(owner: Owner, signal?: AbortSignal, deterministic = false) {
   const files = await prisma.pluginCodingHomeworkAttachment.findMany({ where: { ...owner, kind: "provided_file" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: MAX_FILES + 1 });
   if (!files.length) throw new AppError(404, "HOMEWORK_PROVIDED_FILES_MISSING", "No provided files are available for this activity.");
   if (files.length > MAX_FILES || files.some(file => file.sizeBytes < 0n || file.sizeBytes > BigInt(MAX_FILE_BYTES)) || files.reduce((sum, file) => sum + file.sizeBytes, 0n) > BigInt(MAX_TOTAL_BYTES)) throw new AppError(413, "HOMEWORK_PROVIDED_FILES_LIMIT", "The provided files exceed the combined download limit. Ask your teacher to reduce or package the files.");
   const alreadyZip = files.length === 1 && metadata(files[0].metadata).providedPath === undefined && (/\.zip$/i.test(files[0].originalName) || ["application/zip", "application/x-zip-compressed"].includes(files[0].mimeType ?? ""));
   const fileName = alreadyZip ? providedArchiveNames(files)[0] : "provided-files.zip";
-  const stream = Readable.toWeb(Readable.from(alreadyZip ? readProvidedAttachmentChunks(files[0], signal) : archiveChunks(files, signal), { objectMode: false })) as ReadableStream;
+  const stream = Readable.toWeb(Readable.from(alreadyZip ? readProvidedAttachmentChunks(files[0], signal) : archiveChunks(files, signal, deterministic), { objectMode: false })) as ReadableStream;
   return new Response(stream, { headers: { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"; filename*=UTF-8''${encodeURIComponent(fileName)}`, "Cache-Control": "private, no-store, max-age=0", "X-Content-Type-Options": "nosniff" } });
 }

@@ -66,7 +66,8 @@ Open these only when changing or reviewing the named area:
 - [Activity-contributed gradebook actions](GRADEBOOK_PLUGIN_ACTIONS.md): generic activity-owned download contracts, authorized roster scope and original homework ZIP downloads.
 - [Activity logs and student actions](ACTIVITY_LOGS.md): shared report history, scoped pagination, per-student submission actions and confirmed class-wide recovery/cancellation.
 - [Inspecting work in progress](WORK_IN_PROGRESS_INSPECTION.md): read-only saved-work views, current Test questions, file previews and progress-load recovery.
-- [Student answer PDF/ZIP exports](ANSWER_EXPORTS.md)
+- [Teacher answer PDF/ZIP exports](ANSWER_EXPORTS.md)
+- [Student course exports](STUDENT_COURSE_EXPORTS.md): teacher opt-in, visible course PDFs and original files, learner-only answers, release/closure checks and archive limits.
 - [Role authorization and multi-teacher E2E plan](ROLE_AUTHORIZATION_E2E_IMPLEMENTATION_PLAN.md)
 - [Student groupings and teams](STUDENT_GROUPINGS.md)
 - [Team activity submissions](TEAM_ACTIVITY_SUBMISSIONS.md): approved shared-workspace, membership, individual challenge and grading rules; implementation checkpoints.

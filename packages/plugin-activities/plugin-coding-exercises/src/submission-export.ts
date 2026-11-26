@@ -1,6 +1,6 @@
 import { readCodingSourceFiles } from "./coding-files";
 import { AppError } from "@cognelo/core";
-import { exportRecord, exportText, feedbackExportBlocks, type AnswerExportBlock, type SubmissionExportHandler } from "@cognelo/activity-sdk/server";
+import { exportRecord, exportText, feedbackExportBlocks, studentSubmissionExportInput, type AnswerExportBlock, type SubmissionExportHandler, type StudentActivityExportHandler } from "@cognelo/activity-sdk/server";
 import { prisma } from "./db-client";
 import { getLatestCodingExerciseTestResult } from "./executions";
 export const exportCodingSubmission: SubmissionExportHandler = async (input) => {
@@ -17,13 +17,18 @@ export const exportCodingSubmission: SubmissionExportHandler = async (input) => 
       if (Array.isArray(summary.tests) && summary.tests.length) grading.push({ kind: "table", title: input.labels.tests,
         headers: [input.labels.test, input.labels.result, input.labels.weight, input.labels.comments], rows: summary.tests.map((value) => {
           const row = exportRecord(value);
-          return [exportText(row.name), row.passed === true ? input.labels.passed : input.labels.failed, exportText(row.weight), exportText(row.message)];
+          return [exportText(row.name), row.passed === true ? input.labels.passed : input.labels.failed, exportText(row.weight), input.audience === "student" ? "" : exportText(row.message)];
         }) });
     }
-    const savedFeedback = Object.keys(input.feedback).length || !execution ? null : await prisma.pluginCodingExerciseAiEvaluation.findFirst({
+    const savedFeedback = input.includeAiFeedback === false || Object.keys(input.feedback).length || !execution ? null : await prisma.pluginCodingExerciseAiEvaluation.findFirst({
       where: { activityId: input.activity.id, executionId: execution.id, status: "completed" }, orderBy: { version: "desc" }, select: { sanitizedFeedback: true }
     });
     grading.push(...feedbackExportBlocks(savedFeedback?.sanitizedFeedback ?? input.feedback, input.labels));
   }
   return { prompt: input.includePrompt && typeof input.activity.config?.prompt === "string" && input.activity.config.prompt !== input.activity.description ? [{ kind: "markdown", text: input.activity.config.prompt }] : [], answer: files ? files.map(file => ({ kind: "code" as const, title: file.name, text: file.sourceCode, language: exportText(input.activity.config?.language) })) : [{ kind: "code", text: typeof source === "string" ? source : input.labels.noAnswer, language: exportText(input.activity.config?.language) }], grading };
 };
+
+export const exportStudentCoding: StudentActivityExportHandler = async input => input.attempt
+  ? exportCodingSubmission(studentSubmissionExportInput(input))
+  : { answer: [], prompt: typeof input.activity.config?.prompt === "string" && input.activity.config.prompt !== input.activity.description
+    ? [{ kind: "markdown", text: input.activity.config.prompt }] : [] };

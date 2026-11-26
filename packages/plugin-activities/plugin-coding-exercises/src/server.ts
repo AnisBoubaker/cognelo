@@ -6,7 +6,7 @@ import { codingTestPracticeScope, getCodingPracticeRunAllowance, assertCodingPra
 import { readCodingBlankResponse } from "./code-blanks";
 import { codingExerciseStudentProgress } from "./student-progress";
 import { codingWorkInspection } from "./work-inspection";
-import { exportCodingSubmission } from "./submission-export";
+import { exportCodingSubmission, exportStudentCoding } from "./submission-export";
 import type { PluginAiFeedbackTeacherReviewContext, ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import {
   codingExerciseGeneratePromptRoute,
@@ -54,6 +54,7 @@ export { listCodingExerciseProgrammingLanguages } from "./judge0";
 
 export const codingExercisesServerPlugin: ServerActivityPlugin = {
   submissionExport: { activityTypeKeys: ["coding-exercise"], getContent: exportCodingSubmission },
+  studentExport: { activityTypeKeys: ["coding-exercise"], getContent: exportStudentCoding },
   key: "coding-exercises",
   studentProgress: codingExerciseStudentProgress,
   workInspection: codingWorkInspection,

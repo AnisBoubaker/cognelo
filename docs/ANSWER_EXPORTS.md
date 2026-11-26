@@ -1,4 +1,6 @@
-# Student answer exports
+# Teacher answer exports
+
+This document covers teacher downloads of student answers. Teacher-enabled learner downloads of the whole visible course use the separate [student course export](STUDENT_COURSE_EXPORTS.md) projection and ZIP workflow.
 
 Teachers open **Export student answers** from the activity report’s three-dot Activity actions menu (Class overview, Student results or Logs), or **Export answer as PDF** from a student's result-row menu. The individual dialog selects the exact submitted attempt, defaulting to the latest. Both dialogs offer **Include the prompt with each answer** (on by default) and **Include grades, rubric scores, comments and test results** (off by default).
 
@@ -44,7 +46,9 @@ Run those commands from the checked-out release directory. Refresh the cached br
 
 Linux hosts must permit unprivileged user namespaces for the selected Chromium executable, including any required AppArmor profile. Keep the sandbox enabled; follow [Chromium’s host-policy guidance](https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md) if the host rejects its namespace sandbox. Test an actual export during upgrade rehearsal.
 
-Alternatively, `PDF_CHROMIUM_EXECUTABLE_PATH` can select an already-installed compatible Chrome/Chromium executable. Local browser testing's `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` is also honored, so development can use its configured Chrome. No database migration is required.
+Alternatively, `PDF_CHROMIUM_EXECUTABLE_PATH` can select an already-installed compatible Chrome/Chromium executable. Local browser testing's `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` is also honored, so development can use its configured Chrome. Teacher answer exports need no database migration; the separate student course opt-in adds its documented Course column.
+
+Teacher and student exports share the two per-process slots and a four-minute operation lifetime. The shared renderer closes Chromium on cancellation/timeout, propagates the original abort reason and releases its slot in all cases. Its 30-second image-work budget excludes time spent printing PDFs while retaining shared byte/cache limits across documents. Student image projections add an export-owner allowlist and trusted activity-scoped SEB validation before the ordinary delivery check.
 
 ## Verification
 

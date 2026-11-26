@@ -218,3 +218,7 @@ Released Parsons exercises expose order/indentation messages and a component bre
 ## Saved-work inspection
 
 Standalone inspection reads the latest private in-progress arrangement without calling ensureAttempt or recording events. Embedded Tests use the supplied child state instead. Return saved order/indentation only, with no correctness or reference solution. See [the shared inspection contract](../../../../docs/WORK_IN_PROGRESS_INSPECTION.md) for permissions, public bounds, snapshot freshness and the host dialog.
+
+## Student course exports
+
+The separate `studentExport` projection uses accessible instructions and the learner’s saved arrangement/indentation. Prompt-only export never initializes an attempt; submitted export never evaluates or substitutes the reference solution. The host enforces enrollment, visibility, content closure, SEB and feedback release, then revalidates before delivery. See [course export contract and limits](../../../../docs/STUDENT_COURSE_EXPORTS.md).

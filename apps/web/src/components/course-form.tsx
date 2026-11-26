@@ -4,16 +4,16 @@ import { HelpLabel } from "@cognelo/activity-ui";
 import { AppIcon } from "@/components/app-icon";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { EditActionBar, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
+import { EditActionBar, ToggleSwitch, useNotifications, useUnsavedChangesGuard } from "@cognelo/activity-ui";
 import type { CourseInput, StudentContentLayout } from "@cognelo/contracts";
 import type { Course, Subject } from "@/lib/api";
 import { resolveStudentContentLayout } from "@/lib/course-settings";
 import { useI18n } from "@/lib/i18n";
 
-type CourseFormInput = CourseInput & { studentContentLayout?: StudentContentLayout };
+type CourseFormInput = CourseInput & { studentContentLayout?: StudentContentLayout; studentCourseExportEnabled?: boolean };
 
 type Props = {
-  initial?: Pick<Course, "subjectId" | "title" | "description" | "status" | "metadata">;
+  initial?: Pick<Course, "subjectId" | "title" | "description" | "status" | "metadata" | "studentCourseExportEnabled">;
   showStudentContentLayout?: boolean;
   subjects: Subject[];
   submitLabel: string;
@@ -21,12 +21,13 @@ type Props = {
 };
 
 export function CourseForm({ initial, showStudentContentLayout = false, subjects, submitLabel, onSubmit }: Props) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const notifications = useNotifications();
   const [title, setTitle] = useState(initial?.title ?? "");
   const [subjectId, setSubjectId] = useState(initial?.subjectId ?? subjects[0]?.id ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [status, setStatus] = useState(initial?.status ?? "draft");
+  const [studentCourseExportEnabled, setStudentCourseExportEnabled] = useState(initial?.studentCourseExportEnabled === true);
   const [studentContentLayout, setStudentContentLayout] = useState<StudentContentLayout>(() =>
     resolveStudentContentLayout(initial?.metadata)
   );
@@ -42,8 +43,8 @@ export function CourseForm({ initial, showStudentContentLayout = false, subjects
   }, [initial, subjectId, subjects]);
 
   const currentSnapshot = useMemo(
-    () => ({ subjectId, title, description, status, studentContentLayout }),
-    [description, status, studentContentLayout, subjectId, title]
+    () => ({ subjectId, title, description, status, studentContentLayout, studentCourseExportEnabled }),
+    [description, status, studentContentLayout, studentCourseExportEnabled, subjectId, title]
   );
   const hasUnsavedChanges = !courseSnapshotsEqual(currentSnapshot, savedSnapshot);
 
@@ -53,6 +54,7 @@ export function CourseForm({ initial, showStudentContentLayout = false, subjects
     setDescription(savedSnapshot.description);
     setStatus(savedSnapshot.status);
     setStudentContentLayout(savedSnapshot.studentContentLayout);
+    setStudentCourseExportEnabled(savedSnapshot.studentCourseExportEnabled);
     setError("");
   }, [savedSnapshot]);
 
@@ -65,9 +67,9 @@ export function CourseForm({ initial, showStudentContentLayout = false, subjects
         title,
         description,
         status,
-        ...(showStudentContentLayout ? { studentContentLayout } : {})
+        ...(showStudentContentLayout ? { studentContentLayout, studentCourseExportEnabled } : {})
       });
-      setSavedSnapshot({ subjectId, title, description, status, studentContentLayout });
+      setSavedSnapshot({ subjectId, title, description, status, studentContentLayout, studentCourseExportEnabled });
     } catch (err) {
       notifications.error(err instanceof Error ? err.message : t("courseForm.saveError"));
       setError("");
@@ -75,7 +77,7 @@ export function CourseForm({ initial, showStudentContentLayout = false, subjects
     } finally {
       setSaving(false);
     }
-  }, [description, notifications, onSubmit, showStudentContentLayout, status, studentContentLayout, subjectId, t, title]);
+  }, [description, notifications, onSubmit, showStudentContentLayout, status, studentContentLayout, studentCourseExportEnabled, subjectId, t, title]);
 
   useUnsavedChangesGuard(
     useMemo(
@@ -135,6 +137,8 @@ export function CourseForm({ initial, showStudentContentLayout = false, subjects
 
         </div>
       ) : null}
+      {showStudentContentLayout ? <ToggleSwitch checked={studentCourseExportEnabled} onChange={setStudentCourseExportEnabled}
+        label={t("courseExport.setting")} help={t("courseExport.settingHelp")} locale={locale} disabled={saving} /> : null}
       {error ? <p className="error">{error}</p> : null}
       {initial ? (
         <EditActionBar
@@ -165,7 +169,8 @@ function courseSnapshot(initial: Props["initial"], fallbackSubjectId: string) {
     title: initial?.title ?? "",
     description: initial?.description ?? "",
     status: initial?.status ?? "draft",
-    studentContentLayout: resolveStudentContentLayout(initial?.metadata)
+    studentContentLayout: resolveStudentContentLayout(initial?.metadata),
+    studentCourseExportEnabled: initial?.studentCourseExportEnabled === true
   };
 }
 
@@ -177,5 +182,6 @@ function courseSnapshotsEqual(
     && left.title === right.title
     && left.description === right.description
     && left.status === right.status
-    && left.studentContentLayout === right.studentContentLayout;
+    && left.studentContentLayout === right.studentContentLayout
+    && left.studentCourseExportEnabled === right.studentCourseExportEnabled;
 }

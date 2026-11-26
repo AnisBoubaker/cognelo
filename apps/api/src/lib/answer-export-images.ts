@@ -20,11 +20,14 @@ export function consumeAnswerExportImageBytes(budget: AnswerExportImageBudget, b
 }
 
 /** No cookies/auth, pinned public IPv4, shared transfer/deadline limits across redirects. */
-export async function fetchPublicExportImage(value: string, budget = createAnswerExportImageBudget(), redirects = 0): Promise<{ bytes: Buffer; mime: string }> {
+export async function fetchPublicExportImage(value: string, budget = createAnswerExportImageBudget(), redirects = 0, callerSignal?: AbortSignal): Promise<{ bytes: Buffer; mime: string }> {
+  callerSignal?.throwIfAborted();
   const url = publicImageUrl(value);
   const remainingMs = Math.min(5000, budget.deadline - Date.now());
   if (remainingMs <= 0 || budget.remainingBytes <= 0) throw new Error("Export image budget exceeded");
-  const signal = AbortSignal.timeout(remainingMs);
+  const timeout = AbortSignal.timeout(remainingMs);
+  const signal = callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
+  signal.throwIfAborted();
   const addresses = await Promise.race([
     lookup(url.hostname, { family: 4, all: true }),
     new Promise<never>((_, reject) => signal.addEventListener("abort", () => reject(new Error("Image lookup timed out")), { once: true }))
@@ -60,7 +63,7 @@ export async function fetchPublicExportImage(value: string, budget = createAnswe
   });
   if (response.redirect) {
     if (redirects >= 3) throw new Error("Too many image redirects");
-    return fetchPublicExportImage(response.redirect, budget, redirects + 1);
+    return fetchPublicExportImage(response.redirect, budget, redirects + 1, callerSignal);
   }
   return response;
 }

@@ -797,7 +797,7 @@ async function listScopedContentItems(user: CurrentUser, courseId: string, optio
       effectiveItems = effectiveItems.map((item) => item.materialId && hiddenMaterial(item.materialId) ? { ...item, isVisible: false } : item);
     }
   }
-  if (scope.groupId && !await canManageCourse(user, courseId)) {
+  if (scope.groupId && (!manager || options.learnerVisibility)) {
     const assignmentByActivity = new Map(items.filter((item) => item.groupId === scope.groupId && item.courseGroupActivityId).map((item) => [item.activityId, item.courseGroupActivityId!]));
     const exceptions = await assignmentExceptionsForUser([...assignmentByActivity.values()], user.id);
     effectiveItems = effectiveItems.map((item) => {
@@ -809,7 +809,7 @@ async function listScopedContentItems(user: CurrentUser, courseId: string, optio
   const withVisibility = addEffectiveVisibility(effectiveItems);
   const scopedItems = mergeGroupAssignmentsIntoSharedActivityPlacements(withVisibility, scope.groupId);
   return manager && !options.visibleOnly ? scopedItems : scopedItems.filter((item) =>
-    item.effectiveVisibility === "visible" && (manager || item.kind !== "activity" || Boolean(item.courseGroupActivityId)));
+    item.effectiveVisibility === "visible" && ((manager && !options.learnerVisibility) || item.kind !== "activity" || Boolean(item.courseGroupActivityId)));
 }
 
 function applyGroupVisibilityOverrides<T extends { id: string; isVisible: boolean }>(

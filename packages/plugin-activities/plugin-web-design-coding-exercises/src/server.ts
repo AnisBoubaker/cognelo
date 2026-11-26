@@ -1,4 +1,4 @@
-import { exportWebDesignSubmission } from "./submission-export";
+import { exportWebDesignSubmission, exportStudentWebDesign } from "./submission-export";
 import { webDesignWorkInspection } from "./work-inspection";
 import { prisma } from "./db-client";
 import { parseWebDesignExerciseConfig } from "./web-design-coding-exercises";
@@ -11,6 +11,7 @@ import { createWebDesignBankActivityVariation } from "./variation";
 
 export const webDesignCodingExercisesServerPlugin: ServerActivityPlugin = {
   submissionExport: { activityTypeKeys: ["web-design-coding-exercise"], getContent: exportWebDesignSubmission },
+  studentExport: { activityTypeKeys: ["web-design-coding-exercise"], getContent: exportStudentWebDesign },
   key: "web-design-coding-exercises",
   workInspection: webDesignWorkInspection,
   studentSolution: {

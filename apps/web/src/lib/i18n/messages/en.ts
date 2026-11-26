@@ -3,6 +3,19 @@ import { SYSTEM_ERRORS } from "@cognelo/contracts";
 import type { MessageTree } from "../types";
 
 export const enMessages = {
+  courseExport: {
+    "setting": "Allow students to export course content",
+    "settingHelp": "Students can download a ZIP with visible course materials, accessible activity prompts, their submitted attempts and available feedback. Hidden or inaccessible content is excluded.",
+    "action": "Export course content",
+    "preparing": "Preparing course export",
+    "preparingHelp": "Creating PDFs and collecting your accessible course content. You can cancel this download.",
+    "ready": "Your course export is ready.",
+    "failed": "Unable to export the course.",
+    "changed": "Course content or access changed. Please try the export again.",
+    "unavailable": "Course export is not available. Refresh the course or contact your teacher.",
+    "tooLarge": "This course exceeds the export limit. Contact your teacher.",
+    "busy": "Other exports are running. Please try again shortly."
+},
   systemErrors: {
     message: "System error ({code}).",
     ...SYSTEM_ERRORS

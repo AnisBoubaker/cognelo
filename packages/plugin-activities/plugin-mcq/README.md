@@ -78,3 +78,5 @@ Assessment feedback now places the question’s saved teacher instructions in th
 Released exercise scores and available teacher feedback are accessible from the learner Grades tab, including each child of a Test. See [learner grading details](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md).
 
 Teacher AI assessment supports [atomic cancellable grading runs](../../../docs/AI_GRADING_RUNS.md): completed copies stay private until saved, and interrupted runs offer named Keep/Discard results.
+
+Students can also use teacher-enabled [course exports](../../../docs/STUDENT_COURSE_EXPORTS.md); see [student export details](docs/REFERENCE.md#student-course-exports).

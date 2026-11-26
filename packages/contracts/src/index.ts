@@ -349,7 +349,8 @@ export const StudentContentLayoutSchema = z.enum(["accordion", "folder_tabs"]);
 export type StudentContentLayout = z.infer<typeof StudentContentLayoutSchema>;
 
 export const CourseUpdateSchema = partialWithoutDefaults(CourseInputSchema).extend({
-  studentContentLayout: StudentContentLayoutSchema.optional()
+  studentContentLayout: StudentContentLayoutSchema.optional(),
+  studentCourseExportEnabled: z.boolean().optional()
 });
 export type CourseUpdate = z.infer<typeof CourseUpdateSchema>;
 
@@ -1085,3 +1086,5 @@ export type CurrentUser = {
 export * from "./application-time";
 
 export * from "./answer-export";
+export * from "./export-document";
+export * from "./student-course-export";

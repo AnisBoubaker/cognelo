@@ -48,3 +48,7 @@ The host modal reader uses a sticky heading with an icon-only close cross and lo
 ## Prepared material indexes
 
 The text-owned indexing service fingerprints the saved title/body and prepares reusable semantic embeddings through core. See [material embedding services](../../../../docs/MATERIAL_EMBEDDING_SERVICES.md).
+
+## Student course exports
+
+The optional server `studentExport` handler contributes to the teacher-enabled [course ZIP](../../../../docs/STUDENT_COURSE_EXPORTS.md). Export only the saved public Markdown body; omit embedding indexes and other metadata. Authorized images use the shared media references. Core owns actual learner enrollment, effective folder/section visibility, plugin activation and final access revalidation.

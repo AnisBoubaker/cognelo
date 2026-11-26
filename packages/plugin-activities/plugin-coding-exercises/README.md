@@ -146,3 +146,5 @@ Inside Tests, manual review retains drafts across questions and uses one [Save a
 Test AI batches can use up to three graded Test submissions as examples, matched to the corresponding question with complete feedback. Each question keeps its own instructions, included in the model system prompt as the authoritative grading policy. The main Test editor can replace this field across all eligible children at once; it does not introduce a separate parent policy. See [guided Test grading](docs/REFERENCE.md#test-ai-grading-compatibility).
 
 Teacher AI assessment supports [atomic cancellable grading runs](../../../docs/AI_GRADING_RUNS.md): completed copies stay private until saved, and interrupted runs offer named Keep/Discard results.
+
+Students can also use teacher-enabled [course exports](../../../docs/STUDENT_COURSE_EXPORTS.md); see [student export details](docs/REFERENCE.md#student-course-exports).

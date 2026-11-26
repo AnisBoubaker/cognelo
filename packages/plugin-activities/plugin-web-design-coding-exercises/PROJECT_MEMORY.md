@@ -56,3 +56,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - The shared [learner grading details](../../../docs/GRADEBOOK_IMPLEMENTATION_PLAN.md) display Test-child comments and plugin-declared student feedback under the parent release/content-access policy. Keep private result/configuration/analytics out of the public feedback envelope.
 
 - Teacher report actions stay in the host-owned Activity actions menu across activity types; the context-sensitive Back link stays visible. Keep plugin permissions, eligibility, handlers and confirmation/reason flows unchanged. See [shared report actions](../../../docs/ACTION_BUTTONS.md#activity-report-actions).
+
+- [Student course exports](docs/REFERENCE.md#student-course-exports) use an explicit learner projection. The separate `studentExport` projection prints accessible prompts, the already-cached expected-result image, the learner’s saved files and permitted public outcomes. It omits private grader messages and never invokes the screenshot or execution runner.

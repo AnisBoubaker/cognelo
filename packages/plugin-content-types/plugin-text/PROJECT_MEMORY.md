@@ -16,3 +16,5 @@
 - Modal text readers keep the localized close cross in a sticky header; full-screen editing exits through the top cross without remounting or losing draft content. Card hover transforms must be disabled while a descendant rich-text editor is fullscreen, because they otherwise make fixed positioning relative to the card. See [dialog headers](../../../docs/DIALOGS.md).
 
 - Own `indexing.policy` and `indexing.prepare`; core supplies authorized embedding storage and search. Never call a sibling plugin. Prepared semantic indexes remain outside public resource metadata. See [service contract](../../../docs/MATERIAL_EMBEDDING_SERVICES.md).
+
+- [Student course exports](docs/REFERENCE.md#student-course-exports) use the explicit server `studentExport` hook. Export only the saved public Markdown body; omit embedding indexes and other metadata. Authorized images use the shared media references.

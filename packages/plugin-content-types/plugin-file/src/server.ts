@@ -37,6 +37,20 @@ function readMetadata(metadata: Record<string, unknown> | undefined): FileMetada
 
 export const fileContentServerPlugin: ServerContentTypePlugin = {
   key: "file-content",
+  studentExport: async ({ resource, signal }) => {
+    signal?.throwIfAborted();
+    const metadata = readMetadata(resource.metadata);
+    if (!metadata.storedName) return { blocks: [] };
+    const file = await openStoredMaterial(path.resolve(process.cwd(), "../../storage/course-content-files"), [resource.courseId], metadata.storedName);
+    try {
+      const stat = await file.stat();
+      if (stat.size > MAX_UPLOAD_BYTES || (typeof metadata.size === "number" && stat.size !== metadata.size)) throw new AppError(409, "COURSE_EXPORT_FILE_CHANGED", "A course file is unavailable or changed.");
+      const bytes = new Uint8Array(await file.readFile());
+      signal?.throwIfAborted();
+      const name = typeof metadata.originalName === "string" ? metadata.originalName : resource.title;
+      return { blocks: [{ kind: "markdown", text: name }], files: [{ name, bytes }] };
+    } finally { await file.close(); }
+  },
   indexing: {
     policy: resource => ({ revision: contentIndexRevision({ title: resource.title, ...readMetadata(resource.metadata), embeddingIndex: undefined }) }),
     prepare: async ({ resource, store, signal }) => store(await getPreparedFileDocuments(resource, signal))

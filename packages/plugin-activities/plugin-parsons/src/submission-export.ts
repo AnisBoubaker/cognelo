@@ -1,5 +1,5 @@
 import { AppError } from "@cognelo/core";
-import { exportRecord, exportText, feedbackExportBlocks, type SubmissionExportHandler } from "@cognelo/activity-sdk/server";
+import { exportRecord, exportText, feedbackExportBlocks, studentSubmissionExportInput, type SubmissionExportHandler, type StudentActivityExportHandler } from "@cognelo/activity-sdk/server";
 import { prisma } from "./db-client";
 export const exportParsonsSubmission: SubmissionExportHandler = async (input) => {
   const saved = input.state ?? (input.metadata.submittedState ? exportRecord(input.metadata.submittedState) : null);
@@ -12,3 +12,8 @@ export const exportParsonsSubmission: SubmissionExportHandler = async (input) =>
     : exportText(block.displayText)).join("\n");
   return { prompt: input.includePrompt && typeof input.activity.config?.prompt === "string" && input.activity.config.prompt !== input.activity.description ? [{ kind: "markdown", text: input.activity.config.prompt }] : [], answer: [{ kind: "code", text: text || input.labels.noAnswer, language: exportText(input.activity.config?.language) }], grading: input.includeGrading ? feedbackExportBlocks(input.feedback, input.labels) : [] };
 };
+
+export const exportStudentParsons: StudentActivityExportHandler = async input => input.attempt
+  ? exportParsonsSubmission(studentSubmissionExportInput(input))
+  : { answer: [], prompt: typeof input.activity.config?.prompt === "string" && input.activity.config.prompt !== input.activity.description
+    ? [{ kind: "markdown", text: input.activity.config.prompt }] : [] };

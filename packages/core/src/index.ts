@@ -75,3 +75,4 @@ export * from "./activity-batch-actions";
 export * from "./activity-logs";
 export * from "./work-inspection";
 export * from "./grading-review";
+export * from "./student-course-export";

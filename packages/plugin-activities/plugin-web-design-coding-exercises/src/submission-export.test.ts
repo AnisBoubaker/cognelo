@@ -20,3 +20,10 @@ it("uses the stored screenshot instead of leaving an expected-result token in th
   expect(content.replaceDescription).toBe(true);
   expect(content.prompt).toMatchObject([{ text: "![Prompt](data:image/png;base64,cGljdHVyZQ==)" }]);
 });
+it("keeps student source and public outcomes while omitting private grader messages", async () => {
+  mocks.submission.mockResolvedValue({ files: [{ path: "index.html", starterCode: "My saved HTML" }], testResults: [{ name: "Visible check", passed: false, message: "PRIVATE REFERENCE HTML" }] });
+  const content = await exportWebDesignSubmission({ ...input, audience: "student", includeGrading: true });
+  expect(JSON.stringify(content)).toContain("My saved HTML");
+  expect(JSON.stringify(content)).not.toContain("PRIVATE REFERENCE HTML");
+  expect(mocks.submission).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ userId: "student" }) }));
+});

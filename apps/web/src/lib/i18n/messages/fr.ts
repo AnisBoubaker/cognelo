@@ -2,6 +2,19 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const frMessages = {
+  courseExport: {
+    "setting": "Autoriser les étudiants à exporter le contenu du cours",
+    "settingHelp": "Les étudiants peuvent télécharger un ZIP contenant les ressources visibles, les énoncés accessibles, leurs tentatives remises et la rétroaction disponible. Le contenu masqué ou inaccessible est exclu.",
+    "action": "Exporter le contenu du cours",
+    "preparing": "Préparation de l’exportation",
+    "preparingHelp": "Création des PDF et collecte du contenu du cours qui vous est accessible. Vous pouvez annuler ce téléchargement.",
+    "ready": "L’exportation de votre cours est prête.",
+    "failed": "Impossible d’exporter le cours.",
+    "changed": "Le contenu du cours ou vos accès ont changé. Veuillez réessayer.",
+    "unavailable": "L’exportation n’est pas disponible. Actualisez le cours ou contactez votre enseignant.",
+    "tooLarge": "Ce cours dépasse la limite d’exportation. Contactez votre enseignant.",
+    "busy": "D’autres exportations sont en cours. Veuillez réessayer sous peu."
+},
   systemErrors: {
     message: "Erreur système ({code}).",
     "SYS-001": "Erreur inattendue du serveur. Consultez les journaux de l’API pour retrouver l’exception d’origine.",

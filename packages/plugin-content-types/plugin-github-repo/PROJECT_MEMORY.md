@@ -25,3 +25,5 @@ This file is for GitHub repo content plugin memory only.
 
 - Own `indexing.policy` and `indexing.prepare`; core supplies authorized embedding storage and search. Never call a sibling plugin. Prepared semantic indexes remain outside public resource metadata. See [service contract](../../../docs/MATERIAL_EMBEDDING_SERVICES.md).
 - Exclude known IDE settings, CMake/build output, dependency/cache folders and macOS sidecars before applying repository size/count limits or fetching source bytes. Large `.idea/editor.xml` caches must not dominate a teaching corpus. Keep authored XML/YAML and build definitions such as `CMakeLists.txt`; do not exclude every hidden directory (for example, authored `.github/workflows` may be teaching material). Version this extraction policy so previously polluted indexes are refreshed before new opening without rewriting active pinned snapshots.
+
+- [Student course exports](README.md#student-course-exports) use the explicit server `studentExport` hook. Export only the normalized public repository URL and title. Do not fetch repository contents, credentials or derived indexes.

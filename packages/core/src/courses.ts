@@ -213,7 +213,7 @@ export async function updateCourse(user: CurrentUser, courseId: string, input: u
   let metadata: Prisma.InputJsonValue | undefined;
   const course = await prisma.course.findUnique({
     where: { id: courseId },
-    select: { title: true, description: true, status: true, metadata: true }
+    select: { title: true, description: true, status: true, metadata: true, studentCourseExportEnabled: true }
   });
   if (!course) {
     throw notFound("Course");
@@ -248,12 +248,14 @@ export async function updateCourse(user: CurrentUser, courseId: string, input: u
           title: course.title,
           description: course.description,
           status: course.status,
+          studentCourseExportEnabled: course.studentCourseExportEnabled,
           studentContentLayout: asMetadataRecord(course.metadata).studentContentLayout ?? null
         },
         nextValue: {
           title: updatedCourse.title,
           description: updatedCourse.description,
           status: updatedCourse.status,
+          studentCourseExportEnabled: updatedCourse.studentCourseExportEnabled,
           studentContentLayout: asMetadataRecord(updatedCourse.metadata).studentContentLayout ?? null
         }
       }

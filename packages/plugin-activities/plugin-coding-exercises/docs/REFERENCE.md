@@ -450,3 +450,7 @@ The main course/bank Test editor can replace the AI grading instruction field on
 ## Saved-work inspection
 
 Inspection reads only the generic saved source; it needs no execution or submitted core attempt. Embedded Tests pass their selected saved state directly. It never runs code or loads grading evidence. See [the shared inspection contract](../../../../docs/WORK_IN_PROGRESS_INSPECTION.md) for permissions, public bounds, snapshot freshness and the host dialog.
+
+## Student course exports
+
+The separate `studentExport` projection reads only the learner’s exact saved execution or recovered answer. It includes accessible prompts, source files and permitted saved feedback/test outcomes; private diagnostic messages, reference code and hidden test data are omitted. Ordinary Formative exports do not query AI feedback. The host enforces enrollment, visibility, content closure, SEB and feedback release, then revalidates before delivery. See [course export contract and limits](../../../../docs/STUDENT_COURSE_EXPORTS.md).

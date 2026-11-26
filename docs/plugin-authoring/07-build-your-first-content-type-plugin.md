@@ -136,6 +136,8 @@ type ContentEmbeddingSource =
 
 Future indexing code should call core's `getContentResourceEmbeddingSource` service. It should not import your plugin directly.
 
+To join [student course exports](../STUDENT_COURSE_EXPORTS.md), add the optional server `studentExport({ user, resource, signal })` handler. Core has already forced actual learner enrollment and visible section/folder access. Return only public Markdown/code/table/link blocks and optional original visible file bytes; never serialize resource metadata wholesale, fetch a linked page, expose a private summary/index or write academic state. Reuse validated URL and no-follow file readers, honor cancellation and retain deterministic projections for the host's final revalidation. Omitting this capability produces an unavailable-content notice instead of a private-data fallback.
+
 ## 4. Add A Settings Form
 
 In `src/settings.tsx`, export a React component that matches the renderer props used in [apps/web/src/lib/content-type-renderers.tsx](../../apps/web/src/lib/content-type-renderers.tsx). Keep the form plugin-owned, but let the course page own the dialog shell and save button.

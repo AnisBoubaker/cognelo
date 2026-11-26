@@ -29,14 +29,14 @@ export function resolveActivityContentLock(policy: Policy, attempts: Attempt[], 
   };
 }
 
-export async function getActivityContentAccess(user: CurrentUser, courseId: string, groupId: string, activityId: string) {
+export async function getActivityContentAccess(user: CurrentUser, courseId: string, groupId: string, activityId: string, options: { forceLearner?: boolean } = {}) {
   const assignment = await prisma.courseGroupActivity.findFirst({
     where: { groupId, activityId, group: { courseId } },
     include: { activity: { select: { id: true, title: true, metadata: true, activityType: { select: { key: true } } } }, gradebookItem: true }
   });
   if (!assignment) throw notFound("Group activity assignment");
   const participant = await prisma.courseGroupParticipant.findFirst({ where: { groupId, userId: user.id }, select: { id: true, role: true } });
-  const staff = await canManageCourse(user, courseId) || (participant?.role !== "student" && await canGradeGroup(user, courseId, groupId));
+  const staff = !options.forceLearner && (await canManageCourse(user, courseId) || (participant?.role !== "student" && await canGradeGroup(user, courseId, groupId)));
   if (!staff && participant?.role !== "student") throw forbidden();
   const enabled = courseActivityHidesAfterAttempts(assignment.activity.metadata);
   const base = { title: assignment.activity.title, enabled, locked: false, canFinalize: false,

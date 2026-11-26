@@ -1,4 +1,4 @@
-import { exportParsonsSubmission } from "./submission-export";
+import { exportParsonsSubmission, exportStudentParsons } from "./submission-export";
 import { parsonsStudentProgress } from "./student-progress";
 import { parsonsWorkInspection } from "./work-inspection";
 export * from "./attempt-types";
@@ -17,6 +17,7 @@ export const parsonsServerPlugin: ServerActivityPlugin = {
   studentProgress: parsonsStudentProgress,
   workInspection: parsonsWorkInspection,
   submissionExport: { activityTypeKeys: ["parsons-problem"], getContent: exportParsonsSubmission },
+  studentExport: { activityTypeKeys: ["parsons-problem"], getContent: exportStudentParsons },
   key: "parsons",
   studentSolution: {
     activityTypeKeys: ["parsons-problem"],

@@ -60,3 +60,15 @@ it("preserves text and alt labels when embedding repeated images", async () => {
   );
   expect(mocks.fetch).toHaveBeenCalledTimes(1);
 });
+it("refuses uploaded assets outside the student's export before reading or fetching them", async () => {
+  const authorize = vi.fn().mockResolvedValue(false);
+  const html = await embedImages('<img src="/api/media-assets/other-course/content" alt="Private">', user, "en", new Map(), createAnswerExportImageBudget(), authorize);
+  expect(html).not.toContain("<img");
+  expect(authorize).toHaveBeenCalledWith("other-course");
+  expect(mocks.asset).not.toHaveBeenCalled(); expect(mocks.read).not.toHaveBeenCalled(); expect(mocks.fetch).not.toHaveBeenCalled();
+});
+it("propagates cancellation without replacing it with an unavailable-image placeholder", async () => {
+  const controller = new AbortController();
+  mocks.fetch.mockImplementation(async () => { controller.abort(); throw new Error("socket closed"); });
+  await expect(embedImages('<img src="https://example.test/image.png">', user, "en", new Map(), createAnswerExportImageBudget(), undefined, controller.signal)).rejects.toHaveProperty("name", "AbortError");
+});

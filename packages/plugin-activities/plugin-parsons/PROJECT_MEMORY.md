@@ -55,3 +55,5 @@ Read [docs/DECISIONS.md](docs/DECISIONS.md) only for the area being changed.
 - Teacher authoring explanations use shared `HelpLabel`/`HelpTooltip` after their title or label on the same row. Preserve native field names, descriptions, unsaved drafts and existing notifications. Keep learner instructions and required confirmations visible. See [contextual help](../../../docs/CONTEXTUAL_HELP.md).
 
 - Teacher report actions stay in the host-owned Activity actions menu across activity types; the context-sensitive Back link stays visible. Keep plugin permissions, eligibility, handlers and confirmation/reason flows unchanged. See [shared report actions](../../../docs/ACTION_BUTTONS.md#activity-report-actions).
+
+- [Student course exports](docs/REFERENCE.md#student-course-exports) use an explicit learner projection. The separate `studentExport` projection uses accessible instructions and the learner’s saved arrangement/indentation. Prompt-only export never initializes an attempt; submitted export never evaluates or substitutes the reference solution.

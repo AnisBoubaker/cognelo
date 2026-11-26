@@ -1,4 +1,4 @@
-import type { CurrentUser } from "@cognelo/contracts";
+import type { CurrentUser, ExportDocumentBlock } from "@cognelo/contracts";
 import type { ContentEmbeddingSourceKind } from "./index";
 import type { ContentVectorIndexResult, ContentVectorSearchResult } from "./vector";
 export {
@@ -184,6 +184,11 @@ export type ContentIndexingService = {
 };
 
 export type ServerContentTypePlugin = {
+  /** Called only for a currently visible learner material. Never return private summaries/indexes. */
+  studentExport?: (input: { user: CurrentUser; resource: ServerContentResourceRecord; signal?: AbortSignal }) => Promise<{
+    blocks: ExportDocumentBlock[];
+    files?: Array<{ name: string; bytes: Uint8Array }>;
+  }>;
   indexing?: ContentIndexingService;
   key: string;
   routes?: readonly ContentTypeRouteDefinition[];

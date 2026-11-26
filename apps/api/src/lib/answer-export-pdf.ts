@@ -3,7 +3,7 @@ import { consumeAnswerExportImageBytes, createAnswerExportImageBudget, fetchPubl
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { chromium } from "playwright";
+import { chromium, type Page } from "playwright";
 import { Marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 import katex from "katex";
@@ -15,6 +15,7 @@ import { answerExportLabels } from "./answer-export-labels";
 
 type Export = Awaited<ReturnType<typeof buildAnswerExport>>;
 const escape = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+export { escape as escapeExportHtml };
 const markdown = new Marked({ gfm: true, renderer: { html: ({ text }) => escape(text) } });
 markdown.use({ extensions: [
   { name: "displayMath", level: "block", start: (src) => src.indexOf("$$"), tokenizer(src) { const match = /^\$\$([\s\S]+?)\$\$(?:\n|$)/.exec(src); if (match) return { type: "displayMath", raw: match[0], text: match[1] }; }, renderer(token) { return katex.renderToString(token.text, { displayMode: true, throwOnError: false, trust: false, maxSize: 50, maxExpand: 1000 }); } },
@@ -24,9 +25,14 @@ function markdownHtml(text: string) {
   return sanitizeHtml(markdown.parse(text, { async: false }), { allowedTags: [...sanitizeHtml.defaults.allowedTags, "img", "span", "math", "semantics", "annotation", "mrow", "mi", "mo", "mn", "msup", "msub", "msubsup", "mfrac", "msqrt", "mroot", "mtext", "mspace", "mtable", "mtr", "mtd", "mover", "munder", "munderover", "mpadded", "svg", "path", "line"],
     allowedAttributes: { ...sanitizeHtml.defaults.allowedAttributes, "*": ["class", "style", "aria-hidden"], img: ["src", "alt", "width", "height"], math: ["xmlns", "display"], annotation: ["encoding"], svg: ["xmlns", "width", "height", "viewBox", "preserveAspectRatio"], path: ["d"], line: ["x1", "x2", "y1", "y2"] }, allowedSchemes: ["https", "http", "data"], allowedSchemesByTag: { a: ["https", "http", "mailto"], img: ["https", "http", "data"] } });
 }
-function blockHtml(block: AnswerExportBlock) {
+export function blockHtml(block: AnswerExportBlock) {
   const title = block.title ? `<h4>${escape(block.title)}</h4>` : "";
   if (block.kind === "code") return `${title}<pre dir="ltr"><code>${escape(block.text)}</code></pre>`;
+  if (block.kind === "link") {
+    let safe = false;
+    try { const url = new URL(block.url); safe = ["http:", "https:"].includes(url.protocol) && !url.username && !url.password; } catch { /* Invalid legacy links are text only. */ }
+    return `${title}<p>${safe ? `<a href="${escape(block.url)}">${escape(block.text || block.url)}</a>` : escape(block.text || "")}</p>${safe && block.text && block.text !== block.url ? `<p class="meta" dir="ltr">${escape(block.url)}</p>` : ""}${block.description ? `<p>${escape(block.description)}</p>` : ""}`;
+  }
   if (block.kind === "table") return `${title}<table><thead><tr>${block.headers.map((h) => `<th>${escape(h)}</th>`).join("")}</tr></thead><tbody>${block.rows.map((row) => `<tr>${row.map((cell) => `<td>${escape(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   return `${title}<div class="markdown">${markdownHtml(block.text)}</div>`;
 }
@@ -44,7 +50,10 @@ export function answerExportHtml(data: Export, documents: AnswerExportDocument[]
       ${data.options.includePrompt && section.prompt.length ? `<div class="prompt"><h4>${escape(labels.prompt)}</h4>${blocks(section.prompt)}</div>` : ""}
       ${section.answer.length ? `<div class="answer"><h4>${escape(labels.answer)}</h4>${blocks(section.answer)}</div>` : ""}
       ${data.options.includeGrading && (section.grading.length || section.score !== undefined) ? `<div class="grading"><h4>${escape(labels.grading)}</h4>${section.score !== undefined ? `<p>${escape(labels.score)}: ${escape(section.score ?? labels.ungraded)}</p>` : ""}${blocks(section.grading)}</div>` : ""}</section>`).join("")}</article>`).join("")).join("");
-  return `<!doctype html><html lang="${data.options.locale}" dir="${data.options.locale === "ar" ? "rtl" : "ltr"}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src 'none'"><title>${escape(data.activityTitle)}</title><style>${css}
+  return exportDocumentHtml(data.activityTitle, data.options.locale, body, css);
+}
+export function exportDocumentHtml(title: string, locale: string, body: string, css = "") {
+  return `<!doctype html><html lang="${locale}" dir="${locale === "ar" ? "rtl" : "ltr"}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src 'none'"><title>${escape(title)}</title><style>${css}
     *{box-sizing:border-box}body{font:11pt Arial,'Noto Sans','Noto Sans CJK SC',sans-serif;line-height:1.45;color:#17233c;margin:0}h1{font-size:20pt;margin:5px 0 14px}h2{font-size:15pt;margin:6px 0}h3{font-size:13pt;border-bottom:1px solid #cad3df;padding-bottom:5px;margin:20px 0 12px}h4{font-size:11pt;margin:14px 0 6px}p{margin:6px 0}header{border-bottom:2px solid #287cca;padding-bottom:12px}.course{color:#287cca;font-weight:bold;font-size:10pt}.meta{color:#5d6778;font-size:9pt}.grade{font-weight:bold}.submission+.submission{break-before:page}h1,h2,h3,h4{break-after:avoid}pre{white-space:pre-wrap;overflow-wrap:anywhere;tab-size:4;font:9pt 'Courier New','Noto Sans Mono',monospace;line-height:1.4;background:#f5f7fa;border:1px solid #dde3eb;padding:10px;margin:6px 0;box-decoration-break:clone}code{font-family:'Courier New',monospace}table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:9pt;margin:10px 0}td,th{border:1px solid #d6dfe9;padding:7px;text-align:start;overflow-wrap:anywhere;vertical-align:top}th{background:#eff4fa}tr{break-inside:avoid}thead{display:table-header-group}img{max-width:100%;max-height:230mm;object-fit:contain}a{color:#225f9e;overflow-wrap:anywhere}.prompt{background:#f6f8fb;border-inline-start:3px solid #bdd2e9;padding:1px 12px 10px}.grading{border-top:1px solid #ddd;margin-top:15px}.katex{font-size:1.05em}.katex-display{overflow-wrap:anywhere}blockquote{margin-inline:12px;border-inline-start:2px solid #ccc;padding-inline-start:10px}
   </style></head><body>${body}</body></html>`;
 }
@@ -59,12 +68,14 @@ async function embeddedKatexCss() {
     return fonts.reduce((css, [font, data]) => css.replaceAll(`url(${font})`, `url(${data})`), source);
   })();
 }
-export async function embedImages(html: string, user: CurrentUser, locale: string, cache: Map<string, string | null>, budget: AnswerExportImageBudget) {
+type SebImageAccess = (scope: { courseId: string; groupId: string; activityId: string }) => Promise<boolean>;
+export async function embedImages(html: string, user: CurrentUser, locale: string, cache: Map<string, string | null>, budget: AnswerExportImageBudget, authorizeImage?: (assetId: string) => Promise<boolean>, signal?: AbortSignal, hasSafeExamBrowserAccess?: SebImageAccess) {
   let htmlBytes = Buffer.byteLength(html);
   if (htmlBytes > 64_000_000) throw new AppError(413, "ANSWER_EXPORT_TOO_LARGE", "Select fewer students or attempts for this export.");
   const fragments: string[] = [];
   let cursor = 0;
   for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
+    signal?.throwIfAborted();
     fragments.push(html.slice(cursor, match.index));
     cursor = match.index + match[0].length;
     const src = /src="([^"]+)"/.exec(match[0])?.[1] ?? "";
@@ -78,12 +89,14 @@ export async function embedImages(html: string, user: CurrentUser, locale: strin
           consumeAnswerExportImageBytes(budget, Math.ceil((src.length - src.indexOf(",") - 1) * 3 / 4));
           data = src;
         } else if (id) {
-          const asset = await getMediaAssetForDelivery(user, decodeURIComponent(id));
+          const assetId = decodeURIComponent(id);
+          if (authorizeImage && !await authorizeImage(assetId)) throw new Error("Image is outside the permitted export content");
+          const asset = hasSafeExamBrowserAccess ? await getMediaAssetForDelivery(user, assetId, { hasSafeExamBrowserAccess }) : await getMediaAssetForDelivery(user, assetId);
           if (asset.byteSize > 10_000_000 || !/^image\/(png|jpeg|webp|gif)$/.test(asset.mimeType)) throw new Error("Unsupported image");
           consumeAnswerExportImageBytes(budget, asset.byteSize);
           data = `data:${asset.mimeType};base64,${(await readFile(asset.filePath)).toString("base64")}`;
         } else {
-          const image = await fetchPublicExportImage(src.replaceAll("&amp;", "&"), budget);
+          const image = await fetchPublicExportImage(src.replaceAll("&amp;", "&"), budget, 0, signal);
           data = `data:${image.mime};base64,${image.bytes.toString("base64")}`;
         }
         cache.set(src, data);
@@ -93,6 +106,7 @@ export async function embedImages(html: string, user: CurrentUser, locale: strin
       if (htmlBytes > 64_000_000) throw new AppError(413, "ANSWER_EXPORT_TOO_LARGE", "Select fewer students or attempts for this export.");
       fragments.push(match[0].replace(`src="${src}"`, `src="${data}"`));
     } catch (error) {
+      signal?.throwIfAborted();
       if (error instanceof AppError && error.code === "ANSWER_EXPORT_TOO_LARGE") throw error;
       const placeholder = `<p>[${escape(answerExportLabels(locale).imageUnavailable)}: ${escape(/alt="([^"]*)"/.exec(match[0])?.[1] ?? src)}]</p>`;
       htmlBytes += Buffer.byteLength(placeholder) - Buffer.byteLength(match[0]);
@@ -105,28 +119,62 @@ export async function embedImages(html: string, user: CurrentUser, locale: strin
 }
 export const answerExportFileName = (name: string) => name.normalize("NFC").replace(/[\x00-\x1f\x7f/\\:*?"<>|]/g, "-").replace(/\.{2,}/g, "-").trim().slice(0, 120) || "answers";
 let activeExports = 0;
-export async function createAnswerExportFile(loadData: Export | (() => Promise<Export>), user: CurrentUser) {
+export type PdfExportRender = (html: string, footer?: boolean, authorizeImage?: (assetId: string) => Promise<boolean>, hasSafeExamBrowserAccess?: SebImageAccess) => Promise<Buffer>;
+
+/** One admission budget for teacher and student exports. Browsers receive no application secrets. */
+export async function withAnswerExportRenderer<T>(user: CurrentUser, locale: string | (() => string), signal: AbortSignal | undefined,
+  work: (renderer: { render: PdfExportRender; css: string; signal: AbortSignal }) => Promise<T>): Promise<T> {
   if (activeExports >= 2) throw new AppError(429, "ANSWER_EXPORT_BUSY", "Other answer exports are running. Try again shortly.");
   activeExports++;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
-  let deadline: ReturnType<typeof setTimeout> | undefined;
+  let page: Page | undefined;
+  const lifetime = new AbortController();
+  const scoped = signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal;
+  const deadline = setTimeout(() => lifetime.abort(new AppError(413, "ANSWER_EXPORT_TOO_LARGE", "The export exceeded its time limit.")), 240_000);
+  const cancel = () => { void browser?.close().catch(() => undefined); };
+  scoped.addEventListener("abort", cancel, { once: true });
   try {
-    const data = typeof loadData === "function" ? await loadData() : loadData;
-    browser = await chromium.launch({ chromiumSandbox: true, env: Object.fromEntries(["PATH", "HOME", "TMPDIR", "DISPLAY", "LD_LIBRARY_PATH", "FONTCONFIG_PATH"].flatMap((key) => process.env[key] ? [[key, process.env[key]!]] : [])), executablePath: process.env.PDF_CHROMIUM_EXECUTABLE_PATH || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined, timeout: 30_000 });
-    deadline = setTimeout(() => { void browser?.close().catch(() => undefined); }, 240_000);
-    const context = await browser.newContext({ javaScriptEnabled: false, serviceWorkers: "block", offline: true });
-    await context.route("**/*", (route) => route.abort());
-    const page = await context.newPage();
-    page.setDefaultTimeout(30_000);
+    scoped.throwIfAborted();
     const css = await embeddedKatexCss();
     const imageCache = new Map<string, string | null>();
-    const imageBudget = createAnswerExportImageBudget();
-    const render = async (documents: AnswerExportDocument[], footer = true) => {
-      const html = await embedImages(answerExportHtml(data, documents, css), user, data.options.locale, imageCache, imageBudget);
-      if (Buffer.byteLength(html) > 64_000_000) throw new AppError(413, "ANSWER_EXPORT_TOO_LARGE", "Select fewer students or attempts for this export.");
-      await page.setContent(html, { waitUntil: "load", timeout: 30_000 });
+    let imageBudget: AnswerExportImageBudget | undefined;
+    let imageTimeRemaining = 30_000;
+    const render: PdfExportRender = async (html, footer = true, authorizeImage, hasSafeExamBrowserAccess) => {
+      scoped.throwIfAborted();
+      imageBudget ??= createAnswerExportImageBudget();
+      imageBudget.deadline = Date.now() + imageTimeRemaining;
+      const prepared = await embedImages(html, user, typeof locale === "function" ? locale() : locale, imageCache, imageBudget, authorizeImage, scoped, hasSafeExamBrowserAccess);
+      imageTimeRemaining = Math.max(0, imageBudget.deadline - Date.now());
+      scoped.throwIfAborted();
+      if (Buffer.byteLength(prepared) > 64_000_000) throw new AppError(413, "ANSWER_EXPORT_TOO_LARGE", "The printable document exceeds the export limit.");
+      if (!page) {
+        browser = await chromium.launch({ chromiumSandbox: true, env: Object.fromEntries(["PATH", "HOME", "TMPDIR", "DISPLAY", "LD_LIBRARY_PATH", "FONTCONFIG_PATH"].flatMap(key => process.env[key] ? [[key, process.env[key]!]] : [])), executablePath: process.env.PDF_CHROMIUM_EXECUTABLE_PATH || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined, timeout: 30_000 });
+        scoped.throwIfAborted();
+        const context = await browser.newContext({ javaScriptEnabled: false, serviceWorkers: "block", offline: true });
+        await context.route("**/*", route => route.abort());
+        page = await context.newPage(); page.setDefaultTimeout(30_000);
+      }
+      await page.setContent(prepared, { waitUntil: "load", timeout: 30_000 });
+      scoped.throwIfAborted();
       return page.pdf({ format: "A4", printBackground: true, tagged: true, displayHeaderFooter: footer, headerTemplate: "<span></span>", footerTemplate: '<div style="font-size:9px;color:#667085;text-align:center;width:100%"><span class="pageNumber"></span> / <span class="totalPages"></span></div>', margin: { top: "16mm", right: "15mm", bottom: "18mm", left: "15mm" } });
     };
+    const result = await work({ render, css, signal: scoped });
+    scoped.throwIfAborted(); return result;
+  } catch (error) {
+    scoped.throwIfAborted();
+    throw error;
+  } finally {
+    clearTimeout(deadline); scoped.removeEventListener("abort", cancel);
+    try { await browser?.close().catch(() => undefined); } finally { activeExports--; }
+  }
+}
+
+export async function createAnswerExportFile(loadData: Export | (() => Promise<Export>), user: CurrentUser, signal?: AbortSignal) {
+  let locale = typeof loadData === "function" ? "en" : loadData.options.locale;
+  return withAnswerExportRenderer(user, () => locale, signal, async ({ render: print, css, signal: scoped }) => {
+    const data = typeof loadData === "function" ? await loadData() : loadData;
+    locale = data.options.locale;
+    const render = (documents: AnswerExportDocument[], footer = true) => print(answerExportHtml(data, documents, css), footer);
     const renderWithAttachments = async (documents: AnswerExportDocument[]) => {
       if (!data.options.includePrompt || !documents.some((document) => document.attempts.some((attempt) => attempt.sections.some((section) => section.promptPdfs?.length)))) return render(documents);
       const parts: Array<{ bytes: Uint8Array; attachment?: boolean }> = [];
@@ -140,10 +188,11 @@ export async function createAnswerExportFile(loadData: Export | (() => Promise<E
     const files: Record<string, Uint8Array> = {};
     let total = 0;
     for (const [index, student] of data.documents.entries()) {
+      scoped.throwIfAborted();
       const bytes = await renderWithAttachments([student]); total += bytes.length;
       if (total > 128_000_000) throw new AppError(413, "ANSWER_EXPORT_TOO_LARGE", "Select fewer students or attempts for this export.");
       files[`${String(index + 1).padStart(3, "0")}-${answerExportFileName(student.name)}-${answerExportFileName(student.groupTitle)}.pdf`] = bytes;
     }
     return { bytes: zipSync(files, { level: 1 }), mime: "application/zip", fileName: `${answerExportFileName(data.activityTitle)}.zip` };
-  } finally { clearTimeout(deadline); try { await browser?.close(); } finally { activeExports--; } }
+  });
 }

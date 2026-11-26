@@ -1,0 +1,1 @@
+ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "studentCourseExportEnabled" BOOLEAN NOT NULL DEFAULT false;

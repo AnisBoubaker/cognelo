@@ -23,6 +23,7 @@ import { useAuth } from "@/components/auth-provider";
 import { DateTimeMinuteInput } from "@/components/date-time-minute-input";
 import { CourseGradeChallengesPanel } from "@/components/course-grade-challenges-panel";
 import { StudentCourseContent } from "@/components/student-course-content";
+import { StudentCourseExportButton } from "@/components/student-course-export-button";
 import { MyTeamsPanel } from "@/components/my-teams-panel";
 import { StudentGroupingsPanel } from "@/components/student-groupings-panel";
 import { WorkspaceTabs } from "@/components/workspace-tabs";
@@ -288,6 +289,7 @@ export default function CourseGroupPage() {
               <div className="workspace-context">
                 <h1>{course.subject?.title ?? `${course.title}: ${group.title}`}</h1>
                 {course.subject ? <p className="muted">{course.title}: {group.title}</p> : null}
+                {course.studentCourseExportEnabled ? <StudentCourseExportButton courseId={courseId} /> : null}
               </div>
             }
             ariaLabel={t("groupPage.workspaceTabs")}

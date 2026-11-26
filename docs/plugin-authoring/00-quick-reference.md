@@ -266,6 +266,10 @@ Typical shape:
 type ServerActivityPlugin = {
   key: string;
   routes?: readonly PluginRouteDefinition[];
+  studentExport?: {
+    activityTypeKeys: readonly string[];
+    getContent: StudentActivityExportHandler;
+  };
   gradeCompletion?: {
     activityTypeKeys: readonly string[];
     getCompletions: PluginGradeCompletionHandler;
@@ -356,6 +360,8 @@ type ContentEmbeddingSource =
 ```
 
 Future indexing services should call core's generic `getContentResourceEmbeddingSource` instead of importing your plugin directly.
+
+Both server SDKs support an explicit optional `studentExport` capability for [student course ZIPs](../STUDENT_COURSE_EXPORTS.md). Activities use a type-scoped `StudentActivityExportHandler`, receiving either a public prompt request or an exact owned saved attempt with feedback permissions. Content handlers receive the authorized resource and return `{ blocks: ExportDocumentBlock[], files?: { name, bytes }[] }`. Keep the projection read-only and public-only, respect cancellation, and omit private settings/indexes. Teacher `submissionExport` does not imply student export support.
 
 ## Minimal Plugin Example
 

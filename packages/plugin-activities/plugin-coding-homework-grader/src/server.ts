@@ -15,7 +15,7 @@ import { homeworkWorkflowRoutes } from "./workflow-routes";
 import { codingHomeworkGradebookFileRoute } from "./gradebook-file";
 import { finalizeHomeworkSavedAnswers } from "./deadline";
 import { homeworkPreparationRoute, homeworkPreparedFileRoute, homeworkTeacherSolutionRoute, homeworkSelectFunctionsRoute } from "./preparation-routes";
-import { exportHomeworkSubmission } from "./submission-export";
+import { exportHomeworkSubmission, exportStudentHomework } from "./submission-export";
 import type { ServerActivityPlugin } from "@cognelo/activity-sdk/server";
 import { AppError } from "@cognelo/core";
 import { prisma } from "./db-client";
@@ -97,6 +97,7 @@ export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
   gradebookActions: homeworkGradebookActionService,
   materialReferences: homeworkMaterialReferences,
   submissionExport: { activityTypeKeys: ["coding-homework-grader"], getContent: exportHomeworkSubmission },
+  studentExport: { activityTypeKeys: ["coding-homework-grader"], getContent: exportStudentHomework },
   key: "coding-homework-grader",
   timedFinalization: { activityTypeKeys: ["coding-homework-grader"], finalize: finalizeHomeworkSavedAnswers },
   attemptContinuation: {

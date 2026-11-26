@@ -14,6 +14,11 @@ const payloadSchema = linkPayloadSchema.extend({
 
 export const linkContentServerPlugin: ServerContentTypePlugin = {
   key: "link-content",
+  studentExport: async ({ resource }) => {
+    const { href } = getLinkContentPresentation(resource.metadata);
+    const { description } = readLinkMetadata(resource.metadata);
+    return { blocks: href ? [{ kind: "link", url: href, text: resource.title, description }] : [] };
+  },
   indexing: linkMaterialIndexing,
   routes: [{
     path: "summary",

@@ -1,5 +1,5 @@
 import { prisma } from "./db-client";
-import { exportRecord, exportText, feedbackExportBlocks, type AnswerExportBlock, type SubmissionExportHandler } from "@cognelo/activity-sdk/server";
+import { exportRecord, exportText, feedbackExportBlocks, studentSubmissionExportInput, type AnswerExportBlock, type SubmissionExportHandler, type StudentActivityExportHandler } from "@cognelo/activity-sdk/server";
 import { parseMcqSource, type McqBlock } from "./mcq";
 export const mcqBlocksMarkdown = (blocks: McqBlock[]): string => blocks.map((block) => {
   if (block.type === "code") return `\n\`\`\`${block.language}\n${block.code}\n\`\`\`\n`;
@@ -20,10 +20,20 @@ export const exportMcqSubmission: SubmissionExportHandler = async (input) => {
     const choices = input.includePrompt ? question.choices : question.choices.filter((choice) => selected.includes(choice.id));
     answer.push({ kind: "markdown", title: `${labels.answer} ${index + 1}`, text: choices.length
       ? choices.map((choice) => `${selected.includes(choice.id) ? "☑" : "☐"} ${markdown(choice.blocks)}`).join("\n\n") : labels.noAnswer });
-    if (input.includeGrading) answer.push({ kind: "markdown", title: labels.correctAnswer, text: question.choices.filter((choice) => choice.isCorrect).map((choice) => markdown(choice.blocks)).join("\n\n") });
+    if (input.includeGrading && input.audience !== "student") answer.push({ kind: "markdown", title: labels.correctAnswer, text: question.choices.filter((choice) => choice.isCorrect).map((choice) => markdown(choice.blocks)).join("\n\n") });
   }
-  const savedFeedback = input.includeGrading && !input.state && !Object.keys(input.feedback).length ? await prisma.pluginMcqAiEvaluation.findFirst({
+  const savedFeedback = input.includeGrading && input.includeAiFeedback !== false && !input.state && !Object.keys(input.feedback).length ? await prisma.pluginMcqAiEvaluation.findFirst({
     where: { activityId: input.activity.id, coreAttemptId: input.coreAttemptId, status: "completed" }, orderBy: { version: "desc" }, select: { sanitizedFeedback: true }
   }) : null;
   return { prompt: input.includePrompt && parsed.introBlocks.length ? [{ kind: "markdown", text: markdown(parsed.introBlocks) }] : [], answer, grading: input.includeGrading ? feedbackExportBlocks(savedFeedback?.sanitizedFeedback ?? input.feedback, labels) : [] };
+};
+
+export const exportStudentMcq: StudentActivityExportHandler = async input => {
+  if (input.attempt) return exportMcqSubmission(studentSubmissionExportInput(input));
+  const parsed = parseMcqSource(exportText(input.activity.config?.source), exportText(input.activity.config?.defaultCodeLanguage) || "none");
+  return { answer: [], prompt: [
+    ...(parsed.introBlocks.length ? [{ kind: "markdown" as const, text: markdown(parsed.introBlocks) }] : []),
+    ...parsed.questions.map((question, index) => ({ kind: "markdown" as const, title: `${input.labels.question} ${index + 1}: ${question.title}`,
+      text: markdown([...question.leadingBlocks, ...question.promptBlocks]) + "\n\n" + question.choices.map(choice => `☐ ${markdown(choice.blocks)}`).join("\n\n") }))
+  ] };
 };

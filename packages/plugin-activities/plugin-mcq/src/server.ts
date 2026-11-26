@@ -1,5 +1,5 @@
 import { constrainMcqAnswers } from "./mcq";
-import { exportMcqSubmission } from "./submission-export";
+import { exportMcqSubmission, exportStudentMcq } from "./submission-export";
 import { mcqWorkInspection } from "./work-inspection";
 import { AppError } from "@cognelo/core";
 import { prisma } from "@cognelo/db";
@@ -14,6 +14,7 @@ import { reconcileMcqResponseState } from "./mcq";
 
 export const mcqServerPlugin: ServerActivityPlugin = {
   submissionExport: { activityTypeKeys: ["mcq"], getContent: exportMcqSubmission },
+  studentExport: { activityTypeKeys: ["mcq"], getContent: exportStudentMcq },
   key: "mcq",
   workInspection: mcqWorkInspection,
   studentSolution: {

@@ -15,3 +15,5 @@ Modal readers and full-screen editors use the shared [persistent close cross](..
 ## Prepared embedding service
 
 This material provides plugin-owned preparation/refresh through core. See [material embedding services](../../../docs/MATERIAL_EMBEDDING_SERVICES.md) for source extraction, reuse, freshness and limits. The prior deterministic index handlers remain a legacy compatibility path; Coding Homework uses the prepared semantic service.
+
+Teacher-enabled [student course exports](../../../docs/STUDENT_COURSE_EXPORTS.md) use a safe public projection; see [export details](docs/REFERENCE.md#student-course-exports).

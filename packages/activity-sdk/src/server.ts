@@ -1,6 +1,6 @@
 import type { GradebookActionService } from "./gradebook-actions";
 export * from "./gradebook-actions";
-import type { SubmissionExportHandler } from "./submission-export";
+import type { SubmissionExportHandler, StudentActivityExportHandler } from "./submission-export";
 export * from "./submission-export";
 import type { ActivityStudentProgress, CurrentUser } from "@cognelo/contracts";
 import type { GradingReviewRequest } from "@cognelo/contracts";
@@ -463,6 +463,8 @@ export type ServerActivityPlugin = {
   /** Read-only projection of a host-authorized submitted attempt. */
   gradebookActions?: GradebookActionService;
   submissionExport?: { activityTypeKeys: readonly string[]; getContent: SubmissionExportHandler };
+  /** Explicit learner-safe projection; teacher export handlers are never a fallback. */
+  studentExport?: { activityTypeKeys: readonly string[]; getContent: StudentActivityExportHandler };
   studentSolution?: {
     activityTypeKeys: readonly string[];
     /** Called only after the host authorizes solution release. Never return grading secrets. */
@@ -950,6 +952,10 @@ export async function runActivityAttemptDeletedHooksForPlugins(
 
 export function getSubmissionExportHandler(activityTypeKey: string): SubmissionExportHandler | null {
   return currentServerPlugins().find((plugin) => plugin.submissionExport?.activityTypeKeys.includes(activityTypeKey))?.submissionExport?.getContent ?? null;
+}
+
+export function getStudentActivityExportHandler(activityTypeKey: string): StudentActivityExportHandler | null {
+  return currentServerPlugins().find(plugin => plugin.studentExport?.activityTypeKeys.includes(activityTypeKey))?.studentExport?.getContent ?? null;
 }
 
 export function resolveActivityTimedFinalization(activityTypeKey: string) {

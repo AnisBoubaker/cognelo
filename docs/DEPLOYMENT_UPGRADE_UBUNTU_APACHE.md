@@ -157,7 +157,7 @@ They must resolve to:
 
 Install, generate, test, and build while the old release remains online:
 
-Teacher answer PDF exports additionally need the API-side Chromium browser and multilingual fonts. Complete the [answer-export runtime setup](ANSWER_EXPORTS.md#runtime-installation) for the service account before enabling downloads; this is separate from the Web Design execution runner.
+Teacher answer PDF exports and teacher-enabled student course ZIPs additionally need the API-side Chromium browser and multilingual fonts. Complete the [answer-export runtime setup](ANSWER_EXPORTS.md#runtime-installation) for the service account before enabling downloads; this is separate from the Web Design execution runner. Student course exports add the idempotent core migration `202611250001_student_course_export` through `npm run db:migrate:all`; existing courses remain disabled by default. Regenerate clients and restart the applications in the normal upgrade sequence. No new environment variables or runner changes are needed; see [student course exports](STUDENT_COURSE_EXPORTS.md).
 
 ```bash
 sudo -u instance1 /bin/bash -c '

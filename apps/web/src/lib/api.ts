@@ -370,6 +370,7 @@ export type Course = {
   title: string;
   description: string;
   status: "draft" | "published" | "archived";
+  studentCourseExportEnabled?: boolean;
   metadata?: Record<string, unknown>;
   subject?: Subject;
   memberships?: CourseMembership[];
@@ -2061,6 +2062,24 @@ export const api = {
     return { blob: await response.blob(), fileName };
   },
   answerExportStudents: (courseId: string, activityId: string, groupId?: string) => request<{ students: AnswerExportStudent[] }>(`/courses/${courseId}/gradebook/activities/${activityId}/answers-export${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ""}`),
+  exportStudentCourse: async (courseId: string, locale: string, signal: AbortSignal) => {
+    const path = `/courses/${courseId}/student-export`;
+    assertStudentViewRequestIsSafe(path, { method: "POST" });
+    const response = await fetch(`${API_URL}/api${path}`, { method: "POST", signal, credentials: "include", cache: "no-store",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale }) }).catch((error: unknown) => {
+        if (error instanceof Error && error.name === "AbortError") throw error;
+        throw systemApiError("SYS-007");
+      });
+    if (!response.ok) {
+      if (response.status === 401) notifyUnauthorized();
+      const body = await response.json().catch(() => ({}));
+      throw responseApiError(body.error, response.status);
+    }
+    const encoded = /filename\*=UTF-8''([^;]+)/i.exec(response.headers.get("Content-Disposition") ?? "")?.[1];
+    let fileName = "course.zip";
+    if (encoded) { try { fileName = decodeURIComponent(encoded); } catch { /* Retain the safe fallback. */ } }
+    return { blob: await response.blob(), fileName };
+  },
   exportActivityAnswers: async (courseId: string, activityId: string, input: AnswerExportRequest) => {
     const path = `/courses/${courseId}/gradebook/activities/${activityId}/answers-export`;
     assertStudentViewRequestIsSafe(path, { method: "POST" });

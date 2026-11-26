@@ -25,6 +25,13 @@ beforeEach(() => {
 });
 
 describe("activity content closure", () => {
+  it("does not bypass learner closure in a personal export when the account also manages the course", async () => {
+    mocks.manage.mockResolvedValue(true);
+    expect((await getActivityContentAccess(user, "course-1", "group-1", "activity-1")).locked).toBe(false);
+    expect((await getActivityContentAccess(user, "course-1", "group-1", "activity-1", { forceLearner: true })).locked).toBe(true);
+    mocks.participant.mockResolvedValue({ id: "staff", role: "teacher" });
+    await expect(getActivityContentAccess(user, "course-1", "group-1", "activity-1", { forceLearner: true })).rejects.toMatchObject({ status: 403 });
+  });
   it("uses the assessment-stage date and a cleared stage duration instead of the old general timer", async () => {
     const names = { en: "Answers", fr: "Réponses", zh: "作答", ar: "الإجابات" };
     registerActivityPlugin({ key: "closure-stage-fixture", name: "Stages", packageName: "test", db: { namespace: "closure_stage_test", tables: [] }, activities: [{ key: "closure-stage-fixture", name: "Stages", description: "Stages", studentView: { mode: "read_only" }, submissionStages: [{ id: "questions", names, assessment: true }] }] });

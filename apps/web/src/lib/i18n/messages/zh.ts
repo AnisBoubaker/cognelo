@@ -2,6 +2,19 @@ import { parsonsMessages } from "@cognelo/plugin-parsons";
 import type { MessageTree } from "../types";
 
 export const zhMessages = {
+  courseExport: {
+    "setting": "允许学生导出课程内容",
+    "settingHelp": "学生可以下载 ZIP，其中包含可见课程资料、可访问的活动题目、自己已提交的作答和可查看的反馈。不包含隐藏或不可访问的内容。",
+    "action": "导出课程内容",
+    "preparing": "正在准备课程导出",
+    "preparingHelp": "正在创建 PDF 并收集您可访问的课程内容。您可以取消下载。",
+    "ready": "课程导出已准备就绪。",
+    "failed": "无法导出课程。",
+    "changed": "课程内容或访问权限已更改，请重新导出。",
+    "unavailable": "当前无法导出课程，请刷新课程或联系教师。",
+    "tooLarge": "此课程超出导出限制，请联系教师。",
+    "busy": "其他导出任务正在进行，请稍后重试。"
+},
   systemErrors: {
     message: "系统错误（{code}）。",
     "SYS-001": "服务器发生意外错误。请查看 API 日志中的原始异常。",

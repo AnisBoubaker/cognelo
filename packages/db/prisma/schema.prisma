@@ -351,6 +351,7 @@ model Course {
   description               String                     @default("")
   timeZone                  String?
   status                    CourseStatus               @default(draft)
+  studentCourseExportEnabled Boolean                   @default(false)
   metadata                  Json                       @default("{}")
   createdById               String
   createdAt                 DateTime                   @default(now())

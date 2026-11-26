@@ -231,3 +231,7 @@ Released Web Design exercises expose their final grade and available teacher com
 ## Saved-work inspection
 
 Inspection displays the generic saved file bundle as escaped source. Never mount an iframe preview, run JavaScript or call the execution runner. Embedded Tests use their supplied saved file state. See [the shared inspection contract](../../../../docs/WORK_IN_PROGRESS_INSPECTION.md) for permissions, public bounds, snapshot freshness and the host dialog.
+
+## Student course exports
+
+The separate `studentExport` projection prints accessible prompts, the already-cached expected-result image, the learner’s saved files and permitted public outcomes. It omits private grader messages and never invokes the screenshot or execution runner. The host enforces enrollment, visibility, content closure, SEB and feedback release, then revalidates before delivery. See [course export contract and limits](../../../../docs/STUDENT_COURSE_EXPORTS.md).

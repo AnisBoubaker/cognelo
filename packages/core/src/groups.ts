@@ -943,6 +943,14 @@ export async function getGroupAssignedActivity(user: CurrentUser, courseId: stri
   return getGroupAssignedActivityRecord(user, courseId, groupId, activityId, group, false);
 }
 
+/** Real enrollment with forced learner rules, even when this account also has staff roles. */
+export async function getGroupAssignedActivityForStudentExport(user: CurrentUser, courseId: string, groupId: string, activityId: string) {
+  const participant = await prisma.courseGroupParticipant.findFirst({ where: { groupId, userId: user.id, role: "student", group: { courseId } }, select: { id: true } });
+  if (!participant) throw new AppError(403, "FORBIDDEN", "Student enrollment is required.");
+  const group = await assertGroupBelongsToCourse(courseId, groupId);
+  return getGroupAssignedActivityRecord(user, courseId, groupId, activityId, group, true, true);
+}
+
 export async function getGroupAssignedActivityForStudentPreview(
   user: CurrentUser,
   courseId: string,
@@ -960,13 +968,14 @@ async function getGroupAssignedActivityRecord(
   groupId: string,
   activityId: string,
   group: Awaited<ReturnType<typeof assertGroupBelongsToCourse>>,
-  forceStudentRules: boolean
+  forceStudentRules: boolean,
+  studentExport = false
 ) {
   let assignment = await prisma.courseGroupActivity.findFirst({
     where: { groupId, activityId },
     include: {
       activity: {
-        include: { activityType: true, bankActivity: true, activityVersion: true }
+        include: { activityType: true, bankActivity: !studentExport, activityVersion: !studentExport }
       }
     }
   });
@@ -975,7 +984,7 @@ async function getGroupAssignedActivityRecord(
     throw notFound("Group activity assignment");
   }
 
-  if (!forceStudentRules) {
+  if (!forceStudentRules || studentExport) {
     const overrides = await assignmentExceptionsForUser([assignment.id], user.id);
     assignment = applyAssignmentExceptions(assignment, overrides.get(assignment.id) ?? {});
   }
@@ -991,7 +1000,7 @@ async function getGroupAssignedActivityRecord(
       throw new AppError(403, "GROUP_ACTIVITY_NOT_AVAILABLE", "This activity is not currently available in the group.");
     }
 
-    const visibleContentItems = await listContentItems(user, courseId, { groupId, visibleOnly: true });
+    const visibleContentItems = await listContentItems(user, courseId, { groupId, visibleOnly: true, ...(studentExport ? { learnerVisibility: true } : {}) });
     if (!visibleContentItems.some((item) => item.courseGroupActivityId === assignment.id)) {
       throw new AppError(403, "GROUP_ACTIVITY_HIDDEN", "This activity is hidden in the group workspace.");
     }

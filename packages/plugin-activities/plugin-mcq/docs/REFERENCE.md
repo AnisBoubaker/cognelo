@@ -174,3 +174,7 @@ The host's [AI grading run](../../../../docs/AI_GRADING_RUNS.md) evaluates copie
 ## Saved-work inspection
 
 Inspection projects saved selections and authored prompts/choices only. Ignore unknown answer IDs and omit correctness, answer keys, feedback and grading evidence. It performs no answer evaluation or attempt creation. See [the shared inspection contract](../../../../docs/WORK_IN_PROGRESS_INSPECTION.md) for permissions, public bounds, snapshot freshness and the host dialog.
+
+## Student course exports
+
+The separate `studentExport` projection prints public question/choice text and the learner’s saved selections, never answer keys. Saved AI feedback is read only when the host permits it; ordinary Formative exports do not load that fallback. The host enforces enrollment, visibility, content closure, SEB and feedback release, then revalidates before delivery. See [course export contract and limits](../../../../docs/STUDENT_COURSE_EXPORTS.md).

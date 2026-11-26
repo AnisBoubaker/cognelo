@@ -4,7 +4,7 @@ import { prisma } from "@cognelo/db";
 import { test, expect, ORIGINAL_SOURCE } from "./fixtures/bank-course";
 import { createAuthenticatedApi } from "./fixtures/auth";
 import { responseJson } from "./fixtures/activity-suite";
-import { parseMcqSource } from "../../packages/plugin-activities/plugin-mcq/src/mcq";
+import { parseMcqSource, readMcqConfig } from "../../packages/plugin-activities/plugin-mcq/src/mcq";
 import type { AnswerExportStudent } from "@cognelo/contracts";
 import type { CourseActivityAssignmentSettings } from "../../apps/web/src/lib/api";
 
@@ -109,7 +109,7 @@ test("exports a compound Test with saved code, question prompts and only selecte
     for (const [api, label] of [[student, "Sam"], [peer, "Peer"]] as const) {
       const { runtime } = await responseJson<{ runtime: { attempt: { id: string }; test: { items: Array<{ id: string; activity: { activityType: { key: string }; config: Record<string, unknown> } }> } } }>(await api.post(`${assigned}/test`, { data: { sessionId: `${data.token}-${label}` } }));
       for (const item of runtime.test.items) {
-        const question = item.activity.activityType.key === "mcq" ? parseMcqSource(String(item.activity.config.source), "none").questions[0] : null;
+        const question = item.activity.activityType.key === "mcq" ? readMcqConfig(item.activity.config).questions[0] : null;
         const state = question ? { answers: { [question.id]: [question.choices[0].id] } } : { sourceCode: `# ${label}\n${sourceCode}` };
         await responseJson(await api.put(`${assigned}/test/items/${item.id}`, { data: { parentAttemptId: runtime.attempt.id, sessionId: `${data.token}-${label}`, state } }));
       }
