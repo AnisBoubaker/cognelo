@@ -159,6 +159,8 @@ Install, generate, test, and build while the old release remains online:
 
 Teacher answer PDF exports and teacher-enabled student course ZIPs additionally need the API-side Chromium browser and multilingual fonts. Complete the [answer-export runtime setup](ANSWER_EXPORTS.md#runtime-installation) for the service account before enabling downloads; this is separate from the Web Design execution runner. Student course exports add the idempotent core migration `202611250001_student_course_export` through `npm run db:migrate:all`; existing courses remain disabled by default. Regenerate clients and restart the applications in the normal upgrade sequence. No new environment variables or runner changes are needed; see [student course exports](STUDENT_COURSE_EXPORTS.md).
 
+Usage rights and confidentiality add the idempotent `202611250002_student_export_usage_rights` migration through that same command: site terms default empty, teacher editing defaults on, courses inherit terms and watermarks default off. Existing export enablement is preserved. Rehearse the site lock, course override and multilingual generated/appended PDF attribution in isolated preprod; copied original PDFs must stay byte-identical. Browser/fonts and environment requirements are unchanged.
+
 ```bash
 sudo -u instance1 /bin/bash -c '
   set -euo pipefail

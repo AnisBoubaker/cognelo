@@ -3,6 +3,24 @@ import type { MessageTree } from "../types";
 
 export const zhMessages = {
   courseExport: {
+    "adminOnly": "只有管理员可以修改全站导出策略。",
+    "adminTitle": "课程导出",
+    "adminNavText": "学生下载的使用权",
+    "adminHelp": "设置全站课程导出的使用权，并决定是否允许教师自定义。",
+    "siteUsageRights": "全站使用权",
+    "siteRightsHelp": "这些条款会原样写入单独的使用权 PDF。禁止教师编辑时，条款适用于所有课程。",
+    "allowTeacherEditing": "允许教师编辑使用权",
+    "allowTeacherEditingHelp": "关闭后，全站条款会覆盖课程条款。已保存的课程条款会保留，以便日后使用。",
+    "usageRights": "使用权",
+    "usageRightsHelp": "这些条款会写入导出包中的单独 PDF。文件标题和版权声明使用课程教学语言，您输入的条款保持原样。",
+    "useSiteDefault": "使用全站默认条款",
+    "inheritsSiteDefault": "正在使用全站使用权条款。",
+    "confidential": "为 PDF 添加“Confidential”水印",
+    "confidentialHelp": "在生成的 PDF 的每一页添加“Confidential”，包括附加的作业说明页。原始下载文件保持不变。",
+    "rightsLocked": "使用权为只读，由网站管理员管理。",
+    "policyLoadError": "无法加载导出使用权，请重试。",
+    "policySaved": "课程导出策略已保存。",
+
     "setting": "允许学生导出课程内容",
     "settingHelp": "学生可以下载 ZIP，其中包含可见课程资料、可访问的活动题目、自己已提交的作答和可查看的反馈。不包含隐藏或不可访问的内容。",
     "action": "导出课程内容",

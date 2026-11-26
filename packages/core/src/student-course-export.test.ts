@@ -3,7 +3,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 const mocks = vi.hoisted(() => ({
   course: vi.fn(), groups: vi.fn(), tree: vi.fn(), assigned: vi.fn(), access: vi.fn(), stage: vi.fn(), policy: vi.fn(),
   attempts: vi.fn(), attempt: vi.fn(), grades: vi.fn(), grade: vi.fn(), reviews: vi.fn(), resources: vi.fn(), materials: vi.fn(),
-  resourceActive: vi.fn(), pluginActive: vi.fn(), bytes: vi.fn(), image: vi.fn(), content: vi.fn(), handler: vi.fn(), materialContent: vi.fn()
+  resourceActive: vi.fn(), pluginActive: vi.fn(), bytes: vi.fn(), image: vi.fn(), content: vi.fn(), handler: vi.fn(), materialContent: vi.fn(), exportPolicy: vi.fn()
 }));
 vi.mock("@cognelo/db", () => ({ prisma: { course: { findFirst: mocks.course }, courseGroup: { findMany: mocks.groups },
   gradebookItem: { findFirst: mocks.policy }, activityAttempt: { findMany: mocks.attempts, findFirst: mocks.attempt },
@@ -16,6 +16,7 @@ vi.mock("./activity-submission-stages", () => ({ activitySubmissionStageSafeExam
 vi.mock("./grading-review", () => ({ getActivityGradingReviews: mocks.reviews }));
 vi.mock("./plugins", () => ({ assertContentResourcePluginActive: mocks.resourceActive, isActivityTypePluginEnabled: mocks.pluginActive }));
 vi.mock("./course-time", () => ({ getCourseTimeSettings: async () => ({ timeZone: "America/Toronto" }) }));
+vi.mock("./student-course-export-policy", () => ({ getStudentCourseExportPolicy: mocks.exportPolicy }));
 vi.mock("./media-assets", () => ({ extractMediaAssetIds: () => new Set<string>() }));
 vi.mock("@cognelo/activity-sdk", () => ({ getActivityDefinition: (key: string) => ({ supportsSafeExamBrowser: true, assessmentFlow: key === "coding-homework-grader" ? "deferred" : undefined, preparationMediaFields: [] }) }));
 vi.mock("@cognelo/activity-sdk/server", async original => ({ ...await original<object>(), getStudentActivityExportHandler: mocks.handler }));
@@ -39,6 +40,7 @@ const build = (actor = user, security = {}) => buildStudentCourseExport(actor, "
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.course.mockResolvedValue(course); mocks.groups.mockResolvedValue([group]); mocks.tree.mockResolvedValue([item()]);
+  mocks.exportPolicy.mockResolvedValue({ usageRights: "Site rights", allowTeacherEditing: true });
   mocks.assigned.mockResolvedValue(activity); mocks.access.mockResolvedValue({ locked: false }); mocks.stage.mockResolvedValue(null);
   mocks.policy.mockResolvedValue({ id: "gradebook", gradesReleased: false, updatedAt: stamp });
   mocks.attempts.mockResolvedValue([reference()]); mocks.attempt.mockImplementation(async ({ where }) => attempt(where.id));
@@ -52,6 +54,18 @@ beforeEach(() => {
 });
 
 describe("student course export authorization and projections", () => {
+  it("uses course terms only when permitted, and uses the course teaching language for rights", async () => {
+    mocks.course.mockResolvedValue({ ...course, subject: { ...course.subject, teachingLanguage: "fr" }, studentCourseExportUsageRights: "Course terms", studentCourseExportConfidential: true });
+    expect((await build()).rights).toEqual({ locale: "fr", usageRights: "Course terms", confidential: true });
+    mocks.exportPolicy.mockResolvedValue({ usageRights: "Locked site terms", allowTeacherEditing: false });
+    expect((await build()).rights.usageRights).toBe("Locked site terms");
+    mocks.course.mockResolvedValue(course);
+    expect((await build()).rights).toEqual({ locale: "en", usageRights: "Locked site terms", confidential: false });
+  });
+  it("discards an export when site usage rights change before delivery", async () => {
+    const result = await build(); mocks.exportPolicy.mockResolvedValue({ usageRights: "Changed terms", allowTeacherEditing: false });
+    await expect(result.revalidate()).rejects.toMatchObject({ code: "COURSE_EXPORT_CHANGED" });
+  });
   it.each([undefined, false])("keeps courses disabled unless explicitly enabled (%s)", async enabled => {
     mocks.course.mockResolvedValue({ ...course, studentCourseExportEnabled: enabled });
     await expect(build()).rejects.toMatchObject({ status: 403, code: "COURSE_EXPORT_DISABLED" });

@@ -3,7 +3,8 @@ import { prisma } from "@cognelo/db";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { exportRecord, getStudentActivityExportHandler, type AnswerExportBlock, type AnswerExportLabels, type ServerActivityRecord, type StudentActivityExportInput } from "@cognelo/activity-sdk/server";
 import { getServerContentTypePlugin } from "@cognelo/content-type-sdk/server";
-import { StudentCourseExportRequestSchema, type CurrentUser } from "@cognelo/contracts";
+import { StudentCourseExportRequestSchema, SubjectTeachingLanguageSchema, type CurrentUser } from "@cognelo/contracts";
+import { getStudentCourseExportPolicy } from "./student-course-export-policy";
 import { AppError, forbidden } from "./errors";
 import { listContentItems } from "./course-content";
 import { getGroupAssignedActivityForStudentExport, assignmentRequiresSafeExamBrowser } from "./groups";
@@ -38,6 +39,7 @@ export type StudentCourseExportSecurity = {
 export type StudentCourseExportBundle = {
   courseTitle: string; subjectTitle: string; studentName: string; timeZone: string;
   locale: "en" | "fr" | "zh" | "ar"; exportedAt: string; labels: StudentCourseExportLabels;
+  rights: { locale: "en" | "fr" | "zh" | "ar"; usageRights: string; confidential: boolean };
   documents: StudentCourseExportDocument[]; directories: string[][];
   files: Array<{ path: string[]; bytes: Uint8Array }>;
   revalidate: () => Promise<void>;
@@ -93,7 +95,7 @@ const segment = (index: number, title: string) => `${String(index + 1).padStart(
 
 export async function assertStudentCourseExportAccess(user: CurrentUser, courseId: string) {
   const course = await prisma.course.findFirst({ where: { id: courseId, groups: { some: { participants: { some: { userId: user.id, role: "student" } } } } },
-    select: { id: true, title: true, studentCourseExportEnabled: true, updatedAt: true, subject: { select: { title: true } } } });
+    select: { id: true, title: true, studentCourseExportEnabled: true, studentCourseExportUsageRights: true, studentCourseExportConfidential: true, updatedAt: true, subject: { select: { title: true, teachingLanguage: true } } } });
   if (!course) throw forbidden();
   if (!course.studentCourseExportEnabled) throw new AppError(403, "COURSE_EXPORT_DISABLED", "Student course export is not enabled for this course.");
   return course;
@@ -103,6 +105,7 @@ async function collectScope(user: CurrentUser, courseId: string, security: Stude
   security.signal?.throwIfAborted();
   await security.validateSession?.();
   const course = await assertStudentCourseExportAccess(user, courseId);
+  const exportPolicy = await getStudentCourseExportPolicy();
   const now = new Date();
   const groups = await prisma.courseGroup.findMany({ where: { courseId, status: "published", participants: { some: { userId: user.id, role: "student" } },
     AND: [{ OR: [{ availableFrom: null }, { availableFrom: { lte: now } }] }, { OR: [{ availableUntil: null }, { availableUntil: { gt: now } }] }] },
@@ -169,10 +172,10 @@ async function collectScope(user: CurrentUser, courseId: string, security: Stude
   }
   const materialIds = [...new Set(trees.flatMap(items => items.flatMap(item => item.materialId ? [item.materialId] : [])))];
   const materials = materialIds.length ? await prisma.courseMaterial.findMany({ where: { courseId, id: { in: materialIds } } }) : [];
-  return { course, sections, attempts, reviews, grades, resources, resourceActive, materials };
+  return { course, exportPolicy, sections, attempts, reviews, grades, resources, resourceActive, materials };
 }
 function scopeRevision(scope: Awaited<ReturnType<typeof collectScope>>) {
-  return digest({ course: scope.course, sections: scope.sections.map(section => ({ group: section.group,
+  return digest({ course: scope.course, exportPolicy: scope.exportPolicy, sections: scope.sections.map(section => ({ group: section.group,
     items: section.items.map(({ item }) => [item.id, item.parentId, item.position, item.titleSnapshot, item.updatedAt]),
     activities: section.activities.map(({ activity, access, sebAllowed, itemPolicy, mode }) => [activity.id, activity.updatedAt, activity.assignment, access.locked, sebAllowed, itemPolicy, mode]) })),
     attempts: scope.attempts, reviews: scope.reviews.map(review => [review.id, review.version]), grades: scope.grades,
@@ -317,6 +320,9 @@ export async function buildStudentCourseExport(user: CurrentUser, courseId: stri
   }
   return { courseTitle: scope.course.title, subjectTitle: scope.course.subject.title, studentName: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.name || user.email,
     locale: input.locale, timeZone, exportedAt: new Date().toISOString(), labels, documents, directories, files,
+    rights: { locale: SubjectTeachingLanguageSchema.catch("en").parse(scope.course.subject.teachingLanguage),
+      usageRights: scope.exportPolicy.allowTeacherEditing ? scope.course.studentCourseExportUsageRights ?? scope.exportPolicy.usageRights : scope.exportPolicy.usageRights,
+      confidential: scope.course.studentCourseExportConfidential === true },
     revalidate: async () => {
       security.signal?.throwIfAborted();
       for (const validate of projections) { security.signal?.throwIfAborted(); await validate(); }

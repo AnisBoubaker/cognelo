@@ -176,6 +176,14 @@ test("Homework exports retain provided ZIPs, frozen source, assignment PDF pages
     expect(result.all).toContain("Portfolio instructions"); expect(result.all).toContain("Original assignment PDF");
     expect(result.all).toContain("Student's own saved source, line 130"); expect(result.all).toContain("Published homework feedback");
     expect(result.all).not.toContain("PRIVATE STAGED FEEDBACK"); expect(result.all).not.toContain("PRIVATE HOMEWORK INSTRUCTIONS");
+    const { PDFDocument: Pdf } = await import("pdf-lib");
+    const homeworkPath = Object.keys(result.archive).find(name => name.endsWith("Homework portfolio.pdf"))!;
+    const homeworkPdf = await Pdf.load(result.archive[homeworkPath]);
+    const artifact = testInfo.outputPath("homework-with-notices.pdf"); await writeFile(artifact, result.archive[homeworkPath]);
+    for (let page = 1; page <= homeworkPdf.getPageCount(); page++) {
+      const text = execFileSync("pdftotext", ["-f", String(page), "-l", String(page), "-raw", artifact, "-"], { encoding: "utf8" });
+      expect(text).toContain("All rights reserved to the copyright owners."); expect(text).toContain("Sam Student");
+    }
     const originalPath = Object.keys(result.archive).find(name => name.endsWith("starter.zip"))!;
     expect(Buffer.from(result.archive[originalPath])).toEqual(starter);
     const assignmentPath = Object.keys(result.archive).find(name => name.endsWith("assignment.pdf"))!;

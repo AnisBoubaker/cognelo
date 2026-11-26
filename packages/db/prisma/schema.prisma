@@ -352,6 +352,8 @@ model Course {
   timeZone                  String?
   status                    CourseStatus               @default(draft)
   studentCourseExportEnabled Boolean                   @default(false)
+  studentCourseExportUsageRights String?
+  studentCourseExportConfidential Boolean               @default(false)
   metadata                  Json                       @default("{}")
   createdById               String
   createdAt                 DateTime                   @default(now())
@@ -1704,6 +1706,8 @@ model ApplicationSettings {
   timeZone             String   @default("UTC")
   allowCourseTimeZone   Boolean  @default(false)
   allowUserNameChanges  Boolean  @default(true)
+  exportUsageRights    String   @default("")
+  allowCourseExportUsageRights Boolean @default(true)
   updatedAt            DateTime @updatedAt
   updatedById          String?
   updatedBy            User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)

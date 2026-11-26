@@ -119,7 +119,8 @@ export async function embedImages(html: string, user: CurrentUser, locale: strin
 }
 export const answerExportFileName = (name: string) => name.normalize("NFC").replace(/[\x00-\x1f\x7f/\\:*?"<>|]/g, "-").replace(/\.{2,}/g, "-").trim().slice(0, 120) || "answers";
 let activeExports = 0;
-export type PdfExportRender = (html: string, footer?: boolean, authorizeImage?: (assetId: string) => Promise<boolean>, hasSafeExamBrowserAccess?: SebImageAccess) => Promise<Buffer>;
+export type PdfExportRender = (html: string, footer?: boolean, authorizeImage?: (assetId: string) => Promise<boolean>, hasSafeExamBrowserAccess?: SebImageAccess,
+  pageNotice?: { footerHtml: string; bottomMarginMm: number }) => Promise<Buffer>;
 
 /** One admission budget for teacher and student exports. Browsers receive no application secrets. */
 export async function withAnswerExportRenderer<T>(user: CurrentUser, locale: string | (() => string), signal: AbortSignal | undefined,
@@ -139,7 +140,7 @@ export async function withAnswerExportRenderer<T>(user: CurrentUser, locale: str
     const imageCache = new Map<string, string | null>();
     let imageBudget: AnswerExportImageBudget | undefined;
     let imageTimeRemaining = 30_000;
-    const render: PdfExportRender = async (html, footer = true, authorizeImage, hasSafeExamBrowserAccess) => {
+    const render: PdfExportRender = async (html, footer = true, authorizeImage, hasSafeExamBrowserAccess, pageNotice) => {
       scoped.throwIfAborted();
       imageBudget ??= createAnswerExportImageBudget();
       imageBudget.deadline = Date.now() + imageTimeRemaining;
@@ -156,7 +157,7 @@ export async function withAnswerExportRenderer<T>(user: CurrentUser, locale: str
       }
       await page.setContent(prepared, { waitUntil: "load", timeout: 30_000 });
       scoped.throwIfAborted();
-      return page.pdf({ format: "A4", printBackground: true, tagged: true, displayHeaderFooter: footer, headerTemplate: "<span></span>", footerTemplate: '<div style="font-size:9px;color:#667085;text-align:center;width:100%"><span class="pageNumber"></span> / <span class="totalPages"></span></div>', margin: { top: "16mm", right: "15mm", bottom: "18mm", left: "15mm" } });
+      return page.pdf({ format: "A4", printBackground: true, tagged: true, displayHeaderFooter: footer || Boolean(pageNotice), headerTemplate: "<span></span>", footerTemplate: pageNotice?.footerHtml ?? '<div style="font-size:9px;color:#667085;text-align:center;width:100%"><span class="pageNumber"></span> / <span class="totalPages"></span></div>', margin: { top: "16mm", right: "15mm", bottom: `${pageNotice?.bottomMarginMm ?? 18}mm`, left: "15mm" } });
     };
     const result = await work({ render, css, signal: scoped });
     scoped.throwIfAborted(); return result;

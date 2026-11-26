@@ -27,6 +27,7 @@ export function SettingsNav() {
     ? [
         ...settingsItems,
         { href: "/settings/time", labelKey: "timeSettings.title", textKey: "timeSettings.navText" },
+        { href: "/settings/course-exports", labelKey: "courseExport.adminTitle", textKey: "courseExport.adminNavText" },
         { href: "/settings/users", labelKey: "settings.usersNav", textKey: "settings.usersNavText" },
         { href: "/settings/email", labelKey: "settings.emailDeliveryNav", textKey: "settings.emailDeliveryNavText" },
         { href: "/settings/runners", labelKey: "settings.runnersNav", textKey: "settings.runnersNavText" },

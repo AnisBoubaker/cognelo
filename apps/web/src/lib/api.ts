@@ -1,4 +1,5 @@
 import type { GradingReview } from "@cognelo/contracts";
+import type { StudentCourseExportPolicy } from "@cognelo/contracts";
 import type { CodingPracticeRunAllowance } from "@cognelo/plugin-coding-exercises";
 import type { GradebookActionDefinition } from "@cognelo/activity-sdk";
 import type { ActivityLogCursor, ActivityLogPage, ActivityStudentActionList, ActivityBatchActionList } from "@cognelo/contracts";
@@ -371,6 +372,8 @@ export type Course = {
   description: string;
   status: "draft" | "published" | "archived";
   studentCourseExportEnabled?: boolean;
+  studentCourseExportUsageRights?: string | null;
+  studentCourseExportConfidential?: boolean;
   metadata?: Record<string, unknown>;
   subject?: Subject;
   memberships?: CourseMembership[];
@@ -1694,6 +1697,8 @@ export const api = {
   finalizeClosedActivityContent: (courseId: string, groupId: string, activityId: string) => request<{ access: ActivityContentAccess }>(`/courses/${courseId}/groups/${groupId}/activities/assigned/${activityId}/content-access`, { method: "POST" }),
   applicationTime: () => request<{ timeZone: string; serverNow: string }>("/application-time"),
   applicationTimeSettings: () => request<ApplicationTimeSettingsDto>("/settings/time"),
+  studentCourseExportPolicy: () => request<StudentCourseExportPolicy>("/settings/course-exports"),
+  updateStudentCourseExportPolicy: (input: StudentCourseExportPolicy) => request<StudentCourseExportPolicy>("/settings/course-exports", { method: "PUT", body: JSON.stringify(input) }),
   userProfilePolicy: () => request<UserProfilePolicy>("/settings/users"),
   updateUserProfilePolicy: (input: UserProfilePolicy) => request<UserProfilePolicy>("/settings/users", { method: "PUT", body: JSON.stringify(input) }),
   updateApplicationTimeSettings: (timeZone: string, allowCourseTimeZone?: boolean) => request<ApplicationTimeSettingsDto>("/settings/time", { method: "PUT", body: JSON.stringify({ timeZone, allowCourseTimeZone }) }),

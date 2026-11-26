@@ -4,6 +4,7 @@ import { AppError, type StudentCourseExportBundle, type StudentCourseExportDocum
 import type { CurrentUser } from "@cognelo/contracts";
 import { blockHtml, escapeExportHtml as escape, exportDocumentHtml, withAnswerExportRenderer } from "./answer-export-pdf";
 import { mergeAnswerPdfParts } from "./answer-export-pdf-merge";
+import { studentCoursePageNotice, studentCourseRightsHtml, studentCourseRightsLabels, studentCourseWatermarkHtml } from "./student-course-export-rights";
 
 /** Bound UTF-8 path components and retain extensions without permitting traversal or device names. */
 export function studentCourseArchiveName(value: string) {
@@ -15,8 +16,12 @@ export function studentCourseArchiveName(value: string) {
   const result = (name + extension).replace(/[. ]+$/g, "") || "content";
   return /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(result) ? `content-${result}` : result;
 }
+function contentPath(path: string[]) {
+  // Reserve 000 for rights and 001 for the contents without colliding with a first item of that name.
+  return path.map((part, index) => studentCourseArchiveName(index === 0 ? part.replace(/^(\d+)-/, (_, position: string) => `${String(Number(position) + 1).padStart(3, "0")}-`) : part));
+}
 export function studentCoursePdfPath(document: StudentCourseExportDocument) {
-  const parts = document.path.map(studentCourseArchiveName);
+  const parts = contentPath(document.path);
   if (!parts.length) throw new AppError(409, "COURSE_EXPORT_CHANGED", "An export item is unavailable.");
   parts[parts.length - 1] += ".pdf";
   return parts.join("/");
@@ -41,8 +46,9 @@ export function studentCourseDocumentHtml(data: StudentCourseExportBundle, docum
 function indexHtml(data: StudentCourseExportBundle, css: string) {
   const date = new Intl.DateTimeFormat(data.locale, { timeZone: data.timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(data.exportedAt));
   const rows = [
+    [studentCourseRightsLabels(data).title, `000-${studentCourseArchiveName(studentCourseRightsLabels(data).title)}.pdf`],
     ...data.documents.map(document => [document.title, studentCoursePdfPath(document)]),
-    ...data.files.map(file => [file.path.at(-1) ?? data.labels.file, file.path.map(studentCourseArchiveName).join("/")])
+    ...data.files.map(file => [file.path.at(-1) ?? data.labels.file, contentPath(file.path).join("/")])
   ];
   return exportDocumentHtml(data.labels.contents, data.locale, `<article><header><p class="course">${escape(data.subjectTitle)}</p><h1>${escape(data.courseTitle)}</h1>
     <h2>${escape(data.labels.contents)}</h2><p>${escape(data.studentName)}</p><p class="meta">${escape(data.labels.exported)} ${escape(date)}</p></header>
@@ -53,6 +59,7 @@ export async function createStudentCourseExportFile(loadData: (signal: AbortSign
   return withAnswerExportRenderer(user, locale, signal, async ({ render, css, signal: scoped }) => {
     const data = await loadData(scoped);
     const files: Record<string, Uint8Array> = Object.create(null);
+    let attachmentNoticePdf: Buffer | undefined;
     let total = 0;
     const prefix = `Course-${studentCourseArchiveName(data.courseTitle)}`;
     const add = (name: string, bytes: Uint8Array) => {
@@ -62,9 +69,11 @@ export async function createStudentCourseExportFile(loadData: (signal: AbortSign
       if (total > 128_000_000 || Object.keys(files).length >= 4000) throw new AppError(413, "COURSE_EXPORT_TOO_LARGE", "This course exceeds the export limit.");
       files[name] = bytes;
     };
-    add(`${prefix}/000-${studentCourseArchiveName(data.labels.contents)}.pdf`, await render(indexHtml(data, css), true, data.authorizeImage, data.hasSafeExamBrowserAccess));
-    for (const directory of data.directories) add(`${prefix}/${directory.map(studentCourseArchiveName).join("/")}/`, new Uint8Array());
-    for (const file of data.files) add(`${prefix}/${file.path.map(studentCourseArchiveName).join("/")}`, file.bytes);
+    const print = (html: string, pageNumbers = true) => render(studentCourseWatermarkHtml(html, data.rights.confidential), pageNumbers, data.authorizeImage, data.hasSafeExamBrowserAccess, studentCoursePageNotice(data, pageNumbers));
+    add(`${prefix}/000-${studentCourseArchiveName(studentCourseRightsLabels(data).title)}.pdf`, await print(studentCourseRightsHtml(data, css)));
+    add(`${prefix}/001-${studentCourseArchiveName(data.labels.contents)}.pdf`, await print(indexHtml(data, css)));
+    for (const directory of data.directories) add(`${prefix}/${contentPath(directory).join("/")}/`, new Uint8Array());
+    for (const file of data.files) add(`${prefix}/${contentPath(file.path).join("/")}`, file.bytes);
     for (const document of data.documents) {
       scoped.throwIfAborted();
       const seen = new Set<string>();
@@ -73,8 +82,10 @@ export async function createStudentCourseExportFile(loadData: (signal: AbortSign
         if (seen.has(hash)) return false;
         seen.add(hash); return true;
       });
-      const printed = await render(studentCourseDocumentHtml(data, document, css), !attachments.length, data.authorizeImage, data.hasSafeExamBrowserAccess);
-      const bytes = attachments.length ? await mergeAnswerPdfParts([{ bytes: printed }, ...attachments.map(attachment => ({ bytes: attachment.bytes, attachment: true }))], document.title) : printed;
+      const printed = await print(studentCourseDocumentHtml(data, document, css), !attachments.length);
+      if (attachments.length && !attachmentNoticePdf) attachmentNoticePdf = await render(exportDocumentHtml("", data.rights.locale, '<div style="height:1px"></div>', css), false, data.authorizeImage, data.hasSafeExamBrowserAccess, studentCoursePageNotice(data, false));
+      const bytes = attachments.length ? await mergeAnswerPdfParts([{ bytes: printed }, ...attachments.map(attachment => ({ bytes: attachment.bytes, attachment: true }))], document.title,
+        { attachmentNoticePdf, ...(data.rights.confidential ? { attachmentWatermark: "Confidential" } : {}) }) : printed;
       add(`${prefix}/${studentCoursePdfPath(document)}`, bytes);
     }
     scoped.throwIfAborted();

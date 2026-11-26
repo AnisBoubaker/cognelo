@@ -9,6 +9,7 @@ export * from "./material-references";
 export * from "./ai-grading-runs";
 export * from "./grading-review";
 import { z } from "zod";
+import { ExportUsageRightsTextSchema } from "./student-course-export";
 
 // Zod 4 applies inner defaults through optional properties. Patch schemas must
 // preserve omitted fields instead of resetting them to creation defaults.
@@ -350,7 +351,9 @@ export type StudentContentLayout = z.infer<typeof StudentContentLayoutSchema>;
 
 export const CourseUpdateSchema = partialWithoutDefaults(CourseInputSchema).extend({
   studentContentLayout: StudentContentLayoutSchema.optional(),
-  studentCourseExportEnabled: z.boolean().optional()
+  studentCourseExportEnabled: z.boolean().optional(),
+  studentCourseExportUsageRights: ExportUsageRightsTextSchema.nullable().optional(),
+  studentCourseExportConfidential: z.boolean().optional()
 });
 export type CourseUpdate = z.infer<typeof CourseUpdateSchema>;
 

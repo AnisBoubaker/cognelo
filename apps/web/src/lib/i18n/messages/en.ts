@@ -4,6 +4,24 @@ import type { MessageTree } from "../types";
 
 export const enMessages = {
   courseExport: {
+    "adminOnly": "Only administrators can change the site-wide export policy.",
+    "adminTitle": "Course exports",
+    "adminNavText": "Usage rights for student downloads",
+    "adminHelp": "Set site-wide usage rights for student course exports and decide whether teachers may customize them.",
+    "siteUsageRights": "Site-wide usage rights",
+    "siteRightsHelp": "These terms are included verbatim in the separate rights-of-use PDF. They apply to every course while teacher editing is disabled.",
+    "allowTeacherEditing": "Allow teachers to edit usage rights",
+    "allowTeacherEditingHelp": "When disabled, site-wide terms override course-specific terms. Saved course terms are retained for later use.",
+    "usageRights": "Usage rights",
+    "usageRightsHelp": "These terms appear in a separate PDF in the export. The file title and copyright notice use the course teaching language; your terms remain exactly as written.",
+    "useSiteDefault": "Use site default",
+    "inheritsSiteDefault": "Using site-wide usage rights.",
+    "confidential": "Watermark PDFs with “Confidential”",
+    "confidentialHelp": "Adds “Confidential” to every generated PDF page, including appended assignment pages. Original downloaded files are unchanged.",
+    "rightsLocked": "Usage rights are read-only and managed by the site administrator.",
+    "policyLoadError": "Unable to load export usage rights. Please try again.",
+    "policySaved": "Course export policy saved.",
+
     "setting": "Allow students to export course content",
     "settingHelp": "Students can download a ZIP with visible course materials, accessible activity prompts, their submitted attempts and available feedback. Hidden or inaccessible content is excluded.",
     "action": "Export course content",

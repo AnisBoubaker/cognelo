@@ -68,6 +68,8 @@ Some plugins need additional services:
 
 Teacher answer PDF/ZIP exports and optional [student course exports](docs/STUDENT_COURSE_EXPORTS.md) use an API-side Chromium renderer. See [answer exports](docs/ANSWER_EXPORTS.md#runtime-installation) for browser and font setup.
 
+Student course exports support site-wide or teacher-customized usage rights, a separate rights document in the course teaching language, student attribution on generated pages and an optional Confidential watermark. Original downloaded files stay unchanged.
+
 ## Verification
 
 ```bash

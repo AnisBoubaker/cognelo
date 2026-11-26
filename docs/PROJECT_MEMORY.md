@@ -4,7 +4,7 @@ This file is intentionally short. It records only cross-cutting decisions that a
 
 ## Platform Invariants
 
-- [Student course exports](STUDENT_COURSE_EXPORTS.md) are teacher-enabled and default off. Force learner checks for enrolled dual-role users, keep grade-only/SEB boundaries, and use explicit student plugin projections with no teacher-export fallback. Retain original visible files beside folder-organized PDFs and revalidate before delivery; exporting is read-only.
+- [Student course exports](STUDENT_COURSE_EXPORTS.md) are teacher-enabled and default off. Force learner/grade-only/SEB checks and explicit student plugin projections. Site usage terms may lock retained course overrides; serialize the lock with term writes and revalidate before delivery. Put course-language rights first, attribute every generated page to the student and allow a Confidential watermark; copied originals stay unchanged. Exporting is read-only.
 
 - [Required grading reviews](GRADING_REVIEWS.md) belong to core, with optional SDK requests and private plugin evidence. Pending reviews block automatic grading/release even with an older grade; explicit teacher final scores resolve them atomically with stale-review checks. Reopening withdraws the prior review with its grade. Do not implement plugin-specific gradebook scanners or new activity types for this capability.
 

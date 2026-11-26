@@ -50,6 +50,8 @@ Alternatively, `PDF_CHROMIUM_EXECUTABLE_PATH` can select an already-installed co
 
 Teacher and student exports share the two per-process slots and a four-minute operation lifetime. The shared renderer closes Chromium on cancellation/timeout, propagates the original abort reason and releases its slot in all cases. Its 30-second image-work budget excludes time spent printing PDFs while retaining shared byte/cache limits across documents. Student image projections add an export-owner allowlist and trusted activity-scoped SEB validation before the ordinary delivery check.
 
+Student course exports supply their own repeated copyright footer and optional watermark. Their appended artwork receives a clipped, Unicode-capable notice PDF above reserved pagination space. Teacher answer exports retain their existing prompt/grading selections and pagination; site/course student-export rights do not apply to that separate staff workflow.
+
 ## Verification
 
 Core tests cover grading scope, submitted-only selection, latest/all/exact attempts, changed selections, grade suppression, and Test revision/order preservation. Renderer tests cover escaped content, option isolation, filenames, and denied private image targets. E2E scenarios download real PDF/ZIP files from bulk and individual actions, check access denial and selection behavior, and verify exports do not mutate attempts. PDFs are rendered with Poppler for visual review of code wrapping, tables, formulas, page breaks, and footers.

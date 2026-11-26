@@ -3,6 +3,24 @@ import type { MessageTree } from "../types";
 
 export const frMessages = {
   courseExport: {
+    "adminOnly": "Seuls les administrateurs peuvent modifier la politique d’exportation du site.",
+    "adminTitle": "Exportations de cours",
+    "adminNavText": "Droits d’utilisation des téléchargements",
+    "adminHelp": "Définissez les droits d’utilisation des exportations de cours et autorisez ou non leur modification par les enseignants.",
+    "siteUsageRights": "Droits d’utilisation du site",
+    "siteRightsHelp": "Ces conditions sont reproduites telles quelles dans le PDF distinct des droits d’utilisation. Elles s’appliquent à tous les cours lorsque les enseignants ne peuvent pas les modifier.",
+    "allowTeacherEditing": "Autoriser les enseignants à modifier les droits d’utilisation",
+    "allowTeacherEditingHelp": "Si cette option est désactivée, les conditions du site remplacent celles des cours. Les conditions propres aux cours sont conservées pour une utilisation ultérieure.",
+    "usageRights": "Droits d’utilisation",
+    "usageRightsHelp": "Ces conditions figurent dans un PDF distinct de l’exportation. Le titre du fichier et la mention de droit d’auteur utilisent la langue d’enseignement du cours ; votre texte reste inchangé.",
+    "useSiteDefault": "Utiliser les conditions du site",
+    "inheritsSiteDefault": "Utilisation des droits d’utilisation du site.",
+    "confidential": "Ajouter le filigrane « Confidential » aux PDF",
+    "confidentialHelp": "Ajoute « Confidential » à chaque page des PDF générés, y compris les pages d’énoncé ajoutées. Les fichiers originaux téléchargés restent inchangés.",
+    "rightsLocked": "Les droits d’utilisation sont en lecture seule et gérés par l’administrateur du site.",
+    "policyLoadError": "Impossible de charger les droits d’utilisation. Veuillez réessayer.",
+    "policySaved": "Politique d’exportation des cours enregistrée.",
+
     "setting": "Autoriser les étudiants à exporter le contenu du cours",
     "settingHelp": "Les étudiants peuvent télécharger un ZIP contenant les ressources visibles, les énoncés accessibles, leurs tentatives remises et la rétroaction disponible. Le contenu masqué ou inaccessible est exclu.",
     "action": "Exporter le contenu du cours",

@@ -83,3 +83,5 @@ Local acceptance tests use a controlled AI endpoint owned by a disposable accoun
 Scheduling advertises all stage names through capabilities. File preparation starts its optional clock on the first accepted upload while its stage is active, or on activation for an existing nonempty draft; deletion/reload cannot reset it, and teacher cancellation clears it. Question time starts only on Answer, never during queue wait. Effective deadlines are the earlier stage/overall date, capped by duration; no dates means no calendar deadline. The additive plugin migration `202611090020_submission_stage_clocks` retains preparation starts and is applied with `npm run db:migrate:all`. See [stage scheduling](../../../docs/ACTIVITY_SUBMISSION_STAGES.md).
 
 Students can also use teacher-enabled [course exports](../../../docs/STUDENT_COURSE_EXPORTS.md); see [student export details](docs/REFERENCE.md#student-course-exports).
+
+The host adds usage rights, student attribution and optional watermarks to generated export pages, including appended assignment pages; separately copied original files remain unchanged.

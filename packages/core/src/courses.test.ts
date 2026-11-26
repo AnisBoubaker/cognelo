@@ -2,6 +2,8 @@ vi.mock("./course-content", () => ({ listContentItems: vi.fn().mockResolvedValue
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const tx = vi.hoisted(() => ({
+  $executeRaw: vi.fn(),
+  applicationSettings: { findUnique: vi.fn() },
   course: {
     update: vi.fn()
   },
@@ -99,6 +101,7 @@ describe("course services", () => {
     vi.clearAllMocks();
     mockPrisma.$transaction.mockImplementation(async (handler: (transaction: typeof tx) => unknown) => handler(tx));
     mockPrisma.course.findMany.mockResolvedValue([]);
+    tx.applicationSettings.findUnique.mockResolvedValue({ allowCourseExportUsageRights: true });
   });
 
   it("creates a course with an owner membership for the creator", async () => {
@@ -243,6 +246,22 @@ describe("course services", () => {
         }
       })
     );
+  });
+
+  it("rejects stale or forged course terms after an administrator locks usage rights", async () => {
+    mockPrisma.course.findUnique.mockResolvedValue({ id: "course-1", metadata: {} });
+    tx.applicationSettings.findUnique.mockResolvedValue({ allowCourseExportUsageRights: false });
+    await expect(updateCourse(teacherUser, "course-1", { studentCourseExportUsageRights: "Forged terms" })).rejects.toMatchObject({ code: "COURSE_EXPORT_RIGHTS_LOCKED", status: 403 });
+    expect(tx.course.update).not.toHaveBeenCalled(); expect(tx.courseAuditEvent.create).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).toHaveBeenCalledOnce();
+  });
+
+  it("keeps watermark choices editable without rewriting locked course terms", async () => {
+    mockPrisma.course.findUnique.mockResolvedValue({ id: "course-1", metadata: {} }); tx.course.update.mockResolvedValue({ id: "course-1" });
+    tx.applicationSettings.findUnique.mockResolvedValue({ allowCourseExportUsageRights: false });
+    await updateCourse(teacherUser, "course-1", { studentCourseExportConfidential: true });
+    expect(tx.course.update).toHaveBeenCalledWith(expect.objectContaining({ data: { studentCourseExportConfidential: true } }));
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 
   it("adds non-student course memberships with the selected enrollment role", async () => {

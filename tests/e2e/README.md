@@ -1,5 +1,7 @@
 # Browser user flows
 
+`student-course-export-rights.spec.ts` covers site-wide terms and teacher edit locks, teacher overrides/inheritance and watermark Save/Cancel, stale/direct write denial, translated first rights files, copyright and watermark checks on every generated PDF page, unchanged original PDFs/academic records, and mobile containment. It restores its temporary site policy and uses only an isolated local/preprod database.
+
 `student-course-export.spec.ts` checks default-off teacher activation and save/cancel, learner-only downloads, multiple enrollments/section folders and dual-role isolation, nested/hidden content, printable links, original file integrity, Homework frozen source/assignment PDFs/original provided ZIPs and staged-feedback exclusion, feedback release, saved compound Test answers, pre-start/closed exam privacy, read-only attempts, mobile containment and cancellation of late downloads. It uses Poppler's `pdftotext` (also required by material PDF preparation) to inspect real archive PDFs. Run only against a local or isolated preprod database.
 
 `text-fullscreen.spec.ts` checks Text material fullscreen on desktop/mobile, both editing modes, viewport bounds, retained drafts, long-content scrolling, close/Escape, body-scroll restoration and saving.

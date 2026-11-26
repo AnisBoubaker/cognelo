@@ -76,3 +76,4 @@ export * from "./activity-logs";
 export * from "./work-inspection";
 export * from "./grading-review";
 export * from "./student-course-export";
+export * from "./student-course-export-policy";

@@ -2,6 +2,7 @@ import { selectAiAgentModel } from "./ai-agents";
 import { listContentItems } from "./course-content";
 import { CourseInputSchema, CourseSettingsInputSchema, CourseUpdateSchema, EnrollmentInputSchema } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
+import { assertCourseExportRightsEditable } from "./student-course-export-policy";
 import type { CurrentUser } from "@cognelo/contracts";
 import {
   assertCanCreateCourse,
@@ -213,7 +214,7 @@ export async function updateCourse(user: CurrentUser, courseId: string, input: u
   let metadata: Prisma.InputJsonValue | undefined;
   const course = await prisma.course.findUnique({
     where: { id: courseId },
-    select: { title: true, description: true, status: true, metadata: true, studentCourseExportEnabled: true }
+    select: { title: true, description: true, status: true, metadata: true, studentCourseExportEnabled: true, studentCourseExportUsageRights: true, studentCourseExportConfidential: true }
   });
   if (!course) {
     throw notFound("Course");
@@ -232,6 +233,7 @@ export async function updateCourse(user: CurrentUser, courseId: string, input: u
   };
 
   return prisma.$transaction(async (tx) => {
+    if (data.studentCourseExportUsageRights !== undefined) await assertCourseExportRightsEditable(tx);
     const updatedCourse = await tx.course.update({
       where: { id: courseId },
       data: updateData,
@@ -249,6 +251,8 @@ export async function updateCourse(user: CurrentUser, courseId: string, input: u
           description: course.description,
           status: course.status,
           studentCourseExportEnabled: course.studentCourseExportEnabled,
+          studentCourseExportUsageRights: course.studentCourseExportUsageRights,
+          studentCourseExportConfidential: course.studentCourseExportConfidential,
           studentContentLayout: asMetadataRecord(course.metadata).studentContentLayout ?? null
         },
         nextValue: {
@@ -256,6 +260,8 @@ export async function updateCourse(user: CurrentUser, courseId: string, input: u
           description: updatedCourse.description,
           status: updatedCourse.status,
           studentCourseExportEnabled: updatedCourse.studentCourseExportEnabled,
+          studentCourseExportUsageRights: updatedCourse.studentCourseExportUsageRights,
+          studentCourseExportConfidential: updatedCourse.studentCourseExportConfidential,
           studentContentLayout: asMetadataRecord(updatedCourse.metadata).studentContentLayout ?? null
         }
       }

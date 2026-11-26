@@ -295,6 +295,8 @@ Install dependencies, generate Prisma clients, verify, and build as the service 
 
 Teacher answer PDF exports and optional [student course ZIPs](STUDENT_COURSE_EXPORTS.md) additionally need the API-side Chromium browser and multilingual fonts. Complete the [answer-export runtime setup](ANSWER_EXPORTS.md#runtime-installation) for the service account before enabling downloads; this is separate from the Web Design execution runner. The normal `npm run db:migrate:all` setup includes the default-off student export Course column; no additional environment variables are needed.
 
+The same migration command installs site/course usage-rights fields and the default-off course Confidential watermark (`202611250002_student_export_usage_rights`). Configure site defaults and the teacher-edit policy in Settings → Course exports; terms initially are empty and teacher editing is allowed. Generated PDF attribution uses the course teaching language and the existing API browser/fonts. Original file bytes are preserved.
+
 ```bash
 sudo -u instance1 /bin/bash -c '
   set -euo pipefail

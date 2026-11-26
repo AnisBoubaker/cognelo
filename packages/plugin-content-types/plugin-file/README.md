@@ -23,3 +23,5 @@ This material provides plugin-owned preparation/refresh through core. See [mater
 ## Student course exports
 
 The optional server `studentExport` handler contributes to the teacher-enabled [course ZIP](../../../docs/STUDENT_COURSE_EXPORTS.md). Export original uploaded bytes and the original filename through the same no-follow scoped opener as downloads. Check the 25 MiB limit and stored size before buffering; never extract or execute the file for export. Core owns actual learner enrollment, effective folder/section visibility, plugin activation and final access revalidation.
+
+Original PDFs and archives remain byte-for-byte unchanged when the host adds copyright attribution and optional Confidential watermarks to generated PDFs. Rights-of-use policy and page decoration belong to the host, outside file-plugin storage and extraction.

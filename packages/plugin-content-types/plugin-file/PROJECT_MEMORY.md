@@ -1,5 +1,7 @@
 # File Content Plugin Memory
 
+- Preserve original PDF/archive bytes in course exports even when host-generated pages receive attribution/watermarks. Usage-rights policy and page decoration remain host-owned; see [export integration](README.md#student-course-exports).
+
 - Plugin key: `file-content`.
 - Content type key: `file`.
 - Uploaded bytes are stored under `storage/course-content-files/:courseId`.

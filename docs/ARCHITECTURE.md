@@ -190,6 +190,8 @@ Teacher [answer exports](ANSWER_EXPORTS.md) use the capability-driven `submissio
 
 Default-off [student course exports](STUDENT_COURSE_EXPORTS.md) use separate explicit activity/content `studentExport` projections. Core forces actual learner enrollment, tree visibility, assignment exceptions, content closure, SEB and grade-release checks even for dual-role accounts. The archive preserves course folders, item PDFs and original visible files; private source/feedback remains plugin-owned. Authentication, permissions and stored projections are revalidated before delivery. Student and teacher exports share bounded, cancellable offline print capacity.
 
+Core also resolves site/course usage-rights inheritance and the administrator's teacher-edit lock, serialized with course-term writes. The host reserves a first rights PDF in the course teaching language and attributes every generated page to the downloading student, with an optional Confidential watermark. Appended PDF artwork receives a Unicode-capable notice; copied originals stay unchanged. Policy, terms, language and watermark choices participate in final revalidation.
+
 ## Content Type Extensibility
 
 Content type plugins are the sibling system for non-activity course content. Their contracts/registry API live in `packages/content-type-sdk`, their installed composition lives in `packages/plugin-registry`, and implementations live under `packages/plugin-content-types/*`.
