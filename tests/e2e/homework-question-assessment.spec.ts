@@ -2,7 +2,7 @@ import { prisma } from "@cognelo/db";
 import type { APIRequestContext } from "@playwright/test";
 import { test, expect } from "./fixtures/bank-course";
 import { createCourseActivity, responseJson, type ActivitySuiteData } from "./fixtures/activity-suite";
-import { createAuthenticatedApi } from "./fixtures/auth";
+import { createAuthenticatedApi, createAuthenticatedApiWithCredentials, credentialsFor } from "./fixtures/auth";
 import { homeworkModelFixture } from "./fixtures/homework-model";
 import { openActivityReportActions } from "./fixtures/gradebook-ui";
 import { defaultHomeworkGrading } from "../../packages/plugin-activities/plugin-coding-homework-grader/src/rubric";
@@ -25,15 +25,64 @@ async function prepare(data: ActivitySuiteData, api: APIRequestContext, model: A
   await responseJson(await model.api.put(`${base}/workflow-settings`, { data: { enabled: true } }));
   await prisma.course.update({ where: { id: data.courseId }, data: { metadata: { aiSettings: { automaticFeedbackEnabled: true, assessmentFeedbackAiAgentConnectionId: model.connection.id } } } });
   const endpoint = `${course}/groups/${data.groupId}/activities/assigned/${id}/coding-homework-grader`;
+  await submitAnswers(student, endpoint, points);
+  const attempt = await prisma.activityAttempt.findFirstOrThrow({ where: { activityId: id, lifecycle: "submitted" } });
+  return { course, id, base, attempt, endpoint };
+}
+async function submitAnswers(student: APIRequestContext, endpoint: string, points = 30) {
   await responseJson(await student.post(`${endpoint}/preparation`, { data: { kind: "file", path: "main.c", expectedRevision: 0, base64: Buffer.from("int add(int a){return a+1;}").toString("base64") } }));
   await responseJson(await student.post(`${endpoint}/hand-in`, { data: { expectedRevision: 1 } }));
   await expect.poll(async () => (await responseJson<{ submission: { status: string } }>(await student.get(`${endpoint}/workspace`))).submission.status, { timeout: 30_000 }).toBe("challenge_ready");
   const workspace = await responseJson<{ submission: { id: string } }>(await student.get(`${endpoint}/workspace`));
   const answering = await responseJson<{ questions: Array<{ id: string }> }>(await student.post(`${endpoint}/answering`, { data: { submissionId: workspace.submission.id } }));
   await responseJson(await student.post(`${endpoint}/challenge-answers`, { data: { submissionId: workspace.submission.id, answers: answering.questions.map((question, index) => ({ questionId: question.id, answer: points === 0 || index === 0 ? "weak explanation" : "It adds one to the argument." })) } }));
-  const attempt = await prisma.activityAttempt.findFirstOrThrow({ where: { activityId: id, lifecycle: "submitted" } });
-  return { course, id, base, attempt };
 }
+
+test("a student's challenge-answer action assesses only that student and leaves another eligible student untouched", async ({ bankCourse: data, teacherApi: api, browser }) => {
+  test.setTimeout(120_000);
+  const model = await homeworkModelFixture(data), student = await createAuthenticatedApi("student");
+  let peer: APIRequestContext | undefined, peerId: string | undefined;
+  try {
+    const seed = await prisma.user.findUniqueOrThrow({ where: { email: credentialsFor("student").email } });
+    const email = `answer-peer-${data.token}@example.test`;
+    const account = await prisma.user.create({ data: { email, passwordHash: seed.passwordHash, firstName: "Other", lastName: "Student", isActive: true, emailVerifiedAt: new Date(), roles: { create: { role: { connect: { key: "student" } } } } } });
+    peerId = account.id;
+    await responseJson(await api.post(`/api/courses/${data.courseId}/groups/${data.groupId}/participants`, { data: { email, role: "student" } }));
+    peer = await createAuthenticatedApiWithCredentials({ email, password: credentialsFor("student").password });
+    const { course, id, attempt, endpoint } = await prepare(data, api, model, student, 0);
+    const page = await model.page(browser);
+    await page.goto(`/courses/${data.courseId}/gradebook/activities/${id}`);
+    const peerRow = page.locator(".table-row-gradebook-detail").filter({ hasText: email });
+    await peerRow.getByRole("button", { name: /^Actions for / }).click();
+    await expect(page.getByRole("menuitem", { name: "Assess challenge answers with AI", exact: true })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await submitAnswers(peer, endpoint, 0);
+    await page.reload();
+    const studentRow = page.locator(".table-row-gradebook-detail").filter({ hasText: credentialsFor("student").email });
+    const studentName = await studentRow.locator("strong").first().innerText();
+    const openAction = async () => {
+      await studentRow.getByRole("button", { name: /^Actions for / }).click();
+      await page.getByRole("menuitem", { name: "Assess challenge answers with AI", exact: true }).click();
+      return page.getByRole("dialog", { name: "Assess challenge answers with AI", exact: true });
+    };
+    const cancelled = await openAction();
+    await expect(cancelled).toContainText(studentName);
+    await expect(cancelled).toContainText("only this student's");
+    await cancelled.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect(model.requests.filter(request => request.systemPrompt?.includes("You assess programming homework"))).toHaveLength(0);
+    const confirmation = await openAction();
+    const creation = page.waitForRequest(request => request.method() === "POST" && request.url().endsWith(`/activities/${id}/ai-grading-runs`));
+    await confirmation.getByRole("button", { name: "Confirm", exact: true }).click();
+    expect((await creation).postDataJSON()).toEqual({ actionId: "challenge-answers", attemptIds: [attempt.id] });
+    await expect(studentRow.getByRole("button", { name: "Possible unauthorized assistance", exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(peerRow.getByRole("button", { name: "Possible unauthorized assistance", exact: true })).toHaveCount(0);
+    expect(model.requests.filter(request => request.systemPrompt?.includes("You assess programming homework"))).toHaveLength(2);
+    const peerAttempt = await prisma.activityAttempt.findFirstOrThrow({ where: { activityId: id, userId: peerId } });
+    const peerReview = (await responseJson<{ review: { feedback: { questionsScore: number | null } } }>(await api.get(`${course}/gradebook/attempts/${peerAttempt.id}/ai-feedback`))).review;
+    expect(peerReview.feedback.questionsScore).toBeNull();
+    expect(await prisma.grade.count({ where: { gradebookItemId: attempt.gradebookItemId } })).toBe(0);
+  } finally { await student.dispose(); await peer?.dispose(); if (peerId) await prisma.user.deleteMany({ where: { id: peerId } }); await model.close(); }
+});
 
 test("challenge-only class assessment preserves code, updates answer grades, and shows a core warning icon under either threshold rule", async ({ bankCourse: data, teacherApi: api, browser }) => {
   test.setTimeout(120_000);

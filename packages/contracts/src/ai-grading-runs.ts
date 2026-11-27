@@ -9,6 +9,7 @@ export const AiGradingRunCreateSchema = z.object({
 const localizedText = z.record(z.string(), z.string().min(1).max(2000)).refine(value => typeof value.en === "string");
 export const AiGradingActionSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/).max(80), labels: localizedText, messages: localizedText,
+  participantMessages: localizedText.optional(),
   attemptIds: z.array(z.string().min(1)).min(1).max(500)
 }).strict();
 export type AiGradingAction = z.infer<typeof AiGradingActionSchema>;

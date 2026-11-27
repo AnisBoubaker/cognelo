@@ -8,7 +8,7 @@ import { useActivityBatchActions } from "@/lib/use-activity-batch-actions";
 import { WorkInspectionDialog } from "@/components/work-inspection-dialog";
 import { getActivityDefinition } from "@cognelo/activity-sdk";
 import { ActivityLogs } from "@/components/activity-logs";
-import type { ActivityStudentAction } from "@cognelo/contracts";
+import type { ActivityStudentAction, AiGradingAction } from "@cognelo/contracts";
 import { useGradebookPluginActions } from "@/lib/use-gradebook-plugin-actions";
 import type { GradebookPluginAction } from "@/lib/api";
 import { useAiGradingRun } from "@/lib/use-ai-grading-run";
@@ -525,6 +525,18 @@ export default function GradebookActivityResultsPage() {
     finally { setSavingGradeKey(null); }
   }
 
+  async function runAdditionalAiAction(action: AiGradingAction, row?: CourseGradebookRow) {
+    if (aiGrading.busy || aiGrading.run || !action.attemptIds.length) return;
+    const confirmKey = row && !getGradebookActivityActions(row.activityTypeKey).aiAssessmentChangesGrade
+      ? "courseDetail.aiAssessmentFeedbackConfirm" : "courseDetail.aiAssessmentGradingConfirm";
+    const message = row
+      ? (action.participantMessages?.[locale] ?? action.participantMessages?.en)?.replace("{name}", row.participantName) ?? t(confirmKey, { name: row.participantName })
+      : action.messages[locale] ?? action.messages.en;
+    if (await dialogs.confirm({ title: action.labels[locale] ?? action.labels.en, message })) {
+      await aiGrading.start({ actionId: action.id, attemptIds: action.attemptIds });
+    }
+  }
+
   function aiFeedbackBatchTargets(excludedAttemptIds: readonly string[] = []) {
     const eligible = groupedRows.flatMap((row) => {
       if (!getGradebookActivityActions(row.activityTypeKey).canAssessWithAi) return [];
@@ -871,11 +883,7 @@ export default function GradebookActivityResultsPage() {
   if (isSummativeActivity && activityActions.canRerunAutomaticGrading) reportMenuActions.push({ id: "regrade", icon: "refresh", label: savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll"), disabled: !hasRowsWithSubmittedAttempts || savingGradeKey === "__all:regrade", onSelect: () => { void regradeAllRows(); } });
   if (isSummativeActivity && activityActions.canAssessWithAi) reportMenuActions.push({ id: "assess-ai", icon: "generate", label: savingGradeKey === "__all:ai-feedback" ? t("common.saving") : t("courseDetail.generateAiFeedbackAll"), disabled: savingGradeKey === "__all:ai-feedback", onSelect: () => { void (activityActions.aiAssessmentChangesGrade ? openAiGradingBatchDialog() : generateAiFeedbackForAllRows()); } });
   for (const action of aiGrading.actions) reportMenuActions.push({ id: `ai-action:${action.id}`, icon: "generate", label: action.labels[locale] ?? action.labels.en,
-    disabled: aiGrading.busy || Boolean(aiGrading.run), onSelect: () => { void (async () => {
-      if (await dialogs.confirm({ title: action.labels[locale] ?? action.labels.en, message: action.messages[locale] ?? action.messages.en })) {
-        await aiGrading.start({ actionId: action.id, attemptIds: action.attemptIds });
-      }
-    })(); } });
+    disabled: aiGrading.busy || Boolean(aiGrading.run), onSelect: () => { void runAdditionalAiAction(action); } });
   if (activityActions.canReviewAndGrade) {
     if (isSummativeActivity && (supportsAiFeedbackReview(activityTypeKey) || activityTypeKey === "test")) reportMenuActions.push({ id: "review", icon: "review", label: t("courseDetail.gradeAllManually"), disabled: !hasRowsWithSubmittedAttempts, onSelect: () => {
       if (activityTypeKey === "test") setReviewAndGradeRow(groupedRows.find(row => selectedSubmittedAttempt(row)) ?? null);
@@ -1010,6 +1018,9 @@ export default function GradebookActivityResultsPage() {
                   onReopenSubmission={reopenSubmission}
                   onRegrade={regradeRow}
                   onGenerateAiFeedback={generateAiFeedbackForRow}
+                  aiActions={additionalAiActionsForRow(row, aiGrading.actions)}
+                  aiActionBusy={aiGrading.busy || Boolean(aiGrading.run)}
+                  onAiAction={action => { void runAdditionalAiAction(action, row); }}
                   t={t}
                 />
               ))}
@@ -1344,6 +1355,9 @@ function GradebookStudentRow({
   onReopenSubmission,
   onRegrade,
   onGenerateAiFeedback,
+  aiActions,
+  aiActionBusy,
+  onAiAction,
   t
 }: {
   row: CourseGradebookRow;
@@ -1365,6 +1379,9 @@ function GradebookStudentRow({
   onReopenSubmission: (row: CourseGradebookRow) => Promise<void>;
   onRegrade: (row: CourseGradebookRow) => Promise<void>;
   onGenerateAiFeedback: (row: CourseGradebookRow) => Promise<void>;
+  aiActions: AiGradingAction[];
+  aiActionBusy: boolean;
+  onAiAction: (action: AiGradingAction) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const rowHasSubmittedAttempt = hasSubmittedAttempt(row);
@@ -1377,7 +1394,7 @@ function GradebookStudentRow({
   const canInspectWork = Boolean(getActivityDefinition(row.activityTypeKey)?.supportsWorkInspection) && (progress?.state === "in_progress" || progress?.state === "stage_submitted");
   const canDeleteSubmission = deletableSubmissions(row).length > 0;
   const canExport = canExportActivityAnswers(row.activityTypeKey) && row.attempts.some((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
-  const hasActions = canInspectWork || studentActions.length > 0 || pluginActions.length > 0 || canExport || canDeleteSubmission || canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
+  const hasActions = canInspectWork || aiActions.length > 0 || studentActions.length > 0 || pluginActions.length > 0 || canExport || canDeleteSubmission || canReopen || canAssessWithAi || canRerunAutomaticGrading || activityActions.canReviewAndGrade;
 
   function closeActionMenu() {
     setActionMenuAnchor(null);
@@ -1435,6 +1452,8 @@ function GradebookStudentRow({
                   <span>{t("courseDetail.reopenSubmission")}</span>
                 </button>
               ) : null}
+              {aiActions.map(action => <button key={action.id} className="content-context-menu-item" disabled={aiActionBusy} role="menuitem" type="button"
+                onClick={() => { closeActionMenu(); onAiAction(action); }}><AppIcon name="generate" /><span>{action.labels[locale] ?? action.labels.en}</span></button>)}
               {canAssessWithAi ? (
                 <button
                   className="content-context-menu-item"
@@ -1543,6 +1562,16 @@ function manualGradingHref(courseId: string, activityId: string, groupId?: strin
 
 function selectedFeedbackAttempt(row: CourseGradebookRow) {
   return selectedSubmittedAttempt(row);
+}
+
+function additionalAiActionsForRow(row: CourseGradebookRow, actions: AiGradingAction[]): AiGradingAction[] {
+  if (row.assessmentMode !== "summative") return [];
+  return actions.flatMap(action => {
+    const attempt = row.attempts.filter(attempt => attempt.assessmentMode === row.assessmentMode
+      && ["submitted", "graded"].includes(attempt.lifecycle) && action.attemptIds.includes(attempt.id))
+      .sort((a, b) => b.attemptNumber - a.attemptNumber)[0];
+    return attempt ? [{ ...action, attemptIds: [attempt.id] }] : [];
+  });
 }
 
 function selectedSubmittedAttempt(row: CourseGradebookRow) {

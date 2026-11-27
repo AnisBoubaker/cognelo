@@ -31,5 +31,11 @@ const warningCopy = {
   ar: { warningTitle: "تنبيهات مراجعة الإجابات", warningEnabled: "التنبيه إلى انخفاض درجات الإجابات", warningThreshold: "عتبة التنبيه (%)", warningMode: "يُطلق التنبيه عندما", warningMean: "يكون متوسط جميع الإجابات أقل من العتبة", warningAny: "تكون أي إجابة أقل من العتبة", warningHelp: "إشارة مراجعة للمعلمين فقط، تُحسب من نسب المعايير قبل وزن النشاط. لا تُطلق المساواة مع العتبة تنبيهًا. الدرجات المنخفضة لا تثبت الاستعانة بمساعدة غير مصرح بها، ولا يمنع التنبيه نشر الدرجات.", assessAnswers: "تقييم الإجابات بالذكاء الاصطناعي", assessAnswersConfirm: "تقييم إجابات {count} من الطلاب بالذكاء الاصطناعي؟ ستُحدّث درجات الإجابات والتنبيهات مع الاحتفاظ بتقييم المشروع والتعديلات الفردية للدرجة النهائية." }
 };
 export function homeworkRubricCopy(locale = "en") {
-  return { ...rubricBaseCopy(locale), ...(warningCopy[locale as keyof typeof warningCopy] ?? warningCopy.en) };
+  const participantConfirm = {
+    en: "Assess challenge answers for {name} with AI? This updates only this student's answer-rubric scores and review warnings while preserving project-code assessments and the individual final-grade override.",
+    fr: "Évaluer les réponses de {name} avec l’IA ? Seules les notes des réponses et les avertissements de cet étudiant seront actualisés. Les évaluations du code et sa note finale modifiée individuellement seront conservées.",
+    zh: "用 AI 评估 {name} 的问答？仅更新该学生的回答评分和复核提醒，保留项目代码评估和个人最终成绩覆盖。",
+    ar: "تقييم إجابات {name} بالذكاء الاصطناعي؟ ستُحدّث درجات إجابات هذا الطالب وتنبيهاته فقط، مع الاحتفاظ بتقييم المشروع والتعديل الفردي للدرجة النهائية."
+  };
+  return { ...rubricBaseCopy(locale), ...(warningCopy[locale as keyof typeof warningCopy] ?? warningCopy.en), assessAnswersForStudentConfirm: participantConfirm[locale as keyof typeof participantConfirm] ?? participantConfirm.en };
 }

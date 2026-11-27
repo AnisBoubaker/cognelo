@@ -31,7 +31,8 @@ export const homeworkChallengeAssessmentActions: NonNullable<NonNullable<ServerA
     if (!eligible.length) return [];
     const labels = Object.fromEntries((["en", "fr", "zh", "ar"] as const).map(locale => [locale, homeworkRubricCopy(locale).assessAnswers]));
     const messages = Object.fromEntries((["en", "fr", "zh", "ar"] as const).map(locale => [locale, homeworkRubricCopy(locale).assessAnswersConfirm.replace("{count}", String(eligible.length))]));
-    return [{ id: homeworkChallengeAssessmentActionId, labels, messages, attemptIds: eligible.map(attempt => attempt.id) }];
+    const participantMessages = Object.fromEntries((["en", "fr", "zh", "ar"] as const).map(locale => [locale, homeworkRubricCopy(locale).assessAnswersForStudentConfirm]));
+    return [{ id: homeworkChallengeAssessmentActionId, labels, messages, participantMessages, attemptIds: eligible.map(attempt => attempt.id) }];
   },
   evaluate(context) {
     if (context.actionId !== homeworkChallengeAssessmentActionId) throw new AppError(409, "AI_GRADING_ACTION_UNAVAILABLE", "This homework assessment action is unavailable.");
