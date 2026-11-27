@@ -73,7 +73,7 @@ test("homework authoring keeps grading drafts and guidance separate; manual rubr
 
 test("team AI grading shares code, grades answers individually and preserves individual overrides", async ({ bankCourse: data, teacherApi: api }) => {
   test.setTimeout(120_000);
-  const longFeedback = "Evidence-based criterion feedback\n\n" + "main.c, add: « return a+1; » supports the assessment of this criterion.\n".repeat(200);
+  const longFeedback = "Evidence-based criterion feedback\n\n" + "main.c:1, add: « return a+1; » supports the assessment of this criterion.\n".repeat(200);
   const model = await homeworkModelFixture(data, { rubricFeedback: longFeedback }), student = await createAuthenticatedApi("student");
   let peer: Awaited<ReturnType<typeof createAuthenticatedApiWithCredentials>> | undefined, peerId: string | undefined;
   try {
@@ -141,6 +141,10 @@ test("team AI grading shares code, grades answers individually and preserves ind
     const assessmentPrompts = model.requests.filter(request => request.systemPrompt?.includes("You assess programming homework"));
     expect(assessmentPrompts.length).toBeGreaterThan(0);
     expect(assessmentPrompts.every(request => request.systemPrompt?.includes("give all examples in the submitted evidence"))).toBe(true);
+    for (const request of assessmentPrompts) {
+      expect(request.systemPrompt).toContain("exact submitted filename including folders and its 1-based line number or inclusive line range");
+      expect(JSON.parse(request.userPrompt!).evidence.files).toEqual([{ path: "main.c", numberedText: "1: int add(int a){return a+1;}" }]);
+    }
     const peerGrade = await grade(peerAttempt.id);
     await responseJson(await api.patch(`${course}/gradebook/items/${peerGrade.gradebookItemId}/participants/${peerGrade.participantId}/override`, { data: { score: 95, maxScore: 100, reason: "Individual teacher adjustment", expectedGradeUpdatedAt: peerGrade.updatedAt.toISOString() } }));
     const reviewPath = `${course}/gradebook/attempts/${ownAttempt.id}/ai-feedback`;

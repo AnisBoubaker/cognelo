@@ -35,7 +35,7 @@ describe("homework rubric assessment boundary", () => {
   });
   it("stages complete immutable artifacts without publishing grades or shared source state", async () => {
     await evaluateHomeworkWithAi({ ...context, deferPublication: true });
-    expect(mocks.artifact).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ metadata: expect.objectContaining({ status: "staged", coreAttemptId: "attempt", promptVersion: "homework-rubric-v2" }) }) }));
+    expect(mocks.artifact).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ metadata: expect.objectContaining({ status: "staged", coreAttemptId: "attempt", promptVersion: "homework-rubric-v3" }) }) }));
   });
   it("requests all deduction evidence inside criterion feedback and preserves long model comments in stored artifacts", async () => {
     const evidence = Array.from({ length: 150 }, (_, index) => `main.c, function f${index}: « return a; » omet l'incrément requis. La valeur retournée reste inchangée.`).join("\n\n");
@@ -46,6 +46,8 @@ describe("homework rubric assessment boundary", () => {
       expect(prompt.systemPrompt).toContain("give all examples in the submitted evidence");
       expect(prompt.systemPrompt).toContain("only in the criterion feedback field, as free-form text");
       expect(prompt.systemPrompt).toContain("Penalize each underlying mistake only once");
+      expect(prompt.systemPrompt).toContain("exact submitted filename including folders and its 1-based line number or inclusive line range");
+      expect(prompt.systemPrompt).toContain("Never restart numbering at a function excerpt");
       expect(prompt.maxOutputTokens).toBeGreaterThan(6000);
     }
     expect(codePrompt.systemPrompt).toContain("quote short exact code excerpts");
@@ -54,6 +56,26 @@ describe("homework rubric assessment boundary", () => {
     expect(answerPrompt.systemPrompt).toContain("A defect in the code alone does not justify deducting answer points");
     expect(evaluation.feedback).toMatchObject({ code: { criteria: [{ feedback: evidence }] }, questions: [{ criteria: [{ feedback: evidence }] }, { criteria: [{ feedback: "Aucune réponse fournie" }] }] });
     expect(mocks.artifact.mock.calls[0][0].data.rubric).toEqual(evaluation.feedback);
+  });
+  it("numbers complete frozen files including blank lines and supplies absolute source lines for question excerpts", async () => {
+    const source = "// submitted header\r\n\r\nint helper(void) { return 0; }\r\nint add(int a) {\r\n  return a;\r\n}\r\n";
+    const header = "// declarations\r\rint add(int a);\n";
+    mocks.submission.mockResolvedValue({ id: "submission", coreAttemptId: "attempt", metadata: {},
+      files: [{ path: "src/main.c", sizeBytes: Buffer.byteLength(source) }, { path: "include/main.h", sizeBytes: Buffer.byteLength(header) }],
+      questions: [{ id: "q1", submissionId: "submission", questionText: "Explain add.", studentAnswer: "It adds one.", metadata: { studentCodeContext: {
+        code: "int add(int a) {\n  return a;\n}", filePath: "src/main.c", functionName: "add", languageKey: "c"
+      } } }] });
+    mocks.file.mockImplementation(async (file: { path: string }) => Buffer.from(file.path === "src/main.c" ? source : header));
+    await evaluateHomeworkWithAi(context);
+    const codeEvidence = JSON.parse(mocks.model.mock.calls[0][1].userPrompt).evidence;
+    const answerEvidence = JSON.parse(mocks.model.mock.calls[1][1].userPrompt).evidence;
+    expect(codeEvidence.files).toEqual([
+      { path: "src/main.c", numberedText: "1: // submitted header\n2: \n3: int helper(void) { return 0; }\n4: int add(int a) {\n5:   return a;\n6: }\n7: " },
+      { path: "include/main.h", numberedText: "1: // declarations\n2: \n3: int add(int a);\n4: " }
+    ]);
+    expect(answerEvidence.files).toEqual([codeEvidence.files[0]]);
+    expect(answerEvidence.context.code).toBe("int add(int a) {\n  return a;\n}");
+    expect(answerEvidence.context.filePath).toBe("src/main.c");
   });
   it("leaves grades unchanged for narrative-only review and strips template identity/control fields from model prompts", async () => {
     const current = homeworkFeedbackDraft(policy, ["q1", "q2"]);
