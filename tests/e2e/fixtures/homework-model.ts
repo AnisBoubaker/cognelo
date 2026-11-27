@@ -5,7 +5,7 @@ import { isolatedAiOwner } from "./isolated-ai-owner";
 import type { ActivitySuiteData } from "./activity-suite";
 
 /** Local-only OpenAI boundary stand-in; all homework/core APIs and storage remain real. */
-export async function homeworkModelFixture(data: Pick<ActivitySuiteData, "courseId" | "token">, options: { hold?: boolean; failFirst?: number; provider?: "openai" | "codex" | "claude" | "ollama"; questionText?: (number: number) => string } = {}) {
+export async function homeworkModelFixture(data: Pick<ActivitySuiteData, "courseId" | "token">, options: { hold?: boolean; failFirst?: number; provider?: "openai" | "codex" | "claude" | "ollama"; questionText?: (number: number) => string; rubricFeedback?: string } = {}) {
   const owner = await isolatedAiOwner(data);
   let sequence = 0, active = 0, maximum = 0, hold = options.hold ?? false, failures = options.failFirst ?? 0;
   const embeddingTexts: string[] = [];
@@ -30,7 +30,7 @@ export async function homeworkModelFixture(data: Pick<ActivitySuiteData, "course
       }
       if (Array.isArray(payload.rubric)) {
         const score = payload.evidence?.answer?.includes("weak") ? 40 : 80;
-        const text = JSON.stringify({ noAnswerProvided: false, summary: "Reviewed submission", criteria: payload.rubric.map((criterion: { id: string }) => ({ criterionId: criterion.id, scorePercent: score, feedback: "Evidence-based criterion feedback" })) });
+        const text = JSON.stringify({ noAnswerProvided: false, summary: "Reviewed submission", criteria: payload.rubric.map((criterion: { id: string }) => ({ criterionId: criterion.id, scorePercent: score, feedback: options.rubricFeedback ?? "Evidence-based criterion feedback" })) });
         response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ output_text: text, content: [{ text }], message: { content: text } })); return;
       }
       if (Array.isArray(payload.functions)) { response.writeHead(200, { "Content-Type": "application/json" }); response.end(JSON.stringify({ output_text: JSON.stringify({ selectedFunctionKeys: payload.functions.slice(0, 1).map((fn: { key: string }) => fn.key) }) })); return; }

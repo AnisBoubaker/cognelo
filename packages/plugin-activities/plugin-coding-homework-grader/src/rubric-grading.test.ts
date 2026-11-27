@@ -35,7 +35,25 @@ describe("homework rubric assessment boundary", () => {
   });
   it("stages complete immutable artifacts without publishing grades or shared source state", async () => {
     await evaluateHomeworkWithAi({ ...context, deferPublication: true });
-    expect(mocks.artifact).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ metadata: expect.objectContaining({ status: "staged", coreAttemptId: "attempt", promptVersion: "homework-rubric-v1" }) }) }));
+    expect(mocks.artifact).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ metadata: expect.objectContaining({ status: "staged", coreAttemptId: "attempt", promptVersion: "homework-rubric-v2" }) }) }));
+  });
+  it("requests all deduction evidence inside criterion feedback and preserves long model comments in stored artifacts", async () => {
+    const evidence = Array.from({ length: 150 }, (_, index) => `main.c, function f${index}: « return a; » omet l'incrément requis. La valeur retournée reste inchangée.`).join("\n\n");
+    mocks.model.mockResolvedValue(JSON.stringify({ noAnswerProvided: false, summary: "Justification détaillée dans la rétroaction du critère.", criteria: [{ criterionId: "criterion", scorePercent: 80, feedback: evidence }] }));
+    const evaluation = await evaluateHomeworkWithAi(context);
+    const codePrompt = mocks.model.mock.calls[0][1], answerPrompt = mocks.model.mock.calls[1][1];
+    for (const prompt of [codePrompt, answerPrompt]) {
+      expect(prompt.systemPrompt).toContain("give all examples in the submitted evidence");
+      expect(prompt.systemPrompt).toContain("only in the criterion feedback field, as free-form text");
+      expect(prompt.systemPrompt).toContain("Penalize each underlying mistake only once");
+      expect(prompt.maxOutputTokens).toBeGreaterThan(6000);
+    }
+    expect(codePrompt.systemPrompt).toContain("quote short exact code excerpts");
+    expect(codePrompt.systemPrompt).toContain("Never present private reference-solution code");
+    expect(answerPrompt.systemPrompt).toContain("student's actual answer");
+    expect(answerPrompt.systemPrompt).toContain("A defect in the code alone does not justify deducting answer points");
+    expect(evaluation.feedback).toMatchObject({ code: { criteria: [{ feedback: evidence }] }, questions: [{ criteria: [{ feedback: evidence }] }, { criteria: [{ feedback: "Aucune réponse fournie" }] }] });
+    expect(mocks.artifact.mock.calls[0][0].data.rubric).toEqual(evaluation.feedback);
   });
   it("leaves grades unchanged for narrative-only review and strips template identity/control fields from model prompts", async () => {
     const current = homeworkFeedbackDraft(policy, ["q1", "q2"]);

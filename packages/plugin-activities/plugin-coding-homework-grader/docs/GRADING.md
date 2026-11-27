@@ -1,5 +1,9 @@
 # Homework rubric grading
 
+## Plugin independence
+
+Programming Homework and Programming Exercises are independent plugins. Homework owns its grading and execution implementation. Useful exercise code may be copied into this plugin and maintained independently, but must not create cross-plugin imports, runtime dependencies or a common grading/execution module shared between the two plugins.
+
 ## Authoring
 
 Course and bank authoring offer **Activity / Concepts / Grading**, with the course Reference materials tab unchanged. Grading uses shared left navigation for **Rubric / Tests** and the same activity Save/Cancel draft as Activity and Concepts. Existing homework keeps manual grading until **Use rubric grading** is enabled.
@@ -15,6 +19,10 @@ Private authoring lives under assignment `settings.grading`; `settings.gradingRu
 **Assess with AI** and **Review and grade** use the platform feedback, guided-batch, audit and grade-release services. Summative submission does not run AI. The course assessment-feedback connection/switch is required for AI; ordinary manual rubric assessment requires no model. Questions continue to use the independently selected generation model.
 
 AI applies current saved rubrics and directions, plus any run-specific directions and reviewed examples. Teacher policy is in the system prompt; source and answers are untrusted evidence. The source is assessed as a whole project, and answers against their specific question and retained submitted-code context. An underlying mistake is deducted once under its most relevant criterion. Empty answers receive zero and the Subject-language no-answer message without a model call. Nonempty incorrect or incomplete attempts receive normal assessment. Structured criterion identities/scores/comments are validated, with one bounded correction retry. No grading path executes code or invents test outcomes.
+
+Every deducted criterion's **Feedback / Rétroaction** must explain each reason for lost points and include all supporting examples from the submitted work, rather than only representative examples. Code feedback cites actual filenames/functions and short exact excerpts; missing code is described as absent instead of inventing an excerpt or line number. Answer feedback uses the actual answer and its retained code context, without deducting for code defects the student correctly explains. Evidence stays entirely in the existing criterion feedback text, with no prescribed format or additional fields. Summaries remain brief and the no-answer rule still applies. Prompt version `homework-rubric-v2` records this policy; existing reviews change only through a new assessment or teacher edit.
+
+Criterion feedback accepts up to 50,000 characters consistently in AI-output validation, teacher edits and the review form, with a 16,000-token output allowance per assessed rubric. Feedback is stored as strings in existing PostgreSQL JSONB rubric/grade snapshots; the review's general feedback column is already TEXT. Neither requires a migration. Long comments are retained without truncation; ordinary request-size and export budgets still apply. No structured evidence schema is introduced.
 
 AI source evidence is capped at 160,000 bytes of C/H files, the private solution at 200,000 serialized characters and assignment text/PDF at 100,000 characters. Larger work remains manually gradeable; evidence is never silently truncated. PDF extraction uses the existing bounded Poppler utility. Feedback and rubrics use the Subject teaching language, independently of viewer locale.
 
@@ -34,4 +42,4 @@ Private review artifacts retain policy, effective directions, examples' attempt 
 
 The existing release and content-closure gates apply. Results show the weighted code/question contributions, criterion scores and explanations, individual questions/answers and final teacher grade. Zero-weight components are omitted. The plugin rechecks learner, section, active released grade and exact submitted attempt before projecting questions. A final-grade override resolves its latest submitted attempt. Private solutions, instructions, hashes, retrieval metadata, model artifacts and test internals are excluded. Teacher answer exports include the latest reviewed code/question criteria and component scores through a bounded, read-only block projection; staged artifacts never appear. Learner copy describes grading/feedback without identifying its mechanism.
 
-The user-approved next step is executable tests generated from assignment text/PDF and solution for the teacher-selected required functions, with adjustable function weights and validation against the private solution before use.
+The current scope remains rubric-only grading. Executable tests, including generation, per-required-function weights and private-solution validation, remain deferred.

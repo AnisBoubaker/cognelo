@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { MarkdownRenderer } from "@cognelo/activity-ui";
-import { calculateHomeworkFeedback, isHomeworkFeedback, objectRecord, type HomeworkRubricFeedback, type HomeworkRubricScore } from "../rubric";
+import { HOMEWORK_CRITERION_FEEDBACK_MAX_LENGTH, calculateHomeworkFeedback, isHomeworkFeedback, objectRecord, type HomeworkRubricFeedback, type HomeworkRubricScore } from "../rubric";
 import { HomeworkFileViewer, type HomeworkFileReader } from "./homework-file-viewer";
 import { homeworkRubricCopy } from "./rubric-copy";
 import { QuestionCodeContext } from "./question-code-context";
@@ -53,7 +53,7 @@ export function HomeworkRubricFields({ rubric, title, locale, readOnly, onChange
       {criterion.description && <p className="muted">{criterion.description}</p>}
       {readOnly ? <><p>{copy.score}: {criterion.scorePercent ?? copy.pending}{criterion.scorePercent !== null ? "%" : ""}</p>{criterion.feedback && <p style={{ whiteSpace: "pre-wrap" }}>{criterion.feedback}</p>}</> : <>
         <label className="field"><span>{copy.score}</span><input type="number" min={0} max={100} step="0.01" value={criterion.scorePercent ?? ""} onChange={event => { const scorePercent = event.target.value === "" ? null : Number(event.target.value); onChange?.({ ...rubric, criteria: rubric.criteria.map(item => item.id === criterion.id ? { ...item, scorePercent } : item) }); }} /></label>
-        <label className="field"><span>{copy.comment}</span><textarea rows={3} maxLength={2000} value={criterion.feedback} onChange={event => { const feedback = event.target.value; onChange?.({ ...rubric, criteria: rubric.criteria.map(item => item.id === criterion.id ? { ...item, feedback } : item) }); }} /></label>
+        <label className="field"><span>{copy.comment}</span><textarea rows={6} maxLength={HOMEWORK_CRITERION_FEEDBACK_MAX_LENGTH} value={criterion.feedback} onChange={event => { const feedback = event.target.value; onChange?.({ ...rubric, criteria: rubric.criteria.map(item => item.id === criterion.id ? { ...item, feedback } : item) }); }} /></label>
       </>}
     </section>)}
   </section>;

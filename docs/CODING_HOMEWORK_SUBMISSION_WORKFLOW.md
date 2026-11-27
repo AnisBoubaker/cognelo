@@ -31,7 +31,9 @@ The November 9 [editor update](PROGRAMMING_HOMEWORK_EDITOR.md) places course-onl
 
 ## Rubric-grading update — November 16, 2026
 
-The user approved whole-project code-rubric grading and one generic rubric applied independently to each answer, averaged equally. Team code/test scores are shared, question grades individual, with individual teacher final-grade adjustments retained. This delivery implements rubric generation with guidance, teacher-triggered AI/manual assessment, gradebook integration and released student feedback. Executable tests are deferred: the next delivery will target teacher-selected required functions, allow per-function weights and validate generated tests against the solution. See [the canonical grading reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/GRADING.md).
+The user approved whole-project code-rubric grading and one generic rubric applied independently to each answer, averaged equally. Team code scores are shared, question grades individual, with individual teacher final-grade adjustments retained. This delivery implements rubric generation with guidance, teacher-triggered AI/manual assessment, gradebook integration and released student feedback. Executable tests remain deferred. See [the canonical grading reference](../packages/plugin-activities/plugin-coding-homework-grader/docs/GRADING.md).
+
+The November 27 follow-up keeps grading rubric-only and requires every AI deduction to include all supporting examples from the submitted code or answer in that criterion's existing Feedback / Rétroaction text. No separate evidence structure is added. Homework and Programming Exercises retain independent implementations; copying code is permitted, sharing their grading/execution implementation is not. The canonical reference owns the evidence policy and storage/validation limits.
 
 ## Scope
 

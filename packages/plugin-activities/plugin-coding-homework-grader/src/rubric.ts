@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const HOMEWORK_CRITERION_FEEDBACK_MAX_LENGTH = 50_000;
+
 export const homeworkCriterionSchema = z.object({
   id: z.string().min(1).max(80), title: z.string().trim().min(1).max(200),
   description: z.string().max(4000).default(""), weightPercent: z.number().int().min(1).max(100)
@@ -65,7 +67,7 @@ export function homeworkFeedbackDraft(policy: HomeworkGradingPolicy, questionIds
     questionsWeightPercent: policy.questionsWeightPercent, testWeightPercent: 0, code: sharedCode ?? blank("code"),
     questions: questionIds.map(id => ({ ...blank("questions"), id })), privateSharedCodeRevision, summary: "", strengths: [], improvements: [], codeScore: null, questionsScore: null, combinedScore: null });
 }
-const scoredCriterionSchema = z.object({ id: z.string(), scorePercent: z.number().min(0).max(100).nullable(), feedback: z.string().max(2000) });
+const scoredCriterionSchema = z.object({ id: z.string(), scorePercent: z.number().min(0).max(100).nullable(), feedback: z.string().max(HOMEWORK_CRITERION_FEEDBACK_MAX_LENGTH) });
 const scoreRevisionSchema = z.object({ summary: z.string().max(3000), criteria: z.array(scoredCriterionSchema).max(20) });
 const revisionSchema = z.object({ summary: z.string().max(3000), strengths: z.array(z.string().max(10000)).max(10), improvements: z.array(z.string().max(10000)).max(10),
   code: scoreRevisionSchema, questions: z.array(scoreRevisionSchema.extend({ id: z.string() })).max(20) });

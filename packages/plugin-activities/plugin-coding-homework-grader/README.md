@@ -54,6 +54,8 @@ The display name is **Programming Homework** (French: **Devoir de programmation*
 
 Rubric grading adds a shared **Grading** tab with a whole-project code rubric and one generic rubric applied separately to each challenge answer. Component points total 100; test points remain zero until executable tests are added. Teachers generate rubrics with saved guidance, assess individually/in batches with AI, or edit scores/comments manually. Team code scores are shared; answers and final-grade overrides remain individual. Release blocks incomplete weighted components and student results show the released breakdown. Existing homework stays manual until rubric grading is enabled. See [grading behavior and boundaries](docs/GRADING.md).
 
+Grading remains rubric-only. AI criterion feedback explains every deduction with all supporting examples from submitted code or answers, entirely inside the existing Feedback / Rétroaction text. Each criterion comment supports 50,000 characters; existing JSONB storage needs no migration. See [grading evidence and limits](docs/GRADING.md#teacher-grading).
+
 Teacher activity reports use the shared three-dot **Activity actions** menu for activity-wide operations. The context-sensitive Back link stays visible outside it; student-specific actions remain in row menus. See [report actions](../../../docs/ACTION_BUTTONS.md#activity-report-actions).
 
 ## Read by topic
@@ -71,6 +73,8 @@ Teacher activity reports use the shared three-dot **Activity actions** menu for 
 - [Assignment exceptions](../../../docs/ACTIVITY_ASSIGNMENT_EXCEPTIONS.md), [content closure](../../../docs/ACTIVITY_CONTENT_ACCESS.md), [submission continuation](../../../docs/SUBMISSION_CONTINUATION.md), and [answer exports](../../../docs/ANSWER_EXPORTS.md)
 
 ## Boundaries
+
+Programming Homework owns its grading/execution implementation independently of Programming Exercises. Code may be copied and maintained locally; do not introduce cross-plugin dependencies or a common grading/execution module shared by the two plugins. See [plugin independence](docs/GRADING.md#plugin-independence).
 
 Course authoring can save the assignment, structural requirements and explicit workflow-setting changes in one private transaction. Deadlines/late policy are now core assignment settings; legacy endpoints delegate new policy writes to core and read existing private defaults until shared scheduling is saved. Connection authorization, readiness and submission locks still apply; existing workflow endpoints remain supported.
 

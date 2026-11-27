@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultHomeworkGrading, homeworkFeedbackDraft, homeworkGradingSchema, calculateHomeworkFeedback, reviseHomeworkFeedback, rubricScore, type HomeworkGradingPolicy } from "./rubric";
+import { HOMEWORK_CRITERION_FEEDBACK_MAX_LENGTH, defaultHomeworkGrading, homeworkFeedbackDraft, homeworkGradingSchema, calculateHomeworkFeedback, reviseHomeworkFeedback, rubricScore, type HomeworkGradingPolicy } from "./rubric";
 const criterion = { id: "quality", title: "Quality", description: "Assess the whole project", weightPercent: 100 };
 const policy: HomeworkGradingPolicy = { ...defaultHomeworkGrading(), enabled: true, code: { criteria: [criterion], instructions: "Credit demonstrated work." }, questions: { criteria: [{ ...criterion, id: "understanding" }], instructions: "Assess the answer to the actual question." } };
 describe("homework rubric composition", () => {
@@ -39,5 +39,21 @@ describe("homework rubric composition", () => {
     expect(() => reviseHomeworkFeedback(draft, { ...draft, questions: [] })).toThrow();
     expect(() => reviseHomeworkFeedback(draft, { ...draft, code: { ...draft.code, criteria: [{ ...draft.code.criteria[0], id: "foreign" }] } })).toThrow();
     expect(reviseHomeworkFeedback(draft, { ...draft, questions: [...draft.questions].reverse() }).questions.map(item => item.id)).toEqual(["one", "two"]);
+  });
+  it("retains long code and answer evidence through teacher edits and rejects comments over the supported limit", () => {
+    const draft = homeworkFeedbackDraft(policy, ["one"]);
+    const edited = structuredClone(draft);
+    const evidence = "é".repeat(HOMEWORK_CRITERION_FEEDBACK_MAX_LENGTH);
+    edited.code.criteria[0].feedback = evidence;
+    edited.questions[0].criteria[0].feedback = evidence;
+    const revised = reviseHomeworkFeedback(draft, edited);
+    expect(revised.code.criteria[0].feedback).toBe(evidence);
+    expect(revised.questions[0].criteria[0].feedback).toBe(evidence);
+    expect(revised.combinedScore).toBeNull();
+    edited.code.criteria[0].feedback += "!";
+    expect(() => reviseHomeworkFeedback(draft, edited)).toThrow();
+    edited.code.criteria[0].feedback = "";
+    edited.questions[0].criteria[0].feedback += "!";
+    expect(() => reviseHomeworkFeedback(draft, edited)).toThrow();
   });
 });

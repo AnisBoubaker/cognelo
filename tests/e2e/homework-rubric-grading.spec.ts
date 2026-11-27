@@ -53,15 +53,18 @@ test("homework authoring keeps grading drafts and guidance separate; manual rubr
     const review = page.getByRole("dialog", { name: "Review and grade", exact: true });
     await expect(review.locator(".homework-submitted-file-content")).toContainText("int add");
     await review.getByLabel("Score (%)", { exact: true }).fill("85");
-    await review.getByLabel("Feedback", { exact: true }).fill("Clear complete implementation.");
+    const longFeedback = "Clear complete implementation.\n\n" + "main.c, add: « return a+b; » demonstrates the required addition.\n".repeat(700);
+    await review.getByLabel("Feedback", { exact: true }).fill(longFeedback);
     await expect(review.getByText(/Calculated total: 85 \/ 100/)).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await review.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
     await review.getByRole("button", { name: "Save review", exact: true }).click();
     await expect.poll(async () => (await prisma.grade.findFirst({ where: { selectedAttemptId: attempt.id } }))?.normalizedScore).toBe(85);
+    const saved = await responseJson<{ review: { feedback: { code: { criteria: Array<{ feedback: string }> } } } }>(await api.get(`${course}/gradebook/attempts/${attempt.id}/ai-feedback`));
+    expect(saved.review.feedback.code.criteria[0].feedback).toBe(longFeedback);
     await responseJson(await api.patch(`${course}/gradebook/items/${attempt.gradebookItemId}/release`, { data: { released: true } }));
     await studentPage.goto(`/courses/${data.courseId}/groups/${data.groupId}/activities/assigned/${id}`);
-    await expect(studentPage.getByText("Clear complete implementation.", { exact: true })).toBeVisible();
+    await expect(studentPage.getByText(longFeedback, { exact: true })).toBeVisible();
     const grades = await responseJson<unknown>(await student.get(`${course}/groups/${data.groupId}/grades`));
     expect(JSON.stringify(grades)).not.toContain("Credit demonstrated reasoning");
     expect(JSON.stringify(grades)).not.toContain("privateSharedCodeRevision");
@@ -70,7 +73,8 @@ test("homework authoring keeps grading drafts and guidance separate; manual rubr
 
 test("team AI grading shares code, grades answers individually and preserves individual overrides", async ({ bankCourse: data, teacherApi: api }) => {
   test.setTimeout(120_000);
-  const model = await homeworkModelFixture(data), student = await createAuthenticatedApi("student");
+  const longFeedback = "Evidence-based criterion feedback\n\n" + "main.c, add: « return a+1; » supports the assessment of this criterion.\n".repeat(200);
+  const model = await homeworkModelFixture(data, { rubricFeedback: longFeedback }), student = await createAuthenticatedApi("student");
   let peer: Awaited<ReturnType<typeof createAuthenticatedApiWithCredentials>> | undefined, peerId: string | undefined;
   try {
     const course = `/api/courses/${data.courseId}`;
@@ -130,6 +134,13 @@ test("team AI grading shares code, grades answers individually and preserves ind
     const grade = (attemptId: string) => prisma.grade.findFirstOrThrow({ where: { participantId: attempts.find(attempt => attempt.id === attemptId)!.participantId, gradebookItemId: attempts.find(attempt => attempt.id === attemptId)!.gradebookItemId } });
     expect((await grade(ownAttempt.id)).normalizedScore).toBe(80);
     expect((await grade(peerAttempt.id)).normalizedScore).toBe(68);
+    const storedReviews = await prisma.$queryRaw<Array<{ rubric: { code: { criteria: Array<{ feedback: string }> }; questions: Array<{ criteria: Array<{ feedback: string }> }> } }>>`SELECT rubric FROM "PluginCodingHomeworkReview" WHERE "submissionId"=${ownAttempt.pluginAttemptRef} AND metadata->>'status'='completed'`;
+    expect(storedReviews.length).toBeGreaterThan(0);
+    expect(storedReviews[0].rubric.code.criteria[0].feedback).toBe(longFeedback);
+    expect(storedReviews[0].rubric.questions.every(question => question.criteria[0].feedback === longFeedback)).toBe(true);
+    const assessmentPrompts = model.requests.filter(request => request.systemPrompt?.includes("You assess programming homework"));
+    expect(assessmentPrompts.length).toBeGreaterThan(0);
+    expect(assessmentPrompts.every(request => request.systemPrompt?.includes("give all examples in the submitted evidence"))).toBe(true);
     const peerGrade = await grade(peerAttempt.id);
     await responseJson(await api.patch(`${course}/gradebook/items/${peerGrade.gradebookItemId}/participants/${peerGrade.participantId}/override`, { data: { score: 95, maxScore: 100, reason: "Individual teacher adjustment", expectedGradeUpdatedAt: peerGrade.updatedAt.toISOString() } }));
     const reviewPath = `${course}/gradebook/attempts/${ownAttempt.id}/ai-feedback`;
