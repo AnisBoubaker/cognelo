@@ -2,7 +2,7 @@ import type { CurrentUser } from "@cognelo/contracts";
 import { Prisma, prisma } from "@cognelo/db";
 import { resolvePluginAiFeedbackHandler, resolvePluginAiFeedbackPublisher, resolvePluginAiFeedbackTeacherReviewHandler,
   resolvePluginAiGradingBatchHandler, type PluginAiFeedbackResult, type PluginAiFeedbackTeacherReviewContext,
-  type PluginAiGradingBatchGuidance } from "@cognelo/activity-sdk/server";
+  type PluginAiGradingBatchGuidance, resolvePluginAiFeedbackAdditionalActions } from "@cognelo/activity-sdk/server";
 import { AppError } from "./errors";
 import { getActivityAttemptRegradeContext, recordActivityAttemptGradingResult, recordActivityAttemptAiFeedback } from "./gradebook";
 import { getTeacherAttemptAiFeedbackReview, recordAiFeedbackResearchEvent } from "./ai-feedback";
@@ -10,7 +10,7 @@ import { resolveTestAiGradingGuidance } from "./test-ai-grading";
 import { recordTestItemAiFeedback, recalculateTestAttemptGrade } from "./test-execution";
 import { assertNoRequiredGradingReview } from "./grading-review";
 
-export type AiGradingGuidance = { instructions?: string; templateAttemptIds?: string[] };
+export type AiGradingGuidance = { instructions?: string; templateAttemptIds?: string[]; actionId?: string };
 type Evaluation = { activityId: string; activityTypeKey: string; testItemId?: string; expectedUpdatedAt?: string; evaluation: PluginAiFeedbackResult };
 export type PreparedAiGrading = {
   attemptId: string;
@@ -32,6 +32,7 @@ export async function prepareAiGradingAttempt(user: CurrentUser, courseId: strin
     expected: { attempt: before.updatedAt.toISOString(), grade: grade?.updatedAt.toISOString() ?? null,
       children: Object.fromEntries(before.testItemAttempts.map(child => [child.testItemId, child.updatedAt.toISOString()])) }, evaluations: [] };
   if (context.activityTypeKey === "test") {
+    if (options.actionId) throw new AppError(400, "AI_GRADING_ACTION_UNAVAILABLE", "This assessment action is unavailable for compound Tests.");
     if (options.instructions !== undefined) throw new AppError(400, "TEST_AI_INSTRUCTIONS_QUESTION_SPECIFIC", "A Test uses each question's saved instructions.");
     const { review, guidance } = await resolveTestAiGradingGuidance(user, courseId, attemptId, options.templateAttemptIds ?? []);
     for (const item of review.items) {
@@ -59,16 +60,24 @@ export async function prepareAiGradingAttempt(user: CurrentUser, courseId: strin
       throw new AppError(409, "TEST_ITEMS_NOT_GRADED", "Every exercise must be graded before keeping this Test.");
     }
   } else {
-    const evaluate = resolvePluginAiFeedbackHandler(context.activityTypeKey);
+    const additional = options.actionId ? resolvePluginAiFeedbackAdditionalActions(context.activityTypeKey) : null;
+    const evaluate = options.actionId ? additional?.evaluate : resolvePluginAiFeedbackHandler(context.activityTypeKey);
     if (!evaluate) throw new AppError(409, "PLUGIN_AI_FEEDBACK_UNAVAILABLE", "This activity does not support AI grading.");
     assertStagingSupported(context.activityTypeKey);
     const guidance = options.instructions !== undefined || options.templateAttemptIds?.length
       ? await resolveBatchGuidance({ user, courseId, targetAttemptId: attemptId, targetActivityId: context.activityId,
           activityTypeKey: context.activityTypeKey, instructions: options.instructions, templateAttemptIds: options.templateAttemptIds ?? [] }) : undefined;
     await checkRunning();
+    if (options.actionId) {
+      const actions = await additional!.list({ user, courseId, activityId: context.activityId,
+        attempts: [{ id: attemptId, groupId: context.groupId, pluginAttemptRef: context.pluginAttemptRef ?? null }] });
+      if (!actions.some(action => action.id === options.actionId && action.attemptIds.includes(attemptId))) throw new AppError(409, "AI_GRADING_ACTION_UNAVAILABLE", "The assessment action or submission changed.");
+    }
+    const currentFeedback = options.actionId ? (await getTeacherAttemptAiFeedbackReview(user, courseId, attemptId)).feedback : undefined;
     const evaluation = await evaluate({ user, courseId, groupId: context.groupId, activityId: context.activityId,
       coreAttemptId: attemptId, pluginAttemptRef: context.pluginAttemptRef, activity: context.activity,
-      triggerKind: "teacher_batch", deferPublication: true, batchGuidance: guidance });
+      triggerKind: "teacher_batch", deferPublication: true, batchGuidance: guidance,
+      ...(options.actionId ? { actionId: options.actionId, currentFeedback } : {}) } as Parameters<typeof evaluate>[0]);
     prepared.evaluations.push({ activityId: context.activityId, activityTypeKey: context.activityTypeKey, evaluation });
   }
   if (!prepared.evaluations.length) throw new AppError(409, "TEST_AI_FEEDBACK_UNAVAILABLE", "No exercise has effective AI grading configuration.");
@@ -106,7 +115,7 @@ export async function commitPreparedAiGrading(user: CurrentUser, courseId: strin
       await recordTestItemAiFeedback(user, courseId, attempt.id, entry.testItemId, {
         ...evaluation, expectedUpdatedAt: entry.expectedUpdatedAt
       }, tx);
-    } else if (evaluation.gradingResult) {
+    } else if (evaluation.gradingResult && !(evaluation.preserveFinalGradeOverride && grade && grade.isActive !== false && ["manual", "override"].includes(grade.source))) {
       const grading = evaluation.gradingResult;
       result = await recordActivityAttemptGradingResult(user, {
         attemptId: attempt.id, rawScore: grading.rawScore, rawMaxScore: grading.rawMaxScore,
@@ -115,7 +124,7 @@ export async function commitPreparedAiGrading(user: CurrentUser, courseId: strin
         normalizedResult: { ...(grading.metadata ?? {}), studentFeedback: { ...evaluation.feedback,
           feedbackRef: evaluation.feedbackRef, feedbackVersion: evaluation.feedbackVersion, feedbackHash: evaluation.feedbackHash, challengeAllowed: true } } as Prisma.InputJsonValue,
         metadata: { aiFeedbackRef: evaluation.feedbackRef, aiFeedbackVersion: evaluation.feedbackVersion }
-      }, tx, synchronizeShared);
+      }, tx, synchronizeShared && evaluation.synchronizeSharedGrading !== false);
     } else result = await recordActivityAttemptAiFeedback(user, courseId, { attemptId: attempt.id, ...evaluation }, tx);
     await recordAiFeedbackResearchEvent({ eventType: "grade_feedback_recorded", courseId, groupId: context.groupId,
       activityId: entry.activityId, attemptId: attempt.id, actorUserId: user.id, pluginKey: entry.activityTypeKey,

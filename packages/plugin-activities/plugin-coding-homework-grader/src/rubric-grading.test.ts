@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultHomeworkGrading, homeworkFeedbackDraft, type HomeworkGradingPolicy } from "./rubric";
-const mocks = vi.hoisted(() => ({ attempt: vi.fn(), submission: vi.fn(), assignment: vi.fn(), solution: vi.fn(), course: vi.fn(), artifact: vi.fn(), model: vi.fn(), connection: vi.fn(), policy: vi.fn(), file: vi.fn(), authorize: vi.fn() }));
+const mocks = vi.hoisted(() => ({ attempt: vi.fn(), submission: vi.fn(), assignment: vi.fn(), solution: vi.fn(), course: vi.fn(), artifact: vi.fn(), reviews: vi.fn(), submissions: vi.fn(), model: vi.fn(), connection: vi.fn(), policy: vi.fn(), file: vi.fn(), authorize: vi.fn() }));
 vi.mock("@cognelo/db", () => ({ prisma: { activityAttempt: { findFirst: mocks.attempt }, course: { findUniqueOrThrow: mocks.course } } }));
-vi.mock("./db-client", () => ({ prisma: { pluginCodingHomeworkSubmission: { findFirst: mocks.submission, findUnique: vi.fn() }, pluginCodingHomeworkAssignment: { findUnique: mocks.assignment, findUniqueOrThrow: mocks.assignment }, pluginCodingHomeworkTeacherSolution: { findUnique: mocks.solution }, pluginCodingHomeworkReview: { create: mocks.artifact } } }));
+vi.mock("./db-client", () => ({ prisma: { $queryRaw: mocks.reviews, pluginCodingHomeworkSubmission: { findFirst: mocks.submission, findUnique: vi.fn(), findMany: mocks.submissions }, pluginCodingHomeworkAssignment: { findUnique: mocks.assignment, findUniqueOrThrow: mocks.assignment }, pluginCodingHomeworkTeacherSolution: { findUnique: mocks.solution }, pluginCodingHomeworkReview: { create: mocks.artifact } } }));
 vi.mock("@cognelo/core", () => ({ AppError: class extends Error { constructor(public status: number, public code: string, message: string) { super(message); } }, assertCanGradeGroup: mocks.authorize, assessmentInstructionPrompt: (value: string) => `Teacher policy: ${value}`, generateAiAgentText: mocks.model, getCourseAssessmentFeedbackAiAgentConnection: mocks.connection, getCourseAssessmentFeedbackPolicy: mocks.policy, hashAiFeedbackValue: (value: unknown) => JSON.stringify(value) }));
 vi.mock("./hand-in", () => ({ readFrozenHomeworkFile: mocks.file }));
 vi.mock("./file-preparation", () => ({ record: (value: unknown) => value && typeof value === "object" ? value : {}, json: (value: unknown) => value }));
-const { evaluateHomeworkWithAi, createHomeworkFeedbackDraft, homeworkGradeCompletions, reviseHomeworkTeacherFeedback } = await import("./rubric-grading");
+const { evaluateHomeworkWithAi, createHomeworkFeedbackDraft, homeworkGradeCompletions, reviseHomeworkTeacherFeedback, homeworkChallengeAssessmentActions, homeworkEvaluationFlags } = await import("./rubric-grading");
 const criterion = { id: "criterion", title: "Understanding", description: "", weightPercent: 100 };
 const policy: HomeworkGradingPolicy = { ...defaultHomeworkGrading(), enabled: true, code: { criteria: [criterion], instructions: "Code directions" }, questions: { criteria: [criterion], instructions: "Question directions" } };
 const context = { user: { id: "teacher", roles: ["teacher"] }, courseId: "course", groupId: "group", activityId: "activity", coreAttemptId: "attempt", pluginAttemptRef: "submission", activity: { id: "activity", title: "Homework" }, triggerKind: "teacher_single" } as unknown as Parameters<typeof evaluateHomeworkWithAi>[0];
@@ -23,6 +23,28 @@ beforeEach(() => {
   mocks.model.mockResolvedValue(JSON.stringify({ noAnswerProvided: false, summary: "Réponse claire", criteria: [{ criterionId: "criterion", scorePercent: 80, feedback: "Bonne justification" }] }));
 });
 describe("homework rubric assessment boundary", () => {
+  it("assesses only individual answers while preserving code and narrative, with override and shared-score protections", async () => {
+    const previous = homeworkFeedbackDraft(policy, ["q1", "q2"]);
+    previous.code.criteria[0].scorePercent = 90; previous.code.criteria[0].feedback = "Existing teacher code assessment"; previous.summary = "Teacher narrative";
+    const evaluation = await homeworkChallengeAssessmentActions.evaluate({ ...context, actionId: "challenge-answers", currentFeedback: previous });
+    expect(mocks.model).toHaveBeenCalledTimes(1);
+    expect(evaluation.feedback).toMatchObject({ code: previous.code, summary: "Teacher narrative", codeScore: 90, questionsScore: 40, combinedScore: 75 });
+    expect(evaluation).toMatchObject({ preserveFinalGradeOverride: true, synchronizeSharedGrading: false });
+    expect(mocks.artifact.mock.calls[0][0].data.metadata.assessmentScope).toBe("questions");
+  });
+  it("keeps missing code assessment pending during answer-only assessment and projects flags without a final grade", async () => {
+    mocks.assignment.mockResolvedValue({ settings: { grading: { ...policy, questionWarning: { enabled: true, thresholdPercent: 60, mode: "any" } } }, promptMarkdown: "Add one" });
+    const evaluation = await homeworkChallengeAssessmentActions.evaluate({ ...context, actionId: "challenge-answers" });
+    expect(evaluation.feedback).toMatchObject({ codeScore: null, questionsScore: 40, combinedScore: null });
+    mocks.reviews.mockResolvedValue([{ submissionId: "submission", rubric: evaluation.feedback }]);
+    const rows = [{ participantId: "student", groupId: "group", attemptId: "attempt", pluginAttemptRef: "submission", feedback: null, gradingResult: {} }];
+    const flags = await homeworkEvaluationFlags({ ...context, rows });
+    expect(flags.student[0]).toMatchObject({ kind: "possible_unauthorized_assistance", reasonCode: "homework_challenge_answers_low" });
+    expect(mocks.reviews.mock.calls[0][0].join("?")).toContain("r.metadata->>'status'='completed'");
+    const revised = structuredClone(evaluation.feedback) as ReturnType<typeof homeworkFeedbackDraft>;
+    for (const question of revised.questions) question.criteria[0].scorePercent = 90;
+    expect((await homeworkEvaluationFlags({ ...context, rows: [{ ...rows[0], gradingResult: { studentFeedback: revised } }] })).student).toEqual([]);
+  });
   it("uses distinct authoritative directions, subject language, individual question evidence and deterministic blank grading", async () => {
     const evaluation = await evaluateHomeworkWithAi(context);
     expect(mocks.model).toHaveBeenCalledTimes(2); // code + one nonblank answer

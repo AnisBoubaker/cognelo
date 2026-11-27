@@ -10,6 +10,34 @@ import { readFrozenHomeworkFile } from "./hand-in";
 import { studentQuestionContext as retainedQuestionContext, studentQuestionContextInclude } from "./question-context";
 import { record, json } from "./file-preparation";
 import { HOMEWORK_CRITERION_FEEDBACK_MAX_LENGTH, calculateHomeworkFeedback, homeworkFeedbackDraft, homeworkGradingPolicy, homeworkPartialScore, isHomeworkFeedback, reviseHomeworkFeedback, type HomeworkRubricFeedback, type HomeworkRubricScore } from "./rubric";
+import { homeworkQuestionWarning, homeworkQuestionWarningMessages } from "./question-warning";
+import { homeworkQuestionsEnabled } from "./question-policy";
+import { homeworkRubricCopy } from "./web/rubric-copy";
+import type { ServerActivityPlugin, PluginEvaluationFlagHandler } from "@cognelo/activity-sdk/server";
+
+export const homeworkChallengeAssessmentActionId = "challenge-answers";
+export const homeworkChallengeAssessmentActions: NonNullable<NonNullable<ServerActivityPlugin["aiFeedback"]>["additionalActions"]> = {
+  async list({ activityId, attempts }) {
+    const settings = (await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId } }))?.settings;
+    const policy = homeworkGradingPolicy(settings);
+    if (!policy.enabled || !homeworkQuestionsEnabled(settings) || !policy.questions.criteria.length || !policy.questions.instructions.trim() || !attempts.length) return [];
+    const submissions = await prisma.pluginCodingHomeworkSubmission.findMany({
+      where: { activityId, id: { in: attempts.flatMap(attempt => attempt.pluginAttemptRef ? [attempt.pluginAttemptRef] : []) }, kind: "final", status: "ready_for_grading" },
+      include: { _count: { select: { questions: true } }, workspaceMember: true, workspace: true }
+    });
+    const eligible = attempts.filter(attempt => submissions.some(submission => submission.id === attempt.pluginAttemptRef && submission.coreAttemptId === attempt.id
+      && submission.groupId === attempt.groupId && !record(submission.metadata).deletion && submission._count.questions > 0
+      && (!submission.workspaceMemberId || submission.workspaceMember?.currentSubmissionId === submission.id && submission.workspace?.currentSubmissionId === submission.sharedSourceId)));
+    if (!eligible.length) return [];
+    const labels = Object.fromEntries((["en", "fr", "zh", "ar"] as const).map(locale => [locale, homeworkRubricCopy(locale).assessAnswers]));
+    const messages = Object.fromEntries((["en", "fr", "zh", "ar"] as const).map(locale => [locale, homeworkRubricCopy(locale).assessAnswersConfirm.replace("{count}", String(eligible.length))]));
+    return [{ id: homeworkChallengeAssessmentActionId, labels, messages, attemptIds: eligible.map(attempt => attempt.id) }];
+  },
+  evaluate(context) {
+    if (context.actionId !== homeworkChallengeAssessmentActionId) throw new AppError(409, "AI_GRADING_ACTION_UNAVAILABLE", "This homework assessment action is unavailable.");
+    return evaluateHomeworkRubrics(context, true);
+  }
+};
 
 export async function homeworkReviewSubmission(context: PluginAiFeedbackTeacherReviewContext) {
   await assertCanGradeGroup(context.user, context.courseId, context.groupId);
@@ -85,7 +113,8 @@ const modelRubricSchema = z.object({ noAnswerProvided: z.boolean(), summary: z.s
   criteria: z.array(z.object({ criterionId: z.string(), scorePercent: z.number().min(0).max(100), feedback: z.string().min(1).max(HOMEWORK_CRITERION_FEEDBACK_MAX_LENGTH) }).strict()).max(20) }).strict();
 const noAnswer = { en: "No answer provided", fr: "Aucune réponse fournie", zh: "未提供答案", ar: "لم يتم تقديم إجابة" };
 
-export const evaluateHomeworkWithAi: PluginAiFeedbackHandler = async context => {
+export const evaluateHomeworkWithAi: PluginAiFeedbackHandler = context => evaluateHomeworkRubrics(context, false);
+async function evaluateHomeworkRubrics(context: Parameters<PluginAiFeedbackHandler>[0], questionsOnly: boolean) {
   const startedAt = Date.now();
   const { submission } = await homeworkReviewSubmission(context);
   const policy = homeworkGradingPolicy((await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId: context.activityId } }))?.settings);
@@ -97,6 +126,12 @@ export const evaluateHomeworkWithAi: PluginAiFeedbackHandler = async context => 
   const language = course.subject.teachingLanguage as keyof typeof noAnswer;
   const emptyMessage = noAnswer[language] ?? noAnswer.en;
   let feedback: HomeworkRubricFeedback = await createHomeworkFeedbackDraft(context);
+  if (questionsOnly && isHomeworkFeedback(context.currentFeedback)) {
+    const previous = context.currentFeedback;
+    feedback = { ...feedback, code: previous.code, privateCodePolicyHash: previous.privateCodePolicyHash,
+      privateSharedCodeRevision: previous.privateSharedCodeRevision, summary: previous.summary, strengths: previous.strengths, improvements: previous.improvements };
+  }
+  if (questionsOnly && (!submission.questions.length || !policy.questions.criteria.length)) throw new AppError(409, "HOMEWORK_CHALLENGE_ASSESSMENT_UNAVAILABLE", "Submitted challenge answers and a saved answer rubric are required.");
   const sources = await gradingSources(submission.files);
   const numberedSources = sources.map(file => ({ path: file.path,
     numberedText: file.text.split(/\r\n|\r|\n/).map((line, index) => `${index + 1}: ${line}`).join("\n") }));
@@ -144,20 +179,21 @@ export const evaluateHomeworkWithAi: PluginAiFeedbackHandler = async context => 
     throw new AppError(502, "AI_FEEDBACK_GENERATION_FAILED", "Assessment could not be generated. Retry or grade the saved submission manually.");
   };
   const sharedExample = submission.sharedSourceId ? context.batchGuidance?.templates.find(template => record(template.submission).privateSharedSourceId === submission.sharedSourceId && isHomeworkFeedback(template.feedback)) : undefined;
-  if (policy.codeWeightPercent > 0) feedback.code = sharedExample ? (sharedExample.feedback as HomeworkRubricFeedback).code : await assess("code", feedback.code, { files: numberedSources }, !sources.some(file => file.text.trim()));
-  if (policy.questionsWeightPercent > 0) for (let index = 0; index < feedback.questions.length; index++) {
+  if (!questionsOnly && policy.codeWeightPercent > 0) feedback.code = sharedExample ? (sharedExample.feedback as HomeworkRubricFeedback).code : await assess("code", feedback.code, { files: numberedSources }, !sources.some(file => file.text.trim()));
+  if (questionsOnly || policy.questionsWeightPercent > 0 || policy.questionWarning.enabled) for (let index = 0; index < feedback.questions.length; index++) {
     const question = submission.questions[index];
     const questionContext = retainedQuestionContext(question);
     const files = questionContext?.filePath ? numberedSources.filter(file => file.path === questionContext.filePath) : numberedSources;
     feedback.questions[index] = { ...await assess("questions", feedback.questions[index], { question: question.questionText, answer: question.studentAnswer ?? "", context: questionContext, files }, !question.studentAnswer?.trim()), id: question.id };
   }
   feedback = calculateHomeworkFeedback(feedback);
-  if (feedback.combinedScore === null) throw new AppError(409, "HOMEWORK_GRADING_INCOMPLETE", "Every contributing rubric requires completed scores. Question generation may be disabled for this submission.");
+  if (!questionsOnly && feedback.combinedScore === null) throw new AppError(409, "HOMEWORK_GRADING_INCOMPLETE", "Every contributing rubric requires completed scores. Question generation may be disabled for this submission.");
   const artifact = await prisma.pluginCodingHomeworkReview.create({ data: { submissionId: submission.id, reviewerUserId: context.user.id, score: feedback.combinedScore, maxScore: 100,
     feedback: feedback.summary, rubric: json(feedback), metadata: json({ status: context.deferPublication ? "staged" : "completed", coreAttemptId: context.coreAttemptId,
-      policy, snapshots, language, promptVersion: "homework-rubric-v3", model: connection?.model ?? null, provider: connection?.provider ?? "deterministic", latencyMs: Date.now() - startedAt, schemaVersion: "homework-rubric-schema-v1", feedbackHash: hashAiFeedbackValue(feedback), templateAttemptIds: context.batchGuidance?.templates.map(item => item.coreAttemptId) ?? [] }) } });
-  return { feedbackRef: artifact.id, feedbackVersion: 1, feedbackHash: hashAiFeedbackValue(feedback), feedback, gradingResult: homeworkRubricGradingResult(feedback) };
-};
+      policy, snapshots, language, assessmentScope: questionsOnly ? "questions" : "all", promptVersion: "homework-rubric-v3", model: connection?.model ?? null, provider: connection?.provider ?? "deterministic", latencyMs: Date.now() - startedAt, schemaVersion: "homework-rubric-schema-v1", feedbackHash: hashAiFeedbackValue(feedback), templateAttemptIds: context.batchGuidance?.templates.map(item => item.coreAttemptId) ?? [] }) } });
+  return { feedbackRef: artifact.id, feedbackVersion: 1, feedbackHash: hashAiFeedbackValue(feedback), feedback, gradingResult: homeworkRubricGradingResult(feedback),
+    ...(questionsOnly ? { preserveFinalGradeOverride: true, synchronizeSharedGrading: false, allowUngradedFeedback: true } : {}) };
+}
 
 export const homeworkGradeCompletions: PluginGradeCompletionHandler = async ({ activityId, rows }) => {
   const policy = homeworkGradingPolicy((await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId } }))?.settings);
@@ -167,5 +203,25 @@ export const homeworkGradeCompletions: PluginGradeCompletionHandler = async ({ a
     const count = feedback ? Number(policy.codeWeightPercent > 0 && typeof feedback.codeScore === "number") + Number(policy.questionsWeightPercent > 0 && typeof feedback.questionsScore === "number") : 0;
     const complete = !policy.enabled || row.gradeSource === "override" || row.gradeSource === "manual" || count === required;
     return [row.participantId, { status: complete ? "complete" : "partial", completedComponentCount: complete ? required : count, requiredComponentCount: required }];
+  }));
+};
+
+export const homeworkEvaluationFlags: PluginEvaluationFlagHandler = async ({ activityId, rows }) => {
+  const policy = homeworkGradingPolicy((await prisma.pluginCodingHomeworkAssignment.findUnique({ where: { activityId } }))?.settings);
+  if (!policy.enabled || !policy.questionWarning.enabled) return {};
+  const storedFeedback = (row: typeof rows[number]) => isHomeworkFeedback(row.gradingResult.studentFeedback) ? row.gradingResult.studentFeedback : isHomeworkFeedback(row.feedback) ? row.feedback : isHomeworkFeedback(record(row.feedback).details) ? record(row.feedback).details as HomeworkRubricFeedback : null;
+  const pending = rows.filter(row => !storedFeedback(row));
+  const refs = pending.flatMap(row => row.pluginAttemptRef ? [row.pluginAttemptRef] : []);
+  const reviews = refs.length ? await prisma.$queryRaw<Array<{ submissionId: string; rubric: unknown }>>`
+    SELECT DISTINCT ON (r."submissionId") r."submissionId", r.rubric FROM "PluginCodingHomeworkReview" r
+    JOIN "PluginCodingHomeworkSubmission" s ON s.id=r."submissionId"
+    WHERE s."activityId"=${activityId} AND s.id=ANY(${refs}::text[]) AND s."coreAttemptId"=ANY(${pending.map(row => row.attemptId)}::text[])
+      AND s.kind='final' AND s.status='ready_for_grading' AND NOT(s.metadata ? 'deletion') AND r.metadata->>'status'='completed'
+    ORDER BY r."submissionId", r."createdAt" DESC, r.id DESC` : [];
+  return Object.fromEntries(rows.map(row => {
+    const reviewed = reviews.find(review => review.submissionId === row.pluginAttemptRef)?.rubric;
+    const feedback = storedFeedback(row) ?? (isHomeworkFeedback(reviewed) ? reviewed : null);
+    const warning = feedback && homeworkQuestionWarning(policy.questionWarning, feedback);
+    return [row.participantId, warning ? [{ kind: "possible_unauthorized_assistance" as const, reasonCode: "homework_challenge_answers_low", messages: homeworkQuestionWarningMessages(warning) }] : []];
   }));
 };

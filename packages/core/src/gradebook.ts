@@ -1,4 +1,5 @@
 import { activityAssessmentStageAssignment, assertActivitySubmissionStageEnabled } from "./activity-submission-stages";
+import { getGradebookEvaluationFlags, evaluationFlagRowKey } from "./evaluation-flags";
 import { studentTestFeedback } from "./student-test-feedback";
 import { escapeCsvCell } from "./csv";
 import { getActivityDefinition, getActivityPlugin, getActivityPluginForActivityType } from "@cognelo/activity-sdk";
@@ -1109,13 +1110,15 @@ export async function recordActivityAttemptAiFeedback(
     feedbackRef: string;
     feedbackVersion: number;
     feedbackHash: string;
+    allowUngradedFeedback?: boolean;
+    preserveFinalGradeOverride?: boolean;
   },
   transaction?: Prisma.TransactionClient
 ) {
   await assertCanViewCourseGradebook(user, courseId);
   const attempt = await (transaction ?? prisma).activityAttempt.findFirst({
     where: { id: input.attemptId, courseId },
-    select: { id: true, gradebookItemId: true, participantId: true, groupId: true, assessmentMode: true }
+    select: { id: true, gradebookItemId: true, participantId: true, groupId: true, assessmentMode: true, metadata: true, lifecycle: true }
   });
   if (!attempt) throw notFound("Activity attempt");
   await assertCanGradeGroup(user, courseId, attempt.groupId);
@@ -1130,13 +1133,6 @@ export async function recordActivityAttemptAiFeedback(
       }
     }
   });
-  if (!current || current.isActive === false) {
-    throw new AppError(409, "GRADE_REQUIRED_FOR_FEEDBACK", "A deterministic grade must exist before feedback-only AI feedback can be recorded.");
-  }
-  if (current.selectedAttemptId !== attempt.id) {
-    throw new AppError(409, "GRADE_ATTEMPT_NOT_SELECTED", "AI feedback can only be attached to the attempt currently selected for this grade.");
-  }
-  const currentNormalized = asJsonObject(current.normalizedResult) ?? {};
   const studentFeedback = {
     ...input.feedback,
     feedbackRef: input.feedbackRef,
@@ -1144,6 +1140,27 @@ export async function recordActivityAttemptAiFeedback(
     feedbackHash: input.feedbackHash,
     challengeAllowed: false
   };
+  if ((!current || current.isActive === false) && input.allowUngradedFeedback) {
+    if (!["submitted", "graded"].includes(attempt.lifecycle)) throw new AppError(409, "SUBMISSION_NOT_COMPLETED", "A submitted attempt is required for assessment feedback.");
+    const savePending = async (tx: Prisma.TransactionClient) => {
+      const previous = asJsonObject(attempt.metadata) ?? {};
+      await tx.activityAttempt.update({ where: { id: attempt.id }, data: { metadata: { ...previous, teacherFeedback: studentFeedback } as JsonInput } });
+      await tx.gradeEvent.create({ data: { gradebookItemId: attempt.gradebookItemId, participantId: attempt.participantId, attemptId: attempt.id, actorUserId: user.id,
+        eventType: "ai_feedback_recorded", previousValue: { feedback: previous.teacherFeedback ?? null } as JsonInput,
+        nextValue: { feedback: studentFeedback } as JsonInput, metadata: { feedbackRef: input.feedbackRef, feedbackVersion: input.feedbackVersion, feedbackHash: input.feedbackHash, gradePending: true } } });
+      return null;
+    };
+    return transaction ? savePending(transaction) : prisma.$transaction(savePending);
+  }
+  if (!current || current.isActive === false) {
+    throw new AppError(409, "GRADE_REQUIRED_FOR_FEEDBACK", "A deterministic grade must exist before feedback-only AI feedback can be recorded.");
+  }
+  if (current.selectedAttemptId !== attempt.id) {
+    const latest = input.preserveFinalGradeOverride && current.selectedAttemptId === null && ["manual", "override"].includes(current.source)
+      ? await (transaction ?? prisma).activityAttempt.findFirst({ where: { gradebookItemId: attempt.gradebookItemId, participantId: attempt.participantId, assessmentMode: "summative", lifecycle: { in: ["submitted", "graded"] } }, orderBy: { attemptNumber: "desc" }, select: { id: true } }) : null;
+    if (latest?.id !== attempt.id) throw new AppError(409, "GRADE_ATTEMPT_NOT_SELECTED", "AI feedback can only be attached to the attempt currently selected for this grade.");
+  }
+  const currentNormalized = asJsonObject(current.normalizedResult) ?? {};
   const save = async (tx: Prisma.TransactionClient) => {
     const grade = await tx.grade.update({
       where: { id: current.id },
@@ -1605,6 +1622,8 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         attempt.assessmentMode === "formative" ? "formative" : "summative"
       ) === assessmentMode);
       const currentModeSubmittedAttempts = currentModeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
+      const latestCurrentAttempt = [...currentModeAttempts].sort((a, b) => b.attemptNumber - a.attemptNumber)[0];
+      const latestAttemptFeedback = latestCurrentAttempt ? readAttemptTeacherFeedback(latestCurrentAttempt.metadata) : null;
       const gradingReviews = requiredReviews.filter(review => currentModeSubmittedAttempts.some(attempt => attempt.id === review.attemptId));
       const summativeAttempts = activeAttempts.filter((attempt) => attempt.assessmentMode !== "formative");
       const summativeSubmittedAttempts = summativeAttempts.filter((attempt) => attempt.lifecycle === "submitted" || attempt.lifecycle === "graded");
@@ -1643,7 +1662,9 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
         latePenaltyPercent: effectiveGrade?.latePenaltyPercent ?? null,
         feedback: sanitizeStudentGradeFeedback(effectiveGrade?.normalizedResult),
         gradeCompletionContext: {
-          gradingResult: asJsonObject(effectiveGrade?.normalizedResult) ?? {}
+          gradingResult: asJsonObject(effectiveGrade?.normalizedResult) ?? {},
+          evaluationAttemptId: effectiveGrade?.selectedAttemptId ?? (effectiveGrade && ["manual", "override"].includes(effectiveGrade.source) ? latestCurrentAttempt?.id ?? null : null),
+          ...(latestAttemptFeedback ? { evaluationFeedback: { attemptId: latestCurrentAttempt.id, feedback: latestAttemptFeedback } } : {})
         },
         selectedAttemptNumber: effectiveGrade?.selectedAttempt?.attemptNumber ?? null,
         attemptCount: currentModeAttempts.length,
@@ -1668,6 +1689,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
     });
   });
 
+  const evaluationFlags = await getGradebookEvaluationFlags(user, courseId, rows);
   return {
     filters: {
       groupId: filters.groupId ?? null,
@@ -1693,7 +1715,7 @@ export async function getCourseGradebook(user: CurrentUser, courseId: string, fi
       pointsPossible: item.pointsPossible,
       studentCount: item.group.participants.length
     })),
-    rows
+    rows: rows.map(row => { const flags = evaluationFlags.get(evaluationFlagRowKey(row)) ?? []; return { ...row, ...(flags.length ? { evaluationFlags: flags } : {}) }; })
   };
 }
 

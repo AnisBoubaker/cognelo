@@ -54,6 +54,7 @@ Content-type plugin entry points live under `packages/plugin-content-types/`; th
 Open these only when changing or reviewing the named area:
 
 - [Required teacher grading reviews](GRADING_REVIEWS.md): shared plugin review requests, grade/release gates and audited teacher resolution.
+- [Teacher evaluation flags](EVALUATION_FLAGS.md): core warning icons for graded/ungraded rows, staff-only plugin signals and Homework answer thresholds.
 - [Atomic AI grading and interruption recovery](AI_GRADING_RUNS.md)
 - [AI feedback, grading, and challenges](AI_FEEDBACK_GRADING_CHALLENGES_IMPLEMENTATION_PLAN.md)
 - [Programming Homework](CODING_HOMEWORK_GRADER_IMPLEMENTATION_PLAN.md)

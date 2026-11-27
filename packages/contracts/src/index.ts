@@ -8,6 +8,7 @@ export * from "./work-inspection";
 export * from "./material-references";
 export * from "./ai-grading-runs";
 export * from "./grading-review";
+export * from "./evaluation-flags";
 import { z } from "zod";
 import { ExportUsageRightsTextSchema } from "./student-course-export";
 

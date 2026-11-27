@@ -876,7 +876,7 @@ function LegacyCodingHomeworkActivityView({
           </section>
           <section className="stack" hidden={authoringTab !== "questions"}><HelpLabel help={questionPolicyLocked ? editor.locked : questionsEnabled ? editor.modeChange : editor.disabledHelp}><h2>{editor.questions}</h2></HelpLabel>
             <ToggleSwitch locale={locale} label={editor.enabled} checked={questionsEnabled} disabled={loading || saving || questionPolicyLocked} onChange={questionGenerationEnabled => { setAssignment(current => ({ ...current, settings: { ...current.settings, questionGenerationEnabled,
-              ...(!questionGenerationEnabled && current.settings.grading ? { grading: { ...objectRecord(current.settings.grading), codeWeightPercent: 100, questionsWeightPercent: 0 } } : {}) } })); }} />
+              ...(!questionGenerationEnabled && current.settings.grading ? { grading: { ...objectRecord(current.settings.grading), codeWeightPercent: 100, questionsWeightPercent: 0, questionWarning: { ...objectRecord(objectRecord(current.settings.grading).questionWarning), enabled: false } } } : {}) } })); }} />
 
             <div className="stack" hidden={!questionsEnabled}>
               <div className="settings-grid">

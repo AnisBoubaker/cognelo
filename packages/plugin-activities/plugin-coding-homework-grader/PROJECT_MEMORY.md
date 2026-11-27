@@ -1,5 +1,7 @@
 # Programming Homework memory
 
+- [Challenge-answer assessment](docs/GRADING.md#challenge-answer-assessment-and-warnings) uses core's additional AI action and evaluation-flag contracts. Default-off thresholds compare the answer mean or any single score strictly below the configured percentage, including zero-weight question components. Preserve code/shared scores and explicit final overrides. Published answer feedback can exist without a grade; core renders the warning beside `–`. Never infer misconduct, block release, expose warnings to learners or read staged artifacts.
+
 - [Plugin independence](docs/GRADING.md#plugin-independence): Homework and Programming Exercises must own independent grading/execution implementations. Copying code is permitted; cross-plugin imports, runtime dependencies and a common grading/execution module shared by the two plugins are prohibited.
 
 - [Rubric evidence](docs/GRADING.md#teacher-grading): Keep grading rubric-only for now. Every AI deduction must cite all supporting submitted-code/answer examples in that criterion's existing Feedback / Rétroaction text, without a new evidence structure or fabricated excerpts. Code examples require exact submitted paths and 1-based full-file lines/ranges from privately numbered frozen source; never restart at a question's function excerpt. Keep its 50,000-character limit aligned across AI validation, teacher revision and UI; JSONB already retains the full text. Blank-answer grading and single-deduction rules remain authoritative.

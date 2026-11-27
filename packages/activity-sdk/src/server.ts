@@ -2,7 +2,7 @@ import type { GradebookActionService } from "./gradebook-actions";
 export * from "./gradebook-actions";
 import type { SubmissionExportHandler, StudentActivityExportHandler } from "./submission-export";
 export * from "./submission-export";
-import type { ActivityStudentProgress, CurrentUser } from "@cognelo/contracts";
+import type { ActivityStudentProgress, CurrentUser, AiGradingAction, EvaluationFlag } from "@cognelo/contracts";
 import type { GradingReviewRequest } from "@cognelo/contracts";
 import type { ActivityLogCursor, ActivityLogEvidence, ActivityStudentActionList, ActivityBatchAction } from "@cognelo/contracts";
 import type { GradebookActionContext } from "./gradebook-actions";
@@ -212,12 +212,24 @@ export type PluginGradeCompletionHandler = (input: {
   rows: readonly PluginGradeCompletionRow[];
 }) => Promise<Readonly<Record<string, PluginGradeCompletion>>>;
 
+export type PluginEvaluationFlagRow = {
+  participantId: string; groupId: string; attemptId: string; pluginAttemptRef: string | null;
+  feedback: Record<string, unknown> | null; gradingResult: Record<string, unknown>;
+};
+export type PluginEvaluationFlagHandler = (input: {
+  user: CurrentUser; courseId: string; activityId: string; rows: readonly PluginEvaluationFlagRow[];
+}) => Promise<Readonly<Record<string, EvaluationFlag[]>>>;
+
 export type PluginAiFeedbackResult = {
   feedbackRef: string;
   feedbackVersion: number;
   feedbackHash: string;
   feedback: Record<string, unknown>;
   gradingResult?: PluginGradingResult;
+  preserveFinalGradeOverride?: boolean;
+  synchronizeSharedGrading?: boolean;
+  /** Retain assessed components on the submitted attempt while its final grade is still pending. */
+  allowUngradedFeedback?: boolean;
 };
 
 export type PluginAiGradingTemplate = {
@@ -250,6 +262,8 @@ export type PluginAiFeedbackHandler = (input: {
   batchGuidance?: PluginAiGradingBatchGuidance;
   /** Keep private artifacts out of ordinary report/history queries until the host commits. */
   deferPublication?: boolean;
+  /** Existing authorized feedback for component-specific assessment. */
+  currentFeedback?: Record<string, unknown> | null;
 }) => Promise<PluginAiFeedbackResult>;
 
 export type PluginAiFeedbackTeacherReviewContext = {
@@ -502,6 +516,8 @@ export type ServerActivityPlugin = {
     activityTypeKeys: readonly string[];
     getCompletions: PluginGradeCompletionHandler;
   };
+  /** Read-only staff flags. Core owns scope, validation and display, including ungraded submissions. */
+  evaluationFlags?: { activityTypeKeys: readonly string[]; getFlags: PluginEvaluationFlagHandler };
   /** Publish a shared component and project it onto current related submissions.
    * Core validates each target and records ordinary audited grades in the same transaction. */
   sharedGrading?: {
@@ -527,6 +543,11 @@ export type ServerActivityPlugin = {
     }) => Promise<void>;
     teacherReview?: PluginAiFeedbackTeacherReviewHandler;
     batchGrading?: PluginAiGradingBatchHandler;
+    additionalActions?: {
+      list: (input: { user: CurrentUser; courseId: string; activityId: string;
+        attempts: Array<{ id: string; groupId: string; pluginAttemptRef: string | null }> }) => Promise<AiGradingAction[]>;
+      evaluate: (input: Parameters<PluginAiFeedbackHandler>[0] & { actionId: string }) => Promise<PluginAiFeedbackResult>;
+    };
   };
   compositeExecution?: {
     activityTypeKeys: readonly string[];
@@ -740,6 +761,10 @@ export function resolvePluginGradeCompletionHandler(activityTypeKey: string) {
   )?.gradeCompletion?.getCompletions ?? null;
 }
 
+export function resolvePluginEvaluationFlagHandler(activityTypeKey: string) {
+  return currentServerPlugins().find(plugin => plugin.evaluationFlags?.activityTypeKeys.includes(activityTypeKey))?.evaluationFlags?.getFlags ?? null;
+}
+
 export function resolvePluginSharedGrading(pluginKey: string) {
   return currentServerPlugins().find(plugin => plugin.key === pluginKey)?.sharedGrading ?? null;
 }
@@ -754,6 +779,11 @@ export function resolvePluginAiFeedbackPublisher(activityTypeKey: string) {
   return currentServerPlugins().find((plugin) =>
     plugin.aiFeedback?.evaluateAttempt && plugin.routes?.some((route) => !route.activityTypeKeys || route.activityTypeKeys.includes(activityTypeKey))
   )?.aiFeedback?.publishEvaluation ?? null;
+}
+
+export function resolvePluginAiFeedbackAdditionalActions(activityTypeKey: string) {
+  return currentServerPlugins().find(plugin => plugin.aiFeedback?.additionalActions
+    && plugin.routes?.some(route => route.activityTypeKeys?.includes(activityTypeKey)))?.aiFeedback?.additionalActions ?? null;
 }
 
 export function resolvePluginAiFeedbackTeacherReviewHandler(activityTypeKey: string) {

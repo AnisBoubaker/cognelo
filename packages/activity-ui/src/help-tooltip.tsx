@@ -1,7 +1,7 @@
 "use client";
 import React, { Children, createContext, isValidElement, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ActionIcon } from "./action-icon";
+import { ActionIcon, type ActionIconName } from "./action-icon";
 
 type HelpContextValue = { locale: string; activeId: string | null; setActiveId: (id: string | null) => void };
 const HelpContext = createContext<HelpContextValue | null>(null);
@@ -25,7 +25,7 @@ export function calculateHelpPosition(anchor: { left: number; right: number; top
   return { left, top };
 }
 /** Static explanatory copy, available by hover/focus and pinnable on touch. */
-export function HelpTooltip({ content, label, locale: requestedLocale }: { content: ReactNode; label?: ReactNode; locale?: string }) {
+export function HelpTooltip({ content, label, locale: requestedLocale, icon = "help", accessibleLabel }: { content: ReactNode; label?: ReactNode; locale?: string; icon?: ActionIconName; accessibleLabel?: string }) {
   const context = useContext(HelpContext), [localId, setLocalId] = useState<string | null>(null), id = useId();
   const locale = requestedLocale ?? context?.locale ?? "en", help = ({ en: "Help", fr: "Aide", zh: "帮助", ar: "مساعدة" } as Record<string, string>)[locale] ?? "Help";
   const activeId = context?.activeId ?? localId, setActiveId = context?.setActiveId ?? setLocalId, open = activeId === id;
@@ -59,11 +59,11 @@ export function HelpTooltip({ content, label, locale: requestedLocale }: { conte
   }, [open, close]);
   const title = helpLabelText(label);
   return <>
-    <button type="button" className="help-tooltip-trigger" aria-label={title ? `${help}: ${title}` : help} aria-describedby={open ? `${id}-content` : undefined} aria-expanded={open}
+    <button type="button" className="help-tooltip-trigger" aria-label={accessibleLabel ?? (title ? `${help}: ${title}` : help)} aria-describedby={open ? `${id}-content` : undefined} aria-expanded={open}
       ref={trigger} onMouseEnter={show} onMouseLeave={() => { dismissed.current = false; scheduleClose(); }} onFocus={() => { dismissed.current = false; show(); }}
       onBlur={event => { if (!panel.current?.contains(event.relatedTarget as Node)) { pinned.current = false; close(); } }}
       onClick={event => { event.preventDefault(); event.stopPropagation(); clearClose(); if (pinned.current) close(); else { dismissed.current = false; pinned.current = true; setActiveId(id); } }}>
-      <ActionIcon name="help" size={18} />
+      <ActionIcon name={icon} size={18} />
     </button>
     {open && typeof document !== "undefined" && createPortal(<div id={`${id}-content`} role="tooltip" ref={panel} className="help-tooltip-content" style={position}
       onMouseEnter={clearClose} onMouseLeave={scheduleClose} onFocus={clearClose} onBlur={event => { if (!panel.current?.contains(event.relatedTarget as Node) && event.relatedTarget !== trigger.current) close(); }}>{content}</div>, document.body)}

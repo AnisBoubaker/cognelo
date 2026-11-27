@@ -56,6 +56,8 @@ Rubric grading adds a shared **Grading** tab with a whole-project code rubric an
 
 Grading remains rubric-only. AI criterion feedback explains every deduction with all supporting examples from submitted code or answers, entirely inside the existing Feedback / Rétroaction text. Every code example cites its exact submitted filename and file line number/range using privately numbered frozen source. Each criterion comment supports 50,000 characters; existing JSONB storage needs no migration. See [grading evidence and limits](docs/GRADING.md#teacher-grading).
 
+Grading can enable a challenge-answer warning threshold, triggered by the answer-score average or any single low answer. The report action **Assess challenge answers with AI** updates only answer scores, retaining project-code assessments and teacher final overrides. Core displays the resulting staff-only warning icon beside the grade, including `–`; it does not establish misconduct or block release. See [answer assessment and flags](docs/GRADING.md#challenge-answer-assessment-and-warnings).
+
 Teacher activity reports use the shared three-dot **Activity actions** menu for activity-wide operations. The context-sensitive Back link stays visible outside it; student-specific actions remain in row menus. See [report actions](../../../docs/ACTION_BUTTONS.md#activity-report-actions).
 
 ## Read by topic

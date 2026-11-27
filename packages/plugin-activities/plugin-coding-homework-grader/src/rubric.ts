@@ -10,19 +10,26 @@ const rubricSchema = z.object({
   criteria: z.array(homeworkCriterionSchema).max(20).default([]),
   instructions: z.string().max(8000).default("")
 }).strict();
+export const homeworkQuestionWarningSchema = z.object({
+  enabled: z.boolean().default(false),
+  thresholdPercent: z.number().min(0).max(100).default(50),
+  mode: z.enum(["mean", "any"]).default("mean")
+}).strict();
+export type HomeworkQuestionWarningPolicy = z.infer<typeof homeworkQuestionWarningSchema>;
 export const homeworkGradingSchema = z.object({
   enabled: z.boolean().default(false),
   codeWeightPercent: z.number().int().min(0).max(100).default(70),
   questionsWeightPercent: z.number().int().min(0).max(100).default(30),
   testWeightPercent: z.literal(0).default(0),
   code: rubricSchema.default({ criteria: [], instructions: "" }),
-  questions: rubricSchema.default({ criteria: [], instructions: "" })
+  questions: rubricSchema.default({ criteria: [], instructions: "" }),
+  questionWarning: homeworkQuestionWarningSchema.default({ enabled: false, thresholdPercent: 50, mode: "mean" })
 }).strict().superRefine((policy, context) => {
   if (policy.codeWeightPercent + policy.questionsWeightPercent !== 100) context.addIssue({ code: "custom", message: "Grading weights must total 100.", path: ["codeWeightPercent"] });
   for (const kind of ["code", "questions"] as const) {
     const criteria = policy[kind].criteria;
     if (new Set(criteria.map(item => item.id)).size !== criteria.length) context.addIssue({ code: "custom", message: "Rubric criterion IDs must be unique.", path: [kind] });
-    if ((criteria.length || policy.enabled && policy[`${kind}WeightPercent`] > 0) && criteria.reduce((sum, item) => sum + item.weightPercent, 0) !== 100) {
+    if ((criteria.length || policy.enabled && (policy[`${kind}WeightPercent`] > 0 || kind === "questions" && policy.questionWarning.enabled)) && criteria.reduce((sum, item) => sum + item.weightPercent, 0) !== 100) {
       context.addIssue({ code: "custom", message: "Each contributing rubric must contain criteria whose weights total 100.", path: [kind, "criteria"] });
     }
   }
@@ -44,7 +51,7 @@ export type HomeworkRubricFeedback = {
 export const objectRecord = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 export function defaultHomeworkGrading(questionsEnabled = true): HomeworkGradingPolicy {
   return { enabled: false, codeWeightPercent: questionsEnabled ? 70 : 100, questionsWeightPercent: questionsEnabled ? 30 : 0,
-    testWeightPercent: 0, code: { criteria: [], instructions: "" }, questions: { criteria: [], instructions: "" } };
+    testWeightPercent: 0, code: { criteria: [], instructions: "" }, questions: { criteria: [], instructions: "" }, questionWarning: { enabled: false, thresholdPercent: 50, mode: "mean" } };
 }
 export function homeworkGradingPolicy(settings: unknown): HomeworkGradingPolicy {
   const saved = objectRecord(settings);

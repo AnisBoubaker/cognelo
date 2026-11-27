@@ -35,6 +35,8 @@ The user approved whole-project code-rubric grading and one generic rubric appli
 
 The November 27 follow-up keeps grading rubric-only and requires every AI deduction to include all supporting examples from the submitted code or answer in that criterion's existing Feedback / Rétroaction text. Every code example includes the exact submitted filename and its full-file line number or range, using server-numbered frozen source. No separate evidence structure is added. Homework and Programming Exercises retain independent implementations; copying code is permitted, sharing their grading/execution implementation is not. The canonical reference owns the evidence policy and storage/validation limits.
 
+The user also approved separate challenge-answer AI assessment and a default-off average/any-answer threshold warning, including answers weighted at 0% of the final grade. Code scores and explicit final overrides are retained. Core owns the reusable staff warning icon beside graded and ungraded results; Homework owns its rule/evidence. See [evaluation flags](EVALUATION_FLAGS.md).
+
 ## Scope
 
 - Support **C** for this delivery, with approximately **30 students submitting at a time**.

@@ -2,6 +2,7 @@
 import { HelpLabel, HelpTooltip } from "@cognelo/activity-ui";
 
 import { ActivityReportActionsMenu, type ActivityReportMenuAction } from "@/components/activity-report-actions-menu";
+import { EvaluationFlags } from "@/components/evaluation-flags";
 import { useActivityStudentActions } from "@/lib/use-activity-student-actions";
 import { useActivityBatchActions } from "@/lib/use-activity-batch-actions";
 import { WorkInspectionDialog } from "@/components/work-inspection-dialog";
@@ -170,7 +171,9 @@ export default function GradebookActivityResultsPage() {
     if (inProgressResult) { setInProgressAttempts(inProgressResult.attempts); setStudentProgress(inProgressResult.progress ?? []); }
   }, [activityId, courseId, groupId, requestStudentProgress]);
 
-  const aiGrading = useAiGradingRun(courseId, activityId, refresh);
+  const aiGrading = useAiGradingRun(courseId, activityId, refresh, groupId);
+  const refreshAiActions = aiGrading.refreshActions;
+  useEffect(() => { if (gradebook) void refreshAiActions().catch(() => {}); }, [gradebook, refreshAiActions]);
 
   useEffect(() => {
     setInProgressAttempts([]);
@@ -867,6 +870,12 @@ export default function GradebookActivityResultsPage() {
   for (const action of pluginActions.actions.filter(action => action.scope === "activity")) reportMenuActions.push({ id: `download:${action.id}`, icon: "download", label: action.labels[locale] ?? action.labels.en, disabled: pluginActions.busy || !action.participantIds.length, onSelect: () => { void pluginActions.download(action); } });
   if (isSummativeActivity && activityActions.canRerunAutomaticGrading) reportMenuActions.push({ id: "regrade", icon: "refresh", label: savingGradeKey === "__all:regrade" ? t("common.saving") : t("courseDetail.regradeAll"), disabled: !hasRowsWithSubmittedAttempts || savingGradeKey === "__all:regrade", onSelect: () => { void regradeAllRows(); } });
   if (isSummativeActivity && activityActions.canAssessWithAi) reportMenuActions.push({ id: "assess-ai", icon: "generate", label: savingGradeKey === "__all:ai-feedback" ? t("common.saving") : t("courseDetail.generateAiFeedbackAll"), disabled: savingGradeKey === "__all:ai-feedback", onSelect: () => { void (activityActions.aiAssessmentChangesGrade ? openAiGradingBatchDialog() : generateAiFeedbackForAllRows()); } });
+  for (const action of aiGrading.actions) reportMenuActions.push({ id: `ai-action:${action.id}`, icon: "generate", label: action.labels[locale] ?? action.labels.en,
+    disabled: aiGrading.busy || Boolean(aiGrading.run), onSelect: () => { void (async () => {
+      if (await dialogs.confirm({ title: action.labels[locale] ?? action.labels.en, message: action.messages[locale] ?? action.messages.en })) {
+        await aiGrading.start({ actionId: action.id, attemptIds: action.attemptIds });
+      }
+    })(); } });
   if (activityActions.canReviewAndGrade) {
     if (isSummativeActivity && (supportsAiFeedbackReview(activityTypeKey) || activityTypeKey === "test")) reportMenuActions.push({ id: "review", icon: "review", label: t("courseDetail.gradeAllManually"), disabled: !hasRowsWithSubmittedAttempts, onSelect: () => {
       if (activityTypeKey === "test") setReviewAndGradeRow(groupedRows.find(row => selectedSubmittedAttempt(row)) ?? null);
@@ -1383,7 +1392,7 @@ function GradebookStudentRow({
       <span className="table-meta muted">{row.groupTitle}</span>
       <div className="gradebook-progress-column" data-label={t("courseDetail.progressHeader")}>{!progress && progressUnavailable ? <span className="muted">{t("courseDetail.progressUnavailable")}</span> : <ActivityProgressBadge progress={progress} locale={locale} t={t} />}</div>
       <div className="gradebook-grade-cell">
-        <strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong>
+        <span className="gradebook-score-with-flags"><strong>{rowHasSubmittedAttempt || row.score !== null ? formatGradebookScore(row.score, row.maxScore) : t("courseDetail.didNotSubmit")}</strong><EvaluationFlags flags={row.evaluationFlags} locale={locale} /></span>
         {row.gradingReviews?.length ? <span className="grade-completion-badge grade-completion-badge-partial">{t("courseDetail.gradingReviewRequired")}</span> : row.gradeCompletion?.status === "partial" ? (
           <span
             className="grade-completion-badge grade-completion-badge-partial"

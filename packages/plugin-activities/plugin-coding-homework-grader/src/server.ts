@@ -1,5 +1,5 @@
 import { homeworkGradebookActionService } from "./gradebook-actions";
-import { evaluateHomeworkWithAi, createHomeworkFeedbackDraft, getHomeworkTeacherSubmission, reviseHomeworkTeacherFeedback, homeworkGradeCompletions, getHomeworkGradingTemplate } from "./rubric-grading";
+import { evaluateHomeworkWithAi, createHomeworkFeedbackDraft, getHomeworkTeacherSubmission, reviseHomeworkTeacherFeedback, homeworkGradeCompletions, getHomeworkGradingTemplate, homeworkChallengeAssessmentActions, homeworkEvaluationFlags } from "./rubric-grading";
 import { homeworkSharedGrading } from "./shared-rubric";
 import { homeworkRubricRoutes } from "./rubric-routes";
 import { getHomeworkStudentGradeReport } from "./rubric-report";
@@ -57,9 +57,11 @@ registerCodingHomeworkBackgroundJobs();
 export const codingHomeworkGraderServerPlugin: ServerActivityPlugin = {
   sharedGrading: homeworkSharedGrading,
   gradeCompletion: { activityTypeKeys: ["coding-homework-grader"], getCompletions: homeworkGradeCompletions },
+  evaluationFlags: { activityTypeKeys: ["coding-homework-grader"], getFlags: homeworkEvaluationFlags },
   studentGradeReport: { activityTypeKeys: ["coding-homework-grader"], getReport: getHomeworkStudentGradeReport },
   aiFeedback: {
     evaluateAttempt: evaluateHomeworkWithAi,
+    additionalActions: homeworkChallengeAssessmentActions,
     publishEvaluation: async ({ activityId, coreAttemptId, feedbackRef, transaction }) => {
       const count = await transaction.execute`UPDATE "PluginCodingHomeworkReview" r SET metadata=jsonb_set(r.metadata,'{status}','"completed"'::jsonb)
         FROM "PluginCodingHomeworkSubmission" s WHERE r.id=${feedbackRef} AND r."submissionId"=s.id

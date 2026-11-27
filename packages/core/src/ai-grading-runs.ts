@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, prisma } from "@cognelo/db";
-import type { CurrentUser, AiGradingRunSummary } from "@cognelo/contracts";
+import { AiGradingActionSchema, type CurrentUser, type AiGradingRunSummary } from "@cognelo/contracts";
 import { assertCanGradeGroup, assertCanViewCourseGradebook } from "./authorization";
-import { getActivityAttemptRegradeContexts } from "./gradebook";
+import { getActivityAttemptRegradeContexts, getCourseGradebook } from "./gradebook";
 import { AppError, notFound } from "./errors";
 import { prepareAiGradingAttempt, commitPreparedAiGrading, type PreparedAiGrading, type AiGradingGuidance } from "./ai-grading-preparation";
-import { resolvePluginSharedGrading } from "@cognelo/activity-sdk/server";
+import { resolvePluginSharedGrading, resolvePluginAiFeedbackAdditionalActions } from "@cognelo/activity-sdk/server";
 import { synchronizeActivitySharedGrading } from "./gradebook";
 
 type AiGradingRun = Prisma.AiGradingRunGetPayload<Record<string, never>>;
@@ -18,6 +18,25 @@ type Entry = {
 const entries = (run: AiGradingRun) => run.entries as unknown as Entry[];
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 const stopped = () => new AppError(409, "AI_GRADING_STOPPED", "The grading run has stopped. Review its completed copies.");
+
+export async function getActivityAiGradingActions(user: CurrentUser, courseId: string, activityId: string, groupId?: string) {
+  const gradebook = await getCourseGradebook(user, courseId, { activityId, ...(groupId ? { groupId } : {}) });
+  const rows = gradebook.rows.filter(row => row.assessmentMode === "summative");
+  const handler = rows[0] ? resolvePluginAiFeedbackAdditionalActions(rows[0].activityTypeKey) : null;
+  if (!handler) return [];
+  const attempts = rows.flatMap(row => {
+    const latest = row.attempts.filter(attempt => attempt.assessmentMode === "summative" && ["submitted", "graded"].includes(attempt.lifecycle))
+      .sort((a, b) => b.attemptNumber - a.attemptNumber)[0];
+    return latest ? [{ id: latest.id, groupId: row.groupId, pluginAttemptRef: latest.pluginAttemptRef }] : [];
+  });
+  const allowed = new Set(attempts.map(attempt => attempt.id));
+  const actions = (await handler.list({ user, courseId, activityId, attempts })).map(action => AiGradingActionSchema.parse(action));
+  if (new Set(actions.map(action => action.id)).size !== actions.length
+    || actions.some(action => new Set(action.attemptIds).size !== action.attemptIds.length || action.attemptIds.some(id => !allowed.has(id)))) {
+    throw new AppError(500, "AI_GRADING_ACTION_INVALID", "An assessment action returned invalid targets.");
+  }
+  return actions;
+}
 
 function summary(run: AiGradingRun): AiGradingRunSummary {
   const students = entries(run).map(({ attemptId, name, status, error }) => ({ attemptId, name, status, error: error ?? null }));
@@ -54,6 +73,10 @@ export async function createAiGradingRun(user: CurrentUser, courseId: string, ac
   if (contexts.length !== input.attemptIds.length || contexts.some(c => c.activityId !== activityId || !["submitted", "graded"].includes(c.lifecycle))) {
     throw new AppError(400, "AI_GRADING_TARGETS_INVALID", "Every target must be a submitted copy of this activity.");
   }
+  if (input.actionId) {
+    const action = (await getActivityAiGradingActions(user, courseId, activityId)).find(action => action.id === input.actionId);
+    if (!action || input.attemptIds.some(id => !action.attemptIds.includes(id))) throw new AppError(409, "AI_GRADING_ACTION_UNAVAILABLE", "This assessment action or its submissions changed. Refresh the results.");
+  }
   const attempts = await prisma.activityAttempt.findMany({ where: { id: { in: input.attemptIds }, courseId }, include: { participant: true } });
   if (new Set(attempts.map(attempt => `${attempt.gradebookItemId}:${attempt.participantId}`)).size !== attempts.length) {
     throw new AppError(400, "AI_GRADING_TARGETS_INVALID", "Choose one submission per student and section.");
@@ -66,7 +89,7 @@ export async function createAiGradingRun(user: CurrentUser, courseId: string, ac
   try {
     const run = await prisma.aiGradingRun.create({ data: { courseId, activityId, actorUserId: user.id,
       activeKey: `${user.id}:${activityId}`, entries: json(targets),
-      guidance: json({ instructions: input.instructions, templateAttemptIds: input.templateAttemptIds }) } });
+      guidance: json({ instructions: input.instructions, templateAttemptIds: input.templateAttemptIds, actionId: input.actionId }) } });
     return summary(run);
   } catch (error) {
     if ((error as { code?: string }).code === "P2002") throw new AppError(409, "AI_GRADING_RUN_PENDING", "Resolve the previous grading run before starting another one.");
@@ -150,7 +173,8 @@ export async function actOnAiGradingRun(user: CurrentUser, courseId: string, id:
           await commitPreparedAiGrading(user, courseId, entry.prepared, tx, false);
         }
         for (const entry of items.filter(item => item.status === "completed").sort((a, b) => a.attemptId.localeCompare(b.attemptId))) {
-          if (entry.prepared && resolvePluginSharedGrading(entry.prepared.activityTypeKey)) await synchronizeActivitySharedGrading(user, courseId, entry.attemptId, tx);
+          if (entry.prepared && entry.prepared.evaluations.some(item => item.evaluation.synchronizeSharedGrading !== false)
+            && resolvePluginSharedGrading(entry.prepared.activityTypeKey)) await synchronizeActivitySharedGrading(user, courseId, entry.attemptId, tx);
         }
       }
       await tx.courseAuditEvent.create({ data: { courseId, actorUserId: user.id, eventType: action === "discard" ? "ai_grading_run_discarded" : "ai_grading_run_kept",

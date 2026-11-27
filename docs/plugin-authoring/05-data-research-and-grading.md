@@ -114,6 +114,8 @@ For compound Tests, core reruns every submitted manifest child against current a
 
 ## Required Teacher Review
 
+For a nonblocking teacher signal, implement `evaluationFlags.activityTypeKeys/getFlags` instead. Core supplies the authorized latest submitted roster, including ungraded attempts, validates the bounded localized flag DTO and renders the common warning icon beside the grade. Keep detection and evidence private, exclude staged/history/foreign records, and never invoke AI or write academic records during reads. See [evaluation flags](../EVALUATION_FLAGS.md).
+
 When automatic evidence cannot determine a final grade, use the shared [required grading review contract](../GRADING_REVIEWS.md). Standalone submission accepts `reviewRequired`; a deferred grading result or composite result can return the same neutral request. Return no automatic grade for that result. Keep detailed evidence in your plugin and expose only a safe staff reason. Core supplies review state, grade/release blocking, shared notices and explicit final-score resolution. No separate activity type, plugin-owned gradebook scan or bespoke release flag is needed.
 
 ## Continuing A Submitted Attempt
@@ -121,6 +123,8 @@ When automatic evidence cannot determine a final grade, use the shared [required
 Implement the explicit `ServerActivityPlugin.attemptContinuation` handler to restore saved learner state when a grader reopens the last submission. Use its supplied parameterized transaction interface for plugin-owned SQL so plugin restoration, core lifecycle, grades, and audit evidence commit together. Preserve immutable execution artifacts, return only student-safe response state for the core draft, and archive mutable completion data through the handler's audit result. Core reuses the same attempt number and start and applies current assignment policy. See [Submission continuation](../SUBMISSION_CONTINUATION.md) for the full contract and supported workflows.
 
 ## AI Feedback And AI-Assisted Grading
+
+Component-specific actions may register `aiFeedback.additionalActions.list/evaluate`. Core owns scoped discovery, target revalidation and durable run publication; handlers retain unaffected rubric components through server-supplied `currentFeedback`. Explicit result policies can preserve final overrides, skip shared propagation and retain audited component feedback before a final grade exists. See [the grading-run contract](../AI_GRADING_RUNS.md#plugin-contract).
 
 AI assessment uses an explicit core/plugin boundary:
 

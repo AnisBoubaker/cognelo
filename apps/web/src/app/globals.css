@@ -7101,6 +7101,10 @@ button:hover > .disclosure-indicator {
 .help-label > label { font-weight: 600; }
 button.help-tooltip-trigger { display: inline-flex; flex: 0 0 24px; align-items: center; justify-content: center; width: 24px; min-width: 24px; height: 24px; min-height: 24px; padding: 2px; margin: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); box-shadow: none; vertical-align: middle; }
 button.help-tooltip-trigger:hover, button.help-tooltip-trigger:focus-visible { color: var(--brand-blue); background: color-mix(in srgb, var(--brand-blue), transparent 92%); transform: none; }
+.gradebook-score-with-flags { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.35rem; }
+.evaluation-flag { display: inline-flex; }
+.evaluation-flag button.help-tooltip-trigger { color: #a05a00; }
+.evaluation-flag button.help-tooltip-trigger:hover, .evaluation-flag button.help-tooltip-trigger:focus-visible { color: #7c4300; background: #fff4d6; }
 .help-tooltip-content { position: fixed; z-index: 1200; max-width: calc(100vw - 24px); max-height: min(420px, calc(100dvh - 24px)); overflow: auto; overflow-wrap: anywhere; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface, white); color: var(--ink, #162148); font-size: 14px; font-weight: 400; line-height: 1.5; box-shadow: 0 8px 28px rgb(13 27 71 / 18%); white-space: normal; }
 .help-tooltip-content p { margin: 0; }
 .help-tooltip-content p + p { margin-top: 8px; }

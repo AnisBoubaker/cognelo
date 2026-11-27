@@ -1309,6 +1309,7 @@ export type GradeCompletion = {
 };
 
 export type CourseGradebookRow = {
+  evaluationFlags?: import("@cognelo/contracts").EvaluationFlag[];
   gradingReviews?: GradingReview[];
   gradingReviewRevision?: string | null;
   gradebookItemId: string;
@@ -2201,9 +2202,9 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ attemptId, instructions })
     }),
-  pendingAiGradingRun: (courseId: string, activityId: string) =>
-    request<{ run: AiGradingRunSummary | null }>(`/courses/${courseId}/gradebook/activities/${activityId}/ai-grading-runs`),
-  createAiGradingRun: (courseId: string, activityId: string, input: { attemptIds: string[]; instructions?: string; templateAttemptIds?: string[] }) =>
+  pendingAiGradingRun: (courseId: string, activityId: string, groupId?: string) =>
+    request<{ run: AiGradingRunSummary | null; actions?: import("@cognelo/contracts").AiGradingAction[] }>(`/courses/${courseId}/gradebook/activities/${activityId}/ai-grading-runs${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ""}`),
+  createAiGradingRun: (courseId: string, activityId: string, input: { attemptIds: string[]; instructions?: string; templateAttemptIds?: string[]; actionId?: string }) =>
     request<{ run: AiGradingRunSummary }>(`/courses/${courseId}/gradebook/activities/${activityId}/ai-grading-runs`, { method: "POST", body: JSON.stringify(input) }),
   aiGradingRun: (courseId: string, runId: string) =>
     request<{ run: AiGradingRunSummary }>(`/courses/${courseId}/gradebook/ai-grading-runs/${runId}`),

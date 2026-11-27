@@ -2,7 +2,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ActionIcon, ConfirmationDialog, HelpLabel, ProgressDialog, SideNavigation, ToggleSwitch, useActivityKnowledgeGeneration, useNotifications } from "@cognelo/activity-ui";
-import { homeworkGradingSchema, type HomeworkGradingPolicy, type HomeworkCriterion } from "../rubric";
+import { homeworkGradingSchema, defaultHomeworkGrading, type HomeworkGradingPolicy, type HomeworkCriterion } from "../rubric";
 import { homeworkRubricCopy } from "./rubric-copy";
 import type { HomeworkRequest } from "./workflow-types";
 
@@ -17,6 +17,7 @@ export function HomeworkRubricEditor({ policy, onChange, questionsEnabled, local
   const guidanceQueue = useRef<Promise<unknown>>(Promise.resolve()), mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; controller.current?.abort(); }; }, []);
   const currentPolicy = useRef(policy); currentPolicy.current = policy;
+  const warningPolicy = policy.questionWarning ?? defaultHomeworkGrading().questionWarning;
   function redistribute(criteria: HomeworkCriterion[]) { return criteria.map((item, index) => ({ ...item, weightPercent: Math.floor(100 / criteria.length) + (index < 100 % criteria.length ? 1 : 0) })); }
   async function generate() {
     if (!request || !dialog) return;
@@ -51,6 +52,16 @@ export function HomeworkRubricEditor({ policy, onChange, questionsEnabled, local
           </div>
           <p>{copy.total}: {policy.codeWeightPercent + policy.questionsWeightPercent}</p>
           {!valid && <p role="alert" className="error">{copy.invalid}</p>}
+          {questionsEnabled && <section className="inline-panel stack">
+            <HelpLabel help={copy.warningHelp}><h3>{copy.warningTitle}</h3></HelpLabel>
+            <ToggleSwitch locale={locale} label={copy.warningEnabled} checked={warningPolicy.enabled} disabled={disabled || !policy.enabled} onChange={enabled => onChange({ ...policy, questionWarning: { ...warningPolicy, enabled } })} />
+            {warningPolicy.enabled && <div className="settings-grid">
+              <label className="field"><span>{copy.warningThreshold}</span><input type="number" min={0} max={100} step="0.01" disabled={disabled} value={warningPolicy.thresholdPercent} onChange={event => onChange({ ...policy, questionWarning: { ...warningPolicy, thresholdPercent: Number(event.target.value) } })} /></label>
+              <label className="field"><span>{copy.warningMode}</span><select disabled={disabled} value={warningPolicy.mode} onChange={event => onChange({ ...policy, questionWarning: { ...warningPolicy, mode: event.target.value as "mean" | "any" } })}>
+                <option value="mean">{copy.warningMean}</option><option value="any">{copy.warningAny}</option>
+              </select></label>
+            </div>}
+          </section>}
           {(["code", "questions"] as const).map(kind => <section className="inline-panel stack" key={kind}>
             <h3>{kind === "code" ? copy.code : copy.questions}</h3>
             <div className="row wrap">

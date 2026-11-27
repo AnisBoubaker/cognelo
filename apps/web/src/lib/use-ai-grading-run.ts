@@ -1,25 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AiGradingRunSummary } from "@cognelo/contracts";
+import type { AiGradingRunSummary, AiGradingAction } from "@cognelo/contracts";
 import { api } from "./api";
 import { useI18n } from "./i18n";
 import { useNotifications } from "@cognelo/activity-ui";
 
-type Input = { attemptIds: string[]; instructions?: string; templateAttemptIds?: string[] };
-export function useAiGradingRun(courseId: string, activityId: string, onChanged: () => Promise<void>) {
+type Input = { attemptIds: string[]; instructions?: string; templateAttemptIds?: string[]; actionId?: string };
+export function useAiGradingRun(courseId: string, activityId: string, onChanged: () => Promise<void>, groupId?: string) {
+  const [actions, setActions] = useState<AiGradingAction[]>([]);
   const [run, setRun] = useState<AiGradingRunSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const requestController = useRef<AbortController | null>(null);
   const [error, setError] = useState("");
   const mounted = useRef(true);
-  const scope = `${courseId}:${activityId}`;
+  const scope = `${courseId}:${activityId}:${groupId ?? ""}`;
   const scopeRef = useRef(scope);
   const executing = useRef<string | null>(null);
   const interrupted = useRef<string | null>(null);
   const finished = useRef(new Set<string>());
   const onChangedRef = useRef(onChanged); onChangedRef.current = onChanged;
+  const refreshActions = useCallback(async () => {
+    const result = await api.pendingAiGradingRun(courseId, activityId, groupId);
+    if (mounted.current && scopeRef.current === scope) setActions(result.actions ?? []);
+  }, [courseId, activityId, groupId, scope]);
   const { t } = useI18n(); const notifications = useNotifications();
   const accept = useCallback((next: AiGradingRunSummary | null) => {
     if (!mounted.current || (next && finished.current.has(next.id))) return;
@@ -36,18 +41,18 @@ export function useAiGradingRun(courseId: string, activityId: string, onChanged:
   useEffect(() => {
     mounted.current = true;
     if (scopeRef.current !== scope) {
-      scopeRef.current = scope; setRun(null); setError(""); setBusy(false);
+      scopeRef.current = scope; setRun(null); setActions([]); setError(""); setBusy(false);
       interrupted.current = null; executing.current = null;
     }
     let active = true;
     let retry: ReturnType<typeof setTimeout> | undefined;
     const recover = async () => {
-      try { const result = await api.pendingAiGradingRun(courseId, activityId); if (active) accept(result.run); }
+      try { const result = await api.pendingAiGradingRun(courseId, activityId, groupId); if (active) { accept(result.run); setActions(result.actions ?? []); } }
       catch { if (active) retry = setTimeout(() => void recover(), 3000); }
     };
     void recover();
     return () => { active = false; clearTimeout(retry); mounted.current = false; executing.current = null; requestController.current?.abort(); };
-  }, [courseId, activityId, scope, accept]);
+  }, [courseId, activityId, groupId, scope, accept]);
 
   const runId = run?.id;
   useEffect(() => {
@@ -113,5 +118,5 @@ export function useAiGradingRun(courseId: string, activityId: string, onChanged:
     catch (err) { setError(err instanceof Error ? err.message : t("courseDetail.aiFeedbackError")); }
     finally { setBusy(false); }
   };
-  return { run, busy, finalizing, error, start, act };
+  return { run, busy, finalizing, error, start, act, actions, refreshActions };
 }

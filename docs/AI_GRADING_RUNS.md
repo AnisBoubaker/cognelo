@@ -23,6 +23,10 @@ The legacy direct Test AI endpoint also stages every child and commits them toge
 
 ## Plugin contract
 
+Plugins may register `aiFeedback.additionalActions.list/evaluate` for component-specific assessment. Core validates localized descriptors and eligible attempt IDs against the current authorized roster, exposes them in the report Activity actions menu, and stores the chosen `actionId` in existing run guidance. Creation and each target preparation revalidate availability. The evaluator receives server-loaded `currentFeedback` so it can preserve unaffected components. Compound Tests reject standalone action IDs. Full assessment retains its existing behavior.
+
+An action result may set `preserveFinalGradeOverride`, `synchronizeSharedGrading: false` and `allowUngradedFeedback`. The host then retains an explicit teacher final override, skips shared-component propagation and, when no contributing grade is complete, stores audited feedback on the submitted attempt without creating a synthetic grade. Ordinary feedback-only plugins still require their existing grade. Unselected historical attempts cannot replace override feedback. Homework uses these policies for challenge-answer assessment; [evaluation flags](EVALUATION_FLAGS.md) remain separate, staff-only and nonblocking.
+
 `aiFeedback.evaluateAttempt` accepts `deferPublication: true`. Supported providers save successful private artifacts with status `staged`, which every ordinary history/report fallback excludes. `aiFeedback.publishEvaluation` validates the exact activity, core attempt and feedback reference and promotes that artifact through the host's neutral transaction executor. Deterministic no-answer feedback may have no artifact. Plugins without this explicit capability cannot enter cancellable grading. Programming Exercises, MCQ and Programming Homework implement it; ordinary formative evaluation remains unchanged.
 
 For activities declaring shared grading components, a kept batch writes all prepared individuals before synchronizing shared scores in the same transaction. Existing individual overrides remain intact.

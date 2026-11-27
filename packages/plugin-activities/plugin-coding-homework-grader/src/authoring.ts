@@ -258,6 +258,7 @@ export async function saveCodingHomeworkAuthoring(owner: OwnerContext, input: un
 function validateHomeworkGradingSettings(settings: Record<string, unknown>) {
   const grading = homeworkGradingPolicy(settings);
   if (grading.enabled && settings.questionGenerationEnabled === false && grading.questionsWeightPercent !== 0) throw new AppError(400, "HOMEWORK_GRADING_WEIGHTS_INVALID", "Question-answer points must be zero when questions are disabled.");
+  if (grading.questionWarning.enabled && settings.questionGenerationEnabled === false) throw new AppError(400, "HOMEWORK_QUESTION_WARNING_INVALID", "Enable challenge questions before enabling their review warning.");
 }
 
 export async function uploadCodingHomeworkAssignmentPdf(owner: OwnerContext, input: unknown) {

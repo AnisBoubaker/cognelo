@@ -6,6 +6,8 @@ Teacher workspaces and activity authoring keep explanatory guidance behind the s
 
 Move instructions and background explanations, not user-authored descriptions, required confirmation messages, errors, current operation results or actionable warnings. Disabled controls must still offer their contextual explanation. Shared editors and authoring dialogs follow the same pattern.
 
+Core [evaluation flags](EVALUATION_FLAGS.md) reuse the tooltip's accessible positioning and interaction through an alert-icon trigger and explicit localized accessible label. This keeps the warning sign visible beside the grade; ordinary contextual help retains its question-mark trigger.
+
 Display timezone names only where the administrator/course owner actually chooses the timezone. Routine date/time fields, labels, deadlines and timestamps use that configured zone silently; removing reminders must never alter UTC persistence, parsing, server-clock enforcement or permission to configure the zone.
 
 ## Delivery checkpoints

@@ -169,6 +169,8 @@ Parsons initial grading behavior:
 
 ### Gradebook UI
 
+Core [evaluation flags](EVALUATION_FLAGS.md) render an amber warning icon next to the score in Student results, including rows with `–`. Plugins supply scoped, published evidence through a neutral read-only adapter. The tooltip supports keyboard/touch access. Flags are staff-only signals and do not change completion, grading or release rules.
+
 All activity-report types place editing, settings, messaging, exports/downloads, class-wide grading and plugin batch actions in the header’s three-dot Activity actions menu. The context-sensitive Back link remains outside it and preserves its original destination. The same entries are available from all report tabs, subject to existing permissions, capabilities and disabled states. Per-student operations retain their separate row menus. See [the menu interaction contract](ACTION_BUTTONS.md#activity-report-actions).
 
 Course Gradebook overviews show only currently summative assignments. Both formative policies remain available through course-content activity links and their Class overview / Student results workspace. An activity used summatively in one section and formatively in another contributes only its summative section to Gradebook totals, expansion and release actions. Section Gradebook overviews use the same summative scope; exact activity reports retain formative inspection.
